@@ -1,0 +1,19 @@
+# Buildausgaben
+bin/
+obj/
+publish/
+*.user
+*.suo
+
+# Veroeffentlichte Einzeldatei
+*.exe
+*.pdb
+
+# Visual Studio / Rider
+.vs/
+.idea/
+*.sln.docstates
+
+# Betriebssystem
+Thumbs.db
+desktop.ini

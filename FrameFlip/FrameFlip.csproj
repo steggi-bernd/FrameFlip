@@ -1,0 +1,54 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net8.0-windows</TargetFramework>
+    <RootNamespace>FrameFlip</RootNamespace>
+    <AssemblyName>FrameFlip</AssemblyName>
+    <Version>1.0.0</Version>
+    <UseWPF>true</UseWPF>
+    <UseWindowsForms>true</UseWindowsForms>
+    <Nullable>enable</Nullable>
+    <LangVersion>12</LangVersion>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <ApplicationManifest>app.manifest</ApplicationManifest>
+    <!-- Der WinForms-Teil des SDK ueberschreibt die DPI-Angaben im Manifest. Ohne
+         diese Zeile laeuft der Prozess DPI-unaware, Windows skaliert das Fenster
+         nachtraeglich hoch und die Vorschau wird weich. -->
+    <ApplicationHighDpiMode>PerMonitorV2</ApplicationHighDpiMode>
+    <NoWarn>$(NoWarn);WFAC010</NoWarn>
+    <!-- Die Anzeigekorrektur schreibt direkt in den Rueckpuffer der WriteableBitmap.
+         Ein Zwischenpuffer in Framegroesse waere bei 1080p acht Megabyte je Bild. -->
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+  </PropertyGroup>
+
+  <!-- UseWindowsForms zieht ein implizites "using System.Windows.Forms" ein, das mit
+       den WPF-Typen kollidiert (Application, KeyEventArgs, MouseEventArgs ...).
+       WinForms wird nur fuer NotifyIcon gebraucht und dort per Alias angesprochen. -->
+  <ItemGroup>
+    <Using Remove="System.Windows.Forms" />
+  </ItemGroup>
+
+  <!-- Publish: self-contained single file, kein Trimming (COM-Late-Binding auf Shell.Application). -->
+  <PropertyGroup>
+    <RuntimeIdentifier>win-x64</RuntimeIdentifier>
+    <SelfContained>true</SelfContained>
+    <PublishSingleFile>true</PublishSingleFile>
+    <IncludeNativeLibrariesForSelfExtract>true</IncludeNativeLibrariesForSelfExtract>
+    <!-- Kompression aus: der Host wuerde die Assemblies sonst in den Speicher
+         entpacken statt sie aus der Datei zu mappen - teurer im Working Set. -->
+    <EnableCompressionInSingleFile>false</EnableCompressionInSingleFile>
+    <PublishTrimmed>false</PublishTrimmed>
+    <PublishReadyToRun>false</PublishReadyToRun>
+  </PropertyGroup>
+
+  <!-- GC: Workstation, nicht-concurrent (kein Hintergrund-GC-Thread neben dem Render),
+       RetainVM aus, damit Segmente nach dem Schliessen ans OS zurueckgehen. -->
+  <PropertyGroup>
+    <ServerGarbageCollection>false</ServerGarbageCollection>
+    <ConcurrentGarbageCollection>false</ConcurrentGarbageCollection>
+    <RetainVMGarbageCollection>false</RetainVMGarbageCollection>
+    <TieredPGO>true</TieredPGO>
+  </PropertyGroup>
+
+</Project>

@@ -1,0 +1,138 @@
+<Window x:Class="FrameFlip.Views.ExportWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Video exportieren"
+        Width="560" SizeToContent="Height"
+        WindowStartupLocation="CenterOwner"
+        ResizeMode="NoResize"
+        ShowInTaskbar="False"
+        Background="{StaticResource PanelBackground}"
+        UseLayoutRounding="True"
+        TextOptions.TextFormattingMode="Display">
+
+    <Grid Margin="20">
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="Auto" MinWidth="120" />
+            <ColumnDefinition Width="*" />
+        </Grid.ColumnDefinitions>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />   <!-- 0 ffmpeg -->
+            <RowDefinition Height="Auto" />   <!-- 1 Hinweis -->
+            <RowDefinition Height="Auto" />   <!-- 2 Format -->
+            <RowDefinition Height="Auto" />   <!-- 3 Bereich -->
+            <RowDefinition Height="Auto" />   <!-- 4 Bildrate -->
+            <RowDefinition Height="Auto" />   <!-- 5 Aufloesung -->
+            <RowDefinition Height="Auto" />   <!-- 6 Luecken -->
+            <RowDefinition Height="Auto" />   <!-- 7 Korrektur -->
+            <RowDefinition Height="Auto" />   <!-- 8 Ziel -->
+            <RowDefinition Height="Auto" />   <!-- 9 Zusammenfassung -->
+            <RowDefinition Height="Auto" />   <!-- 10 Fortschritt -->
+            <RowDefinition Height="Auto" />   <!-- 11 Status -->
+            <RowDefinition Height="Auto" />   <!-- 12 Knoepfe -->
+        </Grid.RowDefinitions>
+
+        <TextBlock Grid.Row="0" Grid.Column="0" Text="ffmpeg" Style="{StaticResource DialogLabel}" />
+        <Grid Grid.Row="0" Grid.Column="1">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="Auto" />
+            </Grid.ColumnDefinitions>
+            <TextBox x:Name="FfmpegBox" Grid.Column="0" Style="{StaticResource DialogTextBox}"
+                     Margin="0,0,8,0" />
+            <Button x:Name="BrowseFfmpegButton" Grid.Column="1" Style="{StaticResource OverlayButton}"
+                    Content="Suchen …" Click="OnBrowseFfmpeg" />
+        </Grid>
+
+        <TextBlock x:Name="FfmpegHint" Grid.Row="1" Grid.Column="1" Margin="0,4,0,12"
+                   Foreground="{StaticResource MutedBrush}" FontSize="11" TextWrapping="Wrap" />
+
+        <TextBlock Grid.Row="2" Grid.Column="0" Text="Format" Style="{StaticResource DialogLabel}" />
+        <StackPanel Grid.Row="2" Grid.Column="1" Margin="0,0,0,12">
+            <ComboBox x:Name="PresetBox" Style="{StaticResource OverlayCombo}"
+                      HorizontalAlignment="Left" Width="220"
+                      SelectionChanged="OnPresetChanged" />
+            <TextBlock x:Name="PresetHint" Margin="0,4,0,0"
+                       Foreground="{StaticResource MutedBrush}" FontSize="11" TextWrapping="Wrap" />
+        </StackPanel>
+
+        <TextBlock Grid.Row="3" Grid.Column="0" Text="Bereich" Style="{StaticResource DialogLabel}" />
+        <StackPanel Grid.Row="3" Grid.Column="1" Orientation="Horizontal" Margin="0,0,0,12">
+            <RadioButton x:Name="WholeSequenceRadio" Style="{StaticResource DialogRadio}"
+                         Content="Ganze Sequenz" IsChecked="True" Checked="OnRangeChanged" />
+            <RadioButton x:Name="InOutRadio" Style="{StaticResource DialogRadio}"
+                         Margin="16,0,0,0" Content="In bis Out" Checked="OnRangeChanged" />
+        </StackPanel>
+
+        <TextBlock Grid.Row="4" Grid.Column="0" Text="Bildrate" Style="{StaticResource DialogLabel}" />
+        <ComboBox x:Name="FpsBox" Grid.Row="4" Grid.Column="1" Style="{StaticResource OverlayCombo}"
+                  HorizontalAlignment="Left" Width="120" Margin="0,0,0,12"
+                  SelectionChanged="OnFpsChanged" />
+
+        <TextBlock Grid.Row="5" Grid.Column="0" Text="Auflösung" Style="{StaticResource DialogLabel}" />
+        <StackPanel Grid.Row="5" Grid.Column="1" Orientation="Horizontal" Margin="0,0,0,12">
+            <ComboBox x:Name="ScaleBox" Style="{StaticResource OverlayCombo}"
+                      Width="180" SelectionChanged="OnScaleChanged" />
+            <TextBlock x:Name="ScaleHint" Margin="10,0,0,0" VerticalAlignment="Center"
+                       Foreground="{StaticResource MutedBrush}" FontSize="11" />
+        </StackPanel>
+
+        <TextBlock x:Name="GapLabel" Grid.Row="6" Grid.Column="0" Text="Lücken"
+                   Style="{StaticResource DialogLabel}" Visibility="Collapsed" />
+        <StackPanel x:Name="GapPanel" Grid.Row="6" Grid.Column="1" Margin="0,0,0,12"
+                    Visibility="Collapsed">
+            <RadioButton x:Name="HoldRadio" Style="{StaticResource DialogRadio}"
+                         Content="Letzten Frame halten" IsChecked="True" Checked="OnGapChanged"
+                         ToolTip="Ergibt ein kurzes Standbild statt eines Zeitsprungs" />
+            <RadioButton x:Name="SkipRadio" Style="{StaticResource DialogRadio}"
+                         Margin="0,6,0,0" Content="Lücken überspringen" Checked="OnGapChanged"
+                         ToolTip="Das Video wird kürzer, die Bewegung springt" />
+            <TextBlock x:Name="GapHint" Margin="0,6,0,0"
+                       Foreground="{StaticResource GapBrush}" FontSize="11" TextWrapping="Wrap" />
+        </StackPanel>
+
+        <TextBlock x:Name="AdjustLabel" Grid.Row="7" Grid.Column="0" Text="Bildkorrektur"
+                   Style="{StaticResource DialogLabel}" Visibility="Collapsed" />
+        <StackPanel x:Name="AdjustPanel" Grid.Row="7" Grid.Column="1" Margin="0,0,0,12"
+                    Visibility="Collapsed">
+            <CheckBox x:Name="ApplyAdjustBox" Style="{StaticResource DialogCheckBox}"
+                      Content="Korrektur aus der Vorschau ins Video einrechnen"
+                      Checked="OnApplyAdjustChanged" Unchecked="OnApplyAdjustChanged" />
+            <TextBlock x:Name="AdjustHint" Margin="0,4,0,0" FontSize="11" TextWrapping="Wrap"
+                       Foreground="{StaticResource MutedBrush}" />
+        </StackPanel>
+
+        <TextBlock Grid.Row="8" Grid.Column="0" Text="Zieldatei" Style="{StaticResource DialogLabel}" />
+        <Grid Grid.Row="8" Grid.Column="1" Margin="0,0,0,12">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="Auto" />
+            </Grid.ColumnDefinitions>
+            <TextBox x:Name="OutputBox" Grid.Column="0" Style="{StaticResource DialogTextBox}"
+                     Margin="0,0,8,0" />
+            <Button x:Name="BrowseOutputButton" Grid.Column="1" Style="{StaticResource OverlayButton}"
+                    Content="Wählen …" Click="OnBrowseOutput" />
+        </Grid>
+
+        <TextBlock x:Name="SummaryText" Grid.Row="9" Grid.Column="1" Margin="0,0,0,12"
+                   Foreground="{StaticResource MutedBrush}" FontSize="11" TextWrapping="Wrap" />
+
+        <ProgressBar x:Name="Progress" Grid.Row="10" Grid.ColumnSpan="2" Height="6"
+                     Margin="0,0,0,8" Minimum="0" Maximum="1" Visibility="Collapsed"
+                     Background="{StaticResource TrackBrush}" Foreground="{StaticResource AccentBrush}"
+                     BorderThickness="0" />
+
+        <TextBlock x:Name="StatusText" Grid.Row="11" Grid.ColumnSpan="2" Margin="0,0,0,12"
+                   Foreground="{StaticResource AccentBrush}" FontSize="11" TextWrapping="Wrap" />
+
+        <StackPanel Grid.Row="12" Grid.ColumnSpan="2" Orientation="Horizontal"
+                    HorizontalAlignment="Right">
+            <Button x:Name="CopyCommandButton" Style="{StaticResource LinkButton}"
+                    Content="Befehl kopieren" Margin="0,0,12,0" Click="OnCopyCommand"
+                    ToolTip="Legt den vollstaendigen ffmpeg-Aufruf in die Zwischenablage" />
+            <Button x:Name="CancelButton" Style="{StaticResource OverlayButton}"
+                    Content="Schließen" MinWidth="90" Margin="0,0,8,0" Click="OnCancel" />
+            <Button x:Name="StartButton" Style="{StaticResource OverlayButton}"
+                    Content="Exportieren" MinWidth="110" Click="OnStart" />
+        </StackPanel>
+    </Grid>
+</Window>

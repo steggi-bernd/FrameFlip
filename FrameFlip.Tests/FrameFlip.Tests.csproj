@@ -1,0 +1,32 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    Bewusst ein schlichtes Konsolenprojekt statt xunit/MSTest: die Vorgabe lautet,
+    keine NuGet-Pakete ohne Begruendung aufzunehmen. Ein Testlaeufer waere hier drei
+    Pakete (Test-SDK, Framework, Adapter) fuer neun Zusicherungen. Ausgefuehrt wird
+    mit "dotnet run"; ein Exitcode ungleich 0 bedeutet Fehlschlag, damit laesst sich
+    das genauso in eine Pipeline haengen.
+  -->
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net8.0-windows</TargetFramework>
+    <RootNamespace>FrameFlip.Tests</RootNamespace>
+    <UseWPF>true</UseWPF>
+    <UseWindowsForms>true</UseWindowsForms>
+    <Nullable>enable</Nullable>
+    <LangVersion>12</LangVersion>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+
+    <!-- Muss zum referenzierten Projekt passen, sonst verweigert das SDK den Verweis. -->
+    <RuntimeIdentifier>win-x64</RuntimeIdentifier>
+    <SelfContained>true</SelfContained>
+    <PublishSingleFile>false</PublishSingleFile>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Using Remove="System.Windows.Forms" />
+    <ProjectReference Include="..\FrameFlip\FrameFlip.csproj" />
+  </ItemGroup>
+
+</Project>

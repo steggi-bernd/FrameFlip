@@ -1,0 +1,102 @@
+<Window x:Class="FrameFlip.Views.SettingsWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="FrameFlip – Einstellungen"
+        Width="440" SizeToContent="Height"
+        ResizeMode="NoResize"
+        WindowStartupLocation="CenterScreen"
+        ShowInTaskbar="True"
+        Background="{StaticResource PanelBackground}"
+        TextOptions.TextFormattingMode="Display">
+
+    <Grid Margin="20">
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="150" />
+            <ColumnDefinition Width="*" />
+        </Grid.ColumnDefinitions>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+        </Grid.RowDefinitions>
+
+        <TextBlock Grid.Row="0" Grid.Column="0" Text="Globaler Hotkey" Style="{StaticResource DialogLabel}" />
+        <TextBox x:Name="HotkeyBox" Grid.Row="0" Grid.Column="1" Style="{StaticResource DialogTextBox}"
+                 IsReadOnly="True" Cursor="Hand"
+                 ToolTip="Anklicken und die gewuenschte Kombination druecken" />
+
+        <TextBlock Grid.Row="1" Grid.Column="1" Margin="0,4,0,12"
+                   Foreground="{StaticResource MutedBrush}" FontSize="11" TextWrapping="Wrap"
+                   Text="Mindestens ein Modifikator. Esc bricht die Aufnahme ab." />
+
+        <TextBlock Grid.Row="2" Grid.Column="0" Text="Bildrate" Style="{StaticResource DialogLabel}" />
+        <ComboBox x:Name="FpsBox" Grid.Row="2" Grid.Column="1" Style="{StaticResource OverlayCombo}"
+                  HorizontalAlignment="Left" Width="120" Margin="0,0,0,12" />
+
+        <TextBlock Grid.Row="3" Grid.Column="0" Text="Wiedergabe" Style="{StaticResource DialogLabel}" />
+        <StackPanel Grid.Row="3" Grid.Column="1" Margin="0,0,0,12">
+            <CheckBox x:Name="LoopBox" Style="{StaticResource DialogCheckBox}"
+                      Content="Nach dem letzten Frame nahtlos von vorn" />
+            <CheckBox x:Name="LockToDisplayBox" Style="{StaticResource DialogCheckBox}"
+                      Margin="0,6,0,0"
+                      Content="Bei passender Bildrate an den Bildschirmtakt koppeln"
+                      ToolTip="Verhindert Ruckler, wenn Sollrate und Bildschirmtakt zusammenfallen – etwa 60 fps auf 60 Hz. Die Wiedergabe laeuft dann mit dem Schirmtakt statt exakt mit der Sollrate." />
+            <CheckBox x:Name="CloseOnFocusLossBox" Style="{StaticResource DialogCheckBox}"
+                      Margin="0,6,0,0"
+                      Content="Vorschau schliessen, sobald sie den Fokus verliert"
+                      ToolTip="Abschalten, wenn die Sequenz waehrend der Arbeit in Blender stehen bleiben soll" />
+        </StackPanel>
+
+        <TextBlock Grid.Row="4" Grid.Column="0" Text="RAM-Budget (MB)" Style="{StaticResource DialogLabel}" />
+        <TextBox x:Name="BudgetBox" Grid.Row="4" Grid.Column="1" Style="{StaticResource DialogTextBox}"
+                 HorizontalAlignment="Left" Width="120" Margin="0,0,0,12" />
+
+        <TextBlock Grid.Row="5" Grid.Column="0" Text="Puffer voraus" Style="{StaticResource DialogLabel}" />
+        <TextBox x:Name="AheadBox" Grid.Row="5" Grid.Column="1" Style="{StaticResource DialogTextBox}"
+                 HorizontalAlignment="Left" Width="120" Margin="0,0,0,12" />
+
+        <TextBlock Grid.Row="6" Grid.Column="0" Text="Puffer zurueck" Style="{StaticResource DialogLabel}" />
+        <TextBox x:Name="BehindBox" Grid.Row="6" Grid.Column="1" Style="{StaticResource DialogTextBox}"
+                 HorizontalAlignment="Left" Width="120" Margin="0,0,0,4" />
+
+        <Separator Grid.Row="7" Grid.ColumnSpan="2" Margin="0,4,0,12" Background="{StaticResource PanelBorder}" />
+
+        <TextBlock Grid.Row="8" Grid.Column="0" Text="Dynamische Last" Style="{StaticResource DialogLabel}" />
+        <CheckBox x:Name="AdaptiveBox" Grid.Row="8" Grid.Column="1" Style="{StaticResource DialogCheckBox}"
+                  Content="Ressourcen an CPU-, GPU- und RAM-Last anpassen" Margin="0,0,0,12" />
+
+        <TextBlock Grid.Row="9" Grid.Column="0" Text="Messtakt (s)" Style="{StaticResource DialogLabel}" />
+        <TextBox x:Name="IntervalBox" Grid.Row="9" Grid.Column="1" Style="{StaticResource DialogTextBox}"
+                 HorizontalAlignment="Left" Width="120" Margin="0,0,0,12" />
+
+        <TextBlock Grid.Row="10" Grid.Column="0" Text="Decoder-Threads max" Style="{StaticResource DialogLabel}" />
+        <StackPanel Grid.Row="10" Grid.Column="1" Orientation="Horizontal" Margin="0,0,0,4">
+            <TextBox x:Name="ThreadsBox" Style="{StaticResource DialogTextBox}" Width="120" />
+            <TextBlock x:Name="ThreadsHint" VerticalAlignment="Center" Margin="10,0,0,0"
+                       Foreground="{StaticResource MutedBrush}" FontSize="11" />
+        </StackPanel>
+
+        <TextBlock x:Name="StatusText" Grid.Row="11" Grid.ColumnSpan="2" Margin="0,8,0,0"
+                   Foreground="{StaticResource AccentBrush}" FontSize="11" TextWrapping="Wrap"
+                   Visibility="Collapsed" />
+
+        <StackPanel Grid.Row="12" Grid.ColumnSpan="2" Orientation="Horizontal"
+                    HorizontalAlignment="Right" Margin="0,20,0,0">
+            <Button x:Name="RevealButton" Style="{StaticResource DialogButton}" Content="config.json zeigen"
+                    MinWidth="130" Margin="0,0,8,0" Click="OnRevealClicked" />
+            <Button x:Name="CancelButton" Style="{StaticResource DialogButton}" Content="Abbrechen"
+                    Margin="0,0,8,0" IsCancel="True" Click="OnCancelClicked" />
+            <Button x:Name="SaveButton" Style="{StaticResource DialogButton}" Content="Speichern"
+                    IsDefault="True" Click="OnSaveClicked" />
+        </StackPanel>
+    </Grid>
+</Window>
