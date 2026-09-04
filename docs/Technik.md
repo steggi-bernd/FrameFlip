@@ -1,4 +1,6 @@
-# FrameFlip
+# FrameFlip – Technik
+
+[← zurück zur Startseite](../README.md)
 
 Vorschau für gerenderte Bildsequenzen. Läuft im Tray, öffnet auf Tastendruck die
 Sequenz der im Explorer markierten Datei als Video – und passt sich dabei laufend
