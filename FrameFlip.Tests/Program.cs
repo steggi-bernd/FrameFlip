@@ -23,6 +23,7 @@ static int RunAll()
     ImagingInvariants.Run();
     RawCacheInvariants.Run();
     CadenceInvariants.Run();
+    RangeInvariants.Run();
 
     return Check.Report();
 }

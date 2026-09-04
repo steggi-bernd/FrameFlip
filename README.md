@@ -145,14 +145,18 @@ Die Begründungen stehen bei den Entscheidungen, nicht in einer Zusammenfassung 
 dotnet run --project FrameFlip.Tests
 ```
 
-387 Zusicherungen, keine Fremdpakete – ein schlichtes Konsolenprojekt statt eines
+403 Zusicherungen, keine Fremdpakete – ein schlichtes Konsolenprojekt statt eines
 Testrahmens mit drei NuGet-Abhängigkeiten. Exitcode ungleich 0 heißt Fehlschlag.
+Alles läuft ohne sichtbares Fenster und in unter einer Minute; Bildmaterial legen
+die Tests sich selbst an.
 
-Geprüft wird, was sich ohne sichtbares Fenster prüfen lässt und schon einmal
-falsch war: Zoommathematik, Puffergrenzen, Sequenzerkennung samt Lücken,
-ffmpeg-Argumente, Fensterplatzierung über mehrere Monitore, das Lastprofil, die
-Bildkorrektur und der Rohcache. Die Testsequenzen in
-`FrameFlip-Testsequenzen/` gehören dazu – eine davon hat absichtlich Lücken.
+Geprüft wird, was sich so prüfen lässt und schon einmal falsch war: Zoommathematik,
+Puffergrenzen, In/Out-Bereich, Sequenzerkennung samt Lücken, ffmpeg-Argumente,
+Fensterplatzierung über mehrere Monitore, das Lastprofil, die Bildkorrektur, der
+Rohcache und die Kopplung an den Bildschirmtakt.
+
+Die Sequenzen unter `FrameFlip-Testsequenzen/` sind fürs Ausprobieren von Hand
+gedacht, nicht für die automatischen Tests – eine davon hat absichtlich Lücken.
 
 ## Was noch fehlt
 

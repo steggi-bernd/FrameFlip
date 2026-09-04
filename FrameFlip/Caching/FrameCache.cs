@@ -44,6 +44,20 @@ public sealed class FrameCache : IDisposable
     private bool _loop = true;
     private int _urgent = -1;
 
+    /// <summary>
+    /// Der aktive In/Out-Bereich. Ohne gesetzte Punkte die ganze Sequenz.
+    ///
+    /// Der Ring muss ihn kennen, sonst rechnet er am Bedarf vorbei: Beim Loop-Sprung
+    /// vom Out- zurueck zum In-Punkt wrappte das Vorausladen ueber das SEQUENZende
+    /// statt ueber das Bereichsende. Der Frame am In-Punkt war damit weder vorgeladen
+    /// noch gehalten, waehrend der Ring stattdessen die Frames hinter dem Out-Punkt
+    /// lud, die nie gezeigt werden. Ergebnis: Nachpuffern bei jeder Runde, und bei
+    /// einer langen Sequenz hunderte nutzlose Dekodierungen samt Schreibvorgaengen
+    /// in den Rohcache.
+    /// </summary>
+    private int _first;
+    private int _last;
+
     private int _ahead;
     private int _behind;
     private int _capacity = 2;
@@ -93,6 +107,8 @@ public sealed class FrameCache : IDisposable
         _ahead = _configuredAhead;
         _behind = _configuredBehind;
         _loop = loop;
+        _first = 0;
+        _last = Math.Max(0, sequence.Count - 1);
         _windowScale = profile.WindowScale;
         _budgetScale = profile.BudgetScale;
 
@@ -135,6 +151,39 @@ public sealed class FrameCache : IDisposable
         }
         SignalAll();
     }
+
+    /// <summary>
+    /// Setzt den aktiven In/Out-Bereich. Vorausladen, Halten und die Zaehlung des
+    /// Vorrats beziehen sich danach ausschliesslich darauf.
+    ///
+    /// Frames ausserhalb fliegen sofort raus: Sie werden nicht mehr gezeigt, und der
+    /// Platz gehoert dem Bereich. Bei einem kurzen Ausschnitt passt der dadurch oft
+    /// vollstaendig in den Ring - dann gibt es ueberhaupt kein Nachpuffern mehr.
+    /// </summary>
+    public void SetRange(int first, int last)
+    {
+        lock (_gate)
+        {
+            int max = Math.Max(0, _sequence.Count - 1);
+
+            int newFirst = Math.Clamp(Math.Min(first, last), 0, max);
+            int newLast = Math.Clamp(Math.Max(first, last), 0, max);
+
+            if (newFirst == _first && newLast == _last) return;
+
+            _first = newFirst;
+            _last = newLast;
+
+            RecomputeWindow();
+            EvictOutsideWindow();
+            TrimToCapacity();
+        }
+
+        SignalAll();
+    }
+
+    /// <summary>Laenge des aktiven Bereichs in Frames.</summary>
+    private int RangeLength => Math.Max(1, _last - _first + 1);
 
     /// <summary>Uebernimmt ein neues Lastprofil: Threadzahl, Prioritaet, Fenster und Budget.</summary>
     public void ApplyProfile(ResourceProfile profile)
@@ -249,7 +298,7 @@ public sealed class FrameCache : IDisposable
         {
             for (int k = 1; k <= lookback; k++)
             {
-                int candidate = SequenceMath.Offset(desired, -k * _direction, _sequence.Count, _loop);
+                int candidate = SequenceMath.OffsetInRange(desired, -k * _direction, _first, _last, _loop);
                 if (candidate < 0 || candidate == lastShown) return -1;
                 if (_frames.ContainsKey(candidate)) return candidate;
             }
@@ -274,15 +323,16 @@ public sealed class FrameCache : IDisposable
 
     private int CountReadyAhead()
     {
-        // Liegt die ganze Sequenz im Ring, ist die Antwort ohne Suche klar. Der
-        // Kurzschluss ist noetig, weil _ahead dann der Sequenzlaenge entspricht und
+        // Liegt der ganze Bereich im Ring, ist die Antwort ohne Suche klar. Der
+        // Kurzschluss ist noetig, weil _ahead dann der Bereichslaenge entspricht und
         // die Schleife bei jedem Bild ueber tausende Eintraege liefe.
-        if (_frames.Count >= _sequence.Count) return Math.Min(_ahead, _sequence.Count - 1);
+        int span = RangeLength;
+        if (_frames.Count >= span) return Math.Min(_ahead, Math.Max(0, span - 1));
 
         int ready = 0;
         for (int k = 1; k <= _ahead; k++)
         {
-            int i = SequenceMath.Offset(_position, k * _direction, _sequence.Count, _loop);
+            int i = SequenceMath.OffsetInRange(_position, k * _direction, _first, _last, _loop);
             if (i < 0 || !_frames.ContainsKey(i)) break;
             ready++;
         }
@@ -409,14 +459,14 @@ public sealed class FrameCache : IDisposable
 
         for (int k = 1; k <= _ahead; k++)
         {
-            int i = SequenceMath.Offset(_position, k * _direction, count, _loop);
+            int i = SequenceMath.OffsetInRange(_position, k * _direction, _first, _last, _loop);
             if (i < 0) break;
             yield return i;
         }
 
         for (int k = 1; k <= _behind; k++)
         {
-            int i = SequenceMath.Offset(_position, -k * _direction, count, _loop);
+            int i = SequenceMath.OffsetInRange(_position, -k * _direction, _first, _last, _loop);
             if (i < 0) break;
             yield return i;
         }
@@ -429,22 +479,32 @@ public sealed class FrameCache : IDisposable
     /// </summary>
     private int Score(int index)
     {
-        int count = _sequence.Count;
         if (index == _urgent) return -1;
         if (index == _position) return 0;
+
+        // Ausserhalb des aktiven Bereichs wird nichts mehr gezeigt - also auch
+        // nichts gehalten. Sonst belegten die Frames hinter dem Out-Punkt den Ring,
+        // den der Bereich selbst braucht.
+        if (index < _first || index > _last) return int.MaxValue;
+
+        int span = RangeLength;
+
+        // Die Position kann kurzzeitig ausserhalb liegen, etwa unmittelbar nachdem
+        // ein Bereich gesetzt wurde. Fuer die Bewertung zaehlt dann der Rand.
+        int position = Math.Clamp(_position, _first, _last);
 
         int forward;
         int backward;
 
         if (_loop)
         {
-            int raw = ((index - _position) % count + count) % count;
-            forward = _direction > 0 ? raw : (count - raw) % count;
-            backward = forward == 0 ? 0 : count - forward;
+            int raw = ((index - position) % span + span) % span;
+            forward = _direction > 0 ? raw : (span - raw) % span;
+            backward = forward == 0 ? 0 : span - forward;
         }
         else
         {
-            int relative = (index - _position) * _direction;
+            int relative = (index - position) * _direction;
             forward = relative >= 0 ? relative : int.MaxValue;
             backward = relative < 0 ? -relative : int.MaxValue;
         }
@@ -598,10 +658,15 @@ public sealed class FrameCache : IDisposable
         // 240 Bilder hinein, gehalten wurden aber nur 151. Alles darueber hinaus fiel
         // heraus und musste bei jedem Loop-Durchlauf neu dekodiert werden - genau der
         // Fall, in dem einmal Laden fuer immer gereicht haette.
-        if (fits >= _sequence.Count && _sequence.Count > 0)
+        // Gerechnet wird auf den aktiven Bereich, nicht auf die Sequenz: Ein kurzer
+        // Ausschnitt aus 2000 Frames passt vollstaendig hinein, auch wenn das Ganze
+        // es nie taete - und genau dann darf es kein Nachpuffern mehr geben.
+        int span = RangeLength;
+
+        if (fits >= span && span > 0)
         {
-            _capacity = _sequence.Count;
-            _ahead = Math.Max(1, _sequence.Count - 1);
+            _capacity = span;
+            _ahead = Math.Max(1, span - 1);
             _behind = 0;                    // bei vollstaendigem Ring gibt es kein "zurueck"
             _pool.Configure(_frameBytes, _capacity + _workers.Length);
             return;
@@ -611,7 +676,7 @@ public sealed class FrameCache : IDisposable
         // jeder zusaetzlich gehaltene Frame ist Reserve gegen Schwankungen, und der
         // Speicher ist ohnehin schon zugesagt. Ohne diesen Schritt blieb der Ring bei
         // 151 Frames stehen, obwohl 259 hineingepasst haetten.
-        int room = (int)Math.Min(fits, _sequence.Count);
+        int room = (int)Math.Min(fits, span);
         if (room > desiredAhead + desiredBehind + 1)
             desiredAhead = Math.Max(desiredAhead, room - 1 - desiredBehind);
 

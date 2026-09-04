@@ -122,6 +122,29 @@ völlig anderes: 60 Frames sind bei 24 fps zweieinhalb Sekunden Reserve, bei 60 
 nur eine. Deshalb gilt der eingestellte Wert als Untergrenze, und darüber hinaus
 werden mindestens **zwei Sekunden** Material vorgehalten.
 
+### Der Ring kennt den In/Out-Bereich
+
+Ist ein Bereich gesetzt, spielt die Wiedergabe nur darin – der Ringpuffer rechnete
+aber lange über die **ganze** Sequenz. Beim Loop-Sprung vom Out- zurück zum In-Punkt
+wrappte das Vorausladen deshalb über das Sequenzende statt über das Bereichsende:
+
+* Der Frame am In-Punkt war weder vorgeladen noch gehalten – genau der, auf den der
+  nächste Schritt geht. Ergebnis: Nachpuffern bei **jeder** Runde.
+* Stattdessen lud der Ring die Frames *hinter* dem Out-Punkt, die nie gezeigt werden.
+  Bei einer Sequenz aus 2077 Bildern zu je 8,3 MB sind das bis zu 120 Dekodierungen
+  je Runde, jede zusätzlich in den Rohcache geschrieben – knapp ein Gigabyte
+  Schreiblast für Bilder, die niemand sieht.
+
+`SequenceMath.OffsetInRange` gab es dafür bereits, es war nur nicht angeschlossen.
+Jetzt beziehen sich Ladereihenfolge, Bewertung (`Score`), Rückfall auf ein älteres
+Bild und die Zählung des Vorrats auf den Bereich. Frames außerhalb fliegen sofort
+raus: Der Platz gehört dem Bereich.
+
+Nebeneffekt, der den eigentlichen Gewinn ausmacht: Ein kurzer Ausschnitt passt
+dadurch oft **vollständig** in den Ring, auch wenn die Sequenz es nie täte. Dann gibt
+es überhaupt kein Nachpuffern mehr. Der Regressionstest hält das fest – ohne den Fix
+liegt bei einem Bereich aus zehn Frames genau einer im Ring, mit Fix alle zehn.
+
 ### Der Ring benutzt das Budget
 
 Die Ringgröße folgte früher **allein** aus Vor- plus Rücklauf – bei 2 GB Budget und

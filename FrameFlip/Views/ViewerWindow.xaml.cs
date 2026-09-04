@@ -967,9 +967,12 @@ public partial class ViewerWindow : Window
 
         var stats = cache.GetStats();
 
-        // Liegt die ganze Sequenz im Ring, gibt es kein Nachpuffern mehr - eine
+        var (rangeFirst, rangeLast) = ActiveRange();
+        int rangeLength = rangeLast - rangeFirst + 1;
+
+        // Liegt der ganze Bereich im Ring, gibt es kein Nachpuffern mehr - eine
         // Sekundenangabe waere hier nur Zahlenrauschen.
-        if (stats.CachedFrames >= _sequence.Count)
+        if (stats.CachedFrames >= rangeLength)
         {
             BufferText.Text = "Puffer komplett";
             BufferText.Foreground = (Brush)FindResource("MutedBrush");
@@ -980,7 +983,7 @@ public partial class ViewerWindow : Window
         // trifft dieselben Frames erneut. Fuer die Pufferlogik ist das gleichgueltig,
         // fuer eine Zeitangabe nicht: mehr als die Sequenz selbst kann nicht
         // vorausliegen.
-        int ahead = Math.Min(stats.AheadReady, Math.Max(0, _sequence.Count - 1));
+        int ahead = Math.Min(stats.AheadReady, Math.Max(0, rangeLength - 1));
         double seconds = ahead / _clock.Fps;
 
         BufferText.Text = $"Puffer {seconds:0.0} s";
@@ -999,7 +1002,10 @@ public partial class ViewerWindow : Window
         // Nie mehr verlangen, als der Ring ueberhaupt bereitstellen kann. Sonst
         // wartet das Puffern auf eine Zahl, die nie erreicht wird, und endet erst
         // im Notausstieg nach acht Sekunden.
-        int reachable = Math.Min(PrefetchAhead(), _sequence.Count - 1);
+        // Auf den aktiven Bereich bezogen: Bei einem Ausschnitt von zehn Frames
+        // wartet das Puffern sonst auf neunzig, die es dort gar nicht gibt.
+        var (first, last) = ActiveRange();
+        int reachable = Math.Min(PrefetchAhead(), Math.Max(1, last - first));
         int fitsInRing = _cache?.GetStats().Capacity - 1 ?? reachable;
 
         return Math.Clamp(frames, 2, Math.Max(2, Math.Min(reachable, fitsInRing)));
@@ -1041,7 +1047,9 @@ public partial class ViewerWindow : Window
 
         int ready = cache.ReadyAhead();
         int target = WarmupTarget();
-        bool wholeSequence = cache.GetStats().CachedFrames >= _sequence.Count;
+
+        var (rangeFirst, rangeLast) = ActiveRange();
+        bool wholeSequence = cache.GetStats().CachedFrames >= rangeLast - rangeFirst + 1;
 
         // Notausstieg, damit eine langsame Platte die Wiedergabe nicht endlos blockiert.
         bool timedOut = Environment.TickCount64 - _bufferingSince > 8000;
@@ -1568,6 +1576,10 @@ public partial class ViewerWindow : Window
         var (first, last) = ActiveRange();
         if (_index < first || _index > last) SeekTo(first);
 
+        // Der Ring muss den Bereich kennen. Ohne das lud er beim Loop-Sprung die
+        // Frames hinter dem Out-Punkt, die nie gezeigt werden, und hielt den
+        // In-Punkt nicht - jede Runde endete im Nachpuffern.
+        _cache?.SetRange(first, last);
         _cache?.SetPosition(_index, _direction, _loop, urgent: false);
         ShowBar();
     }
