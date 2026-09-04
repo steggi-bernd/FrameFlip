@@ -749,6 +749,8 @@ public partial class ViewerWindow : Window
         var missing = _sequence.MissingNumbers();
 
         GapStrip.SetSequence(_sequence.StartNumber, _sequence.EndNumber, missing);
+        RangeStrip.SetSequence(_sequence.StartNumber, _sequence.EndNumber);
+        UpdateRangeStrip();
 
         if (missing.Count == 0)
         {
@@ -1584,8 +1586,25 @@ public partial class ViewerWindow : Window
         ShowBar();
     }
 
+    /// <summary>
+    /// Setzt die Markierung auf der Zeitleiste. Die Leiste spannt den Nummernbereich
+    /// auf, deshalb werden hier Indizes in Framenummern uebersetzt.
+    /// </summary>
+    private void UpdateRangeStrip()
+    {
+        if (!HasRange) { RangeStrip.Clear(); return; }
+
+        var (first, last) = ActiveRange();
+
+        if (first < 0 || last >= _sequence.Count) { RangeStrip.Clear(); return; }
+
+        RangeStrip.SetRange(_sequence.Frames[first].Number, _sequence.Frames[last].Number);
+    }
+
     private void UpdateRangeText()
     {
+        UpdateRangeStrip();
+
         if (!HasRange)
         {
             RangeText.Visibility = Visibility.Collapsed;

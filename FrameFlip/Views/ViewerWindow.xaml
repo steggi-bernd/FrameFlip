@@ -154,12 +154,20 @@
                         <!-- Luecken und Scrubber liegen in derselben Zelle mit derselben
                              Randbreite; dadurch decken sich Markierung und Spur exakt. -->
                         <Grid Grid.Column="1" Margin="12,0">
-                            <local:TimelineGaps x:Name="GapStrip" VerticalAlignment="Center"
-                                                IsHitTestVisible="False" />
-
                             <Slider x:Name="Scrubber" Style="{StaticResource Scrubber}"
                                     VerticalAlignment="Center"
                                     Minimum="0" Maximum="1" Value="0" />
+
+                            <!-- Beide Markierungen liegen UEBER dem Scrubber. Der
+                                 gefuellte Teil der Spur ist deckend; darunter waere
+                                 jede Luecke unsichtbar, an der man schon vorbei ist -
+                                 und der In-Punkt praktisch immer. -->
+                            <local:TimelineGaps x:Name="GapStrip" VerticalAlignment="Center"
+                                                IsHitTestVisible="False" />
+
+                            <local:TimelineRange x:Name="RangeStrip" VerticalAlignment="Center"
+                                                 IsHitTestVisible="False"
+                                                 MarkerBrush="{StaticResource ForegroundBrush}" />
                         </Grid>
 
                         <StackPanel Grid.Column="2" Orientation="Horizontal"
