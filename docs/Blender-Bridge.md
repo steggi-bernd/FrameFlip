@@ -1,66 +1,65 @@
-# FrameFlip Bridge — Recherche und Entwurf
+# FrameFlip Bridge — research and design
 
-[← zurück zur Startseite](../README.md)
+[← back to the start page](../README.md)
 
-Vorarbeit für das Blender-Addon, das laufende Renders an FrameFlip meldet, und für
-die Fernsteuerung vom Handy. Alle API-Aussagen hier sind am Blender-Quelltext geprüft,
-nicht aus der Erinnerung — die Dokumentation unter `docs.blender.org` verweigert
-automatisierte Abrufe, deshalb stehen die Fundstellen im Code dabei.
+Groundwork for the Blender add-on that reports running renders to FrameFlip, and for
+remote control from a phone. Every API claim here is verified against the Blender
+source rather than recalled — `docs.blender.org` refuses automated requests, so the
+references point into the code instead.
 
-**Stand:** 5. September 2026, geprüft gegen `blender/blender`, Branch `main`.
+**As of:** 5 September 2026, checked against `blender/blender`, branch `main`.
 
 ---
 
-## 1. Die Anknüpfpunkte in Blender
+## 1. The hooks in Blender
 
-`bpy.app.handlers`, definiert in `source/blender/blenkernel/BKE_callbacks.hh` und an
-Python gebunden in `source/blender/python/intern/bpy_app_handlers.cc`:
+`bpy.app.handlers`, defined in `source/blender/blenkernel/BKE_callbacks.hh` and bound
+to Python in `source/blender/python/intern/bpy_app_handlers.cc`:
 
-| Handler | Argument | Bedeutung für uns |
+| Handler | Argument | What it means here |
 |---|---|---|
-| `render_init` | Scene | Job beginnt — Auflösung, Frame-Bereich, Ausgabepfad einmalig melden |
-| `render_pre` | Scene | Ein Frame beginnt |
-| `render_post` | Scene | Ein Frame ist fertig gerechnet |
-| **`render_write`** | Scene | **Datei geschrieben** — der wichtigste Handler |
-| **`render_stats`** | **String** | Fortschrittstext, siehe Abschnitt 3 |
-| `render_complete` | Scene | Job regulär beendet |
-| `render_cancel` | Scene | Job abgebrochen |
-| `load_post` | Pfad | Anderes .blend geladen |
+| `render_init` | Scene | job begins — report resolution, frame range, output path once |
+| `render_pre` | Scene | a frame starts |
+| `render_post` | Scene | a frame has finished rendering |
+| **`render_write`** | Scene | **file written** — the most important handler |
+| **`render_stats`** | **String** | progress text, see section 3 |
+| `render_complete` | Scene | job finished normally |
+| `render_cancel` | Scene | job cancelled |
+| `load_post` | path | a different .blend was loaded |
 
-Der Quelltext beschreibt `render_write` als „on writing a render frame (directly after
-the frame is written)". Genau das braucht FrameFlip: **Der Addon überträgt keine
-Pixel.** Er meldet einen Pfad, FrameFlip liest die Datei selbst — das kann es bereits,
-inklusive Puffer, Rohcache und Bildkorrektur.
+The source describes `render_write` as “on writing a render frame (directly after the
+frame is written)”. That is exactly what FrameFlip needs: **the add-on transfers no
+pixels.** It reports a path and FrameFlip reads the file itself — which it already
+knows how to do, buffer, raw cache and image correction included.
 
-`BKE_callbacks.hh` hält außerdem fest, wie die Ereignisse zusammenspielen:
+`BKE_callbacks.hh` also records how the events fit together:
 
 > `PRE/POST` handlers may be used along side modal task handlers as is the case for
 > rendering, where rendering an animation uses modal task handlers, rendering a single
 > frame has `PRE/POST` handlers.
 
-Für eine Animation gibt es also `INIT` → n × (`PRE`/`POST`/`WRITE`) → `COMPLETE`
-oder `CANCEL`.
+So an animation gives `INIT` → n × (`PRE`/`POST`/`WRITE`) → `COMPLETE` or `CANCEL`.
 
-### Dauerhafte Registrierung
+### Registering for good
 
-Handler ohne `@persistent` werden beim Laden einer neuen Datei entfernt. Mit dem
-Dekorator überleben sie jeden Dateiwechsel. Das ist die ganze Technik hinter
-„dauerhaft gekoppelt": Der Addon wird einmal installiert, registriert seine Handler
-beim Laden und meldet danach jeden Render in dieser Blender-Instanz — ohne dass
-irgendwo etwas eingeschaltet werden muss.
+Handlers without `@persistent` are removed when a new file is loaded. With the
+decorator they survive every file change. That is the whole technique behind “paired
+permanently”: the add-on is installed once, registers its handlers on load, and from
+then on reports every render in that Blender instance — with nothing to switch on
+anywhere.
 
 ---
 
-## 2. Was Blender **nicht** hergibt
+## 2. What Blender does **not** offer
 
-Zwei Grenzen, die den Zuschnitt des ganzen Projekts bestimmen.
+Two limits that shape the cut of the entire project.
 
-### 2.1 Ein laufender Render lässt sich nicht abbrechen
+### 2.1 A running render cannot be cancelled
 
-In `source/blender/editors/render/render_internal.cc` existiert genau ein
-Render-Operator: `RENDER_OT_render`. Starten geht, Abbrechen nicht.
+`source/blender/editors/render/render_internal.cc` defines exactly one render
+operator: `RENDER_OT_render`. Starting works, cancelling does not.
 
-Die Animationsschleife in `source/blender/render/intern/pipeline.cc` zeigt, warum:
+The animation loop in `source/blender/render/intern/pipeline.cc` shows why:
 
 ```c
 for (nfra = sfra, scene->r.cfra = sfra; scene->r.cfra <= efra; scene->r.cfra++) {
@@ -68,16 +67,17 @@ for (nfra = sfra, scene->r.cfra = sfra; scene->r.cfra <= efra; scene->r.cfra++) 
   if (G.is_break == true) break;
 ```
 
-Abgebrochen wird über das globale Flag `G.is_break`, das der Window-Manager beim
-Druck auf Escape setzt. Python hat darauf keinen Zugriff.
+The loop breaks on the global `G.is_break` flag, which the window manager sets when
+Escape is pressed. Python has no access to it.
 
-Auch der naheliegende Umweg trägt nicht: `efra` ist ein **Parameter**, der beim Start
-der Schleife festgehalten wird. `scene.frame_end` nachträglich kleiner zu setzen
-beendet den Lauf nicht.
+The obvious detour does not work either: `efra` is a **parameter**, captured when the
+loop starts. Lowering `scene.frame_end` afterwards does not end the run.
 
-### 2.2 Der Fortschrittstext ist in der Oberfläche arm
+### 2.2 The progress text — a correction
 
-Cycles baut den Text in `intern/cycles/blender/session.cpp` zusammen:
+This section first claimed that remaining time, memory and the sample counter were
+missing in the interface. **That was wrong.** It was based on this passage from
+`intern/cycles/blender/session.cpp`:
 
 ```cpp
 if (background) {
@@ -87,156 +87,171 @@ if (background) {
 RE_engine_update_stats(&b_engine, "", (timestatus + status).c_str());
 ```
 
-`background` ist nur bei `blender -b` wahr. In der Oberfläche fehlen also **Restzeit,
-Speicherverbrauch und der Unterstatus mit dem Sample-Zähler** — die stehen dort nur im
-Statusbalken, nicht in dem String, den `render_stats` erhält.
-
-### 2.3 Was daraus folgt
-
-Beide Grenzen zeigen in dieselbe Richtung: **Renders sollten als eigener
-Hintergrundprozess laufen** (`blender -b datei.blend -a`). Das löst drei Dinge auf
-einmal:
-
-* Abbrechen wird zum Beenden eines Prozesses — sauber und sofort.
-* Der Fortschrittstext wird vollständig.
-* Blenders Oberfläche bleibt bedienbar, statt für Stunden zu blockieren.
-
-Renders, die von Hand in der Oberfläche gestartet werden, meldet der Addon trotzdem —
-nur eben mit weniger Zahlen und ohne Abbruchmöglichkeit. Das ist keine Einschränkung
-unserer Umsetzung, sondern eine von Blender.
-
----
-
-## 3. Woher jede Zahl kommt
-
-| Metrik | Quelle | Verlässlichkeit |
-|---|---|---|
-| Gesamtfortschritt | `render_write` zählt Frames gegen `frame_start`/`frame_end` | exakt, kein Parsen |
-| Sample-Fortschritt | `render_stats`-String | Format ist engine- und versionsabhängig |
-| Restzeit, Cycles-Speicher | `render_stats`-String, nur im Hintergrundmodus | dito |
-| Zeit je Frame | Differenz zwischen zwei `render_write` | exakt |
-| CPU, RAM des Rechners | **FrameFlip** | exakt |
-| GPU-Last, VRAM, Temperatur | `nvidia-smi`, aufgerufen von FrameFlip | exakt, nur NVIDIA |
-| Vorschaubild | FrameFlip liest die geschriebene Datei | exakt |
-
-Der Grundsatz dahinter: **Der Addon meldet, was nur Blender weiß. Alles über den
-Rechner misst FrameFlip.** Blender bringt kein `psutil` mit; ein Addon, das
-Systemwerte selbst erhebt, bräuchte eine Fremdabhängigkeit oder würde Blenders
-Hauptthread belasten. FrameFlip misst CPU und GPU ohnehin schon.
-
-Der `render_stats`-String wird **defensiv** ausgewertet: Was sich nicht parsen lässt,
-fehlt eben — es darf nie dazu führen, dass eine Meldung ausbleibt oder der Addon
-eine Ausnahme wirft.
-
----
-
-## 4. Vergleich mit Render Control
-
-[rendercontrol.solutions](https://www.rendercontrol.solutions) ist das nächstliegende
-Vorbild. Was es laut eigener Beschreibung kann, und wie es sich hier einordnet:
-
-| Funktion von Render Control | Umsetzbar | Anmerkung |
-|---|---|---|
-| Prozent, Frames, Samples, Laufzeit, Restzeit | ja | Samples und Restzeit nur im Hintergrundmodus |
-| Last, VRAM, Temperatur je Grafikkarte | ja | über `nvidia-smi`; AMD bräuchte einen anderen Weg |
-| Verlauf der letzten Minute als Kurve | ja | FrameFlip misst bereits im Takt |
-| Mehrere Karten einzeln | ja | `nvidia-smi` listet alle |
-| Live-Vorschau des aktuellen Frames | ja | FrameFlip liest die Datei, skaliert auf Handygröße |
-| Zurückspulen durch fertige Frames | **besser** | das ist FrameFlips Kerngeschäft |
-| Render stoppen | ja | **nur** als Hintergrundprozess, siehe 2.1 |
-| Weitere Datei in die Warteschlange | ja | setzt Hintergrundprozesse voraus |
-| .blend speichern | ja | `bpy.ops.wm.save_mainfile` aus einem Timer |
-| PC schlafen legen / herunterfahren | ja | FrameFlip, nicht der Addon |
-| Kopplung per QR-Code oder 6-stelligem Code | ja | siehe Abschnitt 5 |
-| Ende-zu-Ende verschlüsselt | ja | siehe Abschnitt 5 |
-| Einzelbilder oder Video herunterladen | ja | FrameFlip exportiert bereits über ffmpeg |
-| Wecker bei Fertigstellung | ja | Push-Nachricht der App |
-| Bis zu drei Render-PCs | ja | der Relay unterscheidet Geräte ohnehin |
-
-**Eine Vermutung, ausdrücklich als solche:** Render Control nennt keine eigene
-PC-Anwendung, bietet aber eine Warteschlange, „Stop render" und Sample-Zahlen. Eine
-Warteschlange ergibt nur Sinn, wenn etwas außerhalb von Blender die Aufträge startet,
-und die anderen beiden Punkte gibt es nach 2.1 und 2.2 nur im Hintergrundmodus. Alles
-spricht dafür, dass auch Render Control Renders als eigene Prozesse startet. Beweisen
-lässt sich das von außen nicht.
-
----
-
-## 5. Übertragung und Verschlüsselung
-
-### Aufbau
+The conclusion was tempting but did not survive measurement. A recording from a **GUI
+render** with Cycles shows:
 
 ```
-Blender-Addon ──lokal──> FrameFlip ──verschlüsselt──> Relay ──verschlüsselt──> App
-   (dünn)                 (die Zentrale)            (sieht nur Chiffrat)
+Remaining: 01:19.38 | Mem: 6543M | Sample 2304/4096
 ```
 
-Der Addon spricht ausschließlich mit FrameFlip auf dem eigenen Rechner. Er braucht
-damit **kein Netzwerk, keine Kryptografie und keine Fremdpakete** — das hält ihn klein
-und schnell, und es hält die GPL-Grenze sauber: Der Addon ist ein eigenes Repo unter
-GPL, FrameFlip bleibt MIT.
+All there. The source passage was read correctly, the inference from it was not — a
+lesson in how a single code path does not establish behaviour.
 
-### Kopplung
+The recording shows something else: the text is **two-part** when a phase has a
+detail.
 
-Ein QR-Code, den FrameFlip anzeigt, enthält einen zufälligen 256-Bit-Schlüssel. Der
-geht damit **nie über das Netz**. Wer den Code nicht gesehen hat, kann nichts
-entschlüsseln — auch der Relay nicht. Ein sechsstelliger Code als Alternative für den
-Fall, dass der Bildschirm nicht abfotografiert werden kann.
+```
+Mem: 1M | Synchronizing object | Fingernails.001
+Mem: 6544M | Updating Volume | Building octree for CryoMist
+Mem: 198M | Updating Geometry BVH Model_0_mesh0000.017 119/172 | Building BVH
+Time: 02:01.99 (Saving: 00:00.18)
+```
 
-### Verschlüsselung
+Three rules for the parser follow: **join** the descriptive parts rather than taking
+only the last; the closing `Time: …` message is not a current activity; and `119/172`
+without the word *Sample* is not a sample counter.
 
-AES-256-GCM, Sitzungsschlüssel über HKDF aus dem gekoppelten Geheimnis. Beides ist
-ohne Fremdbibliothek zu haben: .NET 8 bringt `AesGcm`, `HKDF` und
-`RandomNumberGenerator` mit, Android `javax.crypto` beziehungsweise die
-Jetpack-Security-Bausteine.
+### 2.3 What follows from that
 
-Das ist echtes Ende-zu-Ende: Der Relay leitet Bytes weiter, die er nicht lesen kann.
-Er braucht dafür weder Zertifikate für die Nutzdaten noch Vertrauen.
+For the **metrics**, nothing any more — they are fully available in the interface.
+
+For **cancelling and queueing** it still stands: both require a process of their own
+(`blender -b file.blend -a`), because 2.1 leaves no other route and a queue needs
+something outside Blender anyway. Renders started by hand in the interface are
+reported in full — they just cannot be stopped from outside.
+
+---
+
+## 3. Where each number comes from
+
+| Metric | Source | Reliability |
+|---|---|---|
+| Overall progress | `render_write` counts frames against `frame_start`/`frame_end` | exact, no parsing |
+| Sample progress | `render_stats` string | format is engine- and version-specific |
+| Remaining time, Cycles memory | `render_stats` string | present in the interface too, see 2.2 |
+| Time per frame | difference between two `render_write` | exact |
+| CPU, RAM of the machine | **FrameFlip** | exact |
+| GPU load, VRAM, temperature | `nvidia-smi`, invoked by FrameFlip | exact, NVIDIA only |
+| Preview image | FrameFlip reads the written file | exact |
+
+The principle behind it: **the add-on reports what only Blender knows. Everything
+about the machine is measured by FrameFlip.** Blender ships no `psutil`; an add-on
+collecting system values itself would need a third-party dependency or would load
+Blender's main thread. FrameFlip measures CPU and GPU anyway.
+
+The `render_stats` string is parsed **defensively**: what cannot be parsed is simply
+absent — it must never cause a message to be dropped or the add-on to throw.
+
+---
+
+## 4. Compared with Render Control
+
+[rendercontrol.solutions](https://www.rendercontrol.solutions) is the closest model.
+What it advertises, and how it maps onto this:
+
+| Render Control feature | Feasible | Note |
+|---|---|---|
+| Percent, frames, samples, elapsed, remaining | yes | complete, even for a render in the interface |
+| Load, VRAM, temperature per card | yes | via `nvidia-smi`; AMD would need another route |
+| Last minute as a graph | yes | FrameFlip already samples on a clock |
+| Multiple cards separately | yes | `nvidia-smi` lists all of them |
+| Live preview of the current frame | yes | FrameFlip reads the file and scales it to phone size |
+| Scrubbing back through finished frames | **better** | that is FrameFlip's core business |
+| Stop the render | yes | **only** as a background process, see 2.1 |
+| Queue another file | yes | requires background processes |
+| Save the .blend | yes | `bpy.ops.wm.save_mainfile` from a timer |
+| Sleep / shut down the PC | yes | FrameFlip, not the add-on |
+| Pairing by QR code or six-digit code | yes | see section 5 |
+| End-to-end encrypted | yes | see section 5 |
+| Download single frames or a video | yes | FrameFlip already exports through ffmpeg |
+| Alarm on completion | yes | push notification from the app |
+| Up to three render PCs | yes | the relay distinguishes devices anyway |
+
+**A conjecture, explicitly labelled as one:** Render Control names no PC application
+of its own, yet offers a queue and “Stop render”. A queue only makes sense if
+something outside Blender starts the jobs, and stopping cannot work any other way
+per 2.1. Much suggests that Render Control also runs renders as separate processes.
+It cannot be proven from the outside.
+
+*(The sample counts were originally part of this conjecture — until 2.2 showed they
+exist in the interface as well. The argument is weaker for it, not void.)*
+
+---
+
+## 5. Transport and encryption
+
+### Layout
+
+```
+Blender add-on ──local──> FrameFlip ──encrypted──> relay ──encrypted──> app
+    (thin)               (the hub)           (sees ciphertext only)
+```
+
+The add-on talks exclusively to FrameFlip on the same machine. It therefore needs
+**no network, no cryptography and no third-party packages** — which keeps it small
+and fast, and keeps the GPL boundary clean: the add-on is its own repository under
+GPL, FrameFlip stays MIT.
+
+### Pairing
+
+A QR code displayed by FrameFlip carries a random 256-bit key. It therefore **never
+crosses the network**. Anyone who has not seen the code can decrypt nothing — the
+relay included. A six-digit code as a fallback for when the screen cannot be
+photographed.
+
+### Encryption
+
+AES-256-GCM, session keys derived through HKDF from the paired secret. Both are
+available without a third-party library: .NET 8 ships `AesGcm`, `HKDF` and
+`RandomNumberGenerator`, Android has `javax.crypto` and the Jetpack Security
+building blocks.
+
+That is genuine end-to-end: the relay forwards bytes it cannot read. It needs neither
+certificates for the payload nor trust.
 
 ### Relay
 
-Ein kleiner Dienst, der Verbindungen einander zuordnet und Pakete weiterreicht — mehr
-nicht. Kein Speichern, keine Entschlüsselung, kein Zustand außer der Zuordnung.
-Läuft als Container hinter einem Reverse-Proxy, der TLS für die Transportschicht
-beisteuert.
+A small service that pairs connections and forwards packets — nothing more. No
+storage, no decryption, no state beyond the pairing. Runs as a container behind a
+reverse proxy that provides TLS for the transport layer.
 
-Weil er nur weiterleitet, ist er anspruchslos: Ein paar hundert Kilobyte je Sekunde
-für Metriken, dazu ein Vorschaubild auf Anfrage. Vorschauen werden **nur auf Abruf**
-erzeugt, in Handygröße und als JPEG — nie das 72-MB-PNG aus dem Renderordner.
+Because it only forwards, it is undemanding: a few hundred kilobytes per second for
+metrics, plus a preview image on request. Previews are generated **on demand only**,
+at phone size and as JPEG — never the 72 MB PNG from the render folder.
 
-> Die Betriebsdaten des Relays (Host, Domains, Zugänge) gehören **nicht** in dieses
-> öffentliche Repo. Sie stehen in der privaten Infrastruktur-Dokumentation.
-
----
-
-## 6. Sparsam bleiben
-
-Der eine Grundsatz, aus dem alles andere folgt:
-
-> **Handler dürfen nichts tun außer einen Eintrag in eine Warteschlange legen.**
-
-Sie laufen auf Blenders Hauptthread und blockieren ihn. Ein Netzwerkaufruf an dieser
-Stelle hängt den Render an der Netzwerklatenz auf — bei einer schlechten Mobilverbindung
-sind das Sekunden je Frame. Ein Hintergrundthread leert die Warteschlange und schreibt
-in den Socket; `bpy`-Daten fasst er nie an.
-
-Weiter:
-
-* `render_stats` feuert in der Oberfläche bis zu einmal je Sekunde und im
-  Hintergrundmodus öfter — wird gedrosselt.
-* Vorschauen nur auf Abruf, nicht bei jedem Frame.
-* Der Addon überträgt Pfade und Ereignisse, keine Bilddaten.
-* Im Leerlauf, also ohne laufenden Render, kostet der Addon nichts außer der
-  Registrierung seiner Handler.
+> The relay's operational details (host, domains, credentials) do **not** belong in
+> this public repository. They live in the private infrastructure documentation.
 
 ---
 
-## 7. Offene Punkte
+## 6. Staying frugal
 
-* **AMD-Grafikkarten** — `nvidia-smi` deckt nur NVIDIA ab. Für AMD wäre ein anderer
-  Weg nötig; bis dahin fehlen dort VRAM und Temperatur.
-* **Andere Render-Engines** — der `render_stats`-String von EEVEE sieht anders aus als
-  der von Cycles. Der Parser muss beides vertragen oder sauber nichts liefern.
-* **Blender-Version** — die Handler gibt es seit 2.8x unverändert, der Aufbau des
-  Statustexts ändert sich dagegen zwischen Versionen. Deshalb hängt keine Funktion
-  davon ab, ob er sich parsen lässt.
+The one principle everything else follows from:
+
+> **Handlers must do nothing except put an entry on a queue.**
+
+They run on Blender's main thread and block it. A network call at that point stalls
+the render on network latency — on a poor mobile connection that is seconds per
+frame. A background thread drains the queue and writes to the socket; it never
+touches `bpy` data.
+
+Further:
+
+* `render_stats` fires up to once a second in the interface and more often in
+  background mode — it is throttled.
+* Previews on request only, not on every frame.
+* The add-on transfers paths and events, no image data.
+* Idle — with no render running — the add-on costs nothing beyond having its handlers
+  registered.
+
+---
+
+## 7. Open points
+
+* **AMD graphics cards** — `nvidia-smi` covers NVIDIA only. AMD would need a
+  different route; until then VRAM and temperature are missing there.
+* **Other render engines** — EEVEE's `render_stats` string looks different from
+  Cycles'. The parser has to tolerate both or cleanly deliver nothing.
+* **Blender version** — the handlers have existed unchanged since 2.8x, whereas the
+  layout of the status text changes between versions. That is why no feature depends
+  on it being parseable.

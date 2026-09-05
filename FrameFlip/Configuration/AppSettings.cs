@@ -107,6 +107,14 @@ public sealed class AppSettings
     public bool PanelOpen { get; set; }
 
     /// <summary>
+    /// Sprache der Oberflaeche: "de" oder "en".
+    ///
+    /// Wird zur Laufzeit umgeschaltet, ohne Neustart - die Texte liegen als
+    /// ResourceDictionary je Sprache und werden gegeneinander getauscht.
+    /// </summary>
+    public string Language { get; set; } = "de";
+
+    /// <summary>
     /// Meldungen des Blender-Addons entgegennehmen.
     ///
     /// Der Empfaenger bindet ausschliesslich an 127.0.0.1 und verlangt ein Token aus

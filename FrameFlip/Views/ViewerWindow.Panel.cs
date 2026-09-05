@@ -5,6 +5,7 @@ using System.Windows.Interop;
 using FrameFlip.Caching;
 using FrameFlip.Configuration;
 using FrameFlip.Imaging;
+using FrameFlip.Localization;
 using FrameFlip.Interop;
 using Brush = System.Windows.Media.Brush;
 
@@ -39,16 +40,12 @@ public partial class ViewerWindow
 
     private void InitialisePanel()
     {
-        ChannelBox.ItemsSource = new[]
-        {
-            new ChannelOption("Alle Kanäle", ChannelView.All),
-            new ChannelOption("Rot", ChannelView.Red),
-            new ChannelOption("Grün", ChannelView.Green),
-            new ChannelOption("Blau", ChannelView.Blue),
-            new ChannelOption("Alpha", ChannelView.Alpha),
-            new ChannelOption("Helligkeit", ChannelView.Luminance),
-        };
+        FillChannelList();
         ChannelBox.SelectedIndex = 0;
+
+        // Nach einem Sprachwechsel muss die Liste neu beschriftet werden - sie
+        // besteht aus Objekten, nicht aus DynamicResource-Verweisen.
+        Localization.Strings.Changed += OnLanguageChangedInPanel;
 
         _adjustments = _settings.Adjustments?.Clamped() ?? ImageAdjustments.Neutral;
         PushAdjustmentsToControls();
@@ -60,6 +57,45 @@ public partial class ViewerWindow
     private sealed record ChannelOption(string Name, ChannelView Value)
     {
         public override string ToString() => Name;
+    }
+
+    private void FillChannelList()
+    {
+        ChannelBox.ItemsSource = new[]
+        {
+            new ChannelOption(Strings.T("S_ChannelAll"), ChannelView.All),
+            new ChannelOption(Strings.T("S_ChannelRed"), ChannelView.Red),
+            new ChannelOption(Strings.T("S_ChannelGreen"), ChannelView.Green),
+            new ChannelOption(Strings.T("S_ChannelBlue"), ChannelView.Blue),
+            new ChannelOption(Strings.T("S_ChannelAlpha"), ChannelView.Alpha),
+            new ChannelOption(Strings.T("S_ChannelLuminance"), ChannelView.Luminance),
+        };
+    }
+
+    /// <summary>
+    /// Beschriftet nach einem Sprachwechsel neu, was der Code gesetzt hat.
+    ///
+    /// Die Auswahl bleibt dabei erhalten: Sie ueber den Wert wiederzufinden statt
+    /// ueber den Index ist zwar umstaendlicher, ueberlebt aber eine spaetere
+    /// Umsortierung der Liste.
+    /// </summary>
+    private void OnLanguageChangedInPanel()
+    {
+        if (_closing) return;
+
+        var selected = CurrentChannel;
+
+        _suppressAdjustment = true;
+        FillChannelList();
+
+        ChannelBox.SelectedItem = ChannelBox.Items
+            .OfType<ChannelOption>()
+            .FirstOrDefault(option => option.Value == selected);
+
+        _suppressAdjustment = false;
+
+        UpdateClipText();
+        UpdateReferenceReadout();
     }
 
     private void TogglePanel() => SetPanelOpen(!_panelOpen, resizeWindow: true);
@@ -300,12 +336,12 @@ public partial class ViewerWindow
         var parts = new List<string>();
 
         if (_histogram.ClippedLow > HistogramView.ClipThreshold)
-            parts.Add($"{_histogram.ClippedLow * 100:0.#} % zugelaufen");
+            parts.Add(Strings.T("S_ClippedLow", $"{_histogram.ClippedLow * 100:0.#}"));
 
         if (_histogram.ClippedHigh > HistogramView.ClipThreshold)
-            parts.Add($"{_histogram.ClippedHigh * 100:0.#} % ausgebrannt");
+            parts.Add(Strings.T("S_ClippedHigh", $"{_histogram.ClippedHigh * 100:0.#}"));
 
-        ClipText.Text = parts.Count == 0 ? "Keine anliegenden Ränder." : string.Join("   ", parts);
+        ClipText.Text = parts.Count == 0 ? Strings.T("S_NoClipping") : string.Join("   ", parts);
         ClipText.Foreground = (Brush)FindResource(parts.Count == 0 ? "MutedBrush" : "GapBrush");
     }
 
@@ -343,8 +379,19 @@ public partial class ViewerWindow
         _referenceNumber = _sequence.Frames[Math.Clamp(buffer.Index, 0, _sequence.Count - 1)].Number;
 
         CompareButton.IsEnabled = true;
-        CompareText.Text = $"Gemerkt: Frame {_referenceNumber.ToString(_numberFormat)}. " +
-                           "Mit A/B oder Taste C umschalten.";
+        UpdateReferenceReadout();
+    }
+
+    /// <summary>
+    /// Beschriftet die Vergleichszeile. Eigene Methode, weil sie an zwei Stellen
+    /// gebraucht wird: nach dem Merken und nach einem Sprachwechsel.
+    /// </summary>
+    private void UpdateReferenceReadout()
+    {
+        CompareText.Text = _referencePixels is null
+            ? Strings.T("S_NoFrameKept")
+            : Strings.T("S_KeptFrame", _referenceNumber.ToString(_numberFormat))
+              + Strings.T("S_KeptFrameHint");
     }
 
     private void OnCompareToggled(object sender, RoutedEventArgs e)
@@ -375,7 +422,7 @@ public partial class ViewerWindow
         UpdateHistogramFromCurrentFrame();
 
         FileNameText.Text = show
-            ? $"A · Frame {_referenceNumber.ToString(_numberFormat)}"
+            ? Strings.T("S_CompareBadge", _referenceNumber.ToString(_numberFormat))
             : _sequence.Frames[Math.Clamp(_shownIndex >= 0 ? _shownIndex : _index, 0, _sequence.Count - 1)].FileName;
     }
 
@@ -445,8 +492,8 @@ public partial class ViewerWindow
         RefreshPresetList();
 
         ShowPanelStatus(existing is null
-            ? $"Vorlage „{name}“ gesichert."
-            : $"Vorlage „{name}“ ersetzt.");
+            ? Strings.T("S_PresetSaved", name)
+            : Strings.T("S_PresetReplaced", name));
     }
 
     private void OnDeletePresetClicked(object sender, RoutedEventArgs e)

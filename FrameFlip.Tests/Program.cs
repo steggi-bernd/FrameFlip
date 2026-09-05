@@ -25,6 +25,7 @@ static int RunAll()
     CadenceInvariants.Run();
     RangeInvariants.Run();
     BridgeInvariants.Run();
+    LocalizationInvariants.Run();
 
     return Check.Report();
 }

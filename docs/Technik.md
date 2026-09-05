@@ -1,591 +1,588 @@
-# FrameFlip – Technik
+# FrameFlip – Technical notes
 
-[← zurück zur Startseite](../README.md)
+[← back to the start page](../README.md)
 
-Vorschau für gerenderte Bildsequenzen. Läuft im Tray, öffnet auf Tastendruck die
-Sequenz der im Explorer markierten Datei als Video – und passt sich dabei laufend
-an die Auslastung der Maschine an, damit ein parallel laufender Blender-Render
-nichts davon merkt.
+A preview for rendered image sequences. Lives in the tray, opens the sequence of the
+file selected in Explorer as a video at a keystroke — and keeps adapting to the
+machine's load, so a Blender render running alongside does not notice.
 
-C# / .NET 8 / WPF. Keine externen Abhängigkeiten, kein ffmpeg, kein OpenCV.
+C# / .NET 8 / WPF. No external dependencies, no ffmpeg, no OpenCV.
 
-## Bauen
+## Building
 
 ```bash
 dotnet publish FrameFlip/FrameFlip.csproj -c Release
 ```
 
-Ergebnis: `bin/Release/net8.0-windows/win-x64/publish/FrameFlip.exe` – self-contained,
-eine einzelne Datei, kein Installer, kein installiertes .NET nötig. Einfach hinkopieren
-und starten (z. B. eine Verknüpfung in den Autostart legen).
+Result: `bin/Release/net8.0-windows/win-x64/publish/FrameFlip.exe` — self-contained, a
+single file, no installer, no installed .NET required. Copy it somewhere and run it
+(a shortcut in the startup folder, say).
 
-Die Datei ist ~160 MB, weil die Kompression bewusst **aus** ist: mit Kompression
-entpackt der Host die Assemblies in privaten Speicher (~130 MB committed statt ~60 MB).
-Wem die Dateigröße wichtiger ist als der Speicher, setzt in der `.csproj`
-`EnableCompressionInSingleFile` auf `true` – dann sind es ~72 MB.
+The file is ~160 MB because compression is deliberately **off**: with compression the
+host unpacks the assemblies into private memory (~130 MB committed instead of
+~60 MB). If file size matters more to you than memory, set
+`EnableCompressionInSingleFile` to `true` in the `.csproj` — that gives ~72 MB.
 
-## Bedienung
+## Controls
 
-| Eingabe | Wirkung |
+| Input | Effect |
 |---|---|
-| Hotkey (Standard **Strg+Alt+Leertaste**) | Vorschau öffnen bzw. schließen |
-| `Esc` / Klick außerhalb | schließen |
-| `Leertaste` / Klick ins Bild | Play / Pause |
-| `→` / `←` | ein Bild vor / zurück (pausiert die laufende Wiedergabe) |
-| Mausrad **pausiert** | zoomen, der Punkt unter dem Zeiger bleibt stehen |
-| Mausrad **während der Wiedergabe** | scrubben |
-| **Strg + Mausrad** | jeweils das andere von beiden |
-| Ziehen im Bild / mittlere Maustaste | verschieben, sobald hineingezoomt ist |
-| Doppelklick / Rechtsklick / `Strg+0` | zwischen Einpassung und 100 % wechseln |
-| `Strg` + `+` / `-` | zoomen ohne Maus |
-| Ziehen an der Kopfleiste | Fenster verschieben |
-| Fensterrand ziehen | Größe ändern |
-| `Pos1` / `Ende` | erster / letzter Frame |
-| `L` | Loop umschalten |
-| `I` / `O` | In- / Out-Punkt setzen (Loop und Export übernehmen ihn) |
-| `Entf` | In/Out wieder aufheben |
-| `D` | Bilddaten in der Kopfleiste ein- / ausblenden |
-| `E` | Exportdialog öffnen |
-| `1` / `2` / `3` | Dekodiergröße 100 % / 50 % / 25 % — verlängert den Puffervorlauf |
-| `Tab` | Bildanpassung ein- / ausblenden |
-| `A` | aktuellen Frame als Vergleich merken |
-| `C` | zwischen gemerktem und aktuellem Frame umschalten |
+| Hotkey (default **Ctrl+Alt+Space**) | open or close the preview |
+| `Esc` / click outside | close |
+| `Space` / click on the image | play / pause |
+| `→` / `←` | one frame forward / back (pauses playback) |
+| Mouse wheel **while paused** | zoom; the point under the cursor stays put |
+| Mouse wheel **during playback** | scrub |
+| **Ctrl + wheel** | whichever of the two is not currently bound |
+| Drag on the image / middle mouse button | pan, once zoomed in |
+| Double-click / right-click / `Ctrl+0` | switch between fit and 100 % |
+| `Ctrl` + `+` / `-` | zoom without the mouse |
+| Drag the header | move the window |
+| Drag the window edge | resize |
+| `Home` / `End` | first / last frame |
+| `L` | toggle looping |
+| `I` / `O` | set the in / out point (looping and export follow it) |
+| `Del` | clear in/out again |
+| `D` | show or hide the image details in the header |
+| `E` | open the export dialog |
+| `1` / `2` / `3` | decode size 100 % / 50 % / 25 % — lengthens the buffer ahead |
+| `Tab` | show or hide image adjustment |
+| `M` | show or hide render metrics |
+| `A` | keep the current frame for comparison |
+| `C` | switch between the kept and the current frame |
+| `Ctrl+,` | settings |
 
-Das Fenster öffnet randlos in der Größe des Mediums (höchstens 90 % der
-Arbeitsfläche, mindestens 400 × 300), mittig auf dem Monitor des Explorers, und
-blendet über 120 ms ein. Die Kopfleiste zeigt Dateiname, Systemlast, Auflösung,
-Farbtiefe, Dateigröße und Zoomstufe; die Bedienleiste unten blendet nach 2 s
-Inaktivität aus und bleibt stehen, solange die Maus darüber liegt, der Scrubber
-gezogen wird oder das FPS-Menü offen ist.
+The window opens borderless at media size (at most 90 % of the work area, at least
+400 × 300), centred on the monitor Explorer is on, and fades in over 120 ms. The
+header shows file name, system load, resolution, bit depth, file size and zoom level;
+the control bar at the bottom fades out after 2 s of inactivity and stays put while
+the mouse is over it, the scrubber is being dragged or the fps menu is open.
 
-Ist die Vorschau bereits offen und der Explorer zeigt inzwischen auf eine **andere**
-Sequenz, tauscht der Hotkey den Inhalt, statt ein zweites Fenster zu öffnen. Zeigt
-er auf dieselbe, schließt er wie gewohnt.
+If the preview is already open and Explorer meanwhile points at a **different**
+sequence, the hotkey swaps the content instead of opening a second window. If it
+points at the same one, it closes as usual.
 
-Der Klick außerhalb schließt die Vorschau (QuickLook-Verhalten). Wer nebenher in
-Blender arbeiten und die Sequenz stehen lassen will, schaltet das in den
-Einstellungen ab.
+Clicking outside closes the preview (QuickLook behaviour). If you want to work in
+Blender alongside and keep the sequence up, turn that off in the settings.
 
-Statt über den Explorer geht es auch direkt:
+There is also a direct route, bypassing Explorer:
 
 ```bash
 FrameFlip.exe --preview "D:\renders\shot_010\render_0001.png"
 ```
 
-Für automatisierte Tests lässt sich über die Umgebungsvariable `FRAMEFLIP_CONFIG`
-ein alternativer Konfigurationspfad angeben; eine so gestartete Instanz läuft auch
-neben einer normalen und lässt `%APPDATA%\FrameFlip\config.json` unberührt.
+For automated tests the environment variable `FRAMEFLIP_CONFIG` can point at an
+alternative configuration path; an instance started that way runs alongside a normal
+one and leaves `%APPDATA%\FrameFlip\config.json` untouched.
 
-> **Auf diesem Rechner ist Strg+Alt+Leertaste bereits belegt** (`RegisterHotKey`
-> meldet Fehler 1409) – ebenso Alt+Leertaste; das sieht nach einem installierten
-> Launcher aus. FrameFlip meldet das beim Start per Ballon-Hinweis. Frei getestet
-> sind u. a. Strg+Umschalt+Leertaste, Strg+Alt+V und Strg+Alt+Q. Umstellen im
-> Tray-Menü unter *Einstellungen*.
+> **On this machine Ctrl+Alt+Space is already taken** (`RegisterHotKey` reports error
+> 1409) — as is Alt+Space; that looks like an installed launcher. FrameFlip reports
+> this with a balloon tip at startup. Ctrl+Shift+Space, Ctrl+Alt+V and Ctrl+Alt+Q
+> tested free, among others. Change it in the tray menu under *Settings*.
 
-## Was wo passiert
+## What happens where
 
-| Datei | Aufgabe |
+| File | Responsibility |
 |---|---|
-| `AppHost.cs` | Tray-Icon, Menü, Toggle-Logik, Fenstergeometrie |
-| `Interop/HotKeyService.cs` | `RegisterHotKey` auf unsichtbarem Fenster, `WM_HOTKEY` |
+| `AppHost.cs` | tray icon, menu, toggle logic, window geometry |
+| `Interop/HotKeyService.cs` | `RegisterHotKey` on an invisible window, `WM_HOTKEY` |
 | `Interop/ExplorerSelectionProvider.cs` | `Shell.Application` → `ShellWindows` → `Document.SelectedItems` |
-| `Diagnostics/SystemLoadMonitor.cs` | CPU/GPU/RAM messen, Ressourcenprofil ableiten |
-| `Diagnostics/GpuLoadCounter.cs` | PDH-Zähler `GPU Engine(*)` über `pdh.dll` |
-| `Sequencing/SequenceScanner.cs` | Dateiname → Präfix/Zifferngruppe/Endung, Ordner scannen |
-| `Decoding/` | `IFrameDecoder` + WIC-Implementierung |
-| `Caching/FrameCache.cs` | Ringpuffer, Decoder-Threads, RAM-Budget |
-| `Playback/PlaybackClock.cs` | zeitbasierte Wiedergabeposition |
-| `Views/ViewerWindow.xaml` | Anzeige, Zoom, Overlays, Eingaben |
+| `Diagnostics/SystemLoadMonitor.cs` | measure CPU/GPU/RAM, derive the resource profile |
+| `Diagnostics/GpuLoadCounter.cs` | PDH counter `GPU Engine(*)` via `pdh.dll` |
+| `Sequencing/SequenceScanner.cs` | file name → prefix/digit group/extension, scan the folder |
+| `Decoding/` | `IFrameDecoder` plus the WIC implementation |
+| `Caching/FrameCache.cs` | ring buffer, decoder threads, RAM budget |
+| `Playback/PlaybackClock.cs` | time-based playback position |
+| `Bridge/` | receives the Blender add-on's messages |
+| `Localization/` | the German and English string dictionaries |
+| `Views/ViewerWindow.xaml` | display, zoom, overlays, input |
 
-### Erst puffern, dann abspielen
+### Buffer first, then play
 
-Die Wiedergabe startet nicht mit dem ersten Frame, sondern erst, wenn genug im
-Ring liegt: standardmäßig anderthalb Sekunden Material (`WarmupFrames` in der
-Konfiguration überschreibt das), oder wenn die ganze Sequenz gepuffert ist.
-Solange steht ein dezentes *Puffern …* oben rechts. Notausstieg nach 8 s, damit
-eine langsame Platte nicht endlos blockiert.
+Playback does not start with the first frame but once enough is in the ring: by
+default one and a half seconds of material (`WarmupFrames` in the configuration
+overrides this), or once the whole sequence is buffered. Until then a discreet
+*Buffering …* sits in the top left. Emergency exit after 8 s, so a slow disk cannot
+block indefinitely.
 
-Läuft der Ring während der Wiedergabe leer, wird angehalten und nachgeladen
-statt weiterzuruckeln. Einzelne fehlende Frames werden dagegen verworfen – erst
-wenn **gar nichts** mehr vorausliegt, wird gepuffert.
+If the ring runs dry during playback, it stops and reloads rather than stuttering on.
+Individual missing frames are dropped instead — only when **nothing at all** lies
+ahead does it buffer.
 
-In der Kopfleiste steht neben der tatsächlich angezeigten Bildrate, **wie weit der
-Puffer vorausreicht**. Wird die Zahl gelb oder rot, ist das nächste Stocken
-absehbar. Und der Hinweis *Puffern …* nennt den Anlass – *Ring leer*, *Sprung*,
-*neue Auflösung*, *neue Sequenz* –, damit unterscheidbar bleibt, ob der Vorrat
-aufgebraucht war oder etwas anderes den Ring verworfen hat.
+Next to the frame rate actually being displayed, the header shows **how far the
+buffer reaches ahead**. Once that number turns yellow or red, the next stall is
+foreseeable. And the *Buffering …* notice names the reason — *ring empty*, *seek*,
+*new resolution*, *new sequence* — so it stays distinguishable whether the supply ran
+out or something else discarded the ring.
 
-### Der Vorlauf folgt der Bildrate
+### The prefetch follows the frame rate
 
-`PrefetchAhead` ist eine **Frameanzahl**, und die bedeutet je nach Bildrate etwas
-völlig anderes: 60 Frames sind bei 24 fps zweieinhalb Sekunden Reserve, bei 60 fps
-nur eine. Deshalb gilt der eingestellte Wert als Untergrenze, und darüber hinaus
-werden mindestens **zwei Sekunden** Material vorgehalten.
+`PrefetchAhead` is a **frame count**, and that means something entirely different
+depending on the frame rate: 60 frames are two and a half seconds of reserve at
+24 fps, but only one at 60 fps. So the configured value acts as a lower bound, and
+beyond it at least **two seconds** of material are kept.
 
-### Der Ring kennt den In/Out-Bereich
+### The ring knows the in/out range
 
-Ist ein Bereich gesetzt, spielt die Wiedergabe nur darin – der Ringpuffer rechnete
-aber lange über die **ganze** Sequenz. Beim Loop-Sprung vom Out- zurück zum In-Punkt
-wrappte das Vorausladen deshalb über das Sequenzende statt über das Bereichsende:
+With a range set, playback stays inside it — but the ring buffer computed over the
+**whole** sequence for a long time. At the loop jump from the out point back to the
+in point, prefetching therefore wrapped around the end of the *sequence* rather than
+the end of the *range*:
 
-* Der Frame am In-Punkt war weder vorgeladen noch gehalten – genau der, auf den der
-  nächste Schritt geht. Ergebnis: Nachpuffern bei **jeder** Runde.
-* Stattdessen lud der Ring die Frames *hinter* dem Out-Punkt, die nie gezeigt werden.
-  Bei einer Sequenz aus 2077 Bildern zu je 8,3 MB sind das bis zu 120 Dekodierungen
-  je Runde, jede zusätzlich in den Rohcache geschrieben – knapp ein Gigabyte
-  Schreiblast für Bilder, die niemand sieht.
+* The frame at the in point was neither prefetched nor retained — precisely the one
+  the next step goes to. Result: re-buffering on **every** pass.
+* Instead the ring loaded the frames *beyond* the out point, which are never shown.
+  For a sequence of 2077 frames at 8.3 MB each that is up to 120 decodes per pass,
+  each additionally written to the raw cache — close to a gigabyte of write load for
+  images nobody sees.
 
-`SequenceMath.OffsetInRange` gab es dafür bereits, es war nur nicht angeschlossen.
-Jetzt beziehen sich Ladereihenfolge, Bewertung (`Score`), Rückfall auf ein älteres
-Bild und die Zählung des Vorrats auf den Bereich. Frames außerhalb fliegen sofort
-raus: Der Platz gehört dem Bereich.
+`SequenceMath.OffsetInRange` already existed for this; it simply was not wired up.
+Load order, scoring (`Score`), falling back to an older frame and counting the supply
+now all refer to the range. Frames outside it are dropped immediately: the space
+belongs to the range.
 
-Nebeneffekt, der den eigentlichen Gewinn ausmacht: Ein kurzer Ausschnitt passt
-dadurch oft **vollständig** in den Ring, auch wenn die Sequenz es nie täte. Dann gibt
-es überhaupt kein Nachpuffern mehr. Der Regressionstest hält das fest – ohne den Fix
-liegt bei einem Bereich aus zehn Frames genau einer im Ring, mit Fix alle zehn.
+The side effect is where the real gain lies: a short excerpt often fits **entirely**
+into the ring, even when the sequence never would. Then there is no re-buffering at
+all. The regression test records this — without the fix exactly one of a ten-frame
+range sits in the ring, with the fix all ten.
 
-### Der Ring benutzt das Budget
+### The ring uses its budget
 
-Die Ringgröße folgte früher **allein** aus Vor- plus Rücklauf – bei 2 GB Budget und
-1080p blieb er deshalb bei 151 Frames stehen, obwohl 259 hineingepasst hätten. Alles
-darüber hinaus fiel heraus und musste bei jedem Loop-Durchlauf neu dekodiert werden,
-obwohl der Speicher längst zugesagt war.
+Ring size used to follow **solely** from prefetch plus rewind — with a 2 GB budget
+and 1080p it therefore stopped at 151 frames although 259 would have fitted.
+Everything beyond that fell out and had to be decoded again on every loop pass, even
+though the memory had long been committed.
 
-Zwei Regeln gelten jetzt:
+Two rules now apply:
 
-* **Passt die Sequenz vollständig ins Budget, wird sie ganz gehalten.** Nach dem
-  ersten Durchlauf wird dann nie wieder nachgeladen – der Loop läuft ohne jedes
-  Puffern. Nachgemessen mit 150 Frames über drei Runden: 0 Nachladevorgänge.
-* **Passt sie nicht, wird trotzdem der ganze Platz benutzt.** Bei 600 Frames und
-  2 GB sind das 258 statt 151 im Ring und 227 statt 120 Frames Vorlauf – bei 60 fps
-  also 3,8 statt 2,0 Sekunden Reserve.
+* **If the sequence fits the budget entirely, all of it is kept.** After the first
+  pass nothing is ever reloaded — the loop runs without any buffering. Measured with
+  150 frames over three passes: 0 reloads.
+* **If it does not fit, the whole space is used anyway.** With 600 frames and 2 GB
+  that is 258 instead of 151 in the ring and 227 instead of 120 frames of prefetch —
+  at 60 fps, 3.8 instead of 2.0 seconds of reserve.
 
-Wie viele Frames hineinpassen, hängt an der Bildgröße:
+How many frames fit depends on the image size:
 
-| Budget | 1080p (7,9 MB) | 1080p schwer (8,5 MB) | 4K (33 MB) |
+| Budget | 1080p (7.9 MB) | 1080p heavy (8.5 MB) | 4K (33 MB) |
 |---|---|---|---|
 | 1 GB | 129 | 120 | 31 |
 | 2 GB | 259 | 240 | 62 |
 | 4 GB | 518 | 481 | 124 |
 
-### Zweite Stufe: Rohcache auf der Platte
+### Second stage: raw cache on disk
 
-Passt die Sequenz nicht in den Arbeitsspeicher, fällt bei jedem Loop-Durchlauf ein
-Teil aus dem Ring und muss neu beschafft werden. Statt das PNG erneut zu entpacken,
-legt FrameFlip die dekodierten Frames als **rohe Bgra32-Blöcke** unter
-`%TEMP%\FrameFlip
-awcache` ab. Gemessen an 1080p:
+If the sequence does not fit in memory, part of it falls out of the ring on every
+loop pass and has to be obtained again. Rather than decoding the PNG a second time,
+FrameFlip stores the decoded frames as **raw Bgra32 blocks** under
+`%TEMP%\FrameFlip\rawcache`. Measured on 1080p:
 
-| Weg | Zeit je Frame |
+| Route | Time per frame |
 |---|---|
-| PNG entpacken | 31 ms |
-| **rohen Block lesen** | **6 ms** |
-| rohen Block schreiben | 3 ms |
-| aus dem Arbeitsspeicher | 0,02 ms |
+| decode the PNG | 31 ms |
+| **read the raw block** | **6 ms** |
+| write the raw block | 3 ms |
+| from memory | 0.02 ms |
 
-Am Loop gemessen, 300 Frames bei einem Ring für 100: die zweite Runde dauert
-**0,59 s statt 1,74 s**. Der erste Durchlauf kostet dafür 15 % mehr, weil nebenher
-geschrieben wird.
+Measured on the loop, 300 frames with a ring holding 100: the second pass takes
+**0.59 s instead of 1.74 s**. In exchange the first pass costs 15 % more, because it
+writes alongside.
 
-Bewusst **ohne Kompression** – sie brächte genau die Rechenzeit zurück, die hier
-gespart werden soll. Und bewusst **sitzungsgebunden**: Der Ordner hängt an
-Sequenz *und* Dekodiergröße und wird beim Schließen gelöscht; Reste früherer
-Sitzungen räumt der nächste Start weg. Jeder Eintrag trägt Änderungszeit und Länge
-der Quelldatei im Kopf – wird während eines laufenden Renders ein Frame
-überschrieben, gilt der alte Block sofort als ungültig. Ohne diese Prüfung zeigte
-die Vorschau hartnäckig das Bild von vorhin.
+Deliberately **without compression** — that would give back exactly the compute time
+this is meant to save. And deliberately **session-scoped**: the folder is keyed to
+sequence *and* decode size and is deleted on close; leftovers from earlier sessions
+are cleared away by the next start. Every entry carries the source file's
+modification time and length in its header — if a frame is overwritten during a
+running render, the old block is invalid immediately. Without that check the preview
+stubbornly showed the earlier image.
 
-Abschaltbar über `RawCacheEnabled`; die Obergrenze steht in `RawCacheMaxGb`
-(Standard 16). Auf einer mechanischen Platte lohnt es sich nicht – dort ist Lesen
-kaum schneller als Entpacken.
+Switched off through `RawCacheEnabled`; the limit is in `RawCacheMaxGb` (default 16).
+On a mechanical disk it is not worth it — there, reading is barely faster than
+decoding.
 
-Soll eine Sequenz komplett im Speicher liegen, muss das Budget also mindestens
-`Frames × Bildgröße` betragen. Die Pufferstufe (`2` / `3`) senkt die Bildgröße auf
-ein Viertel bzw. ein Sechzehntel und bringt eine lange Sequenz damit oft doch noch
-vollständig unter.
+So for a sequence to sit entirely in memory the budget has to be at least
+`frames × image size`. The decode step (`2` / `3`) drops the image size to a quarter
+or a sixteenth and often does fit a long sequence in after all.
 
-Wird die Bildrate im Betrieb umgeschaltet, zieht der Ring sein Fenster nach, ohne
-die bereits dekodierten Frames zu verwerfen.
+If the frame rate is switched at runtime, the ring adjusts its window without
+discarding the frames it has already decoded.
 
-### Dekodiergröße als Pufferstufe
+### Decode size as a buffer step
 
-`1` / `2` / `3` oder der Knopf in der Bedienleiste schalten die Dekodierung auf
-100 %, 50 % oder 25 %. Das wirkt **nicht** auf den Zoom – hineinzoomen geht weiter,
-das Bild ist nur gröber.
+`1` / `2` / `3` or the button in the control bar switch decoding to 100 %, 50 % or
+25 %. This does **not** affect zoom — zooming in still works, the image is just
+coarser.
 
-Der Gewinn liegt nicht dort, wo man ihn vermutet. Gemessen an 1080p-Material
-(5,9 MB je PNG) kostet ein Frame **35,7 ms bei voller und 31,1 ms bei viertel
-Größe** – das Verkleinern spart beim Dekodieren also kaum etwas, weil WIC das PNG
-ohnehin vollständig entpacken muss, bevor es skalieren kann. Der Hebel ist der
-**Speicher**:
+The gain is not where one would expect it. Measured on 1080p material (5.9 MB per
+PNG) a frame costs **35.7 ms at full and 31.1 ms at quarter size** — shrinking
+therefore saves almost nothing during decoding, because WIC has to unpack the PNG
+completely before it can scale. The lever is **memory**:
 
-| Stufe | Speicher je Frame | Passen in 1 GB | Vorlauf bei 24 fps |
+| Step | Memory per frame | Fit in 1 GB | Prefetch at 24 fps |
 |---|---|---|---|
-| 100 % | 7,91 MB | 129 | 5,4 s |
-| 50 % | 1,98 MB | 517 | 21,5 s |
-| 25 % | 0,49 MB | 2070 | 86 s |
+| 100 % | 7.91 MB | 129 | 5.4 s |
+| 50 % | 1.98 MB | 517 | 21.5 s |
+| 25 % | 0.49 MB | 2070 | 86 s |
 
-Deshalb heißt es Pufferstufe und nicht Qualitätsstufe. In einer verkleinerten Stufe
-wird bilinear hochskaliert statt mit `NearestNeighbor` – harte Klötzchen würden
-genau das verdecken, was man beurteilen will.
+Which is why it is called a buffer step and not a quality step. In a reduced step the
+image is scaled up bilinearly rather than with `NearestNeighbor` — hard blocks would
+hide exactly what you are trying to judge.
 
-Zum Vergleich, was der Decoder liefert: bei diesem Material schafft **ein** Thread
-rund 30 Frames/s, vier Threads 116, sechs Threads 161. Ein einzelner Thread liegt
-also nur knapp über den 24 fps der Wiedergabe – unter Systemlast reicht das nicht,
-und dann trägt allein der Vorrat.
+For comparison, what the decoder delivers: on this material **one** thread manages
+about 30 frames/s, four threads 116, six threads 161. A single thread is therefore
+barely above the 24 fps of playback — under system load that is not enough, and then
+the supply alone carries it.
 
-### Wiedergabe ist zeitbasiert
+### Playback is time-based
 
-`PlaybackClock` zählt keine Ticks, sondern rechnet `Anker + Sekunden × FPS`.
-Getaktet wird über `CompositionTarget.Rendering` – kein zusätzlicher Thread, und
-bei Pause wird das Ereignis abgemeldet (0 % CPU im Pausenzustand).
+`PlaybackClock` counts no ticks; it computes `anchor + seconds × fps`. The clock
+comes from `CompositionTarget.Rendering` — no extra thread, and on pause the event is
+unsubscribed (0 % CPU while paused).
 
-Bei aktivem Loop ist die Position `raw mod Frameanzahl` – der Sprung vom letzten
-auf den ersten Frame ist damit kein Sonderfall, weder in der Wiedergabe noch im
-Vorausladen des Puffers. Deshalb ist er nahtlos.
+With looping active the position is `raw mod frame count` — the jump from the last to
+the first frame is therefore not a special case, neither in playback nor in the
+buffer's prefetching. That is why it is seamless.
 
-### Ausnahme: Kopplung an den Bildschirmtakt
+### Exception: locking to the display refresh
 
-Eine bewusste Abweichung von der zeitbasierten Wiedergabe, abschaltbar unter
-*Wiedergabe → an den Bildschirmtakt koppeln* (Vorgabe: an).
+A deliberate departure from time-based playback, switchable under *Playback → lock to
+the display refresh* (default: on).
 
-Liegt die Sollrate auf dem Bildschirmtakt, hat die Zeitachse **keinerlei Reserve**:
-Bei 60 fps auf 60 Hz muss jeder einzelne Kompositionsschritt ein neues Bild
-tragen, und jeder ausgelassene Schritt verschluckt sofort eines. Gemessen auf
-einem 60-Hz-Schirm mit echter Zeichenlast:
+When the target rate sits on the display refresh, the timeline has **no headroom at
+all**: at 60 fps on 60 Hz every single composition step has to carry a new frame, and
+every step that is skipped swallows one immediately. Measured on a 60 Hz display with
+real drawing load:
 
-| Sollrate | Verfahren | gezeigt | Standbilder | Sprünge |
+| Target rate | Method | shown | held frames | skips |
 |---|---|---|---:|---:|
-| 60 fps | zeitbasiert | 40,3/s | 9,3/s | **15,0/s** |
-| 60 fps | gekoppelt | 59,0/s | 0 | **0** |
-| 30 fps | zeitbasiert | 30,0/s | 13,5/s | 0 |
-| 30 fps | gekoppelt | 18,3/s | – | 0 |
+| 60 fps | time-based | 40.3/s | 9.3/s | **15.0/s** |
+| 60 fps | locked | 59.0/s | 0 | **0** |
+| 30 fps | time-based | 30.0/s | 13.5/s | 0 |
+| 30 fps | locked | 18.3/s | – | 0 |
 
-Die letzte Zeile ist der Grund für die enge Bedingung: Bei 30 fps auf 60 Hz kostet
-jeder ausgelassene Schritt einen halben Frame, und die Kopplung bricht ein. Dort
-ist die Uhr richtig – sie zeigt ohnehin null Sprünge, weil die doppelte Reserve
-dazwischenliegt.
+The last row is the reason for the narrow condition: at 30 fps on 60 Hz every skipped
+step costs half a frame, and locking collapses. There the clock is right — it shows
+zero skips anyway, because there is twice the headroom in between.
 
-Gekoppelt wird deshalb nur, wenn **alle** Bedingungen gelten:
+Locking therefore happens only when **all** conditions hold:
 
-* die Sollrate weicht um höchstens 5 % vom gemessenen Takt ab,
-* der Schirm liefert mindestens 80 % seines eigenen Takts (sonst Zeitlupe),
-* die Einstellung ist aktiv.
+* the target rate differs from the measured refresh by at most 5 %,
+* the display delivers at least 80 % of its own refresh (otherwise: slow motion),
+* the setting is on.
 
-Der Takt wird nicht erfragt, sondern gemessen (`RefreshEstimator`): Die
-Anzeigeeinstellung nennt 60 Hz, viele Anschlüsse laufen mit 59,94 – und genau
-dieser Unterschied entscheidet. Der Median der letzten 64 Abstände ergibt den
-Takt des Schirms, die Zahl der Schritte je Sekunde das, was er tatsächlich
-liefert; fallen beide auseinander, lässt die Komposition Schritte aus.
+The refresh is not asked for but measured (`RefreshEstimator`): the display settings
+say 60 Hz, many connections run at 59.94 — and that difference is what decides. The
+median of the last 64 intervals gives the display's refresh, the number of steps per
+second gives what it actually delivers; when the two diverge, composition is dropping
+steps.
 
-Bezahlt wird die Kopplung mit dem Unterschied zwischen Sollrate und echtem
-Schirmtakt, also rund einem Promille. Wer die Zeitachse exakt braucht, schaltet
-sie ab – dann gilt ausschließlich `PlaybackClock`.
+Locking is paid for with the difference between the target rate and the true display
+refresh, so roughly one part in a thousand. If you need the timeline exact, turn it
+off — then `PlaybackClock` alone applies.
 
-### Dynamische Ressourcen
+### Adaptive resources
 
-Solange eine Vorschau offen ist, misst FrameFlip alle 10 Sekunden (einstellbar):
+While a preview is open, FrameFlip measures every 10 seconds (configurable):
 
-* **CPU** über `GetSystemTimes` – der eigene Verbrauch wird abgezogen, sonst sieht
-  FrameFlip die Last, die es selbst erzeugt, und drosselt sich grundlos.
-* **RAM** über `GlobalMemoryStatusEx` (freier physischer Speicher).
-* **GPU** über die PDH-Zähler `GPU Engine(*)\Utilization Percentage`, also dieselbe
-  Quelle wie der Task-Manager. Instanzen derselben Engine-Art werden summiert, über
-  die Engine-Arten hinweg zählt das Maximum.
+* **CPU** through `GetSystemTimes` — its own consumption is subtracted, otherwise
+  FrameFlip sees the load it creates itself and throttles for no reason.
+* **RAM** through `GlobalMemoryStatusEx` (free physical memory, and the total, which
+  is what turns "free" into a utilisation figure).
+* **GPU** through the PDH counters `GPU Engine(*)\Utilization Percentage`, the same
+  source the Task Manager uses. Instances of the same engine type are summed; across
+  engine types the maximum counts.
 
-Daraus folgt eine von vier Stufen mit Totband gegen Pendeln:
+From this follows one of four levels, with a dead band against oscillation:
 
-| Stufe | Auslastung | Decoder-Threads | Threadpriorität | Prozess |
+| Level | Utilisation | Decoder threads | Thread priority | Process |
 |---|---|---|---|---|
-| Leerlauf | < 20 % | bis `MaxDecoderThreads` | Normal | Normal |
-| Mäßig | < 45 % | zwei Drittel davon | BelowNormal | BelowNormal |
-| Beschäftigt | < 80 % | 1 | Lowest | BelowNormal |
-| Kritisch | ≥ 80 % | 1 | Lowest | BelowNormal |
+| Idle | < 20 % | up to `MaxDecoderThreads` | Normal | Normal |
+| Moderate | < 45 % | two thirds of that | BelowNormal | BelowNormal |
+| Busy | < 80 % | 1 | Lowest | BelowNormal |
+| Critical | ≥ 80 % | 1 | Lowest | BelowNormal |
 
-Weniger als 2 GB frei stuft auf *Beschäftigt* herab, weniger als 1 GB auf
-*Kritisch* – unabhängig von der CPU. Die Threadobergrenze ist zusätzlich auf die
-Kernzahl minus zwei gedeckelt (auf diesem Rechner: 10 von 12). Ohne offene Vorschau
-misst nichts, und der Prozess steht wieder auf `BelowNormal`.
+Less than 2 GB free downgrades to *Busy*, less than 1 GB to *Critical* — regardless
+of the CPU. The thread ceiling is additionally capped at the core count minus two (on
+this machine: 10 of 12). With no preview open nothing is measured, and the process is
+back on `BelowNormal`.
 
-**Die Threadzahl entscheidet, welche Bildrate überhaupt erreichbar ist** – das ist
-der Punkt, an dem eine zu vorsichtige Einstellung als Programmfehler erscheint. Ein
-1080p-PNG mit 8,5 MB braucht rund 46 ms zum Entpacken, weil `zlib` das ganze Bild
-dekomprimieren muss:
+While a render is being reported, the sampling interval drops to 2 seconds. The
+normal 10 seconds are enough for the governor but useless for a graph: six points a
+minute make a staircase, not a curve. The measurement itself is a single system call.
 
-| Threads | erreichbare Bildrate | reicht für |
+**The thread count decides which frame rate is reachable at all** — this is the point
+at which too cautious a setting looks like a bug in the program. A 1080p PNG of
+8.5 MB takes about 46 ms to unpack, because `zlib` has to decompress the whole image:
+
+| Threads | Reachable frame rate | Enough for |
 |---|---|---|
-| 1 | ~18 fps | nicht einmal 24 fps |
-| 2 | ~37 fps | 24 fps, nicht 30 |
-| 4 | ~73 fps | 60 fps, knapp |
-| 6 | ~110 fps | 60 fps mit Reserve |
+| 1 | ~18 fps | not even 24 fps |
+| 2 | ~37 fps | 24 fps, not 30 |
+| 4 | ~73 fps | 60 fps, barely |
+| 6 | ~110 fps | 60 fps with reserve |
 
-Dabei sehen CPU und GPU im Task-Manager **unbelastet** aus: zwei arbeitende Threads
-von zwölf Kernen sind 17 % Gesamtlast. Bleibt die Wiedergabe hinter der Bildrate
-zurück und ist zugleich der Puffer leer, sagt FrameFlip das jetzt als Hinweis –
-samt der Zahl der gerade erlaubten Threads.
+Meanwhile CPU and GPU look **unloaded** in the Task Manager: two working threads out
+of twelve cores are 17 % total load. If playback falls behind the frame rate while the
+buffer is empty at the same time, FrameFlip now says so as a notice — including the
+number of threads currently permitted.
 
-Frühere Standardwerte waren zu knapp: Deckel bei der halben Kernzahl,
-`MaxDecoderThreads` von 4, und bei mittlerer Last nochmals halbiert. Für 24 fps
-reichte das, für 60 fps nicht.
+Earlier defaults were too tight: a ceiling at half the core count, `MaxDecoderThreads`
+of 4, and halved again at moderate load. Enough for 24 fps, not for 60.
 
-**Die Puffergröße folgt ausdrücklich *nicht* der CPU-Last, sondern nur dem freien
-Arbeitsspeicher.** Eine frühere Fassung kürzte beides gemeinsam — bei *Beschäftigt*
-auf 70 %, bei *Kritisch* auf 40 %. Das war ein Denkfehler: gerade wenn der Decoder
-nur noch einen Thread hat, ist ein **großer** Vorrat die einzige Reserve, aus der
-die Wiedergabe flüssig laufen kann. Nachgemessen mit 1080p-Material (7,91 MB je
-Frame): bei 512 MB Budget fassen 64 Frames 2,7 Sekunden — auf 70 % gekürzt bleiben
-1,8 Sekunden, und der Ring läuft beim ersten Stocken leer. Gekürzt wird jetzt nur
-bei echtem Speichermangel (unter 2 GB auf 70 %, unter 1 GB auf 40 %), denn dort
-träfe Auslagern die Wiedergabe härter als ein kurzer Puffer.
+**The buffer size explicitly does *not* follow CPU load, only free memory.** An
+earlier version cut both together — to 70 % at *Busy*, to 40 % at *Critical*. That was
+a thinking error: precisely when the decoder is down to one thread, a **large** supply
+is the only reserve playback still has. Measured with 1080p material (7.91 MB per
+frame): at a 512 MB budget, 64 frames hold 2.7 seconds — cut to 70 % that leaves
+1.8 seconds, and the ring runs dry at the first hiccup. Cutting now happens only on
+genuine memory pressure (below 2 GB to 70 %, below 1 GB to 40 %), because there,
+paging would hit playback harder than a short buffer.
 
-Zur Einordnung: **GPU-Last ist messbar, aber kaum steuerbar.** FrameFlip benutzt die
-GPU nur zum Compositing des Fensters; wenn Cycles die Karte auslastet, bringt ein
-Drosseln des Decoders der GPU wenig. Der Wert dient als Indikator „die Maschine
-arbeitet", die wirksamen Stellschrauben sind Threads, Priorität und Puffer.
+For perspective: **GPU load is measurable but barely controllable.** FrameFlip uses
+the GPU only to composite its window; if Cycles saturates the card, throttling the
+decoder does the GPU little good. The value serves as an indicator that "the machine
+is working"; the effective levers are threads, priority and buffer.
 
-Abschaltbar über *Einstellungen → Dynamische Last*. Dann bleibt es bei genau einem
-Decoder-Thread mit `Lowest`, wie ursprünglich spezifiziert.
+Switched off under *Settings → Adaptive load*. Then it stays at exactly one decoder
+thread at `Lowest`, as originally specified.
 
-### Speicher
+### Memory
 
-Frames liegen als `Bgra32`-Pixelpuffer aus einem eigenen Pool im Ring. Im
-eingeschwungenen Zustand rotieren immer dieselben Arrays – keine Allokation pro Frame,
-keine GC-Pausen, und das RAM-Budget ist exakt statt geschätzt
-(`Kapazität = Budget / (Breite × Höhe × 4)`). Passt das konfigurierte Fenster nicht ins
-Budget, schrumpft das Fenster; es wird nie darüber hinaus allokiert. Angezeigt wird
-über **eine** wiederverwendete `WriteableBitmap`.
+Frames live in the ring as `Bgra32` pixel buffers from a pool of their own. In steady
+state the same arrays keep rotating — no allocation per frame, no GC pauses, and the
+RAM budget is exact rather than estimated
+(`capacity = budget / (width × height × 4)`). If the configured window does not fit
+the budget, the window shrinks; nothing is ever allocated beyond it. Display goes
+through **one** reused `WriteableBitmap`.
 
-Das Budget gilt für den Ringpuffer, nicht für den Prozess: dazu kommen etwa
-60 MB Grundlast (WPF, WIC, Runtime).
+The budget applies to the ring buffer, not to the process: about 60 MB of baseline
+(WPF, WIC, runtime) comes on top.
 
-### Fensterplatzierung und DPI
+### Window placement and DPI
 
-Das Fenster wird nicht über eine DIP-Umrechnung positioniert, sondern über einen
-kleinen Regelkreis: Größe setzen, Lage messen (`GetWindowRect`), gegen den Monitor
-(`MonitorFromWindow` + `GetMonitorInfo`) zentrieren, nachziehen, bis die Abweichung
-unter zwei Pixel liegt. Der Grund ist unangenehm konkret: auf gemischt skalierten
-Systemen liefern Fenstergröße, Monitorabfrage und WPF-Koordinaten Werte aus
-unterschiedlichen Räumen. Jede feste Umrechnung wendet den Skalierungsfaktor
-irgendwo doppelt an und schiebt das Fenster aus dem Bildschirm; der Regelkreis
-kommt ohne Annahme über den Faktor aus.
+The window is not positioned through a DIP conversion but through a small control
+loop: set the size, measure the position (`GetWindowRect`), centre it against the
+monitor (`MonitorFromWindow` + `GetMonitorInfo`), adjust, until the deviation is under
+two pixels. The reason is uncomfortably concrete: on mixed-scaling systems, window
+size, monitor query and WPF coordinates come from different spaces. Any fixed
+conversion applies the scaling factor twice somewhere and pushes the window off the
+screen; the control loop needs no assumption about the factor.
 
-> **Bekannte Einschränkung:** Auf der Testmaschine (zwei Monitore, beide 175 %)
-> greift die DPI-Deklaration aus dem Manifest im Single-File-Build nicht — der
-> Prozess läuft für Windows DPI-unaware, `GetMonitorInfo` liefert virtualisierte
-> Werte, und Windows skaliert das fertige Fenster nachträglich hoch. Lage und Größe
-> stimmen dadurch, die Darstellung ist aber nicht pixelgenau, sondern leicht
-> weichgezeichnet. `SetProcessDpiAwarenessContext` lässt sich zur Laufzeit nicht
-> mehr setzen (`ERROR_ACCESS_DENIED`), `ApplicationHighDpiMode` ändert nichts.
-> Auf Systemen mit 100 % Skalierung tritt der Effekt nicht auf.
+> **Known limitation:** on the test machine (two monitors, both at 175 %) the DPI
+> declaration from the manifest does not take effect in the single-file build — the
+> process runs DPI-unaware as far as Windows is concerned, `GetMonitorInfo` returns
+> virtualised values, and Windows scales the finished window up afterwards. Position
+> and size are therefore correct, but the rendering is not pixel-exact, just slightly
+> soft. `SetProcessDpiAwarenessContext` can no longer be set at runtime
+> (`ERROR_ACCESS_DENIED`), and `ApplicationHighDpiMode` changes nothing. On systems at
+> 100 % scaling the effect does not occur.
 
-### Zoom und Auflösung
+### Zoom and resolution
 
-Dekodiert wird auf die tatsächliche Anzeigegröße in **Geräte**pixeln, nie darüber
-und nie über die Quellauflösung hinaus. Beim Hineinzoomen reicht das nicht mehr:
-der Zoom reagiert sofort (hochskaliert), und 150 ms nach dem letzten Rad-Ereignis
-wird der Ring im pausierten Zustand in der passenden Auflösung neu aufgebaut. Weil
-größere Frames mehr Platz brauchen, schrumpft dabei automatisch die Zahl der
-gepufferten Frames – das Budget bleibt eingehalten. Der alte Ring wird vor dem Aufbau
-des neuen geleert, sonst läge das Budget kurzzeitig doppelt im Speicher.
+Decoding targets the actual display size in **device** pixels, never above it and
+never beyond the source resolution. Zooming in outgrows that: the zoom responds
+immediately (scaled up), and 150 ms after the last wheel event the ring is rebuilt at
+the matching resolution while paused. Because larger frames need more room, the
+number of buffered frames shrinks automatically — the budget is kept. The old ring is
+emptied before the new one is built, otherwise the budget would briefly sit in memory
+twice.
 
-Das Nachschärfen ist sprungfrei, weil der Maßstab absolut geführt wird (Bildpixel je
-Gerätepixel) und beim Puffertausch das Produkt aus Inhaltsbreite und Matrixfaktor
-konstant bleibt. Der Zoom selbst liegt ausschließlich in einer `MatrixTransform`:
-kein Codepfad verändert dabei eine Puffergröße, eine Bitmapgröße oder eine
-Layoutgröße.
+Refining is jump-free because the scale is carried absolutely (image pixels per device
+pixel) and the product of content width and matrix factor stays constant across the
+buffer swap. The zoom itself lives exclusively in a `MatrixTransform`: no code path
+changes a buffer size, a bitmap size or a layout size along the way.
 
-Der Bildbereich liegt in einem **`Canvas`**, nicht in einem `Grid`. Das ist keine
-Kosmetik: ein Grid arrangiert sein Kind in der Zellgröße und setzt, sobald das Kind
-größer ist, einen Layout-Clip. Der greift in den Koordinaten des Kindes, also **vor**
-der `RenderTransform` – das anschließend verschobene Bild wurde dadurch rechts und
-unten um genau den Betrag des Versatzes abgeschnitten, und der Versatz wächst mit dem
-Zoom. Ein Canvas misst seine Kinder unbegrenzt; beschnitten wird nur außen am
-Viewport. `FrameFlip.Tests` hält das mit einem Test fest, der wirklich rendert und
-Pixel zählt – auf Matrixwerte allein wäre der Fehler nicht aufgefallen, die Matrix
-war die ganze Zeit richtig.
+The image area sits in a **`Canvas`**, not in a `Grid`. That is not cosmetic: a grid
+arranges its child at the cell size and, as soon as the child is larger, applies a
+layout clip. That clip acts in the child's coordinates, so **before** the
+`RenderTransform` — the subsequently translated image was cut off on the right and at
+the bottom by exactly the amount of the offset, and the offset grows with the zoom. A
+canvas measures its children unbounded; clipping happens only at the outer viewport.
+`FrameFlip.Tests` pins this down with a test that genuinely renders and counts pixels
+— on matrix values alone the bug would not have shown, the matrix was right the whole
+time.
 
-### Sperrdisziplin
+### Locking discipline
 
-Unter dem Cache-Lock laufen nur Dictionary-Operationen. Dekodieren und Kopieren finden
-außerhalb statt – sonst könnte der UI-Thread auf einen `Lowest`-Priority-Decoder warten,
-und unter Renderlast wäre das eine Prioritätsinversion mit zweistelligen Millisekunden.
-Möglich macht das ein Refcount pro Puffer: die Präsentation hält ihn während des
-Kopierens, die Eviction darf ihn parallel aus dem Fenster nehmen, zurück in den Pool
-geht er erst, wenn beide fertig sind. Bei mehreren Decoder-Threads verhindert eine
-`_inFlight`-Menge, dass zwei denselben Frame dekodieren.
+Only dictionary operations run under the cache lock. Decoding and copying happen
+outside it — otherwise the UI thread could wait on a `Lowest`-priority decoder, and
+under render load that would be a priority inversion costing tens of milliseconds.
+What makes it possible is a refcount per buffer: presentation holds it while copying,
+eviction may take it out of the window in parallel, and it only returns to the pool
+once both are done. With several decoder threads an `_inFlight` set prevents two of
+them decoding the same frame.
 
-### Nach dem Schließen
+### After closing
 
-Decoder-Threads werden signalisiert und **außerhalb** des UI-Threads gejoint, Dictionary
-und Pool geleert, dann LOH-Kompaktierung mit `GCCollectionMode.Aggressive` und
-`SetProcessWorkingSetSize(-1,-1)`. Die Puffer liegen auf dem Large Object Heap – ohne
-Kompaktierung bliebe der Speicher stehen, auch wenn managed nichts mehr darauf zeigt.
+Decoder threads are signalled and joined **off** the UI thread, dictionary and pool
+are emptied, then LOH compaction with `GCCollectionMode.Aggressive` and
+`SetProcessWorkingSetSize(-1,-1)`. The buffers live on the Large Object Heap — without
+compaction the memory would stay put even when nothing managed points at it any more.
 
-## Formate
+## Formats
 
-PNG, JPG/JPEG, TIFF, BMP über WIC. WebP funktioniert, wenn die *WebP Image Extension*
-von Microsoft installiert ist – fehlt sie, fällt genau dieses Format sauber aus.
+PNG, JPG/JPEG, TIFF, BMP through WIC. WebP works if Microsoft's *WebP Image
+Extension* is installed — without it, that one format drops out cleanly.
 
-EXR ist **nicht** implementiert, die Architektur hält den Platz frei: eine weitere
-`IFrameDecoder`-Implementierung, registriert in `FrameDecoderRegistry.CreateDefault()`.
-An Cache, Wiedergabe und UI ändert sich dadurch nichts.
+EXR is **not** implemented; the architecture keeps the place free: another
+`IFrameDecoder` implementation, registered in `FrameDecoderRegistry.CreateDefault()`.
+Cache, playback and UI are unaffected.
 
-## Sequenzerkennung
+## Sequence detection
 
-`render_0042.png` → Präfix `render_`, 4 Stellen, Endung `.png`. Erkannt wird die
-**letzte** Zifferngruppe im Namen, also auch bei Ziffern im Präfix (`shot2_0001.png`)
-und bei leerem Präfix (`0001.png`, Ausgabepfad `//render/`). View-Suffixe nach der
-Nummer (`f_0001_L.png`) trennen linke und rechte Ansicht in eigene Sequenzen.
+`render_0042.png` → prefix `render_`, 4 digits, extension `.png`. What is recognised
+is the **last** digit group in the name, so it also works with digits in the prefix
+(`shot2_0001.png`) and with an empty prefix (`0001.png`, output path `//render/`).
+View suffixes after the number (`f_0001_L.png`) separate left and right view into
+sequences of their own.
 
-Das **Padding** wird aus dem Bestand abgeleitet, nicht aus der angeklickten Datei.
-Blender füllt auf N Stellen auf und lässt die Zahl darüber hinauswachsen – nach
-`f_99` kommt `f_100`, nicht `f_00100`. Eine führende Null beweist das Padding,
-sonst zählt die kürzeste vorkommende Nummer. Dadurch findet FrameFlip dieselbe
-Sequenz, egal ob `f_99` oder `f_100` markiert war.
+The **padding** is derived from the inventory, not from the file that was clicked.
+Blender pads to N digits and lets the number grow past it — after `f_99` comes
+`f_100`, not `f_00100`. A leading zero proves the padding; otherwise the shortest
+number present counts. That way FrameFlip finds the same sequence whether `f_99` or
+`f_100` was selected.
 
-Die Zeitleiste spannt den **Nummernbereich** auf, nicht die Listenposition – nur so
-sind Lücken darstellbar; über Positionen sähen 250 gerenderte von 500 Frames aus wie
-eine vollständige Sequenz. Fehlende Frames erscheinen als rote Markierung, darüber
-steht ihre Zahl und Lage (`2 Lücken: 7–9, 13`). Ein Klick auf *Blender-Befehl
-kopieren* legt einen vollständigen Aufruf zum Nachrendern in die Zwischenablage:
+The timeline spans the **number range**, not the list position — only that way are
+gaps representable; over positions, 250 rendered of 500 frames would look like a
+complete sequence. Missing frames appear as a red marker, with their count and
+location above (`2 gaps: 7–9, 13`). A click on *Copy Blender command* puts a complete
+command for re-rendering on the clipboard:
 
 ```
-blender -b "PFAD/ZUM/PROJEKT.blend" -o "D:/renders/shot_010/render_####" -F PNG -x 1 -f 7..9,13
+blender -b "PATH/TO/PROJECT.blend" -o "D:/renders/shot_010/render_####" -F PNG -x 1 -f 7..9,13
 ```
 
-Der Frame-Zähler zeigt die **echte** Framenummer – `0042 / 0250` ist aktuelle Nummer /
-höchste Nummer. Beim Abspielen werden Lücken übersprungen, ohne die Zeitbasis zu
-verschieben, weil die Wiedergabe über Listenpositionen läuft. Ein Sprung in eine Lücke
-landet auf dem nächstgelegenen vorhandenen Frame.
+The frame counter shows the **real** frame number — `0042 / 0250` is current number /
+highest number. During playback gaps are skipped without shifting the time base,
+because playback runs over list positions. A seek into a gap lands on the nearest
+existing frame.
 
-War im Explorer nichts (oder etwas Unlesbares) markiert, nimmt FrameFlip das erste
-darstellbare Bild im aktiven Ordner.
+If nothing (or something unreadable) was selected in Explorer, FrameFlip takes the
+first displayable image in the active folder.
 
-## Bildanpassung
+## Image adjustment
 
-`Tab` klappt rechts ein Panel auf. Das Fenster wächst dabei nach rechts, solange
-der Bildschirm es hergibt; sonst gibt der Bildbereich den Platz ab.
+`Tab` opens a panel on the right. The window grows to the right as long as the screen
+allows; otherwise the image area gives up the space.
 
-Alles darin betrifft **nur die Anzeige** – die Dateien auf der Platte bleiben
-unberührt. Damit man das beim Beurteilen nicht vergisst, steht eine aktive
-Korrektur als Kurzform in der Kopfleiste (`EV -1,2  γ 1,3  K 1,15  S 1,2`).
+Everything in it affects **the display only** — the files on disk stay untouched. So
+that this is not forgotten while judging, an active correction appears in short form
+in the header (`EV -1.2  γ 1.3  C 1.15  S 1.2`).
 
-**Regler:** Belichtung (in Blendenstufen), Gamma, Kontrast, Sättigung, Schwarz- und
-Weißpunkt. Doppelklick auf einen Regler setzt ihn zurück. Die Reihenfolge der
-Schritte ist die in der Farbkorrektur übliche: Belichtung, dann Schwarz-/Weißpunkt,
-dann Gamma, dann Kontrast, zuletzt Sättigung.
+**Sliders:** exposure (in stops), gamma, contrast, saturation, black and white point.
+Double-clicking a slider resets it. The order of operations is the one usual in colour
+correction: exposure, then black/white point, then gamma, then contrast, saturation
+last.
 
-**Verteilung:** Histogramm über RGB oder Helligkeit, gemessen am *korrigierten*
-Bild – im Diagramm steht, was man auch sieht. Liegen mehr als 0,5 % der Pixel oben
-oder unten an, erscheint ein Balken am Rand und eine Zeile darunter. Die Kurve ist
-wurzelskaliert, weil ein einzelner hoher Ausschlag den Rest der Verteilung sonst im
-Bodensatz verschwinden ließe.
+**Distribution:** a histogram over RGB or luminance, measured on the *corrected*
+image — the diagram shows what you actually see. If more than 0.5 % of the pixels sit
+at the top or bottom, a bar appears at the edge and a line below. The curve is
+square-root scaled, because a single tall spike would otherwise sink the rest of the
+distribution into the floor.
 
-**A/B-Vergleich:** `A` merkt den aktuellen Frame, `C` schaltet um. Der gemerkte
-Frame wird ausdrücklich **kopiert** – eine Referenz auf den Ringpuffer zeigte
-später irgendein Bild, weil der Puffer gleich an den nächsten Frame weitergereicht
-wird.
+**A/B comparison:** `A` keeps the current frame, `C` switches. The kept frame is
+explicitly **copied** — a reference into the ring buffer later showed some arbitrary
+image, because the buffer is passed straight on to the next frame.
 
-**Vorlagen:** Korrektureinstellungen lassen sich benennen und speichern; sie stehen
-beim nächsten Mal in der Auswahlliste.
+**Presets:** correction settings can be named and saved; they appear in the drop-down
+next time.
 
-### Wie schnell das ist
+### How fast that is
 
-Die Korrektur läuft auf der CPU beim Kopieren in die Anzeige-Bitmap, ohne
-Zwischenpuffer. Gemessen an 1080p:
+The correction runs on the CPU while copying into the display bitmap, without an
+intermediate buffer. Measured on 1080p:
 
-| Fall | Zeit je Bild |
+| Case | Time per image |
 |---|---|
-| ohne Korrektur | 0,3 ms |
-| nur Tonwerte (Belichtung, Gamma, Kontrast, Levels) | 2,4 ms |
-| zusätzlich Sättigung und Kanalansicht | 9,6 ms |
-| Histogramm getrennt, jedes 4. Pixel | 3,8 ms |
+| no correction | 0.3 ms |
+| tone only (exposure, gamma, contrast, levels) | 2.4 ms |
+| plus saturation and channel view | 9.6 ms |
+| histogram separately, every 4th pixel | 3.8 ms |
 
-Bei 24 fps liegen 41,7 ms zwischen zwei Bildern – es bleibt also Luft. Zwei Dinge
-waren dafür nötig: **Ganzzahl-Arithmetik** statt `double` je Pixel (die erste
-Fassung brauchte 72 ms und hätte Bilder gekostet) und **Verteilen der Zeilen über
-die Kerne**. Ohne eingestellte Korrektur ist es ein reiner Speicherkopiervorgang,
-damit eine ungenutzte Funktion die Wiedergabe nicht einen Takt kostet.
+At 24 fps there are 41.7 ms between two images — so there is room. Two things were
+needed for that: **integer arithmetic** instead of `double` per pixel (the first
+version took 72 ms and would have cost frames) and **spreading the rows across the
+cores**. With no correction set it is a plain memory copy, so that an unused feature
+does not cost playback a single beat.
 
-## Videoexport
+## Video export
 
-`E` oder der Knopf *Export …* in der Bedienleiste. Formate: H.264/MP4, H.265/MP4,
-ProRes 422 HQ, WebM/VP9 und GIF (zweistufig mit eigener Farbpalette). Bereich ist
-wahlweise die ganze Sequenz oder In bis Out, die Bildrate ist aus dem Player
-vorbelegt, die Auflösung original oder verkleinert.
+`E` or the *Export …* button in the tool bar. Formats: H.264/MP4, H.265/MP4,
+ProRes 422 HQ, WebM/VP9 and GIF (two-pass with its own palette). The range is either
+the whole sequence or in to out, the frame rate is pre-filled from the player, the
+resolution original or reduced.
 
-Der Export läuft über den **concat-Demuxer** mit einer expliziten Frameliste – nicht
-über `-i "render_%04d.png"`. Der naheliegende Weg hat zwei Bruchstellen, die bei
-Renderausgaben beide regelmäßig auftreten: er bricht bei der ersten fehlenden Nummer
-ab, und er versteht keinen Padding-Überlauf (nach `f_99` sucht er `f_00100`). Bei
-Lücken ist wählbar, ob sie übersprungen werden oder der letzte Frame als kurzes
-Standbild stehen bleibt – für die Beurteilung von Bewegung meist das bessere Verhalten.
+The export runs through the **concat demuxer** with an explicit frame list — not
+through `-i "render_%04d.png"`. The obvious route has two failure points, both of
+which occur regularly with render output: it stops at the first missing number, and it
+does not understand padding overflow (after `f_99` it looks for `f_00100`). Where
+there are gaps you can choose whether they are skipped or the previous frame is held
+as a brief still — usually the better behaviour for judging motion.
 
-Der Player bleibt währenddessen bedienbar, der Export ist abbrechbar, und eine
-unvollständige Datei wird dabei gelöscht. Prozesspriorität und `-threads` folgen dem
-Lastprofil, damit der Encoder einen laufenden Render nicht verdrängt.
+The player stays usable meanwhile, the export can be cancelled, and an incomplete file
+is deleted when it is. Process priority and `-threads` follow the load profile, so the
+encoder does not crowd out a running render.
 
-Zwei Details der Liste sind gegen die verbreitete Anleitung nachgemessen, mit
+Two details of the list were measured against the widespread advice, with
 **ffmpeg 9.0.1**:
 
-- **Kein `-framerate`.** Das ist eine Option des Bilddatei-Demuxers (`image2`) und
-  existiert beim concat-Demuxer nicht – ffmpeg bricht mit *„Option framerate not
-  found"* ab, bevor überhaupt eine Datei gelesen wird. Die Bildrate der Eingabe steht
-  stattdessen in den `duration`-Zeilen der Liste, `-r` am Ausgang erzwingt die
-  konstante Ausgabe-Bildrate.
-- **Der letzte Dateiname steht *nicht* doppelt.** Die übliche Empfehlung, ihn zu
-  wiederholen, stammt aus einer Zeit, in der concat die `duration` des letzten
-  Eintrags verworfen hat. Heute wird sie ausgewertet: 16 Frames ergaben mit
-  Wiederholung 17 Bilder (0,708 s statt 0,667 s bei 24 fps), ohne exakt 16. Die
-  Wiederholung erzeugt inzwischen also genau den Fehler, den sie einmal verhindert hat.
+- **No `-framerate`.** That is an option of the image-file demuxer (`image2`) and does
+  not exist on the concat demuxer — ffmpeg aborts with *“Option framerate not found”*
+  before it has even read a file. The input frame rate lives in the `duration` lines
+  of the list instead; `-r` on the output forces a constant output frame rate.
+- **The last file name is *not* repeated.** The usual recommendation to repeat it
+  dates from a time when concat discarded the `duration` of the final entry. Today it
+  is honoured: 16 frames produced 17 images with the repetition (0.708 s instead of
+  0.667 s at 24 fps), and exactly 16 without. The repetition now causes precisely the
+  error it once prevented.
 
-Ist im Panel eine Korrektur eingestellt, **fragt der Dialog**, ob sie ins Video
-eingerechnet werden soll. Die Antwort wird gemerkt, bleibt aber je Export
-änderbar. Übernommen werden Belichtung, Gamma, Kontrast, Sättigung sowie Schwarz-
-und Weißpunkt (als `eq`- und `curves`-Filter). **Kanalansichten nicht** – ein Video
-nur mit dem Rotkanal ist praktisch nie gewollt, das ist ein Beurteilungswerkzeug.
+If a correction is set in the panel, **the dialog asks** whether it should be baked
+into the video. The answer is remembered but stays changeable per export. Exposure,
+gamma, contrast, saturation and black and white point are carried over (as `eq` and
+`curves` filters). **Channel views are not** — a video of the red channel alone is
+practically never wanted; that is a judging tool.
 
-Der Zielname ist frei editierbar, aber nicht jeder Codec passt in jeden Behälter.
-ProRes in MP4 etwa lässt ffmpeg mit *„Could not find tag for codec prores"*
-scheitern. Passt die Endung nicht zum Format, korrigiert der Dialog sie beim Start
-und sagt es in der Statuszeile.
+The target name is freely editable, but not every codec fits every container. ProRes
+in MP4, for instance, makes ffmpeg fail with *“Could not find tag for codec prores”*.
+If the extension does not match the format, the dialog corrects it on start and says
+so in the status line.
 
-### ffmpeg wird nicht mitgeliefert
+### ffmpeg is not bundled
 
-Übliche ffmpeg-Builds enthalten **libx264 und stehen damit unter der GPL**. Wäre
-ffmpeg Teil der Auslieferung, müsste FrameFlip ebenfalls unter GPL stehen. Zur
-Laufzeit gesucht bleibt die Lizenzfrage beim Benutzer und FrameFlip permissiv
-lizenzierbar. Ein automatischer Download findet aus demselben Grund nicht statt.
+Common ffmpeg builds contain **libx264 and are therefore GPL**. Were ffmpeg part of
+the delivery, FrameFlip would have to be GPL as well. Looked up at runtime, the
+licence question stays with the user and FrameFlip can be licensed permissively. An
+automatic download does not happen for the same reason.
 
-Gesucht wird in dieser Reihenfolge: eingestellter Pfad, Unterordner `ffmpeg` neben
-der Exe, `PATH`, dann die Ablageorte von winget, Chocolatey und Scoop. Der letzte
-Schritt ist kein Luxus – nach einer frischen Installation kennt ein bereits laufender
-Prozess den erweiterten `PATH` noch nicht, er hat ihn beim Start geerbt.
+The search order is: configured path, an `ffmpeg` subfolder next to the exe, `PATH`,
+then the locations used by winget, Chocolatey and Scoop. That last step is not a
+luxury — after a fresh installation an already running process does not know the
+extended `PATH` yet; it inherited it at startup.
 
-Wird nichts gefunden, erklärt der Dialog das und bietet eine Dateiauswahl an.
-Installation etwa mit:
+If nothing is found, the dialog explains that and offers a file picker. Install for
+example with:
 
 ```bash
 winget install Gyan.FFmpeg
 ```
 
-Der gewählte Pfad wird über `ffmpeg -version` geprüft: eine gleichnamige Datei belegt
-noch nicht, dass dahinter ein lauffähiges ffmpeg steckt.
+The chosen path is verified with `ffmpeg -version`: a file of the right name is not
+yet proof that a working ffmpeg is behind it.
 
-> **Hinweis:** Blender bringt zwar `avcodec`, `avformat` und `avutil` als DLLs mit,
-> aber keine aufrufbare `ffmpeg.exe`. Eine vorhandene Blender-Installation ersetzt
-> ffmpeg also nicht.
+> **Note:** Blender does ship `avcodec`, `avformat` and `avutil` as DLLs, but no
+> callable `ffmpeg.exe`. An existing Blender installation is therefore no substitute.
 
-## Konfiguration
+## Configuration
 
 `%APPDATA%\FrameFlip\config.json`:
 
 ```json
 {
   "Hotkey": "Ctrl+Alt+Space",
+  "Language": "de",
   "Fps": 24,
   "Loop": true,
+  "LockToDisplay": true,
   "ShowMetadata": true,
   "CloseOnFocusLoss": true,
   "MemoryBudgetMb": 1024,
@@ -593,12 +590,14 @@ noch nicht, dass dahinter ein lauffähiges ffmpeg steckt.
   "PrefetchBehind": 15,
   "AdaptiveResources": true,
   "LoadIntervalSeconds": 10,
-  "MaxDecoderThreads": 4,
+  "MaxDecoderThreads": 8,
   "WarmupFrames": 0,
   "DraftStep": 0,
   "RawCacheEnabled": true,
   "RawCacheMaxGb": 16,
   "PanelOpen": false,
+  "BridgeEnabled": true,
+  "BridgePort": 47823,
   "Adjustments": null,
   "AdjustmentPresets": [],
   "ExportApplyAdjustments": null,
@@ -608,27 +607,26 @@ noch nicht, dass dahinter ein lauffähiges ffmpeg steckt.
 }
 ```
 
-`WarmupFrames: 0` heißt „aus der Bildrate ableiten", `FfmpegPath: ""` heißt „bei
-jedem Export neu suchen". FPS, Loop, Bilddatenanzeige und die Exportauswahl werden
-direkt beim Umschalten gespeichert. Änderungen an Budget, Puffergrößen und
-Lasterkennung greifen beim nächsten Öffnen der Vorschau.
+`WarmupFrames: 0` means "derive it from the frame rate", `FfmpegPath: ""` means "look
+it up again on every export", `Language` is `de` or `en`. Fps, looping, the image
+details toggle and the export selection are saved the moment they are switched.
+Changes to budget, buffer sizes and load detection take effect the next time the
+preview is opened.
 
-Neue Schlüssel bekommen beim Einlesen ihren Standardwert; eine ältere Datei wird
-ergänzt, nicht überschrieben. Der Einstellungsdialog geht dabei vom vorhandenen
-Stand aus und überschreibt nur seine eigenen Felder – sonst würde er jede Einstellung
-zurücksetzen, die er selbst nicht anzeigt.
+New keys get their default value when read; an older file is extended, not
+overwritten. The settings dialog starts from the existing state and overwrites only
+its own fields — otherwise it would reset every setting it does not itself display.
 
-## Gemessen
+## Bridge to the Blender add-on
 
-Auf dieser Maschine (12 Kerne), 58 Frames à 1600×900, Budget 512 MB, im Leerlauf:
+While a preview is open, FrameFlip can report a running render: overall progress,
+sample counter, time per frame, a graph of how expensive each frame was, and a
+thumbnail of the last frame written. The add-on that feeds it lives in its own
+repository under GPL; the design and the API research are in
+[Blender-Bridge.md](Blender-Bridge.md).
 
-| Zustand | Working Set | Private Bytes |
-|---|---|---|
-| Tray, Leerlauf | 8 MB | 60 MB |
-| Vorschau offen, auf 229 % gezoomt | 361 MB | 419 MB |
-| nach dem Schließen | 19 MB | 168 MB |
-
-Wiedergabe: 24,9 fps bei 24 fps Sollwert (Messung über einen vollen Loop-Durchlauf,
-Zählerstand per UI Automation abgetastet), kein einziger Messpunkt ohne Fortschritt,
-kein Puffer- oder Rückstandshinweis. Prozesspriorität folgt der Last, Decoder-Threads
-im Leerlauf 3 von maximal 3.
+The receiving end is a TCP listener bound **exclusively to 127.0.0.1**, speaking one
+JSON object per line. Not HTTP: the add-on is to manage without third-party packages,
+and Python's standard library can do sockets and JSON. The first line has to carry a
+token from a file in the user profile — so no other program on the machine can fake a
+render. Switched off through `BridgeEnabled`.

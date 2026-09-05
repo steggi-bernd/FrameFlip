@@ -1,0 +1,148 @@
+<ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+                    xmlns:sys="clr-namespace:System;assembly=System.Runtime">
+
+    <!-- Deutsch. Gegenstueck: Strings.en.xaml - beide muessen dieselben Schluessel
+         fuehren, sonst faellt beim Wechsel ein Text auf seinen Schluessel zurueck. -->
+
+    <!-- ================================================================ Kopfleiste -->
+    <sys:String x:Key="S_Close">Schliessen (Esc)</sys:String>
+    <sys:String x:Key="S_MeasuredRate">Tatsächlich angezeigte Bilder pro Sekunde</sys:String>
+    <sys:String x:Key="S_BufferAhead">Wie weit der Ringpuffer vorausreicht. Wird die Zahl klein, stockt die Wiedergabe gleich – dann hilft eine kleinere Dekodiergröße.</sys:String>
+    <sys:String x:Key="S_Adjusted">Die Anzeige ist korrigiert – die Dateien bleiben unverändert</sys:String>
+    <sys:String x:Key="S_ToggleMeta">Bilddaten ein- oder ausblenden (D)</sys:String>
+    <sys:String x:Key="S_ZoomHint">Klick setzt auf 100 %, erneut auf Einpassung</sys:String>
+
+    <!-- ================================================================ Bedienleiste -->
+    <sys:String x:Key="S_PlayPause">Wiedergabe / Pause (Leertaste)</sys:String>
+    <sys:String x:Key="S_FrameNumber">Framenummer aus dem Dateinamen</sys:String>
+    <sys:String x:Key="S_InOutRange">Bereich zwischen In- und Out-Punkt (I und O, Entf löscht ihn)</sys:String>
+    <sys:String x:Key="S_Loop">Endlosschleife (L)</sys:String>
+    <sys:String x:Key="S_CopyBlender">Blender-Befehl kopieren</sys:String>
+    <sys:String x:Key="S_CopyBlenderHint">Legt einen vollständigen Aufruf zum Nachrendern in die Zwischenablage</sys:String>
+
+    <!-- ================================================================ Werkzeuge -->
+    <sys:String x:Key="S_FrameRate">Bildrate</sys:String>
+    <sys:String x:Key="S_TogglePanel">Bildanpassung ein- oder ausblenden (Tab)</sys:String>
+    <sys:String x:Key="S_ToggleMetrics">Render-Metriken ein- oder ausblenden (M)</sys:String>
+    <sys:String x:Key="S_Export">Export …</sys:String>
+    <sys:String x:Key="S_ExportHint">Sequenz als Video exportieren (E)</sys:String>
+    <sys:String x:Key="S_Settings">Einstellungen (Strg+,)</sys:String>
+
+    <!-- ================================================================ Korrektur -->
+    <sys:String x:Key="S_Distribution">Verteilung</sys:String>
+    <sys:String x:Key="S_Correction">Korrektur</sys:String>
+    <sys:String x:Key="S_Reset">zurücksetzen</sys:String>
+    <sys:String x:Key="S_Exposure">Belichtung</sys:String>
+    <sys:String x:Key="S_Gamma">Gamma</sys:String>
+    <sys:String x:Key="S_Contrast">Kontrast</sys:String>
+    <sys:String x:Key="S_Saturation">Sättigung</sys:String>
+    <sys:String x:Key="S_BlackPoint">Schwarzpunkt</sys:String>
+    <sys:String x:Key="S_WhitePoint">Weißpunkt</sys:String>
+    <sys:String x:Key="S_Channel">Kanal</sys:String>
+    <sys:String x:Key="S_ChannelHint">Einzelne Kanäle isolieren – Alpha zeigt die Freistellung</sys:String>
+    <sys:String x:Key="S_Compare">Vergleich</sys:String>
+    <sys:String x:Key="S_Remember">Merken</sys:String>
+    <sys:String x:Key="S_RememberHint">Diesen Frame als Vergleich festhalten (A)</sys:String>
+    <sys:String x:Key="S_NoFrameKept">Kein Frame gemerkt.</sys:String>
+    <sys:String x:Key="S_RgbToggle">Zwischen Farbkanälen und reiner Helligkeit wechseln</sys:String>
+    <sys:String x:Key="S_CompareToggle">Zwischen gemerktem und aktuellem Frame umschalten (C)</sys:String>
+    <sys:String x:Key="S_Presets">Vorlagen</sys:String>
+    <sys:String x:Key="S_PresetsHint">Gespeicherte Korrektureinstellungen</sys:String>
+    <sys:String x:Key="S_PresetName">Name für die neue Vorlage</sys:String>
+    <sys:String x:Key="S_Save">Sichern</sys:String>
+    <sys:String x:Key="S_DeletePreset">Ausgewählte Vorlage löschen</sys:String>
+    <sys:String x:Key="S_NoClipping">Keine anliegenden Ränder.</sys:String>
+    <sys:String x:Key="S_ClippedLow">{0} % zugelaufen</sys:String>
+    <sys:String x:Key="S_ClippedHigh">{0} % ausgebrannt</sys:String>
+
+    <!-- ================================================================ Metriken -->
+    <sys:String x:Key="S_Render">Render</sys:String>
+    <sys:String x:Key="S_LastWritten">ZULETZT GESCHRIEBEN</sys:String>
+    <sys:String x:Key="S_Overall">GESAMT</sys:String>
+    <sys:String x:Key="S_CurrentFrame">AKTUELLER FRAME</sys:String>
+    <sys:String x:Key="S_SpeedPerFrame">TEMPO JE FRAME</sys:String>
+    <sys:String x:Key="S_PerFrame">JE FRAME</sys:String>
+    <sys:String x:Key="S_Elapsed">LAUFZEIT</sys:String>
+    <sys:String x:Key="S_Cpu">CPU</sys:String>
+    <sys:String x:Key="S_Memory">ARBEITSSPEICHER</sys:String>
+    <sys:String x:Key="S_Gpu">GPU</sys:String>
+    <sys:String x:Key="S_NoRender">Kein Render gemeldet. Sobald in Blender einer startet, steht er hier.</sys:String>
+    <sys:String x:Key="S_BridgeSilent">Die Brücke lauscht nicht – in den Einstellungen prüfen.</sys:String>
+    <sys:String x:Key="S_JobPreparing">wird vorbereitet</sys:String>
+    <sys:String x:Key="S_JobRunning">läuft</sys:String>
+    <sys:String x:Key="S_JobFinished">fertig</sys:String>
+    <sys:String x:Key="S_JobCancelled">abgebrochen</sys:String>
+    <sys:String x:Key="S_JobFailed">fehlgeschlagen</sys:String>
+    <sys:String x:Key="S_JobIdle">bereit</sys:String>
+    <sys:String x:Key="S_FrameOf">Frame {0} / {1}</sys:String>
+    <sys:String x:Key="S_RemainingShort">noch {0}</sys:String>
+    <sys:String x:Key="S_MemoryFree">{0} % · {1} GB frei</sys:String>
+    <sys:String x:Key="S_NotMeasurable">nicht messbar</sys:String>
+    <sys:String x:Key="S_NoFinishedFrames">noch keine fertigen Frames</sys:String>
+    <sys:String x:Key="S_Slowest">{0} langsamster</sys:String>
+    <sys:String x:Key="S_Average">{0} Ø</sys:String>
+    <sys:String x:Key="S_SettingsViaTray">Einstellungen sind nur über das Tray-Symbol erreichbar.</sys:String>
+
+    <!-- ================================================================ Einstellungen -->
+    <sys:String x:Key="S_SettingsTitle">FrameFlip – Einstellungen</sys:String>
+    <sys:String x:Key="S_Hotkey">Globaler Hotkey</sys:String>
+    <sys:String x:Key="S_HotkeyHint">Anklicken und die gewünschte Kombination drücken</sys:String>
+    <sys:String x:Key="S_HotkeyNote">Mindestens ein Modifikator. Esc bricht die Aufnahme ab.</sys:String>
+    <sys:String x:Key="S_PrefetchBehind">Puffer zurück</sys:String>
+    <sys:String x:Key="S_AdaptiveLoad">Dynamische Last</sys:String>
+    <sys:String x:Key="S_AdaptiveLoadHint">Ressourcen an CPU-, GPU- und RAM-Last anpassen</sys:String>
+    <sys:String x:Key="S_LoadInterval">Messtakt (s)</sys:String>
+    <sys:String x:Key="S_MaxThreads">Decoder-Threads max</sys:String>
+    <sys:String x:Key="S_ShowConfig">config.json zeigen</sys:String>
+    <sys:String x:Key="S_Language">Sprache</sys:String>
+    <sys:String x:Key="S_LanguageGerman">Deutsch</sys:String>
+    <sys:String x:Key="S_LanguageEnglish">English</sys:String>
+    <sys:String x:Key="S_Playback">Wiedergabe</sys:String>
+    <sys:String x:Key="S_LoopSeamless">Nach dem letzten Frame nahtlos von vorn</sys:String>
+    <sys:String x:Key="S_LockToDisplay">Bei passender Bildrate an den Bildschirmtakt koppeln</sys:String>
+    <sys:String x:Key="S_LockToDisplayHint">Verhindert Ruckler, wenn Sollrate und Bildschirmtakt zusammenfallen – etwa 60 fps auf 60 Hz. Die Wiedergabe läuft dann mit dem Schirmtakt statt exakt mit der Sollrate.</sys:String>
+    <sys:String x:Key="S_CloseOnFocusLoss">Vorschau schliessen, sobald sie den Fokus verliert</sys:String>
+    <sys:String x:Key="S_CloseOnFocusLossHint">Abschalten, wenn die Sequenz während der Arbeit in Blender stehen bleiben soll</sys:String>
+    <sys:String x:Key="S_MemoryBudget">RAM-Budget (MB)</sys:String>
+    <sys:String x:Key="S_PrefetchAhead">Puffer voraus</sys:String>
+    <sys:String x:Key="S_Ok">Übernehmen</sys:String>
+    <sys:String x:Key="S_Cancel">Abbrechen</sys:String>
+
+
+    <!-- ================================================================ Meldungen -->
+    <sys:String x:Key="S_ChannelAll">Alle Kanäle</sys:String>
+    <sys:String x:Key="S_ChannelRed">Rot</sys:String>
+    <sys:String x:Key="S_ChannelGreen">Grün</sys:String>
+    <sys:String x:Key="S_ChannelBlue">Blau</sys:String>
+    <sys:String x:Key="S_ChannelAlpha">Alpha</sys:String>
+    <sys:String x:Key="S_ChannelLuminance">Helligkeit</sys:String>
+    <sys:String x:Key="S_KeptFrame">Gemerkt: Frame {0}. </sys:String>
+    <sys:String x:Key="S_KeptFrameHint">Mit A/B oder Taste C umschalten.</sys:String>
+    <sys:String x:Key="S_CompareBadge">A · Frame {0}</sys:String>
+    <sys:String x:Key="S_PresetApplied">Vorlage „{0}“ übernommen.</sys:String>
+    <sys:String x:Key="S_PresetNeedsName">Bitte einen Namen für die Vorlage angeben.</sys:String>
+    <sys:String x:Key="S_PresetSaved">Vorlage „{0}“ gesichert.</sys:String>
+    <sys:String x:Key="S_PresetReplaced">Vorlage „{0}“ ersetzt.</sys:String>
+    <sys:String x:Key="S_PresetSelectFirst">Erst eine Vorlage auswählen.</sys:String>
+    <sys:String x:Key="S_PresetDeleted">Vorlage „{0}“ gelöscht.</sys:String>
+    <sys:String x:Key="S_NewSequence">neue Sequenz</sys:String>
+    <sys:String x:Key="S_NewResolution">neue Auflösung</sys:String>
+    <sys:String x:Key="S_LoadReadout">CPU {0} %{1} · {2} Thr</sys:String>
+    <sys:String x:Key="S_DraftFull">Dekodiergröße: voll. Klick verkleinert sie und verlängert damit den Puffer (Tasten 1/2/3)</sys:String>
+    <sys:String x:Key="S_DraftReduced">Dekodiergröße {0} % – gröberes Bild, dafür {1}× mehr Vorlauf</sys:String>
+    <sys:String x:Key="S_NoClipboard">Zwischenablage nicht verfügbar</sys:String>
+    <sys:String x:Key="S_RingEmpty">Ring leer, jetzt {0} Threads</sys:String>
+    <sys:String x:Key="S_LockedToDisplay">An den Bildschirm gekoppelt ({0} Hz)</sys:String>
+    <sys:String x:Key="S_TimeBased">Zeitbasiert – Bildschirm {0} Hz</sys:String>
+    <sys:String x:Key="S_BufferComplete">Puffer komplett</sys:String>
+    <sys:String x:Key="S_BufferSeconds">Puffer {0} s</sys:String>
+    <sys:String x:Key="S_Buffering">Puffern …</sys:String>
+    <sys:String x:Key="S_BufferingReason">Puffern … ({0})</sys:String>
+    <sys:String x:Key="S_DecoderBehind">Decoder kommt nicht mit ({0}).</sys:String>
+    <sys:String x:Key="S_ThreadOne">1 Thread</sys:String>
+    <sys:String x:Key="S_ThreadMany">{0} Threads</sys:String>
+    <sys:String x:Key="S_DecoderHintDraft">Taste 2 verkleinert die Dekodiergröße, mehr Threads in den Einstellungen.</sys:String>
+    <sys:String x:Key="S_DecoderHintThreads">Mehr Decoder-Threads in den Einstellungen.</sys:String>
+
+</ResourceDictionary>

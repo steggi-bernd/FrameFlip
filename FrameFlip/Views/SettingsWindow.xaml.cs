@@ -4,6 +4,7 @@ using System.IO;
 using System.Windows;
 using System.Windows.Input;
 using FrameFlip.Configuration;
+using FrameFlip.Localization;
 using FrameFlip.Interop;
 using FrameFlip.Playback;
 
@@ -30,6 +31,12 @@ public partial class SettingsWindow : Window
         HotkeyBox.Text = _hotkey.ToString();
         HotkeyBox.PreviewKeyDown += OnHotkeyKeyDown;
         HotkeyBox.GotKeyboardFocus += (_, _) => ShowStatus("Kombination druecken …");
+
+        // Die Sprachen stehen in ihrer EIGENEN Sprache da - "Deutsch" und "English",
+        // nicht uebersetzt. Wer die Oberflaeche gerade nicht lesen kann, findet den
+        // eigenen Sprachnamen trotzdem.
+        LanguageBox.ItemsSource = LanguageOption.All;
+        LanguageBox.SelectedItem = LanguageOption.For(Strings.Parse(current.Language));
 
         FpsBox.ItemsSource = FpsOption.All;
         FpsBox.SelectedItem = FpsOption.Closest(current.Fps);
@@ -116,6 +123,11 @@ public partial class SettingsWindow : Window
         var settings = _current.Clone();
 
         settings.Hotkey = _hotkey.ToString();
+
+        settings.Language = LanguageBox.SelectedItem is LanguageOption language
+            ? Strings.ToCode(language.Value)
+            : Strings.ToCode(Strings.Current);
+
         settings.Fps = FpsBox.SelectedItem is FpsOption option ? option.Value : 24.0;
         settings.Loop = LoopBox.IsChecked == true;
         settings.LockToDisplay = LockToDisplayBox.IsChecked == true;
@@ -137,7 +149,29 @@ public partial class SettingsWindow : Window
         Close();
     }
 
-    private void OnCancelClicked(object sender, RoutedEventArgs e) => Close();
+    /// <summary>
+    /// Wechselt die Sprache sofort, nicht erst beim Speichern.
+    ///
+    /// Eine Sprachauswahl, deren Wirkung man erst nach dem Uebernehmen sieht, ist
+    /// eine Zumutung: Man waehlt blind und muss zurueck, wenn es die falsche war.
+    /// Verworfen wird sie beim Abbrechen wieder.
+    /// </summary>
+    private void OnLanguageChanged(object sender, System.Windows.Controls.SelectionChangedEventArgs e)
+    {
+        if (!IsLoaded) return;
+        if (LanguageBox.SelectedItem is not LanguageOption option) return;
+
+        Strings.Apply(option.Value);
+    }
+
+    private void OnCancelClicked(object sender, RoutedEventArgs e)
+    {
+        // Die Sprache wurde beim Auswaehlen sofort umgestellt - Abbrechen muss sie
+        // also auch zuruecknehmen, sonst bliebe von einem verworfenen Dialog etwas
+        // haengen.
+        Strings.Apply(Strings.Parse(_current.Language));
+        Close();
+    }
 
     private void OnRevealClicked(object sender, RoutedEventArgs e)
     {
