@@ -16,6 +16,7 @@ using FrameFlip.Diagnostics;
 using FrameFlip.Imaging;
 using FrameFlip.Interop;
 using FrameFlip.Playback;
+using FrameFlip.Localization;
 using FrameFlip.Sequencing;
 // UseWindowsForms zieht System.Drawing mit ein; dort heissen diese Typen genauso.
 using Brush = System.Windows.Media.Brush;
@@ -357,13 +358,16 @@ public partial class ViewerWindow : Window
         Activate();
         ShowBar();
 
-        if (sequence.Count > 1) EnterBuffering(resume: true, reason: "neue Sequenz");
+        if (sequence.Count > 1) EnterBuffering(resume: true, reason: Strings.T("S_NewSequence"));
         return true;
     }
 
     protected override void OnClosed(EventArgs e)
     {
         _closing = true;
+
+        // Abmelden, sonst haelt das statische Sprachereignis das Fenster fest.
+        Localization.Strings.Changed -= OnLanguageChangedInPanel;
 
         DisposeMetrics();
 
@@ -427,7 +431,7 @@ public partial class ViewerWindow : Window
         _cache?.ApplyProfile(profile);
 
         string gpu = snapshot.GpuPercent is null ? "" : $" · GPU {snapshot.GpuPercent.Value:0} %";
-        LoadText.Text = $"CPU {snapshot.CpuPercent:0} %{gpu} · {profile.DecoderThreads} Thr";
+        LoadText.Text = Strings.T("S_LoadReadout", $"{snapshot.CpuPercent:0}", gpu, profile.DecoderThreads);
         LoadText.ToolTip = snapshot.Describe();
     }
 
@@ -551,7 +555,7 @@ public partial class ViewerWindow : Window
 
         Volatile.Write(ref _pendingIndex, _index);
         if (wasPlaying || _buffering)
-            EnterBuffering(resume: wasPlaying || _resumeAfterBuffering, reason: "neue Auflösung");
+            EnterBuffering(resume: wasPlaying || _resumeAfterBuffering, reason: Strings.T("S_NewResolution"));
     }
 
     /// <param name="deferWhilePlaying">
@@ -616,8 +620,10 @@ public partial class ViewerWindow : Window
         DraftText.Text = $"{_draftScale * 100:0} %";
 
         DraftButton.ToolTip = _draftStep == 0
-            ? "Dekodiergröße: voll. Klick verkleinert sie und verlängert damit den Puffer (Tasten 1/2/3)"
-            : $"Dekodiergröße {_draftScale * 100:0} % – gröberes Bild, dafür {1 / (_draftScale * _draftScale):0}× mehr Vorlauf";
+            ? Strings.T("S_DraftFull")
+            : Strings.T("S_DraftReduced",
+                        $"{_draftScale * 100:0}",
+                        $"{1 / (_draftScale * _draftScale):0}");
 
         DraftText.Foreground = (Brush)FindResource(_draftStep == 0 ? "MutedBrush" : "AccentBrush");
     }
@@ -791,7 +797,7 @@ public partial class ViewerWindow : Window
         }
         catch (Exception)
         {
-            ShowStatus("Zwischenablage nicht verfuegbar");
+            ShowStatus(Strings.T("S_NoClipboard"));
         }
 
         _statusTimer.Stop();
@@ -932,7 +938,7 @@ public partial class ViewerWindow : Window
         // Lastmessung zu warten. Die kommt erst in bis zu zehn Sekunden, und so lange
         // stockt es sonst weiter.
         int workers = cache.RaiseWorkerFloor();
-        EnterBuffering(resume: true, reason: $"Ring leer, jetzt {workers} Threads");
+        EnterBuffering(resume: true, reason: Strings.T("S_RingEmpty", workers));
     }
 
     /// <summary>
@@ -949,9 +955,9 @@ public partial class ViewerWindow : Window
         RateText.Text = $"{rate:0.0} fps";
         RateText.Foreground = (Brush)FindResource(rate < _clock.Fps * 0.9 ? "AccentBrush" : "MutedBrush");
         RateText.ToolTip = _clock.IsLockedToDisplay
-            ? $"An den Bildschirm gekoppelt ({_clock.DisplayHz:0.#} Hz)"
+            ? Strings.T("S_LockedToDisplay", $"{_clock.DisplayHz:0.#}")
             : _clock.DisplayHz > 0
-                ? $"Zeitbasiert – Bildschirm {_clock.DisplayHz:0.#} Hz"
+                ? Strings.T("S_TimeBased", $"{_clock.DisplayHz:0.#}")
                 : null;
 
         UpdateBufferReadout();
@@ -982,7 +988,7 @@ public partial class ViewerWindow : Window
         // Sekundenangabe waere hier nur Zahlenrauschen.
         if (stats.CachedFrames >= rangeLength)
         {
-            BufferText.Text = "Puffer komplett";
+            BufferText.Text = Strings.T("S_BufferComplete");
             BufferText.Foreground = (Brush)FindResource("MutedBrush");
             return;
         }
@@ -994,7 +1000,7 @@ public partial class ViewerWindow : Window
         int ahead = Math.Min(stats.AheadReady, Math.Max(0, rangeLength - 1));
         double seconds = ahead / _clock.Fps;
 
-        BufferText.Text = $"Puffer {seconds:0.0} s";
+        BufferText.Text = Strings.T("S_BufferSeconds", $"{seconds:0.0}");
 
         // Unter einer halben Sekunde Vorrat ist das naechste Stocken absehbar.
         BufferText.Foreground = (Brush)FindResource(seconds < 0.5 ? "GapBrush"
@@ -1041,7 +1047,7 @@ public partial class ViewerWindow : Window
         _bufferingSince = Environment.TickCount64;
 
         PlayButton.Content = "▶";
-        ShowStatus(reason is null ? "Puffern …" : $"Puffern … ({reason})");
+        ShowStatus(reason is null ? Strings.T("S_Buffering") : Strings.T("S_BufferingReason", reason));
         _bufferTimer.Start();
     }
 
@@ -1161,10 +1167,16 @@ public partial class ViewerWindow : Window
         _slowRounds = 0;
 
         int threads = _profile.DecoderThreads;
-        ShowStatus($"Decoder kommt nicht mit ({threads} {(threads == 1 ? "Thread" : "Threads")}). " +
-                   (_draftStep == 0
-                       ? "Taste 2 verkleinert die Dekodiergröße, mehr Threads in den Einstellungen."
-                       : "Mehr Decoder-Threads in den Einstellungen."));
+
+        // Die Einzahl wird nicht uebersetzt zusammengesetzt, sondern als fertiger
+        // Teil eingesetzt: "1 Thread" gegen "1 thread" laesst sich noch regeln,
+        // Sprachen mit mehr als zwei Zahlformen nicht.
+        string count = threads == 1
+            ? Strings.T("S_ThreadOne")
+            : Strings.T("S_ThreadMany", threads);
+
+        ShowStatus(Strings.T("S_DecoderBehind", count) + " " +
+                   Strings.T(_draftStep == 0 ? "S_DecoderHintDraft" : "S_DecoderHintThreads"));
 
         _statusTimer.Stop();
         _statusTimer.Start();
@@ -1274,6 +1286,13 @@ public partial class ViewerWindow : Window
             case Key.M:
                 e.Handled = true;
                 ToggleMetrics();
+                return;
+
+            // Strg+Komma ist die uebliche Kombination fuer Einstellungen.
+            case Key.OemComma:
+                if (!control) break;
+                e.Handled = true;
+                OnSettingsClicked(this, new RoutedEventArgs());
                 return;
 
             case Key.E:
@@ -1751,8 +1770,7 @@ public partial class ViewerWindow : Window
         if (!_barVisible)
         {
             _barVisible = true;
-            ControlBar.IsHitTestVisible = true;
-            ControlBar.BeginAnimation(OpacityProperty, new DoubleAnimation(1.0, TimeSpan.FromMilliseconds(120)));
+            FadeBars(1.0, 120);
         }
 
         _hideTimer.Start();
@@ -1760,12 +1778,26 @@ public partial class ViewerWindow : Window
 
     private void OnHideTick(object? sender, EventArgs e)
     {
-        // Nicht ausblenden, solange die Leiste benutzt wird.
-        if (_scrubbing || ControlBar.IsMouseOver || FpsBox.IsDropDownOpen) return;
+        // Nicht ausblenden, solange eine der Leisten benutzt wird.
+        if (_scrubbing || ControlBar.IsMouseOver || ToolBar.IsMouseOver || FpsBox.IsDropDownOpen) return;
 
         _hideTimer.Stop();
         _barVisible = false;
-        ControlBar.IsHitTestVisible = false;
-        ControlBar.BeginAnimation(OpacityProperty, new DoubleAnimation(0.0, TimeSpan.FromMilliseconds(300)));
+        FadeBars(0.0, 300);
+    }
+
+    /// <summary>
+    /// Beide Leisten gemeinsam. Getrennt zu blenden saehe aus wie ein Fehler - sie
+    /// gehoeren zusammen, auch wenn sie an verschiedenen Raendern sitzen.
+    /// </summary>
+    private void FadeBars(double target, int milliseconds)
+    {
+        var animation = new DoubleAnimation(target, TimeSpan.FromMilliseconds(milliseconds));
+
+        foreach (var bar in new[] { ControlBar, ToolBar })
+        {
+            bar.IsHitTestVisible = target > 0;
+            bar.BeginAnimation(OpacityProperty, animation);
+        }
     }
 }

@@ -56,10 +56,10 @@
             <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
                 <TextBlock x:Name="RateText" VerticalAlignment="Center" Margin="0,0,12,0"
                            Foreground="{StaticResource MutedBrush}" FontSize="11"
-                           ToolTip="Tatsächlich angezeigte Bilder pro Sekunde" />
+                           ToolTip="{DynamicResource S_MeasuredRate}" />
                 <TextBlock x:Name="BufferText" VerticalAlignment="Center" Margin="0,0,12,0"
                            Foreground="{StaticResource MutedBrush}" FontSize="11"
-                           ToolTip="Wie weit der Ringpuffer vorausreicht. Wird die Zahl klein, stockt die Wiedergabe gleich – dann hilft eine kleinere Dekodiergröße." />
+                           ToolTip="{DynamicResource S_BufferAhead}" />
                 <TextBlock x:Name="LoadText" VerticalAlignment="Center" Margin="0,0,12,0"
                            Foreground="{StaticResource MutedBrush}" FontSize="11" />
 
@@ -67,24 +67,24 @@
                 <TextBlock x:Name="AdjustBadge" VerticalAlignment="Center" Margin="0,0,12,0"
                            Foreground="{StaticResource AccentBrush}" FontSize="11"
                            Visibility="Collapsed"
-                           ToolTip="Die Anzeige ist korrigiert – die Dateien bleiben unverändert" />
+                           ToolTip="{DynamicResource S_Adjusted}" />
 
                 <!-- Aufloesung, Farbtiefe und Dateigroesse. Ein Klick blendet die
                      Angaben aus; der Zustand wird in der Konfiguration gehalten. -->
                 <Button x:Name="MetaButton" Style="{StaticResource LinkButton}"
                         Margin="0,0,6,0" Click="OnMetaClicked"
-                        ToolTip="Bilddaten ein- oder ausblenden (D)">
+                        ToolTip="{DynamicResource S_ToggleMeta}">
                     <TextBlock x:Name="MetaText" FontSize="11" />
                 </Button>
 
                 <Button x:Name="ZoomButton" Style="{StaticResource LinkButton}"
                         Margin="0,0,6,0" MinWidth="46" Click="OnZoomClicked"
-                        ToolTip="Klick setzt auf 100 %, erneut auf Einpassung">
+                        ToolTip="{DynamicResource S_ZoomHint}">
                     <TextBlock x:Name="ZoomText" FontSize="11" TextAlignment="Right" />
                 </Button>
 
                 <Button x:Name="CloseButton" Style="{StaticResource HeaderButton}"
-                        Content="&#x2715;" ToolTip="Schliessen (Esc)" Click="OnCloseClicked" />
+                        Content="&#x2715;" ToolTip="{DynamicResource S_Close}" Click="OnCloseClicked" />
             </StackPanel>
         </Grid>
 
@@ -111,10 +111,75 @@
                 </Image>
             </Canvas>
 
+            <!-- Nach links gerueckt: Oben rechts sitzt jetzt die Werkzeugleiste, und
+                 eine Meldung, die einen Knopf verdeckt, ist schlimmer als eine, die
+                 man an ungewohnter Stelle sucht. -->
             <Border x:Name="StatusBadge" Visibility="Collapsed"
-                    HorizontalAlignment="Right" VerticalAlignment="Top" Margin="12"
+                    HorizontalAlignment="Left" VerticalAlignment="Top" Margin="12"
                     Background="{StaticResource BadgeBackground}" CornerRadius="4" Padding="10,5">
-                <TextBlock x:Name="StatusText" Foreground="{StaticResource AccentBrush}" FontSize="12" />
+                <TextBlock x:Name="StatusText" Foreground="{StaticResource AccentBrush}" FontSize="12"
+                           TextWrapping="Wrap" MaxWidth="420" />
+            </Border>
+
+            <!--
+                Werkzeugleiste. Blendet mit derselben Zeit aus wie die Bedienleiste
+                unten - sie ist beim Betrachten eines Bildes genauso im Weg.
+
+                Getrennt von der Wiedergabe, weil es zwei verschiedene Dinge sind:
+                Unten steuert man die Zeit, oben stellt man ein, WIE gezeigt wird.
+                Zusammengedraengt neben dem Scrubber standen beide einander im Weg.
+            -->
+            <Border x:Name="ToolBar" HorizontalAlignment="Right" VerticalAlignment="Top"
+                    Margin="10" Background="{StaticResource OverlayBackground}"
+                    CornerRadius="6" Padding="8,6">
+                <StackPanel Orientation="Horizontal">
+                    <!-- Dekodiergröße. Wirkt auf den Puffervorlauf, nicht auf den Zoom. -->
+                    <Button x:Name="DraftButton" Style="{StaticResource OverlayButton}"
+                            Margin="0,0,8,0" MinWidth="52" Click="OnDraftClicked">
+                        <TextBlock x:Name="DraftText" FontSize="12" />
+                    </Button>
+
+                    <ComboBox x:Name="FpsBox" Style="{StaticResource OverlayCombo}"
+                              Width="88" ToolTip="{DynamicResource S_FrameRate}"
+                              SelectionChanged="OnFpsChanged" />
+
+                    <ToggleButton x:Name="PanelButton" Style="{StaticResource OverlayToggle}"
+                                  Margin="8,0,0,0" Content="&#x25E7;"
+                                  ToolTip="{DynamicResource S_TogglePanel}"
+                                  Checked="OnPanelToggled" Unchecked="OnPanelToggled" />
+
+                    <ToggleButton x:Name="MetricsButton" Style="{StaticResource OverlayToggle}"
+                                  Margin="6,0,0,0" Content="&#x25D4;"
+                                  ToolTip="{DynamicResource S_ToggleMetrics}"
+                                  Checked="OnMetricsToggled" Unchecked="OnMetricsToggled" />
+
+                    <Button x:Name="ExportButton" Style="{StaticResource OverlayButton}"
+                            Margin="8,0,0,0" Content="{DynamicResource S_Export}"
+                            ToolTip="{DynamicResource S_ExportHint}"
+                            Click="OnExportClicked" />
+
+                    <!--
+                        Einstellungen als Schieberegler-Zeichen statt als Zahnrad.
+                        Ein Zahnrad steht fuer Maschinenteile; was man hier oeffnet,
+                        sind Regler - und in einem Werkzeug fuer Bild und Ton ist das
+                        auch das vertrautere Bild.
+                    -->
+                    <Button x:Name="SettingsButton" Style="{StaticResource OverlayButton}"
+                            Margin="8,0,0,0" ToolTip="{DynamicResource S_Settings}"
+                            Click="OnSettingsClicked">
+                        <Canvas Width="15" Height="12" SnapsToDevicePixels="True">
+                            <Path Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"
+                                  StrokeThickness="1.4" StrokeStartLineCap="Round" StrokeEndLineCap="Round"
+                                  Data="M0,2 H15 M0,6 H15 M0,10 H15" />
+                            <Ellipse Canvas.Left="8.5" Canvas.Top="0" Width="4" Height="4"
+                                     Fill="{StaticResource AccentBrush}" />
+                            <Ellipse Canvas.Left="2.5" Canvas.Top="4" Width="4" Height="4"
+                                     Fill="{StaticResource AccentBrush}" />
+                            <Ellipse Canvas.Left="9.5" Canvas.Top="8" Width="4" Height="4"
+                                     Fill="{StaticResource AccentBrush}" />
+                        </Canvas>
+                    </Button>
+                </StackPanel>
             </Border>
 
             <!-- Bedienleiste, blendet nach 2 s Inaktivitaet aus -->
@@ -139,8 +204,8 @@
 
                         <Button x:Name="CopyBlenderButton" Grid.Column="1"
                                 Style="{StaticResource LinkButton}"
-                                Content="Blender-Befehl kopieren" Click="OnCopyBlenderClicked"
-                                ToolTip="Legt einen vollstaendigen Aufruf zum Nachrendern in die Zwischenablage" />
+                                Content="{DynamicResource S_CopyBlender}" Click="OnCopyBlenderClicked"
+                                ToolTip="{DynamicResource S_CopyBlenderHint}" />
                     </Grid>
 
                     <Grid Grid.Row="1">
@@ -149,11 +214,10 @@
                             <ColumnDefinition Width="*" />
                             <ColumnDefinition Width="Auto" />
                             <ColumnDefinition Width="Auto" />
-                            <ColumnDefinition Width="Auto" />
                         </Grid.ColumnDefinitions>
 
                         <Button x:Name="PlayButton" Grid.Column="0" Style="{StaticResource OverlayButton}"
-                                Content="&#x25B6;" ToolTip="Wiedergabe / Pause (Leertaste)" Click="OnPlayClicked" />
+                                Content="&#x25B6;" ToolTip="{DynamicResource S_PlayPause}" Click="OnPlayClicked" />
 
                         <!-- Luecken und Scrubber liegen in derselben Zelle mit derselben
                              Randbreite; dadurch decken sich Markierung und Spur exakt. -->
@@ -179,44 +243,22 @@
                             <TextBlock x:Name="CounterText"
                                        Foreground="{StaticResource ForegroundBrush}"
                                        FontFamily="Consolas, Courier New" FontSize="13"
-                                       ToolTip="Framenummer aus dem Dateinamen" />
+                                       ToolTip="{DynamicResource S_FrameNumber}" />
                             <TextBlock x:Name="RangeText" Margin="10,0,0,0"
                                        Foreground="{StaticResource AccentBrush}"
                                        FontFamily="Consolas, Courier New" FontSize="11"
                                        VerticalAlignment="Center" Visibility="Collapsed"
-                                       ToolTip="Bereich zwischen In- und Out-Punkt (I und O, Entf loescht ihn)" />
+                                       ToolTip="{DynamicResource S_InOutRange}" />
                         </StackPanel>
 
                         <ToggleButton x:Name="LoopButton" Grid.Column="3" Style="{StaticResource OverlayToggle}"
-                                      Content="&#x27F3;" ToolTip="Endlosschleife (L)" Margin="0,0,8,0"
+                                      Content="&#x27F3;" ToolTip="{DynamicResource S_Loop}" Margin="0,0,8,0"
                                       Checked="OnLoopChanged" Unchecked="OnLoopChanged" />
 
-                        <StackPanel Grid.Column="4" Orientation="Horizontal">
-                            <!-- Dekodiergröße. Wirkt auf den Puffervorlauf, nicht auf den Zoom. -->
-                            <Button x:Name="DraftButton" Style="{StaticResource OverlayButton}"
-                                    Margin="0,0,8,0" MinWidth="52" Click="OnDraftClicked">
-                                <TextBlock x:Name="DraftText" FontSize="12" />
-                            </Button>
+                        <!-- Die Werkzeuge sind nach oben gewandert. Hier unten bleibt,
+                             was zur Wiedergabe gehoert: abspielen, scrubben, zaehlen,
+                             loopen. -->
 
-                            <ComboBox x:Name="FpsBox" Style="{StaticResource OverlayCombo}"
-                                      Width="88" ToolTip="Bildrate"
-                                      SelectionChanged="OnFpsChanged" />
-
-                            <ToggleButton x:Name="PanelButton" Style="{StaticResource OverlayToggle}"
-                                          Margin="8,0,0,0" Content="&#x25E7;"
-                                          ToolTip="Bildanpassung ein- oder ausblenden (Tab)"
-                                          Checked="OnPanelToggled" Unchecked="OnPanelToggled" />
-
-                            <ToggleButton x:Name="MetricsButton" Style="{StaticResource OverlayToggle}"
-                                          Margin="6,0,0,0" Content="&#x25D4;"
-                                          ToolTip="Render-Metriken ein- oder ausblenden (M)"
-                                          Checked="OnMetricsToggled" Unchecked="OnMetricsToggled" />
-
-                            <Button x:Name="ExportButton" Style="{StaticResource OverlayButton}"
-                                    Margin="8,0,0,0" Content="Export …"
-                                    ToolTip="Sequenz als Video exportieren (E)"
-                                    Click="OnExportClicked" />
-                        </StackPanel>
                     </Grid>
                 </Grid>
             </Border>
@@ -246,20 +288,45 @@
                             <ColumnDefinition Width="Auto" />
                         </Grid.ColumnDefinitions>
 
-                        <TextBlock Text="Render" Style="{StaticResource PanelHeading}" />
+                        <TextBlock Text="{DynamicResource S_Render}" Style="{StaticResource PanelHeading}" />
 
                         <Border Grid.Column="1" x:Name="JobStateBadge" CornerRadius="4"
                                 Background="#2EF2913F" Padding="7,2">
-                            <TextBlock x:Name="JobStateText" Text="läuft" FontSize="10"
+                            <TextBlock x:Name="JobStateText" Text="{DynamicResource S_JobRunning}" FontSize="10"
                                        FontWeight="SemiBold"
                                        Foreground="{StaticResource AccentBrush}" />
                         </Border>
                     </Grid>
 
+                    <!-- Leerzustand: erklaert sich selbst, statt als Meldung ueber
+                         dem Bild aufzutauchen und dort stehen zu bleiben. -->
+                    <TextBlock x:Name="MetricsEmpty" Style="{StaticResource MetricNote}"
+                               Margin="2,0,0,10" Visibility="Collapsed"
+                               Text="{DynamicResource S_NoRender}" />
+
+                    <!-- Der zuletzt geschriebene Frame. Beantwortet die Frage, wegen
+                         der man ueberhaupt hinsieht: Wie sieht es gerade aus? -->
+                    <Border x:Name="PreviewCard" Style="{StaticResource MetricCard}"
+                            Visibility="Collapsed">
+                        <StackPanel>
+                            <Grid Margin="0,0,0,7">
+                                <TextBlock Text="{DynamicResource S_LastWritten}" Style="{StaticResource MetricLabel}" />
+                                <TextBlock x:Name="PreviewCaption" Style="{StaticResource MetricNote}"
+                                           HorizontalAlignment="Right" Text="" />
+                            </Grid>
+
+                            <Border CornerRadius="5" ClipToBounds="True"
+                                    Background="#FF101014" MinHeight="60">
+                                <Image x:Name="LatestPreview" Stretch="Uniform"
+                                       RenderOptions.BitmapScalingMode="HighQuality" />
+                            </Border>
+                        </StackPanel>
+                    </Border>
+
                     <!-- Gesamtfortschritt -->
                     <Border Style="{StaticResource MetricCard}">
                         <StackPanel>
-                            <TextBlock Text="GESAMT" Style="{StaticResource MetricLabel}" />
+                            <TextBlock Text="{DynamicResource S_Overall}" Style="{StaticResource MetricLabel}" />
 
                             <StackPanel Orientation="Horizontal" Margin="0,3,0,7">
                                 <TextBlock x:Name="OverallPercent" Text="0"
@@ -284,7 +351,7 @@
                     <!-- Aktueller Frame -->
                     <Border Style="{StaticResource MetricCard}">
                         <StackPanel>
-                            <TextBlock Text="AKTUELLER FRAME" Style="{StaticResource MetricLabel}" />
+                            <TextBlock Text="{DynamicResource S_CurrentFrame}" Style="{StaticResource MetricLabel}" />
 
                             <StackPanel Orientation="Horizontal" Margin="0,3,0,7">
                                 <TextBlock x:Name="SampleValue" Text="–"
@@ -298,8 +365,34 @@
                                         Height="4" Width="0" />
                             </Border>
 
+                            <Grid Margin="0,8,0,0">
+                                <TextBlock x:Name="FrameRemainingText" Style="{StaticResource MetricNote}"
+                                           Text="" />
+                                <TextBlock x:Name="MemoryText" Style="{StaticResource MetricNote}"
+                                           HorizontalAlignment="Right" Text="" />
+                            </Grid>
+
                             <TextBlock x:Name="ActivityText" Style="{StaticResource MetricNote}"
-                                       Margin="0,8,0,0" Text="" />
+                                       Margin="0,4,0,0" TextTrimming="CharacterEllipsis"
+                                       Foreground="{StaticResource FaintBrush}" Text="" />
+                        </StackPanel>
+                    </Border>
+
+                    <!-- Tempoverlauf. Ein Mittelwert verschweigt, WELCHE Stellen teuer
+                         waren - genau das will man aber wissen. -->
+                    <Border x:Name="SpeedCard" Style="{StaticResource MetricCard}"
+                            Visibility="Collapsed">
+                        <StackPanel>
+                            <Grid>
+                                <TextBlock Text="{DynamicResource S_SpeedPerFrame}" Style="{StaticResource MetricLabel}" />
+                                <TextBlock x:Name="SpeedSpread" Style="{StaticResource MetricNote}"
+                                           HorizontalAlignment="Right" Text="" />
+                            </Grid>
+
+                            <local:FrameTimeChart x:Name="SpeedChart" Margin="0,6,0,0"
+                                                  BarBrush="{StaticResource AccentBrush}"
+                                                  PeakBrush="{StaticResource ForegroundBrush}"
+                                                  LabelBrush="{StaticResource FaintBrush}" />
                         </StackPanel>
                     </Border>
 
@@ -312,7 +405,7 @@
                             </Grid.ColumnDefinitions>
 
                             <StackPanel>
-                                <TextBlock Text="JE FRAME" Style="{StaticResource MetricLabel}" />
+                                <TextBlock Text="{DynamicResource S_PerFrame}" Style="{StaticResource MetricLabel}" />
                                 <StackPanel Orientation="Horizontal" Margin="0,3,0,0">
                                     <TextBlock x:Name="PerFrameValue" Text="–"
                                                Style="{StaticResource MetricValue}" FontSize="17" />
@@ -322,7 +415,7 @@
                             </StackPanel>
 
                             <StackPanel Grid.Column="1">
-                                <TextBlock Text="LAUFZEIT" Style="{StaticResource MetricLabel}" />
+                                <TextBlock Text="{DynamicResource S_Elapsed}" Style="{StaticResource MetricLabel}" />
                                 <TextBlock x:Name="ElapsedValue" Text="0:00" Margin="0,3,0,0"
                                            Style="{StaticResource MetricValue}" FontSize="17" />
                             </StackPanel>
@@ -340,7 +433,7 @@
                             <local:Sparkline x:Name="CpuLine" Margin="0,4,0,10" />
 
                             <Grid>
-                                <TextBlock Text="ARBEITSSPEICHER" Style="{StaticResource MetricLabel}" />
+                                <TextBlock Text="{DynamicResource S_Memory}" Style="{StaticResource MetricLabel}" />
                                 <TextBlock x:Name="RamValue" Style="{StaticResource MetricNote}"
                                            HorizontalAlignment="Right" Text="–" />
                             </Grid>
@@ -374,11 +467,11 @@
 
                     <!-- Histogramm -->
                     <Grid Margin="0,0,0,4">
-                        <TextBlock Text="Verteilung" Style="{StaticResource PanelHeading}" />
+                        <TextBlock Text="{DynamicResource S_Distribution}" Style="{StaticResource PanelHeading}" />
                         <Button x:Name="HistogramModeButton" Style="{StaticResource LinkButton}"
                                 HorizontalAlignment="Right" Content="RGB"
                                 Click="OnHistogramModeClicked"
-                                ToolTip="Zwischen Farbkanälen und reiner Helligkeit wechseln" />
+                                ToolTip="{DynamicResource S_RgbToggle}" />
                     </Grid>
 
                     <local:HistogramView x:Name="HistogramView" Margin="0,0,0,4" />
@@ -388,14 +481,14 @@
 
                     <!-- Korrektur -->
                     <Grid Margin="0,0,0,6">
-                        <TextBlock Text="Korrektur" Style="{StaticResource PanelHeading}" />
+                        <TextBlock Text="{DynamicResource S_Correction}" Style="{StaticResource PanelHeading}" />
                         <Button x:Name="ResetAdjustButton" Style="{StaticResource LinkButton}"
-                                HorizontalAlignment="Right" Content="zurücksetzen"
+                                HorizontalAlignment="Right" Content="{DynamicResource S_Reset}"
                                 Click="OnResetAdjustClicked" />
                     </Grid>
 
                     <Grid Margin="0,0,0,2">
-                        <TextBlock Text="Belichtung" Style="{StaticResource PanelLabel}" />
+                        <TextBlock Text="{DynamicResource S_Exposure}" Style="{StaticResource PanelLabel}" />
                         <TextBlock x:Name="ExposureValue" Style="{StaticResource PanelValue}" />
                     </Grid>
                     <Slider x:Name="ExposureSlider" Style="{StaticResource PanelSlider}"
@@ -404,7 +497,7 @@
                             MouseDoubleClick="OnSliderReset" Tag="0" />
 
                     <Grid Margin="0,10,0,2">
-                        <TextBlock Text="Gamma" Style="{StaticResource PanelLabel}" />
+                        <TextBlock Text="{DynamicResource S_Gamma}" Style="{StaticResource PanelLabel}" />
                         <TextBlock x:Name="GammaValue" Style="{StaticResource PanelValue}" />
                     </Grid>
                     <Slider x:Name="GammaSlider" Style="{StaticResource PanelSlider}"
@@ -413,7 +506,7 @@
                             MouseDoubleClick="OnSliderReset" Tag="1" />
 
                     <Grid Margin="0,10,0,2">
-                        <TextBlock Text="Kontrast" Style="{StaticResource PanelLabel}" />
+                        <TextBlock Text="{DynamicResource S_Contrast}" Style="{StaticResource PanelLabel}" />
                         <TextBlock x:Name="ContrastValue" Style="{StaticResource PanelValue}" />
                     </Grid>
                     <Slider x:Name="ContrastSlider" Style="{StaticResource PanelSlider}"
@@ -422,7 +515,7 @@
                             MouseDoubleClick="OnSliderReset" Tag="1" />
 
                     <Grid Margin="0,10,0,2">
-                        <TextBlock Text="Sättigung" Style="{StaticResource PanelLabel}" />
+                        <TextBlock Text="{DynamicResource S_Saturation}" Style="{StaticResource PanelLabel}" />
                         <TextBlock x:Name="SaturationValue" Style="{StaticResource PanelValue}" />
                     </Grid>
                     <Slider x:Name="SaturationSlider" Style="{StaticResource PanelSlider}"
@@ -431,7 +524,7 @@
                             MouseDoubleClick="OnSliderReset" Tag="1" />
 
                     <Grid Margin="0,10,0,2">
-                        <TextBlock Text="Schwarzpunkt" Style="{StaticResource PanelLabel}" />
+                        <TextBlock Text="{DynamicResource S_BlackPoint}" Style="{StaticResource PanelLabel}" />
                         <TextBlock x:Name="BlackValue" Style="{StaticResource PanelValue}" />
                     </Grid>
                     <Slider x:Name="BlackSlider" Style="{StaticResource PanelSlider}"
@@ -440,7 +533,7 @@
                             MouseDoubleClick="OnSliderReset" Tag="0" />
 
                     <Grid Margin="0,10,0,2">
-                        <TextBlock Text="Weißpunkt" Style="{StaticResource PanelLabel}" />
+                        <TextBlock Text="{DynamicResource S_WhitePoint}" Style="{StaticResource PanelLabel}" />
                         <TextBlock x:Name="WhiteValue" Style="{StaticResource PanelValue}" />
                     </Grid>
                     <Slider x:Name="WhiteSlider" Style="{StaticResource PanelSlider}"
@@ -449,48 +542,48 @@
                             MouseDoubleClick="OnSliderReset" Tag="1" />
 
                     <!-- Kanäle -->
-                    <TextBlock Text="Kanal" Style="{StaticResource PanelHeading}" Margin="0,16,0,6" />
+                    <TextBlock Text="{DynamicResource S_Channel}" Style="{StaticResource PanelHeading}" Margin="0,16,0,6" />
                     <ComboBox x:Name="ChannelBox" Style="{StaticResource OverlayCombo}"
                               SelectionChanged="OnChannelChanged"
-                              ToolTip="Einzelne Kanäle isolieren – Alpha zeigt die Freistellung" />
+                              ToolTip="{DynamicResource S_ChannelHint}" />
 
                     <!-- A/B -->
-                    <TextBlock Text="Vergleich" Style="{StaticResource PanelHeading}" Margin="0,16,0,6" />
+                    <TextBlock Text="{DynamicResource S_Compare}" Style="{StaticResource PanelHeading}" Margin="0,16,0,6" />
                     <Grid>
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="*" />
                             <ColumnDefinition Width="*" />
                         </Grid.ColumnDefinitions>
                         <Button x:Name="MarkAButton" Grid.Column="0" Style="{StaticResource OverlayButton}"
-                                Margin="0,0,4,0" Content="Merken" Click="OnMarkAClicked"
-                                ToolTip="Diesen Frame als Vergleich festhalten (A)" />
+                                Margin="0,0,4,0" Content="{DynamicResource S_Remember}" Click="OnMarkAClicked"
+                                ToolTip="{DynamicResource S_RememberHint}" />
                         <ToggleButton x:Name="CompareButton" Grid.Column="1" Style="{StaticResource OverlayToggle}"
                                       Margin="4,0,0,0" Content="A / B" IsEnabled="False"
                                       Checked="OnCompareToggled" Unchecked="OnCompareToggled"
-                                      ToolTip="Zwischen gemerktem und aktuellem Frame umschalten (C)" />
+                                      ToolTip="{DynamicResource S_CompareToggle}" />
                     </Grid>
                     <TextBlock x:Name="CompareText" Margin="0,6,0,0" FontSize="10"
                                Foreground="{StaticResource MutedBrush}" TextWrapping="Wrap"
-                               Text="Kein Frame gemerkt." />
+                               Text="{DynamicResource S_NoFrameKept}" />
 
                     <!-- Vorlagen -->
-                    <TextBlock Text="Vorlagen" Style="{StaticResource PanelHeading}" Margin="0,16,0,6" />
+                    <TextBlock Text="{DynamicResource S_Presets}" Style="{StaticResource PanelHeading}" Margin="0,16,0,6" />
                     <ComboBox x:Name="PresetBox" Style="{StaticResource OverlayCombo}"
                               Margin="0,0,0,6" SelectionChanged="OnPresetSelected"
-                              ToolTip="Gespeicherte Korrektureinstellungen" />
+                              ToolTip="{DynamicResource S_PresetsHint}" />
                     <Grid>
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="*" />
                             <ColumnDefinition Width="Auto" />
                         </Grid.ColumnDefinitions>
                         <TextBox x:Name="PresetNameBox" Grid.Column="0" Style="{StaticResource DialogTextBox}"
-                                 Margin="0,0,6,0" ToolTip="Name für die neue Vorlage" />
+                                 Margin="0,0,6,0" ToolTip="{DynamicResource S_PresetName}" />
                         <StackPanel Grid.Column="1" Orientation="Horizontal">
                             <Button x:Name="SavePresetButton" Style="{StaticResource OverlayButton}"
-                                    Content="Sichern" Click="OnSavePresetClicked" />
+                                    Content="{DynamicResource S_Save}" Click="OnSavePresetClicked" />
                             <Button x:Name="DeletePresetButton" Style="{StaticResource OverlayButton}"
                                     Margin="4,0,0,0" MinWidth="26" Content="&#x2715;"
-                                    Click="OnDeletePresetClicked" ToolTip="Ausgewählte Vorlage löschen" />
+                                    Click="OnDeletePresetClicked" ToolTip="{DynamicResource S_DeletePreset}" />
                         </StackPanel>
                     </Grid>
 

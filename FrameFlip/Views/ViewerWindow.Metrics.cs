@@ -1,8 +1,10 @@
 using System.IO;
+using System.Windows.Media.Imaging;
 using System.Windows;
 using System.Windows.Threading;
 using FrameFlip.Bridge;
 using FrameFlip.Diagnostics;
+using FrameFlip.Localization;
 using Brush = System.Windows.Media.Brush;
 
 namespace FrameFlip.Views;
@@ -31,6 +33,18 @@ public partial class ViewerWindow
     private LoadSnapshot? _lastLoad;
 
     private bool _metricsOpen;
+
+    /// <summary>Welcher Frame gerade als Vorschau geladen ist - verhindert Doppelarbeit.</summary>
+    private string? _previewPath;
+
+    /// <summary>
+    /// Der Auftrag, fuer den sich die Spalte bereits selbst geoeffnet hat. Jeder
+    /// Auftrag meldet sich genau einmal - danach entscheidet der Nutzer.
+    /// </summary>
+    private string? _announcedJob;
+
+    /// <summary>Oeffnet die Einstellungen. Vom Tray gesetzt, der sie ohnehin verwaltet.</summary>
+    public Action? SettingsRequested { get; set; }
 
 
     public void AttachRenderMonitor(RenderMonitor monitor)
@@ -98,13 +112,25 @@ public partial class ViewerWindow
         if (_metricsOpen) { HideMetrics(); return; }
 
         ShowMetrics();
+    }
 
-        // Ohne gemeldeten Render bleiben die Karten leer. Ein Hinweis erklaert, warum -
-        // sonst sieht ein aufgeklappter, leerer Fluegel nach einem Fehler aus.
-        if (_monitor?.Job is null)
-            ShowStatus(_monitor?.IsListening == true
-                ? "Kein Render gemeldet – das Blender-Addon meldet sich hier."
-                : "Die Brücke lauscht nicht. In den Einstellungen prüfen.");
+    /// <summary>
+    /// Oeffnet die Einstellungen. Der Viewer baut den Dialog nicht selbst: Ihn
+    /// verwaltet der Tray, der auch weiss, wie geaenderte Werte zu pruefen und zu
+    /// sichern sind. Hier wird nur gefragt.
+    /// </summary>
+    private void OnSettingsClicked(object sender, RoutedEventArgs e)
+    {
+        if (SettingsRequested is null)
+        {
+            ShowStatus(Strings.T("S_SettingsViaTray"));
+            return;
+        }
+
+        // Dass die Vorschau waehrenddessen nicht wegschliesst, regelt der Tray ueber
+        // ModalDialogOpen - hier noch einmal daran zu drehen waere ein zweiter
+        // Schalter fuer dieselbe Sache.
+        SettingsRequested.Invoke();
     }
 
     private void OnMetricsToggled(object sender, RoutedEventArgs e)
@@ -125,32 +151,141 @@ public partial class ViewerWindow
 
         var job = _monitor?.Job;
 
-        // Ein neu gemeldeter Render klappt den Fluegel selbst auf. Ein beendeter
-        // laesst ihn stehen, bis der Nutzer ihn zumacht.
-        if (job is not null && job.IsRunning && !_metricsOpen) ShowMetrics();
+        // Ein neu gemeldeter Render klappt die Spalte EINMAL auf und danach nie
+        // wieder von selbst.
+        //
+        // Ohne das Merken der Kennung tat er es bei jedem Takt: Wer die Spalte
+        // waehrend eines Renders zumachte, sah sie eine Sekunde spaeter wieder
+        // aufspringen und konnte sie ueberhaupt nicht loswerden.
+        if (job is not null && job.IsRunning && !_metricsOpen &&
+            !string.Equals(job.Id, _announcedJob, StringComparison.Ordinal))
+        {
+            _announcedJob = job.Id;
+            ShowMetrics();
+        }
+
         if (!_metricsOpen) return;
 
         SampleSystemLoad();
+
+        // Der Leerzustand steht IM Panel, nicht als Meldung ueber dem Bild: Eine
+        // Meldung dort bleibt stehen und widerspricht spaeter den Zahlen daneben.
+        bool empty = job is null;
+
+        MetricsEmpty.Visibility = empty ? Visibility.Visible : Visibility.Collapsed;
+        MetricsEmpty.Text = _monitor?.IsListening == true
+            ? Strings.T("S_NoRender")
+            : Strings.T("S_BridgeSilent");
+
+        JobStateBadge.Visibility = empty ? Visibility.Collapsed : Visibility.Visible;
 
         if (job is null) return;
 
         UpdateJobState(job);
         UpdateOverall(job);
         UpdateCurrentFrame(job);
+        UpdateSpeed(job);
         UpdateTimes(job);
         UpdateJobDescription(job);
+        UpdatePreview(job);
+    }
+
+    // ---------------------------------------------------------------- Tempoverlauf
+
+    private void UpdateSpeed(RenderJob job)
+    {
+        var durations = job.FrameDurations;
+
+        SpeedCard.Visibility = durations.Length >= 2 ? Visibility.Visible : Visibility.Collapsed;
+        if (durations.Length < 2) return;
+
+        SpeedChart.SetData(durations);
+
+        // Die Spanne beantwortet, ob der Mittelwert ueberhaupt etwas taugt: Liegen
+        // schnellster und langsamster Frame weit auseinander, sagt er wenig.
+        if (job.FastestFrame is double fastest && job.SlowestFrame is double slowest)
+            SpeedSpread.Text = $"{Seconds(fastest)} – {Seconds(slowest)}";
+    }
+
+    // ---------------------------------------------------------------- Vorschau
+
+    /// <summary>
+    /// Zeigt den zuletzt geschriebenen Frame klein an.
+    ///
+    /// Bewusst klein dekodiert: Die Datei kann 70 MB haben, und fuer 260 Pixel
+    /// Breite muss sie nicht in voller Groesse in den Speicher. Geladen wird auf
+    /// einem Hintergrundthread - waehrend eines Renders ist der UI-Thread das
+    /// Letzte, was auf eine Platte warten sollte.
+    /// </summary>
+    private void UpdatePreview(RenderJob job)
+    {
+        var path = job.LatestFrameFile;
+
+        if (string.IsNullOrEmpty(path))
+        {
+            PreviewCard.Visibility = Visibility.Collapsed;
+            return;
+        }
+
+        if (string.Equals(path, _previewPath, StringComparison.OrdinalIgnoreCase)) return;
+
+        _previewPath = path;
+        PreviewCaption.Text = $"Frame {job.CurrentFrame}";
+
+        _ = LoadPreviewAsync(path);
+    }
+
+    private async Task LoadPreviewAsync(string path)
+    {
+        var image = await Task.Run(() => DecodeThumbnail(path));
+
+        if (_closing || image is null) return;
+
+        // Zwischenzeitlich kam ein neuerer Frame: Der alte waere jetzt falsch.
+        if (!string.Equals(path, _previewPath, StringComparison.OrdinalIgnoreCase)) return;
+
+        LatestPreview.Source = image;
+        PreviewCard.Visibility = Visibility.Visible;
+    }
+
+    private static BitmapSource? DecodeThumbnail(string path)
+    {
+        try
+        {
+            // Der Render schreibt womoeglich noch. FileShare erlaubt das Lesen
+            // trotzdem; ein halb geschriebenes Bild faengt der catch ab.
+            using var stream = new FileStream(path, FileMode.Open, FileAccess.Read,
+                                              FileShare.ReadWrite | FileShare.Delete);
+
+            var bitmap = new BitmapImage();
+            bitmap.BeginInit();
+            bitmap.StreamSource = stream;
+            bitmap.DecodePixelWidth = 272;
+            bitmap.CacheOption = BitmapCacheOption.OnLoad;
+            bitmap.CreateOptions = BitmapCreateOptions.IgnoreColorProfile;
+            bitmap.EndInit();
+            bitmap.Freeze();
+
+            return bitmap;
+        }
+        catch (Exception)
+        {
+            // Noch nicht fertig geschrieben, gesperrt, geloescht - beim naechsten
+            // Frame gibt es ohnehin ein neues Bild.
+            return null;
+        }
     }
 
     private void UpdateJobState(RenderJob job)
     {
         (string label, string key) = job.State switch
         {
-            JobState.Preparing => ("wird vorbereitet", "AccentBrush"),
-            JobState.Rendering => ("läuft", "AccentBrush"),
-            JobState.Finished => ("fertig", "MutedBrush"),
-            JobState.Cancelled => ("abgebrochen", "GapBrush"),
-            JobState.Failed => ("fehlgeschlagen", "GapBrush"),
-            _ => ("bereit", "MutedBrush"),
+            JobState.Preparing => (Strings.T("S_JobPreparing"), "AccentBrush"),
+            JobState.Rendering => (Strings.T("S_JobRunning"), "AccentBrush"),
+            JobState.Finished => (Strings.T("S_JobFinished"), "MutedBrush"),
+            JobState.Cancelled => (Strings.T("S_JobCancelled"), "GapBrush"),
+            JobState.Failed => (Strings.T("S_JobFailed"), "GapBrush"),
+            _ => (Strings.T("S_JobIdle"), "MutedBrush"),
         };
 
         JobStateText.Text = label;
@@ -165,10 +300,10 @@ public partial class ViewerWindow
         OverallPercent.Text = (progress * 100).ToString("0");
         SetFill(OverallFill, progress);
 
-        FrameCounter.Text = $"Frame {job.FramesWritten} / {job.TotalFrames}";
+        FrameCounter.Text = Strings.T("S_FrameOf", job.FramesWritten, job.TotalFrames);
 
         RemainingText.Text = job.Remaining is TimeSpan left
-            ? $"noch {Duration(left)}"
+            ? Strings.T("S_RemainingShort", Duration(left))
             : string.Empty;
     }
 
@@ -189,9 +324,20 @@ public partial class ViewerWindow
 
         SetFill(SampleFill, stats.SampleProgress ?? 0);
 
+        // Blenders eigene Restzeit gilt fuer DIESEN Frame - im Unterschied zu der
+        // Angabe oben, die den ganzen Auftrag meint. Beide nebeneinander sind kein
+        // Widerspruch, sondern zwei verschiedene Fragen.
+        FrameRemainingText.Text = stats.FrameRemaining is TimeSpan frameLeft
+            ? Strings.T("S_RemainingShort", Duration(frameLeft))
+            : string.Empty;
+
+        MemoryText.Text = stats.MemoryMb is long memory
+            ? $"{memory / 1024.0:0.0} GB"
+            : string.Empty;
+
         // Ohne Sample-Zaehler bleibt die Taetigkeit die einzige Auskunft darueber, ob
-        // ueberhaupt etwas passiert - "Loading render kernels" erklaert eine Minute
-        // Stillstand, die sonst wie ein Absturz aussieht.
+        // ueberhaupt etwas passiert - "Updating Volume · Building octree" erklaert
+        // eine Minute Stillstand, die sonst wie ein Absturz aussieht.
         ActivityText.Text = stats.Activity ?? string.Empty;
     }
 
@@ -250,7 +396,9 @@ public partial class ViewerWindow
 
             // Belegt statt frei: Die Kurve zeigt Auslastung, und Zahl und Kurve
             // sollen dasselbe meinen. Der freie Rest steht daneben.
-            RamValue.Text = $"{used * 100:0} % · {snapshot.AvailableMb / 1024.0:0.0} GB frei";
+            RamValue.Text = Strings.T("S_MemoryFree",
+                                      $"{used * 100:0}",
+                                      $"{snapshot.AvailableMb / 1024.0:0.0}");
         }
 
         if (snapshot.GpuPercent is double gpu)
@@ -260,7 +408,7 @@ public partial class ViewerWindow
         }
         else
         {
-            GpuValue.Text = "nicht messbar";
+            GpuValue.Text = Strings.T("S_NotMeasurable");
         }
     }
 
@@ -280,6 +428,10 @@ public partial class ViewerWindow
 
         fill.Width = Math.Clamp(fraction, 0, 1) * available;
     }
+
+    /// <summary>Sekunden lesbar - ab anderthalb Minuten in Minuten.</summary>
+    private static string Seconds(double seconds)
+        => seconds >= 90 ? $"{seconds / 60:0.0} min" : $"{seconds:0.0} s";
 
     private static string Duration(TimeSpan span)
         => span.TotalHours >= 1

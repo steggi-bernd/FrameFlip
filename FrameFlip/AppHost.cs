@@ -36,6 +36,10 @@ public sealed class AppHost : IDisposable
     {
         _settings = SettingsStore.Load();
 
+        // Vor allem anderen: Die Oberflaeche soll gleich in der richtigen Sprache
+        // erscheinen, nicht erst nach dem ersten Fensterwechsel.
+        Localization.Strings.Apply(Localization.Strings.Parse(_settings.Language));
+
         CreateTrayIcon();
 
         _hotkeys.Pressed += Toggle;
@@ -251,6 +255,10 @@ public sealed class AppHost : IDisposable
         // waehrend gar keine Vorschau offen ist, und soll dann trotzdem mitgezaehlt
         // werden. Das Fenster haengt sich nur an.
         if (_renderMonitor is not null) viewer.AttachRenderMonitor(_renderMonitor);
+
+        // Der Viewer soll die Einstellungen oeffnen koennen, ohne den Dialog selbst
+        // zu bauen - Pruefen und Sichern gehoeren hierher.
+        viewer.SettingsRequested = ShowSettings;
         viewer.Closed += (_, _) =>
         {
             _viewer = null;
@@ -345,6 +353,16 @@ public sealed class AppHost : IDisposable
         if (viewer is not null) viewer.ModalDialogOpen = true;
 
         var window = new SettingsWindow(_settings, ApplySettings);
+
+        // Die Vorschau liegt ueber allem. Ohne dasselbe fuer den Dialog erschiene er
+        // dahinter - man klickt auf "Einstellungen" und es passiert scheinbar nichts.
+        if (viewer is not null && viewer.IsVisible)
+        {
+            window.Owner = viewer;
+            window.Topmost = true;
+            window.WindowStartupLocation = System.Windows.WindowStartupLocation.CenterOwner;
+        }
+
         window.Closed += (_, _) =>
         {
             _settingsWindow = null;
@@ -373,6 +391,7 @@ public sealed class AppHost : IDisposable
         }
 
         _settings = settings;
+        Localization.Strings.Apply(Localization.Strings.Parse(_settings.Language));
         SettingsStore.Save(_settings);
         UpdateTooltip();
 
