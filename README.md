@@ -12,10 +12,12 @@ zurück, wenn Blender rechnet.
 
 C# · .NET 8 · WPF · Windows 10/11 · keine Fremdpakete
 
----
+![Das Vorschaufenster mit ausgeklapptem Seitenpanel: links das laufende Bild einer
+gerenderten Sequenz, rechts Histogramm und Regler für Belichtung, Gamma, Kontrast,
+Sättigung, Schwarz- und Weißpunkt, unten die Zeitleiste](docs/bildschirmfoto.png)
 
-> **Bildschirmfoto folgt.** Am aussagekräftigsten wäre eines mit echtem
-> Render-Material statt der synthetischen Testbilder aus diesem Repo.
+<sub>Eine Sequenz in 4096 × 2304, rechts das ausklappbare Panel für schnelle
+Bildanpassung. Die Korrektur betrifft nur die Anzeige.</sub>
 
 ---
 
