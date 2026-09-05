@@ -162,8 +162,11 @@ gedacht, nicht für die automatischen Tests – eine davon hat absichtlich Lück
 
 ## Was noch fehlt
 
-* Blender-Addon, das die Ausgabepfade laufender Renders meldet
-* Live-Modus: neu geschriebene Frames während des Renders nachladen
+* Blender-Addon, das laufende Renders meldet — Entwurf und API-Recherche stehen in
+  [docs/Blender-Bridge.md](docs/Blender-Bridge.md)
+* Live-Modus: neu geschriebene Frames während des Renders nachladen, mit
+  ausklappbarem Bereich für Fortschritt und Auslastung
+* Fernsteuerung vom Handy, Ende-zu-Ende verschlüsselt
 * Renderwarteschlange
 
 ## Lizenz
