@@ -80,7 +80,7 @@ public partial class ViewerWindow
         _settings.PanelOpen = open;
         _persist(_settings);
 
-        if (resizeWindow) ResizeForPanel(open);
+        if (resizeWindow) ResizeForPanel(open, SidePanel.Width + 1);
 
         if (open)
         {
@@ -95,10 +95,12 @@ public partial class ViewerWindow
         ShowBar();
     }
 
-    private void ResizeForPanel(bool open)
+    /// <param name="panel">
+    /// Breite der Spalte samt Rahmen. Beide Spalten - Korrektur und Metriken -
+    /// benutzen dieselbe Mechanik; nur so verhalten sie sich fuer den Nutzer gleich.
+    /// </param>
+    private void ResizeForPanel(bool open, double panel)
     {
-        double panel = SidePanel.Width + 1;   // Rahmen
-
         if (!open)
         {
             Width = Math.Max(MinWidth, Width - panel);

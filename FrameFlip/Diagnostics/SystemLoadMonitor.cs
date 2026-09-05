@@ -16,6 +16,12 @@ public enum LoadLevel
 public sealed record LoadSnapshot(double CpuPercent, double? GpuPercent, long AvailableMb, LoadLevel Level)
 {
     /// <summary>
+    /// Gesamter physischer Speicher. Ohne ihn laesst sich aus "frei" keine Auslastung
+    /// rechnen - und eine Kurve, die immer bei null liegt, sagt gar nichts.
+    /// </summary>
+    public long TotalMb { get; init; }
+
+    /// <summary>
     /// True, wenn der Arbeitsspeicher knapp ist - im Unterschied zu blosser CPU-Last.
     ///
     /// Die Unterscheidung ist wesentlich: bei CPU-Last muss der Decoder langsamer
@@ -200,9 +206,13 @@ public sealed class SystemLoadMonitor : IDisposable
         }
 
         long availableMb = 0;
+        long totalMb = 0;
         var status = new NativeMethods.MEMORYSTATUSEX { Length = (uint)System.Runtime.InteropServices.Marshal.SizeOf<NativeMethods.MEMORYSTATUSEX>() };
         if (NativeMethods.GlobalMemoryStatusEx(ref status))
+        {
             availableMb = (long)(status.AvailablePhysical / (1024 * 1024));
+            totalMb = (long)(status.TotalPhysical / (1024 * 1024));
+        }
 
         double? gpu = _gpu.Read();
 
@@ -212,6 +222,7 @@ public sealed class SystemLoadMonitor : IDisposable
 
         return new LoadSnapshot(cpu, gpu, availableMb, ClassifyWithHysteresis(cpu, gpu, availableMb))
         {
+            TotalMb = totalMb,
             MemoryTight = memoryTight,
         };
     }

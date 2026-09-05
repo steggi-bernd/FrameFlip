@@ -29,8 +29,6 @@ public partial class ViewerWindow
     private bool _metricsOpen;
     private bool _panelWasOpen;
 
-    /// <summary>Bezugsgroesse fuer die Speicherkurve, beim ersten Messwert bestimmt.</summary>
-    private long _memoryTotalMb;
 
     public void AttachRenderMonitor(RenderMonitor monitor)
     {
@@ -71,6 +69,13 @@ public partial class ViewerWindow
         MetricsPanel.Visibility = Visibility.Visible;
         _metricsOpen = true;
 
+        // Das Fenster waechst nach rechts, statt der Bildflaeche Platz wegzunehmen -
+        // genau wie bei der Korrekturspalte. Loest eine Spalte die andere ab, bleibt
+        // die Breite stehen: Beide sind gleich breit, es gaebe nichts zu bewegen.
+        if (!_panelWasOpen) ResizeForPanel(true, MetricsPanel.Width + 1);
+
+        MetricsButton.IsChecked = true;
+
         SyncViewport();
         ScheduleRedecode(deferWhilePlaying: false);
     }
@@ -83,7 +88,10 @@ public partial class ViewerWindow
         _metricsOpen = false;
 
         if (_panelWasOpen) SetPanelOpen(true, resizeWindow: false);
+        else ResizeForPanel(false, MetricsPanel.Width + 1);
+
         _panelWasOpen = false;
+        MetricsButton.IsChecked = false;
 
         SyncViewport();
         ScheduleRedecode(deferWhilePlaying: false);
@@ -92,9 +100,26 @@ public partial class ViewerWindow
     /// <summary>Vom Nutzer umgeschaltet - dann bleibt der Fluegel auch ohne Render zu.</summary>
     private void ToggleMetrics()
     {
-        if (_metricsOpen) HideMetrics();
-        else if (_monitor?.Job is not null) ShowMetrics();
-        else ShowStatus("Kein Render gemeldet.");
+        if (_metricsOpen) { HideMetrics(); return; }
+
+        ShowMetrics();
+
+        // Ohne gemeldeten Render bleiben die Karten leer. Ein Hinweis erklaert, warum -
+        // sonst sieht ein aufgeklappter, leerer Fluegel nach einem Fehler aus.
+        if (_monitor?.Job is null)
+            ShowStatus(_monitor?.IsListening == true
+                ? "Kein Render gemeldet – das Blender-Addon meldet sich hier."
+                : "Die Brücke lauscht nicht. In den Einstellungen prüfen.");
+    }
+
+    private void OnMetricsToggled(object sender, RoutedEventArgs e)
+    {
+        // Der Knopf spiegelt den Zustand, deshalb nur handeln, wenn er wirklich
+        // abweicht - sonst schaukelt er sich mit ShowMetrics gegenseitig hoch.
+        bool wanted = MetricsButton.IsChecked == true;
+        if (wanted == _metricsOpen) return;
+
+        ToggleMetrics();
     }
 
     // ---------------------------------------------------------------- Anzeige
@@ -222,17 +247,15 @@ public partial class ViewerWindow
         CpuLine.Add(snapshot.CpuPercent / 100.0);
         CpuValue.Text = $"{snapshot.CpuPercent:0} %";
 
-        if (snapshot.AvailableMb > 0)
+        if (snapshot.AvailableMb > 0 && snapshot.TotalMb > 0)
         {
-            // Der Gesamtspeicher steht in keiner Momentaufnahme. Die groesste je
-            // gesehene freie Menge ist eine brauchbare Untergrenze dafuer - und mehr
-            // braucht eine Kurve nicht, die ohnehin nur den Verlauf zeigen soll.
-            _memoryTotalMb = Math.Max(_memoryTotalMb, snapshot.AvailableMb);
-
-            double used = 1 - snapshot.AvailableMb / (double)Math.Max(1, _memoryTotalMb);
+            double used = 1 - snapshot.AvailableMb / (double)snapshot.TotalMb;
 
             RamLine.Add(used);
-            RamValue.Text = $"{snapshot.AvailableMb / 1024.0:0.0} GB frei";
+
+            // Belegt statt frei: Die Kurve zeigt Auslastung, und Zahl und Kurve
+            // sollen dasselbe meinen. Der freie Rest steht daneben.
+            RamValue.Text = $"{used * 100:0} % · {snapshot.AvailableMb / 1024.0:0.0} GB frei";
         }
 
         if (snapshot.GpuPercent is double gpu)

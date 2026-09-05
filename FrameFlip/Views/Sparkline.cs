@@ -46,7 +46,7 @@ public sealed class Sparkline : FrameworkElement
     public Brush LineBrush { get; set; } = Brushes.White;
 
     /// <summary>Farbe der Flaeche unter der Kurve. Wird nach unten ausgeblendet.</summary>
-    public Color FillColor { get; set; } = Color.FromRgb(0xF2, 0x91, 0x3F);
+    public Color FillColor { get; set; } = Color.FromRgb(0xA4, 0x7B, 0xF0);
 
     public double LineThickness { get; set; } = 1.6;
 

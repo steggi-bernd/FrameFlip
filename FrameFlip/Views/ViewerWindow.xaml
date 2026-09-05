@@ -203,6 +203,11 @@
                                           ToolTip="Bildanpassung ein- oder ausblenden (Tab)"
                                           Checked="OnPanelToggled" Unchecked="OnPanelToggled" />
 
+                            <ToggleButton x:Name="MetricsButton" Style="{StaticResource OverlayToggle}"
+                                          Margin="6,0,0,0" Content="&#x25D4;"
+                                          ToolTip="Render-Metriken ein- oder ausblenden (M)"
+                                          Checked="OnMetricsToggled" Unchecked="OnMetricsToggled" />
+
                             <Button x:Name="ExportButton" Style="{StaticResource OverlayButton}"
                                     Margin="8,0,0,0" Content="Export …"
                                     ToolTip="Sequenz als Video exportieren (E)"
@@ -221,7 +226,7 @@
             schliesst sich mit ihm gegenseitig aus: Zwei Panels nebeneinander fressen
             die Bildflaeche auf, und genau die will man beim Rendern sehen.
         -->
-        <Border x:Name="MetricsPanel" Grid.Row="1" Grid.Column="1" Width="300"
+        <Border x:Name="MetricsPanel" Grid.Row="1" Grid.Column="1" Width="288"
                 Background="{StaticResource PanelBackground}"
                 BorderBrush="{StaticResource PanelBorder}" BorderThickness="1,0,0,0"
                 Visibility="Collapsed">
