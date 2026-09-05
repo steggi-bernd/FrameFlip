@@ -178,9 +178,9 @@ hand, not for the automated tests — one of them has deliberate gaps.
 
 Working already: FrameFlip receives a running render from the Blender add-on and
 shows progress, sample counter, time per frame, a graph of how expensive each frame
-was, and a thumbnail of the last one written. The add-on lives in its own repository
-under GPL; the design and the API research are in
-[docs/Blender-Bridge.md](docs/Blender-Bridge.md).
+was, and a thumbnail of the last one written. The add-on lives in its own repository under GPL —
+[FrameFlipBridge](https://github.com/steggi-bernd/FrameFlipBridge); the design and
+the API research are in [docs/Blender-Bridge.md](docs/Blender-Bridge.md).
 
 Still missing:
 

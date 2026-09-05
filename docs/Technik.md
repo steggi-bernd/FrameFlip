@@ -622,8 +622,9 @@ its own fields — otherwise it would reset every setting it does not itself dis
 While a preview is open, FrameFlip can report a running render: overall progress,
 sample counter, time per frame, a graph of how expensive each frame was, and a
 thumbnail of the last frame written. The add-on that feeds it lives in its own
-repository under GPL; the design and the API research are in
-[Blender-Bridge.md](Blender-Bridge.md).
+repository under GPL —
+[FrameFlipBridge](https://github.com/steggi-bernd/FrameFlipBridge); the design and
+the API research are in [Blender-Bridge.md](Blender-Bridge.md).
 
 The receiving end is a TCP listener bound **exclusively to 127.0.0.1**, speaking one
 JSON object per line. Not HTTP: the add-on is to manage without third-party packages,
