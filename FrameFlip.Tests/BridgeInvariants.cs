@@ -48,10 +48,20 @@ public static class BridgeInvariants
         Check.That(lean.MemoryMb is null && lean.FrameRemaining is null,
             "was nicht dasteht, wird nicht erfunden");
 
-        // EEVEE stellt die Zahlen vor das Wort.
-        var eevee = StatsParser.Parse("Rendering 12 / 64 samples");
-        Check.That(eevee.Sample == 12 && eevee.SampleTotal == 64,
-            "EEVEE: 12 / 64 samples", $"{eevee.Sample}/{eevee.SampleTotal}");
+        // Aufgezeichnet aus einem echten Lauf mit Blender 5.1 und EEVEE: Die Zahlen
+        // stehen VOR dem Wort, es gibt weder Trennstriche noch Speicher noch Restzeit.
+        var eevee = StatsParser.Parse("Rendering 1 / 64 samples");
+        Check.That(eevee.Sample == 1 && eevee.SampleTotal == 64,
+            "EEVEE (gemessen): Rendering 1 / 64 samples", $"{eevee.Sample}/{eevee.SampleTotal}");
+        Check.That(eevee.Activity == "Rendering 1 / 64 samples" || eevee.Activity is null,
+            "der Text bleibt als Taetigkeit lesbar", $"{eevee.Activity}");
+
+        // Ebenfalls gemessen: Nach jedem Frame kommt ueber denselben Handler eine
+        // Abschlussmeldung. Sie beschreibt keine laufende Taetigkeit.
+        var finished = StatsParser.Parse("Time: 00:00.23 (Saving: 00:00.00)");
+        Check.That(finished.Activity is null,
+            "die Abschlussmeldung wird nicht als Taetigkeit angezeigt", $"{finished.Activity}");
+        Check.That(finished.Sample is null, "und enthaelt keinen Sample-Zaehler");
 
         // Gigabyte kommen vor, sobald die Szene groesser wird.
         Check.That(StatsParser.Parse("Mem: 2.5G | Rendering").MemoryMb == 2560,

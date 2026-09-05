@@ -212,6 +212,12 @@ public static class StatsParser
             if (part.StartsWith("Peak:", StringComparison.OrdinalIgnoreCase)) continue;
             if (part.StartsWith("Sample", StringComparison.OrdinalIgnoreCase)) continue;
 
+            // Nach jedem geschriebenen Frame kommt ueber denselben Handler eine
+            // Abschlussmeldung: "Time: 00:00.23 (Saving: 00:00.00)". Sie beschreibt
+            // keine Taetigkeit, sondern eine bereits vergangene - als Zustandszeile
+            // waere sie irrefuehrend. Aufgezeichnet aus Blender 5.1.
+            if (part.StartsWith("Time:", StringComparison.OrdinalIgnoreCase)) continue;
+
             // "Scene, ViewLayer" benennt nur, was gerendert wird, nicht die Taetigkeit.
             if (part.Contains(',') && !part.Contains(' ')) continue;
 

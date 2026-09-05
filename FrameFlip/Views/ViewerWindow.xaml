@@ -31,13 +31,17 @@
             <RowDefinition Height="36" />
             <RowDefinition Height="*" />
         </Grid.RowDefinitions>
+        <!-- Drei Spalten: Metriken links, Bild in der Mitte, Korrektur rechts.
+             Getrennte Spalten statt einer gemeinsamen - dadurch koennen beide
+             gleichzeitig offen sein, und keine muss der anderen weichen. -->
         <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="Auto" />
             <ColumnDefinition Width="*" />
             <ColumnDefinition Width="Auto" />
         </Grid.ColumnDefinitions>
 
         <!-- Kopfleiste: Dateiname links, Zustand rechts. Ziehen bewegt das Fenster. -->
-        <Grid x:Name="Header" Grid.Row="0" Grid.ColumnSpan="2" Background="#FF202020">
+        <Grid x:Name="Header" Grid.Row="0" Grid.ColumnSpan="3" Background="#FF202020">
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="*" />
                 <ColumnDefinition Width="Auto" />
@@ -95,7 +99,7 @@
              abgeschnitten. Ein Canvas misst seine Kinder ohne Begrenzung und
              arrangiert sie in voller Groesse, es entsteht kein Layout-Clip.
              Beschnitten wird nur noch aussen am Viewport. -->
-        <Grid x:Name="Viewport" Grid.Row="1" Grid.Column="0" Background="#FF101010" ClipToBounds="True">
+        <Grid x:Name="Viewport" Grid.Row="1" Grid.Column="1" Background="#FF101010" ClipToBounds="True">
             <Canvas x:Name="Stage" ClipToBounds="True">
                 <Image x:Name="Display"
                        Stretch="None"
@@ -222,13 +226,16 @@
              der Bildschirm es hergibt. Alles hier betrifft nur die Anzeige – die
              Dateien auf der Platte bleiben unberührt. -->
         <!--
-            Der Metrik-Fluegel. Liegt in derselben Zelle wie das Korrekturpanel und
-            schliesst sich mit ihm gegenseitig aus: Zwei Panels nebeneinander fressen
-            die Bildflaeche auf, und genau die will man beim Rendern sehen.
+            Der Metrik-Fluegel, links. Eigene Spalte, damit er neben der Korrektur
+            bestehen kann statt gegen sie: Beide teilten sich vorher eine Zelle,
+            mussten einander weichen und rechneten dabei zweimal an derselben
+            Fensterbreite herum.
+
+            Der Rahmen liegt rechts - zur Bildflaeche hin.
         -->
-        <Border x:Name="MetricsPanel" Grid.Row="1" Grid.Column="1" Width="288"
+        <Border x:Name="MetricsPanel" Grid.Row="1" Grid.Column="0" Width="288"
                 Background="{StaticResource PanelBackground}"
-                BorderBrush="{StaticResource PanelBorder}" BorderThickness="1,0,0,0"
+                BorderBrush="{StaticResource PanelBorder}" BorderThickness="0,0,1,0"
                 Visibility="Collapsed">
             <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
                 <StackPanel Margin="14,12,14,14">
@@ -358,7 +365,7 @@
             </ScrollViewer>
         </Border>
 
-        <Border x:Name="SidePanel" Grid.Row="1" Grid.Column="1" Width="288"
+        <Border x:Name="SidePanel" Grid.Row="1" Grid.Column="2" Width="288"
                 Background="{StaticResource PanelBackground}"
                 BorderBrush="{StaticResource PanelBorder}" BorderThickness="1,0,0,0"
                 Visibility="Collapsed">

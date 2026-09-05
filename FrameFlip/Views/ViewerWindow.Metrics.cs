@@ -11,9 +11,13 @@ namespace FrameFlip.Views;
 /// Der Metrik-Fluegel: was gerade gerendert wird und was der Rechner dabei tut.
 ///
 /// Er erscheint von selbst, sobald ein Render gemeldet wird, und verschwindet nicht
-/// sofort wieder, wenn er endet - man will ja sehen, WAS fertig geworden ist. Er
-/// schliesst sich mit dem Korrekturpanel gegenseitig aus: zwei Panels nebeneinander
-/// fressen genau die Bildflaeche auf, die man beim Rendern betrachten will.
+/// sofort wieder, wenn er endet - man will ja sehen, WAS fertig geworden ist.
+///
+/// Er sitzt links in einer eigenen Spalte, die Korrektur rechts in ihrer. Beide
+/// koennen offen sein, und jede rechnet nur mit ihrer eigenen Breite an der
+/// Fenstergroesse. Solange sie sich eine Zelle teilten, mussten sie einander
+/// verdraengen - und beim Hin- und Herschalten rechneten beide an derselben Breite,
+/// bis die Fenstergroesse nicht mehr stimmte.
 /// </summary>
 public partial class ViewerWindow
 {
@@ -27,7 +31,6 @@ public partial class ViewerWindow
     private LoadSnapshot? _lastLoad;
 
     private bool _metricsOpen;
-    private bool _panelWasOpen;
 
 
     public void AttachRenderMonitor(RenderMonitor monitor)
@@ -55,24 +58,18 @@ public partial class ViewerWindow
 
     // ---------------------------------------------------------------- Ein und aus
 
-    /// <summary>
-    /// Zeigt den Fluegel. Das Korrekturpanel weicht dabei und kommt zurueck, sobald
-    /// der Fluegel wieder schliesst - wer die Regler offen hatte, will sie behalten.
-    /// </summary>
+    /// <summary>Klappt die Metrikspalte links auf. Die Korrektur bleibt, wo sie ist.</summary>
     private void ShowMetrics()
     {
         if (_metricsOpen) return;
 
-        _panelWasOpen = SidePanel.Visibility == Visibility.Visible;
-        if (_panelWasOpen) SetPanelOpen(false, resizeWindow: false);
-
         MetricsPanel.Visibility = Visibility.Visible;
         _metricsOpen = true;
 
-        // Das Fenster waechst nach rechts, statt der Bildflaeche Platz wegzunehmen -
-        // genau wie bei der Korrekturspalte. Loest eine Spalte die andere ab, bleibt
-        // die Breite stehen: Beide sind gleich breit, es gaebe nichts zu bewegen.
-        if (!_panelWasOpen) ResizeForPanel(true, MetricsPanel.Width + 1);
+        // Eigene Spalte, eigene Rechnung: Das Fenster waechst um genau diese Breite
+        // nach links. Die Korrekturspalte rechts bleibt davon unberuehrt - beide
+        // koennen gleichzeitig offen sein.
+        ResizeForPanel(true, MetricsPanel.Width + 1, toTheLeft: true);
 
         MetricsButton.IsChecked = true;
 
@@ -87,10 +84,8 @@ public partial class ViewerWindow
         MetricsPanel.Visibility = Visibility.Collapsed;
         _metricsOpen = false;
 
-        if (_panelWasOpen) SetPanelOpen(true, resizeWindow: false);
-        else ResizeForPanel(false, MetricsPanel.Width + 1);
+        ResizeForPanel(false, MetricsPanel.Width + 1, toTheLeft: true);
 
-        _panelWasOpen = false;
         MetricsButton.IsChecked = false;
 
         SyncViewport();

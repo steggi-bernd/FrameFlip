@@ -99,11 +99,22 @@ public partial class ViewerWindow
     /// Breite der Spalte samt Rahmen. Beide Spalten - Korrektur und Metriken -
     /// benutzen dieselbe Mechanik; nur so verhalten sie sich fuer den Nutzer gleich.
     /// </param>
-    private void ResizeForPanel(bool open, double panel)
+    /// <param name="toTheLeft">
+    /// Waechst das Fenster nach links? Fuer die linke Spalte muss auch die linke
+    /// Kante mitwandern, sonst rutscht das Bild unter dem Zeiger weg - man klappt
+    /// eine Spalte auf und schaut ploetzlich auf eine andere Stelle des Bildes.
+    /// </param>
+    private void ResizeForPanel(bool open, double panel, bool toTheLeft = false)
     {
         if (!open)
         {
-            Width = Math.Max(MinWidth, Width - panel);
+            double shrunk = Math.Max(MinWidth, Width - panel);
+
+            // Nur um das zurueckschieben, was die Breite tatsaechlich abgibt: An der
+            // Mindestbreite gibt sie weniger her als die Spalte breit ist.
+            if (toTheLeft) Left += Width - shrunk;
+
+            Width = shrunk;
             return;
         }
 
@@ -115,14 +126,19 @@ public partial class ViewerWindow
 
         // Passt es nicht mehr auf den Bildschirm, bleibt die Fensterbreite stehen und
         // der Bildbereich gibt den Platz ab.
-        if (wanted <= available)
-        {
-            Width = wanted;
+        if (wanted > available) return;
 
-            // Nach rechts ueber den Rand hinausgewachsen? Dann zurueckschieben.
-            double right = work.X / scale + available;
-            if (Left + Width > right) Left = Math.Max(work.X / scale, right - Width);
-        }
+        Width = wanted;
+
+        // Die linke Spalte waechst nach links, damit das Bild stehen bleibt.
+        if (toTheLeft) Left -= panel;
+
+        double left = work.X / scale;
+        double right = left + available;
+
+        // Ueber einen Rand hinausgewachsen? Dann zurueckschieben.
+        if (Left + Width > right) Left = right - Width;
+        if (Left < left) Left = left;
     }
 
     // ---------------------------------------------------------------- Korrektur
