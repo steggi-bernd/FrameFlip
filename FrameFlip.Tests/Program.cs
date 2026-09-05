@@ -24,6 +24,7 @@ static int RunAll()
     RawCacheInvariants.Run();
     CadenceInvariants.Run();
     RangeInvariants.Run();
+    BridgeInvariants.Run();
 
     return Check.Report();
 }

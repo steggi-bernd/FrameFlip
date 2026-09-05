@@ -216,6 +216,143 @@
         <!-- Bildanpassung. Klappt nach rechts auf; das Fenster wächst mit, solange
              der Bildschirm es hergibt. Alles hier betrifft nur die Anzeige – die
              Dateien auf der Platte bleiben unberührt. -->
+        <!--
+            Der Metrik-Fluegel. Liegt in derselben Zelle wie das Korrekturpanel und
+            schliesst sich mit ihm gegenseitig aus: Zwei Panels nebeneinander fressen
+            die Bildflaeche auf, und genau die will man beim Rendern sehen.
+        -->
+        <Border x:Name="MetricsPanel" Grid.Row="1" Grid.Column="1" Width="300"
+                Background="{StaticResource PanelBackground}"
+                BorderBrush="{StaticResource PanelBorder}" BorderThickness="1,0,0,0"
+                Visibility="Collapsed">
+            <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+                <StackPanel Margin="14,12,14,14">
+
+                    <Grid Margin="0,0,0,10">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+
+                        <TextBlock Text="Render" Style="{StaticResource PanelHeading}" />
+
+                        <Border Grid.Column="1" x:Name="JobStateBadge" CornerRadius="4"
+                                Background="#2EF2913F" Padding="7,2">
+                            <TextBlock x:Name="JobStateText" Text="läuft" FontSize="10"
+                                       FontWeight="SemiBold"
+                                       Foreground="{StaticResource AccentBrush}" />
+                        </Border>
+                    </Grid>
+
+                    <!-- Gesamtfortschritt -->
+                    <Border Style="{StaticResource MetricCard}">
+                        <StackPanel>
+                            <TextBlock Text="GESAMT" Style="{StaticResource MetricLabel}" />
+
+                            <StackPanel Orientation="Horizontal" Margin="0,3,0,7">
+                                <TextBlock x:Name="OverallPercent" Text="0"
+                                           Style="{StaticResource MetricValue}" FontSize="26" />
+                                <TextBlock Text="%" Style="{StaticResource MetricUnit}" />
+                            </StackPanel>
+
+                            <Border Style="{StaticResource ProgressTrack}">
+                                <Border x:Name="OverallFill" Style="{StaticResource ProgressFill}"
+                                        Width="0" />
+                            </Border>
+
+                            <Grid Margin="0,8,0,0">
+                                <TextBlock x:Name="FrameCounter" Style="{StaticResource MetricNote}"
+                                           Text="–" />
+                                <TextBlock x:Name="RemainingText" Style="{StaticResource MetricNote}"
+                                           HorizontalAlignment="Right" Text="" />
+                            </Grid>
+                        </StackPanel>
+                    </Border>
+
+                    <!-- Aktueller Frame -->
+                    <Border Style="{StaticResource MetricCard}">
+                        <StackPanel>
+                            <TextBlock Text="AKTUELLER FRAME" Style="{StaticResource MetricLabel}" />
+
+                            <StackPanel Orientation="Horizontal" Margin="0,3,0,7">
+                                <TextBlock x:Name="SampleValue" Text="–"
+                                           Style="{StaticResource MetricValue}" />
+                                <TextBlock x:Name="SampleTotal" Style="{StaticResource MetricUnit}"
+                                           Text="" />
+                            </StackPanel>
+
+                            <Border Style="{StaticResource ProgressTrack}" Height="4">
+                                <Border x:Name="SampleFill" Style="{StaticResource ProgressFill}"
+                                        Height="4" Width="0" />
+                            </Border>
+
+                            <TextBlock x:Name="ActivityText" Style="{StaticResource MetricNote}"
+                                       Margin="0,8,0,0" Text="" />
+                        </StackPanel>
+                    </Border>
+
+                    <!-- Zeiten -->
+                    <Border Style="{StaticResource MetricCard}">
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="*" />
+                            </Grid.ColumnDefinitions>
+
+                            <StackPanel>
+                                <TextBlock Text="JE FRAME" Style="{StaticResource MetricLabel}" />
+                                <StackPanel Orientation="Horizontal" Margin="0,3,0,0">
+                                    <TextBlock x:Name="PerFrameValue" Text="–"
+                                               Style="{StaticResource MetricValue}" FontSize="17" />
+                                    <TextBlock x:Name="PerFrameUnit" Style="{StaticResource MetricUnit}"
+                                               Text="" />
+                                </StackPanel>
+                            </StackPanel>
+
+                            <StackPanel Grid.Column="1">
+                                <TextBlock Text="LAUFZEIT" Style="{StaticResource MetricLabel}" />
+                                <TextBlock x:Name="ElapsedValue" Text="0:00" Margin="0,3,0,0"
+                                           Style="{StaticResource MetricValue}" FontSize="17" />
+                            </StackPanel>
+                        </Grid>
+                    </Border>
+
+                    <!-- Auslastung -->
+                    <Border Style="{StaticResource MetricCard}">
+                        <StackPanel>
+                            <Grid>
+                                <TextBlock Text="CPU" Style="{StaticResource MetricLabel}" />
+                                <TextBlock x:Name="CpuValue" Style="{StaticResource MetricNote}"
+                                           HorizontalAlignment="Right" Text="–" />
+                            </Grid>
+                            <local:Sparkline x:Name="CpuLine" Margin="0,4,0,10" />
+
+                            <Grid>
+                                <TextBlock Text="ARBEITSSPEICHER" Style="{StaticResource MetricLabel}" />
+                                <TextBlock x:Name="RamValue" Style="{StaticResource MetricNote}"
+                                           HorizontalAlignment="Right" Text="–" />
+                            </Grid>
+                            <local:Sparkline x:Name="RamLine" Margin="0,4,0,10" />
+
+                            <Grid>
+                                <TextBlock Text="GPU" Style="{StaticResource MetricLabel}" />
+                                <TextBlock x:Name="GpuValue" Style="{StaticResource MetricNote}"
+                                           HorizontalAlignment="Right" Text="–" />
+                            </Grid>
+                            <local:Sparkline x:Name="GpuLine" Margin="0,4,0,0" />
+                        </StackPanel>
+                    </Border>
+
+                    <!-- Was gerendert wird -->
+                    <TextBlock x:Name="JobFileText" Style="{StaticResource MetricNote}"
+                               Margin="2,2,0,0" TextTrimming="CharacterEllipsis" Text="" />
+                    <TextBlock x:Name="JobDetailText" Style="{StaticResource MetricLabel}"
+                               Margin="2,4,0,0" Text="" />
+
+                </StackPanel>
+            </ScrollViewer>
+        </Border>
+
         <Border x:Name="SidePanel" Grid.Row="1" Grid.Column="1" Width="288"
                 Background="{StaticResource PanelBackground}"
                 BorderBrush="{StaticResource PanelBorder}" BorderThickness="1,0,0,0"

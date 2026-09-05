@@ -365,6 +365,8 @@ public partial class ViewerWindow : Window
     {
         _closing = true;
 
+        DisposeMetrics();
+
         if (_playing)
         {
             CompositionTarget.Rendering -= OnRendering;
@@ -418,6 +420,10 @@ public partial class ViewerWindow : Window
     public void ApplyLoad(LoadSnapshot snapshot, ResourceProfile profile)
     {
         _profile = profile;
+
+        // Der Metrik-Fluegel greift dieselbe Messung ab, statt eine zweite anzustossen.
+        _lastLoad = snapshot;
+
         _cache?.ApplyProfile(profile);
 
         string gpu = snapshot.GpuPercent is null ? "" : $" · GPU {snapshot.GpuPercent.Value:0} %";
@@ -1263,6 +1269,11 @@ public partial class ViewerWindow : Window
             case Key.D:
                 e.Handled = true;
                 OnMetaClicked(this, new RoutedEventArgs());
+                return;
+
+            case Key.M:
+                e.Handled = true;
+                ToggleMetrics();
                 return;
 
             case Key.E:

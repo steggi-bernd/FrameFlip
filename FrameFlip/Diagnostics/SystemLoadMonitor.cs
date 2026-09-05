@@ -62,6 +62,16 @@ public sealed class SystemLoadMonitor : IDisposable
     private readonly int _maxThreads;
     private readonly TimeSpan _interval;
 
+    /// <summary>
+    /// Messtakt waehrend eines laufenden Renders.
+    ///
+    /// Der normale Takt von zehn Sekunden reicht fuer die Lastregelung, taugt aber
+    /// nicht fuer eine Verlaufskurve: In einer Minute gaeben das sechs Punkte, und
+    /// die Kurve waere eine Treppe aus sechs Stufen. Die Messung selbst kostet einen
+    /// Systemaufruf, ist also auch im Sekundentakt nicht der Rede wert.
+    /// </summary>
+    private static readonly TimeSpan RenderInterval = TimeSpan.FromSeconds(2);
+
     private Timer? _timer;
     private long _prevIdle, _prevKernel, _prevUser;
     private TimeSpan _prevOwnCpu;
@@ -106,6 +116,22 @@ public sealed class SystemLoadMonitor : IDisposable
 
             // Erste echte Messung schnell, danach im konfigurierten Takt.
             _timer = new Timer(_ => Tick(), null, TimeSpan.FromMilliseconds(600), _interval);
+        }
+    }
+
+    /// <summary>
+    /// Schaltet auf den dichteren Messtakt um, solange ein Render laeuft - und
+    /// zurueck, sobald er endet. Ohne das waere die Verlaufskurve im Metrik-Fluegel
+    /// eine Treppe aus wenigen Stufen.
+    /// </summary>
+    public void SetRenderMode(bool rendering)
+    {
+        lock (_gate)
+        {
+            if (_timer is null || _disposed) return;
+
+            var period = rendering && RenderInterval < _interval ? RenderInterval : _interval;
+            _timer.Change(period, period);
         }
     }
 

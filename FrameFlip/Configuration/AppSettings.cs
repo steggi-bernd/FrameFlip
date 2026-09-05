@@ -107,6 +107,18 @@ public sealed class AppSettings
     public bool PanelOpen { get; set; }
 
     /// <summary>
+    /// Meldungen des Blender-Addons entgegennehmen.
+    ///
+    /// Der Empfaenger bindet ausschliesslich an 127.0.0.1 und verlangt ein Token aus
+    /// dem Benutzerprofil - aus dem Netz ist er nicht erreichbar. Wer trotzdem keinen
+    /// offenen Port moechte, schaltet es hier ab; die Vorschau selbst braucht ihn nicht.
+    /// </summary>
+    public bool BridgeEnabled { get; set; } = true;
+
+    /// <summary>Port fuer die Bruecke. 0 heisst: einen freien nehmen.</summary>
+    public int BridgePort { get; set; } = 47823;
+
+    /// <summary>
     /// Zuletzt eingestellte Anzeigekorrektur. Betrifft nur die Darstellung; die
     /// Dateien bleiben unberuehrt.
     /// </summary>

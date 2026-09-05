@@ -25,6 +25,9 @@ public sealed class AppHost : IDisposable
     private WinForms.NotifyIcon? _trayIcon;
     private IntPtr _iconHandle;
     private ViewerWindow? _viewer;
+
+    /// <summary>Nimmt Meldungen des Blender-Addons entgegen. Null, wenn abgeschaltet.</summary>
+    private Bridge.RenderMonitor? _renderMonitor;
     private SettingsWindow? _settingsWindow;
     private SystemLoadMonitor? _loadMonitor;
     private bool _disposed;
@@ -46,6 +49,18 @@ public sealed class AppHost : IDisposable
         }
 
         UpdateTooltip();
+
+        // Die Bruecke zum Blender-Addon. Schlaegt sie fehl - Port belegt, kein Addon
+        // installiert -, bleibt es dabei: FrameFlip ist zuerst eine Vorschau.
+        if (_settings.BridgeEnabled)
+        {
+            _renderMonitor = new Bridge.RenderMonitor(_settings.BridgePort);
+
+            // Waehrend eines Renders wird dichter gemessen: Der normale Takt reicht
+            // fuer die Lastregelung, aber nicht fuer eine Verlaufskurve.
+            _renderMonitor.Changed += () =>
+                _loadMonitor?.SetRenderMode(_renderMonitor?.HasRunningJob == true);
+        }
 
         // Startballast (JIT, XAML-Parser, Icon-Erzeugung) wieder abgeben. Die App
         // steht danach nur noch am Hotkey und soll im Leerlauf nichts festhalten.
@@ -231,6 +246,11 @@ public sealed class AppHost : IDisposable
         var bounds = WindowBoundsFor(explorerWindow, sourceWidth, sourceHeight);
         var viewer = new ViewerWindow(sequence, start, _settings, Persist, _decoders,
                                       bounds, sourceWidth, sourceHeight, maxWorkers);
+
+        // Der Monitor gehoert dem Tray, nicht dem Fenster: Ein Render kann laufen,
+        // waehrend gar keine Vorschau offen ist, und soll dann trotzdem mitgezaehlt
+        // werden. Das Fenster haengt sich nur an.
+        if (_renderMonitor is not null) viewer.AttachRenderMonitor(_renderMonitor);
         viewer.Closed += (_, _) =>
         {
             _viewer = null;
@@ -373,6 +393,9 @@ public sealed class AppHost : IDisposable
         _disposed = true;
 
         StopLoadMonitor();
+
+        _renderMonitor?.Dispose();
+        _renderMonitor = null;
 
         _hotkeys.Pressed -= Toggle;
         _hotkeys.Dispose();
