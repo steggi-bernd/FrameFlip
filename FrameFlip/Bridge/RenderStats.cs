@@ -32,8 +32,10 @@ public readonly record struct RenderStats(
 ///     Rendering 12 / 64 samples
 ///     Loading render kernels (may take a few minutes the first time)
 ///
-/// Restzeit und Speicher liefert Cycles nur im Hintergrundmodus - in der Oberflaeche
-/// bleibt der Text arm. Das ist kein Fehler hier, sondern steht so im Quelltext.
+/// Restzeit, Speicher und Samplezaehler kommen auch aus einem Render in der
+/// Oberflaeche - hier stand einmal das Gegenteil, bis ein echtes Log es widerlegt hat.
+/// Verlassen sollte man sich trotzdem nicht darauf: Welche Teile im Text stehen,
+/// entscheidet die Engine, nicht diese Klasse.
 /// </summary>
 public static class StatsParser
 {

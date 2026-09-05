@@ -26,6 +26,7 @@ static int RunAll()
     RangeInvariants.Run();
     BridgeInvariants.Run();
     LocalizationInvariants.Run();
+    RemoteInvariants.Run();
 
     return Check.Report();
 }
