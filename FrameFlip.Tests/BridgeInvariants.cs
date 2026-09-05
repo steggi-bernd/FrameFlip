@@ -39,7 +39,24 @@ public static class BridgeInvariants
         Check.That(full.MemoryMb == 1234, "Speicher in Megabyte", $"{full.MemoryMb}");
         Check.Near(full.FrameRemaining?.TotalSeconds ?? -1, 83.45, 0.01,
             "Restzeit 01:23.45 sind 83,45 Sekunden");
-        Check.That(full.Activity == "Rendering", "Taetigkeit", $"{full.Activity}");
+        // Alle beschreibenden Teile, zusammengefuegt. Nur den letzten zu nehmen ginge
+        // bei den Vorbereitungsphasen daneben - dort steht im letzten Teil bloss ein
+        // Objektname ohne Zusammenhang.
+        Check.That(full.Activity == "Scene, ViewLayer · Rendering",
+            "Taetigkeit aus allen beschreibenden Teilen", $"{full.Activity}");
+
+        // Genau der Fall, wegen dem zusammengefuegt wird - aufgezeichnet aus einem
+        // echten Cycles-Lauf.
+        var phase = StatsParser.Parse("Mem: 6544M | Updating Volume | Building octree for CryoMist");
+        Check.That(phase.Activity == "Updating Volume · Building octree for CryoMist",
+            "Phase und Detail bleiben zusammen", $"{phase.Activity}");
+        Check.That(phase.MemoryMb == 6544, "und der Speicher wird trotzdem gelesen");
+
+        // Ebenfalls gemessen: eine Zahl, die KEIN Sample-Zaehler ist.
+        var bvh = StatsParser.Parse(
+            "Mem: 198M | Updating Geometry BVH Model_0_mesh0000.017 119/172 | Building BVH");
+        Check.That(bvh.Sample is null,
+            "\"119/172\" ohne das Wort Sample zaehlt nicht als Sample", $"{bvh.Sample}");
         Check.Near(full.SampleProgress ?? -1, 42 / 128.0, 1e-9, "Sample-Fortschritt");
 
         // In der Oberflaeche fehlen Restzeit und Speicher - das ist kein Fehler.

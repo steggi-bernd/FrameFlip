@@ -21,6 +21,14 @@ public sealed class RenderJob
     private const int TimingWindow = 12;
 
     private readonly Queue<double> _frameSeconds = new();
+
+    /// <summary>
+    /// Dauer JEDES Frames, in Reihenfolge. Anders als das gleitende Fenster oben
+    /// wird hier nichts vergessen - daraus entsteht der Tempoverlauf, an dem man
+    /// sieht, welche Stellen der Animation teuer waren.
+    /// </summary>
+    private readonly List<double> _allFrameSeconds = new();
+
     private long _frameStartedTicks;
 
     public string Id { get; init; } = string.Empty;
@@ -59,6 +67,26 @@ public sealed class RenderJob
     /// <summary>Mittlere Dauer je Frame ueber die letzten Frames, oder null.</summary>
     public double? SecondsPerFrame
         => _frameSeconds.Count > 0 ? _frameSeconds.Average() : null;
+
+    /// <summary>
+    /// Dauer jedes fertigen Frames, in Reihenfolge. Kopie, weil die Liste von einem
+    /// Hintergrundthread waechst waehrend die Anzeige sie zeichnet.
+    /// </summary>
+    public double[] FrameDurations
+    {
+        get { lock (_allFrameSeconds) return _allFrameSeconds.ToArray(); }
+    }
+
+    /// <summary>Der teuerste bisher gerenderte Frame, oder null.</summary>
+    public double? SlowestFrame
+    {
+        get { lock (_allFrameSeconds) return _allFrameSeconds.Count > 0 ? _allFrameSeconds.Max() : null; }
+    }
+
+    public double? FastestFrame
+    {
+        get { lock (_allFrameSeconds) return _allFrameSeconds.Count > 0 ? _allFrameSeconds.Min() : null; }
+    }
 
     /// <summary>
     /// Fortschritt ueber den ganzen Auftrag. Der laufende Frame zaehlt anteilig mit,
@@ -127,6 +155,8 @@ public sealed class RenderJob
             {
                 _frameSeconds.Enqueue(seconds);
                 while (_frameSeconds.Count > TimingWindow) _frameSeconds.Dequeue();
+
+                lock (_allFrameSeconds) _allFrameSeconds.Add(seconds);
             }
         }
 

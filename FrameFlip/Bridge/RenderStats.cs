@@ -202,28 +202,28 @@ public static class StatsParser
     private static string? ReadActivity(string text)
     {
         var parts = text.Split('|', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries);
+        var kept = new List<string>(2);
 
-        for (int i = parts.Length - 1; i >= 0; i--)
+        foreach (var part in parts)
         {
-            var part = parts[i];
-
             if (part.StartsWith("Remaining:", StringComparison.OrdinalIgnoreCase)) continue;
             if (part.StartsWith("Mem:", StringComparison.OrdinalIgnoreCase)) continue;
             if (part.StartsWith("Peak:", StringComparison.OrdinalIgnoreCase)) continue;
             if (part.StartsWith("Sample", StringComparison.OrdinalIgnoreCase)) continue;
 
             // Nach jedem geschriebenen Frame kommt ueber denselben Handler eine
-            // Abschlussmeldung: "Time: 00:00.23 (Saving: 00:00.00)". Sie beschreibt
-            // keine Taetigkeit, sondern eine bereits vergangene - als Zustandszeile
-            // waere sie irrefuehrend. Aufgezeichnet aus Blender 5.1.
+            // Abschlussmeldung: "Time: 02:01.99 (Saving: 00:00.18)". Sie beschreibt
+            // keine laufende Taetigkeit, sondern eine bereits vergangene.
             if (part.StartsWith("Time:", StringComparison.OrdinalIgnoreCase)) continue;
 
-            // "Scene, ViewLayer" benennt nur, was gerendert wird, nicht die Taetigkeit.
-            if (part.Contains(',') && !part.Contains(' ')) continue;
-
-            return part.Length > 0 ? part : null;
+            if (part.Length > 0) kept.Add(part);
         }
 
-        return null;
+        // Zusammenfuegen statt nur den letzten Teil zu nehmen: Cycles schreibt die
+        // Vorbereitungsphasen zweiteilig - "Synchronizing object | Fingernails.001",
+        // "Updating Images | Loading Normal Texture.007". Nur der zweite Teil waere
+        // ein Objektname ohne Zusammenhang, nur der erste liesse offen, woran es
+        // gerade haengt. Aufgezeichnet aus einem echten Cycles-Lauf.
+        return kept.Count == 0 ? null : string.Join(" · ", kept);
     }
 }
