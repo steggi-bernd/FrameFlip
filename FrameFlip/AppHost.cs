@@ -32,6 +32,7 @@ public sealed class AppHost : IDisposable
     /// <summary>Reicht den Renderfortschritt ans Handy weiter. Null, solange nicht gekoppelt.</summary>
     private Remote.RemoteLink? _remote;
     private SettingsWindow? _settingsWindow;
+    private MainWindow? _mainWindow;
     private SystemLoadMonitor? _loadMonitor;
     private bool _disposed;
 
@@ -82,6 +83,7 @@ public sealed class AppHost : IDisposable
     {
         var menu = new WinForms.ContextMenuStrip();
 
+        var main = menu.Items.Add(string.Empty, null, (_, _) => ShowMain());
         var open = menu.Items.Add(string.Empty, null, (_, _) => Toggle());
         menu.Items.Add(new WinForms.ToolStripSeparator());
         var settings = menu.Items.Add(string.Empty, null, (_, _) => ShowSettings());
@@ -92,6 +94,7 @@ public sealed class AppHost : IDisposable
         // nicht mitbekommen - es haengt an WinForms und kann kein DynamicResource.
         void Relabel()
         {
+            main.Text = Localization.Strings.T("S_TrayMain");
             open.Text = Localization.Strings.T("S_TrayOpen");
             settings.Text = Localization.Strings.T("S_TraySettings");
             exit.Text = Localization.Strings.T("S_TrayExit");
@@ -108,7 +111,10 @@ public sealed class AppHost : IDisposable
             ContextMenuStrip = menu
         };
 
-        _trayIcon.DoubleClick += (_, _) => Toggle();
+        // Doppelklick oeffnet das Hauptfenster, nicht die Vorschau: Die haengt am
+        // Hotkey und an dem, was im Explorer markiert ist - ein Doppelklick auf ein
+        // Tray-Symbol weiss davon nichts.
+        _trayIcon.DoubleClick += (_, _) => ShowMain();
     }
 
     /// <summary>Zur Laufzeit gezeichnet - so bleibt das Projekt ohne Binaerassets.</summary>
@@ -285,6 +291,8 @@ public sealed class AppHost : IDisposable
 
         _viewer = viewer;
         viewer.Show();
+
+        Remember(sequence, seed, sourceWidth, sourceHeight);
     }
 
     /// <summary>
@@ -309,9 +317,34 @@ public sealed class AppHost : IDisposable
     /// ist. Ohne diese Unterscheidung blieb der Live-Bildschirm leer, sobald man das
     /// Fenster schloss.
     /// </summary>
+    /// <summary>
+    /// Die Sequenz in die Liste der zuletzt geoeffneten aufnehmen.
+    ///
+    /// Im Hintergrund, weil es die Platte anfasst und der Aufrufer gerade ein
+    /// Fenster oeffnet - eine Liste fuer spaeter darf das Jetzt nicht aufhalten.
+    /// </summary>
+    private static void Remember(ImageSequence sequence, string seed, int width, int height)
+    {
+        if (sequence.Count == 0) return;
+
+        var entry = new Configuration.RecentSequence
+        {
+            Folder = sequence.Pattern.Directory,
+            Seed = seed,
+            First = sequence.StartNumber,
+            Last = sequence.EndNumber,
+            Count = sequence.Count,
+            Width = width,
+            Height = height,
+            Kind = sequence.Pattern.Extension.TrimStart(Path.DirectorySeparatorChar, '.').ToUpperInvariant(),
+        };
+
+        Task.Run(() => Configuration.RecentSequences.Remember(entry));
+    }
+
     private void EnsureLoadMonitor()
     {
-        bool wanted = _viewer is not null || _remote is not null;
+        bool wanted = _viewer is not null || _remote is not null || _mainWindow is not null;
 
         if (wanted) StartLoadMonitor();
         else StopLoadMonitor();
@@ -380,6 +413,44 @@ public sealed class AppHost : IDisposable
     private void Persist(AppSettings settings) => SettingsStore.Save(settings);
 
     // ------------------------------------------------------------ Einstellungen
+
+    /// <summary>
+    /// Das Hauptfenster zeigen - oder nach vorn holen, wenn es schon offen ist.
+    ///
+    /// Genau eines: Zwei Fenster mit demselben Inhalt waeren zwei Stellen, an denen
+    /// derselbe Render steht, und die zweite wuerde niemand schliessen.
+    /// </summary>
+    public void ShowMain()
+    {
+        if (_mainWindow is not null)
+        {
+            if (_mainWindow.WindowState == System.Windows.WindowState.Minimized)
+                _mainWindow.WindowState = System.Windows.WindowState.Normal;
+
+            _mainWindow.Activate();
+            return;
+        }
+
+        LivePage.Load = () => _loadMonitor?.LastSnapshot;
+
+        var window = new MainWindow(_renderMonitor, () => _remote?.State, ShowSettings, OpenFile);
+        window.Closed += (_, _) =>
+        {
+            _mainWindow = null;
+
+            // Die Lastmessung lief womoeglich nur fuer dieses Fenster.
+            EnsureLoadMonitor();
+        };
+
+        _mainWindow = window;
+
+        // Ohne offene Vorschau laeuft die Messung sonst nicht, und die Kacheln
+        // blieben leer - ausgerechnet auf der Seite, die sie zeigt.
+        EnsureLoadMonitor();
+
+        window.Show();
+        window.Activate();
+    }
 
     private void ShowSettings()
     {

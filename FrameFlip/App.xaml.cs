@@ -26,14 +26,32 @@ public partial class App : Application
             : @"Local\FrameFlip.SingleInstance";
 
         _singleInstance = new Mutex(true, mutexName, out bool isFirst);
+
         if (!isFirst)
         {
-            // Eine zweite Instanz wuerde den Hotkey nicht bekommen und nur Speicher kosten.
+            // Eine zweite Instanz wuerde den Hotkey nicht bekommen und nur Speicher
+            // kosten. Sie beendet sich also - klopft vorher aber an: Wer die exe ein
+            // zweites Mal startet, will das Fenster sehen. Ohne dieses Zeichen sah
+            // ein Doppelklick aus wie ein defektes Programm, weil schlicht nichts
+            // passierte.
+            try
+            {
+                using var knock = EventWaitHandle.OpenExisting(mutexName + ".Show");
+                knock.Set();
+            }
+            catch (Exception)
+            {
+                // Die erste Instanz ist aelter als dieses Zeichen oder gerade am
+                // Beenden. Dann bleibt es beim stillen Ende.
+            }
+
             _singleInstance.Dispose();
             _singleInstance = null;
             Shutdown();
             return;
         }
+
+        WaitForKnock(mutexName + ".Show");
 
         // Die App laeuft neben einem Render. Sie bekommt, was uebrig ist.
         try
@@ -64,6 +82,51 @@ public partial class App : Application
             Dispatcher.BeginInvoke(new Action(() => _host?.OpenFile(path)));
             break;
         }
+    }
+
+    /// <summary>
+    /// Auf das Zeichen einer zweiten Instanz warten und das Fenster zeigen.
+    ///
+    /// Ein benanntes Ereignis statt eines Sockets oder einer Pipe: Es gibt genau
+    /// ein Signal zu uebertragen - "zeig dich" -, und dafuer waere alles andere zu
+    /// viel Maschinerie. Der Thread ist ein Hintergrundthread; er haelt das
+    /// Programm beim Beenden nicht auf.
+    /// </summary>
+    private void WaitForKnock(string name)
+    {
+        EventWaitHandle handle;
+
+        try
+        {
+            handle = new EventWaitHandle(false, EventResetMode.AutoReset, name);
+        }
+        catch (Exception)
+        {
+            return;
+        }
+
+        var thread = new Thread(() =>
+        {
+            while (true)
+            {
+                try
+                {
+                    handle.WaitOne();
+                }
+                catch (Exception)
+                {
+                    return;
+                }
+
+                Dispatcher.BeginInvoke(new Action(() => _host?.ShowMain()));
+            }
+        })
+        {
+            IsBackground = true,
+            Name = "FrameFlipKnock",
+        };
+
+        thread.Start();
     }
 
     private void OnDispatcherUnhandledException(object sender, DispatcherUnhandledExceptionEventArgs e)

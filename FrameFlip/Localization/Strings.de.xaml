@@ -191,4 +191,6 @@
     <sys:String x:Key="S_RemoteConnecting">Verbinde mit dem Relais …</sys:String>
     <sys:String x:Key="S_RemoteOff">Fernsteuerung aus</sys:String>
 
+    <sys:String x:Key="S_TrayMain">FrameFlip öffnen</sys:String>
+
 </ResourceDictionary>

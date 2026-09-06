@@ -1,0 +1,44 @@
+<UserControl x:Class="FrameFlip.Views.SettingsPage"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+
+    <StackPanel>
+        <TextBlock Text="EINSTELLUNGEN" Margin="0,14,0,0"
+                   FontFamily="{StaticResource DisplayFont}" FontSize="44"
+                   Foreground="{StaticResource ForegroundBrush}" />
+
+        <TextBlock Margin="0,8,0,20" MaxWidth="620" HorizontalAlignment="Left"
+                   TextWrapping="Wrap" FontFamily="{StaticResource BodyFont}"
+                   FontSize="12.5" Foreground="{StaticResource MutedBrush}"
+                   Text="Hotkey, Sprache, Puffer und Fernsteuerung stehen im Einstellungsdialog. Er ist derselbe wie aus dem Tray-Menü – hier steht nur, was ohne ihn nicht zu sehen wäre." />
+
+        <Border Padding="18" CornerRadius="14" HorizontalAlignment="Left" MinWidth="420"
+                Background="{StaticResource AppSurface}"
+                BorderBrush="{StaticResource PanelBorder}" BorderThickness="1">
+            <StackPanel>
+                <TextBlock Text="FERNSTEUERUNG" FontFamily="{StaticResource HeadFont}"
+                           FontWeight="Bold" FontSize="10" Foreground="{StaticResource AccentBrush}" />
+
+                <StackPanel Orientation="Horizontal" Margin="0,12,0,0">
+                    <Ellipse x:Name="LinkDot" Width="8" Height="8" VerticalAlignment="Center"
+                             Fill="{StaticResource DisabledBrush}" />
+                    <TextBlock x:Name="LinkText" Margin="10,0,0,0" VerticalAlignment="Center"
+                               FontFamily="{StaticResource HeadFont}" FontWeight="Bold"
+                               FontSize="12" Foreground="{StaticResource ForegroundBrush}" />
+                </StackPanel>
+
+                <TextBlock x:Name="LinkDetail" Margin="0,10,0,0" TextWrapping="Wrap"
+                           FontFamily="{StaticResource BodyFont}" FontSize="11.5"
+                           Foreground="{StaticResource MutedBrush}" />
+            </StackPanel>
+        </Border>
+
+        <Button x:Name="OpenDialog" Style="{StaticResource DialogButton}"
+                HorizontalAlignment="Left" Margin="0,20,0,0" MinWidth="220"
+                Content="Einstellungsdialog öffnen" Click="OnOpenDialog" />
+
+        <Button x:Name="OpenFolder" Style="{StaticResource DialogButton}"
+                HorizontalAlignment="Left" Margin="0,10,0,0" MinWidth="220"
+                Content="Konfigurationsordner zeigen" Click="OnOpenFolder" />
+    </StackPanel>
+</UserControl>

@@ -890,4 +890,25 @@
         </Setter>
     </Style>
 
+    <!-- Dieselben drei Rollen wie in der Handy-App: Anton fuer Zahlen, die man aus
+         zwei Metern lesen soll, Archivo fuer gesperrte Versalien, Montserrat fuer
+         Fliesstext. Der Doppelpunkt vor dem Doppelkreuz ist Pflicht - ohne ihn sucht
+         WPF die Schrift im Systemordner statt im Programm. -->
+    <FontFamily x:Key="DisplayFont">pack://application:,,,/FrameFlip;component/Assets/Fonts/#Anton</FontFamily>
+    <FontFamily x:Key="HeadFont">pack://application:,,,/FrameFlip;component/Assets/Fonts/#Archivo</FontFamily>
+    <FontFamily x:Key="BodyFont">pack://application:,,,/FrameFlip;component/Assets/Fonts/#Montserrat</FontFamily>
+    <FontFamily x:Key="MonoFont">Consolas, Courier New</FontFamily>
+
+    <!-- Die Farben des Entwurfs 2a, gleich benannt wie in der App. Blau ist
+         bewusst heller als im Designsystem, Rosa entschaerft: Es erscheint nur,
+         wenn etwas nicht stimmt. -->
+    <SolidColorBrush x:Key="AppBg" Color="#FF07070D" />
+    <SolidColorBrush x:Key="AppBg2" Color="#FF0D0D16" />
+    <SolidColorBrush x:Key="AppSurface" Color="#FF11111B" />
+    <SolidColorBrush x:Key="AppNav" Color="#FF0B0B14" />
+    <SolidColorBrush x:Key="AppBlue" Color="#FF60A5FA" />
+    <SolidColorBrush x:Key="AppCyan" Color="#FF22D3EE" />
+    <SolidColorBrush x:Key="AppWarn" Color="#FFF472B6" />
+    <SolidColorBrush x:Key="AppDim" Color="#FF6B6B80" />
+
 </ResourceDictionary>

@@ -28,6 +28,15 @@
   <ItemGroup>
     <Using Remove="System.Windows.Forms" />
   </ItemGroup>
+
+  <!-- Dieselben Schriften wie die Handy-App: Anton fuer Zahlen, Archivo fuer
+       Beschriftungen, Montserrat fuer Fliesstext. Ohne sie saehe dieselbe
+       Gestaltung auf beiden Seiten verschieden aus, und der Wiedererkennungswert
+       war der halbe Punkt der Uebung. Rund 1,5 MB, alle drei SIL OFL. -->
+  <ItemGroup>
+    <Resource Include="Assets\Fonts\*.ttf" />
+  </ItemGroup>
+
   <!-- Die einzigen zwei Fremdpakete im Projekt, beide fuer die Kopplung mit dem Handy.
        QRCoder liefert nur die Modulmatrix; gezeichnet wird sie hier, damit der Code
        bei jeder Skalierung scharf bleibt und System.Drawing aussen vor bleibt.
