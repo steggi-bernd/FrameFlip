@@ -30,6 +30,7 @@ static int RunAll()
     MachineInvariants.Run();
     SettingsInvariants.Run();
     PreviewInvariants.Run();
+    PlacementRegression.Run();
 
     return Check.Report();
 }

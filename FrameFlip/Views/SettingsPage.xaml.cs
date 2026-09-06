@@ -30,10 +30,13 @@ public partial class SettingsPage : UserControl
     private readonly Func<RelayState?> _remoteState;
     private readonly DispatcherTimer _ticker;
 
-    public SettingsPage(Action showDialog, Func<RelayState?> remoteState)
+    private readonly Action _showPairing;
+
+    public SettingsPage(Action showDialog, Func<RelayState?> remoteState, Action showPairing)
     {
         _showDialog = showDialog;
         _remoteState = remoteState;
+        _showPairing = showPairing;
 
         InitializeComponent();
 
@@ -71,6 +74,8 @@ public partial class SettingsPage : UserControl
         LinkText.Text = word;
         LinkDetail.Text = detail;
     }
+
+    private void OnPairing(object sender, System.Windows.Input.MouseButtonEventArgs e) => _showPairing();
 
     private void OnOpenDialog(object sender, RoutedEventArgs e) => _showDialog();
 

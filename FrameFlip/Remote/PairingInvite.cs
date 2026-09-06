@@ -37,6 +37,9 @@ public sealed partial class PairingInvite
     public string SocketUrl(RelayRole role)
         => $"wss://{Relay}/r/{Key.RoomId}?role={(role == RelayRole.Host ? "host" : "client")}";
 
+    /// <summary>Ob sich daraus eine Adresse bauen laesst. Spiegelt die Pruefung im Konstruktor.</summary>
+    public static bool IsUsableHost(string? host) => host is not null && Host.IsMatch(host);
+
     public static bool TryParse(string? text, out PairingInvite? invite)
     {
         invite = null;

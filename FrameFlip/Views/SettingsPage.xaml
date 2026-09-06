@@ -12,7 +12,8 @@
                    FontSize="12.5" Foreground="{StaticResource MutedBrush}"
                    Text="Hotkey, Sprache, Puffer und Fernsteuerung stehen im Einstellungsdialog. Er ist derselbe wie aus dem Tray-Menü – hier steht nur, was ohne ihn nicht zu sehen wäre." />
 
-        <Border Padding="18" CornerRadius="14" HorizontalAlignment="Left" MinWidth="420"
+        <Border x:Name="LinkCard" Padding="18" CornerRadius="14" HorizontalAlignment="Left" MinWidth="420"
+                Cursor="Hand" MouseLeftButtonUp="OnPairing"
                 Background="{StaticResource AppSurface}"
                 BorderBrush="{StaticResource PanelBorder}" BorderThickness="1">
             <StackPanel>

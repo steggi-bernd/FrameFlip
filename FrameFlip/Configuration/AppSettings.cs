@@ -168,6 +168,22 @@ public sealed class AppSettings
     public string PairingSecret { get; set; } = string.Empty;
 
     /// <summary>
+    /// Wo das Hauptfenster zuletzt stand. NaN heisst "noch nie" - dann wird
+    /// zentriert.
+    ///
+    /// Gespeichert wird nur die Lage, nicht ob sie gueltig ist: Ein Bildschirm kann
+    /// zwischen zwei Starts abgezogen worden sein, und dann liegt ein gemerkter Ort
+    /// im Nichts. Geprueft wird deshalb beim Anzeigen, nicht beim Speichern - siehe
+    /// Views.WindowPlacer.
+    /// </summary>
+    public double? MainLeft { get; set; }
+
+    public double? MainTop { get; set; }
+    public double MainWidth { get; set; } = 1080;
+    public double MainHeight { get; set; } = 720;
+    public bool MainMaximized { get; set; }
+
+    /// <summary>
     /// Zuletzt eingestellte Anzeigekorrektur. Betrifft nur die Darstellung; die
     /// Dateien bleiben unberuehrt.
     /// </summary>

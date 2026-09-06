@@ -4,6 +4,7 @@ using System.Windows.Media;
 using System.Windows.Threading;
 using FrameFlip.Bridge;
 using FrameFlip.Configuration;
+using FrameFlip.Configuration;
 using FrameFlip.Remote;
 
 // UseWindowsForms zieht System.Drawing implizit ein, und dort heissen diese Typen ebenso.
@@ -32,25 +33,59 @@ public partial class MainWindow : Window
     private readonly Func<RelayState?> _remoteState;
     private readonly Action _showSettings;
     private readonly Action<string> _openSequence;
+    private readonly Action _showPairing;
 
     private readonly DispatcherTimer _ticker;
 
     private readonly List<(Border Chip, string Key)> _navItems = new();
     private string _page = "live";
 
+    private readonly AppSettings? _settings;
+    private readonly Action<AppSettings>? _persist;
+
     public MainWindow(RenderMonitor? monitor,
                       Func<RelayState?> remoteState,
                       Action showSettings,
-                      Action<string> openSequence)
+                      Action<string> openSequence,
+                      Action showPairing,
+                      AppSettings? settings = null,
+                      Action<AppSettings>? persist = null)
     {
+        _settings = settings;
+        _persist = persist;
+
         _monitor = monitor;
         _remoteState = remoteState;
         _showSettings = showSettings;
         _openSequence = openSequence;
+        _showPairing = showPairing;
 
         InitializeComponent();
 
+        // Vor dem Anzeigen: Eine gemerkte Lage kann seit dem letzten Mal ungueltig
+        // geworden sein - ein Bildschirm abgezogen, die Aufloesung geaendert. Ohne
+        // diese Pruefung ging das Fenster oben aus dem Bild, und dann ist es weder
+        // zu verschieben noch zu schliessen.
+        if (settings is not null)
+        {
+            WindowPlacer.Restore(this, settings.MainLeft, settings.MainTop,
+                                    settings.MainWidth, settings.MainHeight, settings.MainMaximized);
+        }
+
+        // Noch einmal, sobald das Fenster einen Bildschirm kennt: Erst dann steht
+        // der Skalierungsfaktor, und ohne den rechnet die Pruefung oben mit 100 %.
+        SourceInitialized += (_, _) => WindowPlacer.EnsureVisible(this);
+
+        LocationChanged += (_, _) => Remember();
+        SizeChanged += (_, _) => Remember();
+        StateChanged += (_, _) => Remember();
+
         MachineName.Text = Environment.MachineName.ToUpperInvariant();
+
+        // Wer wissen will, ob ein Geraet dran ist, schaut hierher - also fuehrt auch
+        // von hier der Weg zum Koppeln. In den Einstellungen sucht das niemand.
+        LinkPill.Cursor = System.Windows.Input.Cursors.Hand;
+        LinkPill.MouseLeftButtonUp += (_, _) => _showPairing();
 
         BuildNav();
         Show("live");
@@ -62,10 +97,45 @@ public partial class MainWindow : Window
         _ticker.Tick += (_, _) => Refresh();
         _ticker.Start();
 
-        Closed += (_, _) => _ticker.Stop();
+        Closed += (_, _) =>
+        {
+            _ticker.Stop();
+            Remember(force: true);
+        };
 
         Refresh();
     }
+
+    /// <summary>
+    /// Die Lage merken - aber nicht bei jedem Pixel auf die Platte schreiben.
+    ///
+    /// Beim Ziehen feuert LocationChanged dutzende Male je Sekunde. Jedes Mal zu
+    /// speichern hiesse, die Konfigurationsdatei beim Verschieben eines Fensters
+    /// hundertfach neu zu schreiben.
+    /// </summary>
+    private void Remember(bool force = false)
+    {
+        if (_settings is null || _persist is null) return;
+
+        // Im maximierten Zustand steht in Left/Top Unsinn - die alte Lage bleibt
+        // stehen, damit das Wiederherstellen dorthin zurueckfindet.
+        if (WindowState == WindowState.Normal)
+        {
+            _settings.MainLeft = Left;
+            _settings.MainTop = Top;
+            _settings.MainWidth = Width;
+            _settings.MainHeight = Height;
+        }
+
+        _settings.MainMaximized = WindowState == WindowState.Maximized;
+
+        if (!force && DateTime.UtcNow - _lastSaved < TimeSpan.FromSeconds(2)) return;
+
+        _lastSaved = DateTime.UtcNow;
+        _persist(_settings);
+    }
+
+    private DateTime _lastSaved = DateTime.MinValue;
 
     // ---------------------------------------------------------------- Navigation
 
@@ -135,7 +205,7 @@ public partial class MainWindow : Window
         Page.Content = key switch
         {
             "sequences" => new SequencesPage(_openSequence),
-            "settings" => new SettingsPage(_showSettings, _remoteState),
+            "settings" => new SettingsPage(_showSettings, _remoteState, _showPairing),
             _ => new LivePage(),
         };
 

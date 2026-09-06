@@ -1,0 +1,48 @@
+<Window x:Class="FrameFlip.Views.PairingWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:views="clr-namespace:FrameFlip.Views"
+        Title="Koppeln"
+        Width="420" SizeToContent="Height"
+        ResizeMode="NoResize"
+        ShowInTaskbar="False"
+        Background="{StaticResource AppBg}"
+        TextOptions.TextFormattingMode="Display">
+
+    <StackPanel Margin="24">
+        <TextBlock Text="KOPPELN" FontFamily="{StaticResource DisplayFont}"
+                   FontSize="34" Foreground="{StaticResource ForegroundBrush}" />
+
+        <TextBlock x:Name="StateLine" Margin="0,6,0,0"
+                   FontFamily="{StaticResource HeadFont}" FontWeight="Bold"
+                   FontSize="10.5" Foreground="{StaticResource AccentBrush}" />
+
+        <Border Margin="0,18,0,0" Width="220" Height="220" HorizontalAlignment="Center"
+                CornerRadius="{StaticResource SurfaceCorner}" Background="White">
+            <views:QrCodeView x:Name="Code" />
+        </Border>
+
+        <TextBlock x:Name="Hint" Margin="0,14,0,0" TextWrapping="Wrap"
+                   FontFamily="{StaticResource BodyFont}" FontSize="11.5"
+                   Foreground="{StaticResource MutedBrush}" />
+
+        <TextBox x:Name="LinkBox" Margin="0,14,0,0" Style="{StaticResource DialogTextBox}"
+                 IsReadOnly="True" FontFamily="{StaticResource MonoFont}" FontSize="10.5" />
+
+        <TextBlock x:Name="RoomLine" Margin="0,8,0,0"
+                   FontFamily="{StaticResource MonoFont}" FontSize="10"
+                   Foreground="{StaticResource FaintBrush}" />
+
+        <TextBlock Margin="0,14,0,0" TextWrapping="Wrap"
+                   FontFamily="{StaticResource BodyFont}" FontSize="11"
+                   Foreground="{StaticResource AppDim}"
+                   Text="Eine Weboberfläche mit demselben Inhalt wie die App gibt es noch nicht. Der Link oben ist der Kopplungscode selbst – ihn versteht bisher nur die Android-App." />
+
+        <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,20,0,0">
+            <Button x:Name="CopyButton" Style="{StaticResource DialogButton}" MinWidth="130"
+                    Content="Link kopieren" Margin="0,0,8,0" Click="OnCopy" />
+            <Button Style="{StaticResource DialogButton}" MinWidth="130"
+                    Content="Neuer Schlüssel" Click="OnNewKey" />
+        </StackPanel>
+    </StackPanel>
+</Window>

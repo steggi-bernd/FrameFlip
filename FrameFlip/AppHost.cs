@@ -33,6 +33,7 @@ public sealed class AppHost : IDisposable
     private Remote.RemoteLink? _remote;
     private SettingsWindow? _settingsWindow;
     private MainWindow? _mainWindow;
+    private PairingWindow? _pairingWindow;
     private SystemLoadMonitor? _loadMonitor;
     private bool _disposed;
 
@@ -433,7 +434,8 @@ public sealed class AppHost : IDisposable
 
         LivePage.Load = () => _loadMonitor?.LastSnapshot;
 
-        var window = new MainWindow(_renderMonitor, () => _remote?.State, ShowSettings, OpenFile);
+        var window = new MainWindow(_renderMonitor, () => _remote?.State, ShowSettings, OpenFile, ShowPairing,
+                                    _settings, settings => SettingsStore.Save(settings));
         window.Closed += (_, _) =>
         {
             _mainWindow = null;
@@ -450,6 +452,25 @@ public sealed class AppHost : IDisposable
 
         window.Show();
         window.Activate();
+    }
+
+    /// <summary>Der Kopplungscode als eigenes Fenster, ueber dem Hauptfenster.</summary>
+    private void ShowPairing()
+    {
+        if (_pairingWindow is not null) { _pairingWindow.Activate(); return; }
+
+        var window = new PairingWindow(_settings, ApplySettings, () => _remote?.State)
+        {
+            Owner = _mainWindow,
+            WindowStartupLocation = _mainWindow is null
+                ? System.Windows.WindowStartupLocation.CenterScreen
+                : System.Windows.WindowStartupLocation.CenterOwner,
+        };
+
+        window.Closed += (_, _) => _pairingWindow = null;
+        _pairingWindow = window;
+
+        window.Show();
     }
 
     private void ShowSettings()
