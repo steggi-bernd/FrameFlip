@@ -190,7 +190,11 @@
                             <views:QrCodeView x:Name="PairingCode" />
                         </Border>
 
-                        <TextBlock x:Name="RoomText" Margin="0,8,0,0"
+                        <TextBlock x:Name="RemoteState" Margin="0,10,0,0"
+                                   Foreground="{StaticResource AccentBrush}" FontSize="11"
+                                   FontFamily="Consolas" />
+
+                        <TextBlock x:Name="RoomText" Margin="0,6,0,0"
                                    Foreground="{StaticResource FaintBrush}" FontSize="10"
                                    FontFamily="Consolas" />
 

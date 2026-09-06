@@ -186,4 +186,9 @@
     <sys:String x:Key="S_ImageUnreadable">Das Bild konnte nicht gelesen werden.</sys:String>
     <sys:String x:Key="S_FfmpegWrong">Diese Datei antwortet nicht wie ffmpeg. Bitte den Pfad prüfen.</sys:String>
 
+    <sys:String x:Key="S_RemotePaired">Handy verbunden</sys:String>
+    <sys:String x:Key="S_RemoteWaiting">Warte auf das Handy …</sys:String>
+    <sys:String x:Key="S_RemoteConnecting">Verbinde mit dem Relais …</sys:String>
+    <sys:String x:Key="S_RemoteOff">Fernsteuerung aus</sys:String>
+
 </ResourceDictionary>

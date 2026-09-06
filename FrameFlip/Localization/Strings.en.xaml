@@ -186,4 +186,9 @@
     <sys:String x:Key="S_ImageUnreadable">The image could not be read.</sys:String>
     <sys:String x:Key="S_FfmpegWrong">This file does not answer like ffmpeg. Please check the path.</sys:String>
 
+    <sys:String x:Key="S_RemotePaired">Phone connected</sys:String>
+    <sys:String x:Key="S_RemoteWaiting">Waiting for the phone …</sys:String>
+    <sys:String x:Key="S_RemoteConnecting">Connecting to the relay …</sys:String>
+    <sys:String x:Key="S_RemoteOff">Remote is off</sys:String>
+
 </ResourceDictionary>

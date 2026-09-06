@@ -24,17 +24,25 @@ public partial class SettingsWindow : Window
     /// Der Kopplungsschluessel, solange der Dialog offen ist.
     ///
     /// Er entsteht erst, wenn eine brauchbare Relais-Adresse dasteht - ohne Relais
-    /// gaebe es nichts zu koppeln, und ein Geheimnis auf Vorrat zu erzeugen und in
-    /// die Konfiguration zu schreiben waere Unfug. Gespeichert wird er beim Sichern,
-    /// nicht beim Erzeugen: Wer den Dialog abbricht, hat nichts angefasst.
+    /// gaebe es nichts zu koppeln. Abgelegt wird er, sobald der Code auf dem
+    /// Bildschirm steht; siehe <see cref="Commit"/>.
     /// </summary>
     private PairingKey? _pairing;
 
+    /// <summary>Welcher Raum auf welcher Adresse schon abgelegt ist - "raum@adresse".</summary>
+    private string? _committed;
+
+    /// <summary>Wie es um die Leitung steht. Null, wenn die Fernsteuerung aus ist.</summary>
+    private readonly Func<RelayState?> _remoteState;
+
+    private System.Windows.Threading.DispatcherTimer? _remoteTicker;
+
     /// <param name="apply">Uebernimmt die Einstellungen. Rueckgabe: Fehlertext oder null.</param>
-    public SettingsWindow(AppSettings current, Func<AppSettings, string?> apply)
+    public SettingsWindow(AppSettings current, Func<AppSettings, string?> apply, Func<RelayState?>? remoteState = null)
     {
         _apply = apply;
         _current = current;
+        _remoteState = remoteState ?? (() => null);
 
         InitializeComponent();
 
@@ -69,10 +77,41 @@ public partial class SettingsWindow : Window
 
         PairingStore.TryUnprotect(current.PairingSecret, out _pairing);
 
+        // Eine bereits gespeicherte Kopplung gilt als abgelegt - sonst schriebe der
+        // Dialog sie beim Oeffnen sofort neu.
+        if (_pairing is not null && current.RemoteEnabled)
+            _committed = _pairing.RoomId + "@" + current.RelayHost;
+
         RelayBox.Text = current.RelayHost;
         RemoteBox.IsChecked = current.RemoteEnabled;
 
         UpdatePairing();
+
+        // Einmal je Sekunde nachsehen, ob das Handy da ist. Ohne diese Anzeige ist
+        // der Kopplungsvorgang von hier aus blind: Man zeigt einen Code und erfaehrt
+        // nie, ob ihn jemand gelesen hat.
+        _remoteTicker = new System.Windows.Threading.DispatcherTimer
+        {
+            Interval = TimeSpan.FromSeconds(1)
+        };
+
+        _remoteTicker.Tick += (_, _) => UpdateRemoteState();
+        _remoteTicker.Start();
+        Closed += (_, _) => _remoteTicker?.Stop();
+
+        UpdateRemoteState();
+    }
+
+    private void UpdateRemoteState()
+    {
+        RemoteState.Text = _remoteState() switch
+        {
+            RelayState.Paired => Strings.T("S_RemotePaired"),
+            RelayState.Waiting => Strings.T("S_RemoteWaiting"),
+            RelayState.Connecting => Strings.T("S_RemoteConnecting"),
+            RelayState.Off => Strings.T("S_RemoteOff"),
+            _ => Strings.T("S_RemoteOff")
+        };
     }
 
     /// <summary>
@@ -148,6 +187,52 @@ public partial class SettingsWindow : Window
         CopyLinkButton.IsEnabled = true;
         NewKeyButton.IsEnabled = true;
         PairingHint.Text = Strings.T("S_ScanHint");
+
+        Commit(invite);
+    }
+
+    /// <summary>
+    /// Den gezeigten Code sofort gueltig machen.
+    ///
+    /// Vorher wurde der Schluessel erst beim Sichern abgelegt - und genau daran ist
+    /// die Kopplung gescheitert: Man sieht den Code, fotografiert ihn ab, schliesst
+    /// das Fenster, und der Rechner hat ihn wieder vergessen. Auf dem Handy stand
+    /// dann "gekoppelt, PC nicht da", und der Fehler war von keiner Seite aus zu
+    /// sehen.
+    ///
+    /// Ein Code, den jemand schon abfotografiert haben kann, darf nicht vorlaeufig
+    /// sein. Deshalb wird hier abgelegt, sobald er auf dem Bildschirm steht - und
+    /// die Fernsteuerung gleich mit eingeschaltet: Wer einen Kopplungscode anzeigen
+    /// laesst, will koppeln. Sichtbar bleibt es trotzdem, der Haken darueber springt
+    /// mit um und laesst sich sofort wieder abwaehlen.
+    /// </summary>
+    private void Commit(PairingInvite invite)
+    {
+        // Verglichen wird ueber Raum und Adresse, nicht ueber das verpackte Paket:
+        // DPAPI liefert bei jedem Aufruf ein anderes, ein Vergleich darauf waere
+        // immer ungleich und wuerde bei jedem Tastendruck neu speichern.
+        string mark = invite.Key.RoomId + "@" + invite.Relay;
+        if (mark == _committed) return;
+
+        string secret = PairingStore.Protect(invite.Key);
+        if (secret.Length == 0) return;
+
+        var settings = _current.Clone();
+
+        settings.RelayHost = invite.Relay;
+        settings.PairingSecret = secret;
+        settings.RemoteEnabled = true;
+
+        if (_apply(settings) is not null) return;
+
+        // Der Bestand wandert mit, sonst schriebe ein spaeteres Sichern den alten
+        // Zustand zurueck.
+        _current.RelayHost = settings.RelayHost;
+        _current.PairingSecret = settings.PairingSecret;
+        _current.RemoteEnabled = true;
+
+        _committed = mark;
+        RemoteBox.IsChecked = true;
     }
 
     private bool TryInvite(string host, out PairingInvite? invite)

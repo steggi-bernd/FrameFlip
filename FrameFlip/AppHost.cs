@@ -370,7 +370,7 @@ public sealed class AppHost : IDisposable
         var viewer = _viewer;
         if (viewer is not null) viewer.ModalDialogOpen = true;
 
-        var window = new SettingsWindow(_settings, ApplySettings);
+        var window = new SettingsWindow(_settings, ApplySettings, () => _remote?.State);
 
         // Die Vorschau liegt ueber allem. Ohne dasselbe fuer den Dialog erschiene er
         // dahinter - man klickt auf "Einstellungen" und es passiert scheinbar nichts.
