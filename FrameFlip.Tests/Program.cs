@@ -28,6 +28,7 @@ static int RunAll()
     LocalizationInvariants.Run();
     RemoteInvariants.Run();
     MachineInvariants.Run();
+    SettingsInvariants.Run();
 
     return Check.Report();
 }

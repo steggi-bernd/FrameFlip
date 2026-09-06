@@ -139,13 +139,27 @@ public sealed class AppSettings
     /// Wirtsname des Relays, ohne Schema und Pfad - die Verbindung wird immer als
     /// wss aufgebaut.
     ///
-    /// Bewusst leer voreingestellt. Ein fester Standard waere hier die Adresse
-    /// eines fremden Servers: Wer dieses Projekt klont und baut, wuerde seinen
-    /// Renderfortschritt sonst ungefragt ueber eine Maschine schicken, die ihm
-    /// nicht gehoert. Lesen koennte sie zwar nichts, aber gefragt wurde trotzdem
-    /// niemand. Wie man einen eigenen aufsetzt, steht in docs/Blender-Bridge.md.
+    /// Voreingestellt ist <see cref="DefaultRelayHost"/>, damit die Kopplung ohne
+    /// eigene Serverei funktioniert. Das Feld steht im Einstellungsdialog sichtbar
+    /// da und laesst sich ueberschreiben - wer einen eigenen Relay betreibt, traegt
+    /// ihn ein, und ab dann geht nichts mehr ueber den fremden.
+    ///
+    /// Vertretbar ist das, weil der Relay nichts sehen kann: Er lernt die
+    /// Raumkennung und sonst nichts, und die ist eine Einbahnstrasse aus einem
+    /// Schluessel heraus, den nur dieser Rechner und das gekoppelte Handy kennen.
+    /// Zwei Installationen kommen automatisch in verschiedene Raeume - der
+    /// Schluessel sind 256 zufaellige Bit je Rechner, nicht etwas Abgeleitetes.
     /// </summary>
-    public string RelayHost { get; set; } = string.Empty;
+    public string RelayHost { get; set; } = DefaultRelayHost;
+
+    /// <summary>
+    /// Der oeffentliche Relay des Projekts.
+    ///
+    /// Steht hier als Konstante und nicht verstreut im Quelltext, damit ein Fork
+    /// genau eine Zeile aendern muss - und damit man beim Lesen sofort sieht,
+    /// wohin die Verbindung standardmaessig geht.
+    /// </summary>
+    public const string DefaultRelayHost = "relay.steggi-matrix.work";
 
     /// <summary>
     /// Der Kopplungsschluessel, mit DPAPI gegen das Windows-Konto verschluesselt.
@@ -184,11 +198,13 @@ public sealed class AppSettings
         DraftStep = Math.Clamp(DraftStep, 0, 2);
         RawCacheMaxGb = Math.Clamp(RawCacheMaxGb, 1, 512);
 
-        RelayHost = RelayHost?.Trim() ?? string.Empty;
+        // Ein leeres Feld heisst "nimm den Standard", nicht "kein Relay". Wer keinen
+        // will, schaltet die Fernsteuerung ab - das ist der eindeutige Weg.
+        RelayHost = RelayHost?.Trim() is { Length: > 0 } host ? host : DefaultRelayHost;
 
-        // Eingeschaltet ohne Relay oder ohne Schluessel waere ein Zustand, den die
-        // Oberflaeche anzeigt und der nichts tut. Lieber ehrlich aus.
-        if (RelayHost.Length == 0 || PairingSecret.Length == 0) RemoteEnabled = false;
+        // Eingeschaltet ohne Schluessel waere ein Zustand, den die Oberflaeche
+        // anzeigt und der nichts tut. Lieber ehrlich aus.
+        if (PairingSecret.Length == 0) RemoteEnabled = false;
     }
 
     /// <summary>Abgeleitet - gehoert nicht in die Konfigurationsdatei.</summary>
