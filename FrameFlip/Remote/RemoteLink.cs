@@ -141,16 +141,44 @@ public sealed class RemoteLink : IAsyncDisposable
         }
     }
 
+    /// <summary>
+    /// Die Vorschau beantworten - immer, auch wenn es keine gibt.
+    ///
+    /// Vorher wurde in diesem Fall einfach nichts geschickt, und in der App stand
+    /// dauerhaft "Bild wird geholt". Eine Anfrage ohne Antwort ist die schlechteste
+    /// Art zu scheitern: Der Fragende wartet, und niemand sagt ihm, worauf.
+    ///
+    /// Die haeufigsten Gruende sind harmlos und sollen genau so dastehen - ein
+    /// Render, der gerade erst angelaufen ist, hat schlicht noch keinen Frame
+    /// geschrieben.
+    /// </summary>
     private void SendPreview()
     {
         try
         {
             RenderJob? job = _monitor.Job;
 
-            byte[]? jpeg = PreviewEncoder.Encode(job?.LatestFrameFile);
-            if (jpeg is null) return;
+            string? why = job is null
+                ? "Auf dem Rechner laeuft gerade kein Render."
+                : string.IsNullOrEmpty(job.LatestFrameFile)
+                    ? "Noch kein Frame geschrieben."
+                    : null;
 
-            _client.Send(Envelope.Preview(job?.CurrentFrame ?? 0, jpeg));
+            if (why is null)
+            {
+                byte[]? jpeg = PreviewEncoder.Encode(job!.LatestFrameFile);
+
+                if (jpeg is not null)
+                {
+                    _client.Send(Envelope.Preview(job.CurrentFrame, jpeg));
+                    return;
+                }
+
+                why = "Das Bild liess sich nicht lesen.";
+            }
+
+            _client.Send(Envelope.Json(
+                $$"""{"t":"preview","ok":false,"why":{{JsonSerializer.Serialize(why)}}}"""));
         }
         catch (Exception)
         {
