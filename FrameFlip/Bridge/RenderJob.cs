@@ -139,6 +139,24 @@ public sealed class RenderJob
         _frameStartedTicks = Environment.TickCount64;
     }
 
+    /// <summary>
+    /// Ein Einzelbild, das Blender nicht selbst geschrieben hat.
+    ///
+    /// Bei F12 legt Blender keine Datei an - das Ergebnis liegt nur im Speicher.
+    /// Das Addon speichert es nach dem Render als JPEG in den Temp-Ordner und
+    /// meldet den Pfad, damit das Handy ueberhaupt etwas anzeigen kann.
+    ///
+    /// Bewusst NICHT als geschriebener Frame gezaehlt: Im Ausgabeordner des
+    /// Benutzers liegt nichts, und "1 von 1 geschrieben" waere eine Falschaussage
+    /// ueber seine Festplatte. Gesetzt wird nur, wo das Bild zu finden ist.
+    /// </summary>
+    public void NoteStill(int frame, string? path)
+    {
+        CurrentFrame = frame;
+
+        if (!string.IsNullOrEmpty(path)) LatestFrameFile = path;
+    }
+
     public void FrameWritten(int frame, string? path)
     {
         CurrentFrame = frame;

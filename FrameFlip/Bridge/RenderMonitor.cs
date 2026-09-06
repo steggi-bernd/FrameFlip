@@ -84,6 +84,15 @@ public sealed class RenderMonitor : IDisposable
                     Current(message)?.FrameWritten(message.Frame, message.Path);
                     break;
 
+                // Ein Einzelbild-Render schreibt keine Datei - das Ergebnis liegt
+                // nur in Blenders Speicher. Das Addon legt es nach dem Render als
+                // JPEG in den Temp-Ordner und meldet den Pfad. Es zaehlt NICHT als
+                // geschriebener Frame: Im Ausgabeordner des Benutzers liegt nichts,
+                // und der Fortschrittsbalken wuerde sonst luegen.
+                case "still":
+                    Current(message)?.NoteStill(message.Frame, message.Path);
+                    break;
+
                 case "stats":
                     Current(message)?.UpdateStats(StatsParser.Parse(message.Text));
                     break;
