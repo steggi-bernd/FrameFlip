@@ -30,16 +30,23 @@ Anyone writing a second client should work from that page, not from this one.
 
 ## Setting it up
 
-Settings → **Remote**:
+Settings → **Remote**, then scan the QR code with the app. That is the whole thing.
 
-1. Enter the relay's host name (no `https://` — the connection is always `wss://`,
-   and a tampered QR code cannot downgrade it).
-2. Scan the QR code with the app.
-3. Tick **Send render progress to the phone**.
+The relay address is filled in with the project's public one. Enter your own to use it
+instead; an empty field means "the default", not "no relay". Never `https://` — the
+connection is always built as `wss://`, so a tampered QR code cannot downgrade it.
 
-Until all three are true, nothing happens: no connection is attempted, no key is
-written to disk, nothing runs in the background. A feature you do not use should cost
-you nothing.
+**Showing the code commits it.** The key is written to disk the moment it appears on
+screen, and remote is switched on with it. This is not convenience; it is the fix for a
+real failure: previously the key was only stored on Save, so scanning the code and then
+closing the window left the phone holding a key the PC had forgotten. The phone said
+"paired, PC not here" — correct, and impossible to diagnose from either side.
+
+Someone who lets a pairing code be displayed intends to pair. The tick box above it
+moves with it and turns the whole thing off again in one click.
+
+Below the code, a line says whether anyone has actually read it: *waiting for the
+phone* / *phone connected*. Without it, pairing is blind from this end.
 
 **New key** disconnects every device paired so far. There is no separate "unpair" —
 replacing the secret is what unpairing *is*.
@@ -50,8 +57,28 @@ someone already logged in as you, and is not meant to.
 
 ## What travels
 
-One JSON object, at most once a second, whenever the render state changes. Names are
-short because every byte crosses a mobile network:
+Every encrypted message starts with one byte saying what it is:
+
+| Byte | Contents |
+|---|---|
+| `0x01` | UTF-8 JSON. Both directions — state from the PC, commands from the phone. |
+| `0x02` | A preview image: frame number (4 bytes, big endian), then JPEG. |
+
+The type is **stated, not guessed**. This is the same mistake the relay made once and a
+test caught: deciding a frame's type from its first byte sends roughly one payload in
+256 down the wrong path. Here it would be the mirror image — a JPEG begins with
+`0xFF 0xD8`, but relying on that is still reading the envelope out of the letter.
+
+The byte sits *inside* the encryption, so the relay cannot tell numbers from pictures
+either. Size gives it a rough hint anyway; that is the difference between "can be
+guessed at" and "is written down".
+
+Unknown types are dropped, not treated as errors — a later version may add some.
+
+### The state object
+
+One JSON object, at most once a second while rendering and once every five seconds
+when idle. Names are short because every byte crosses a mobile network:
 
 ```json
 {
@@ -107,6 +134,27 @@ card, and the bar next to it will be wrong by a factor of two.
 
 Absent means absent — never `0`. A zero in `gpu` looks like a sleeping machine, and a
 reader cannot tell it from a real idle GPU. Show a dash instead.
+
+## Preview images
+
+The phone asks; the PC answers. The request is `{"c":"preview"}` as a `0x01` payload,
+and the reply is a `0x02` payload holding the last written frame.
+
+It is **never** sent unasked. The render folder holds full-resolution PNGs — at
+4096×2304 that is easily 70 MB each — so the frame is downscaled to 1280 pixels wide
+and encoded as JPEG at quality 80, which lands around 100–300 KB. Even that is too
+much to push automatically: at seven seconds a frame it would be tens of megabytes an
+hour, unasked, often over mobile data. So it costs a tap.
+
+Downscaling happens *while decoding*, not after. The decoder never reads the image at
+full size, which saves both time and memory — and both matter, because a render is
+using the same machine. The file is opened shared for reading, writing and deletion:
+Blender may be writing into that folder right now, and an exclusive handle would be a
+reason for a render to fail. No preview is worth that.
+
+The reply carries the frame number of the *picture*, not of the frame running now.
+While the image was in flight the render moved on, and labelling it with the current
+number would simply be wrong.
 
 ## Why once a second
 

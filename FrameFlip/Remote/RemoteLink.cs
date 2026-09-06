@@ -54,6 +54,7 @@ public sealed class RemoteLink : IAsyncDisposable
         _client = new RelayClient(invite);
 
         _monitor.Changed += OnChanged;
+        _client.PayloadReceived += OnCommand;
 
         // Der eigene Takt ist nicht Beiwerk, sondern die Grundlage: Das Ereignis der
         // Bruecke feuert nur, wenn Blender etwas meldet. Ohne laufenden Render - und
@@ -96,12 +97,64 @@ public sealed class RemoteLink : IAsyncDisposable
                 _lastSent = DateTime.UtcNow;
             }
 
-            _client.Send(System.Text.Encoding.UTF8.GetBytes(json));
+            _client.Send(Envelope.Json(json));
         }
         catch (Exception)
         {
             // Diese Kette haengt an der Vorschau. Sie darf unter keinen Umstaenden
             // etwas nach oben werfen.
+        }
+    }
+
+    /// <summary>
+    /// Ein Befehl vom Handy.
+    ///
+    /// Bisher gibt es genau einen: die Vorschau anfordern. Sie wird ausdruecklich
+    /// nur auf Anfrage geschickt und nicht bei jedem neuen Frame - ein Bild sind
+    /// ein paar hundert Kilobyte, und bei sieben Sekunden je Frame waeren das
+    /// zweistellige Megabyte in der Stunde, ungefragt, oft ueber Mobilfunk.
+    ///
+    /// Die Arbeit laeuft auf dem Threadpool: Ein grosses PNG zu dekodieren dauert
+    /// Millisekunden bis Zehntelsekunden, und diese Kette haengt am Netzwerk-Thread
+    /// der Verbindung. Ihn zu blockieren hiesse, waehrenddessen keine Metriken mehr
+    /// zu senden.
+    /// </summary>
+    private void OnCommand(byte[] payload)
+    {
+        try
+        {
+            if (!Envelope.TryRead(payload, out PayloadKind kind, out byte[] body)) return;
+            if (kind != PayloadKind.Json) return;
+
+            using var document = JsonDocument.Parse(body);
+
+            if (!document.RootElement.TryGetProperty("c", out JsonElement command)) return;
+            if (command.GetString() != "preview") return;
+
+            Task.Run(SendPreview);
+        }
+        catch (Exception)
+        {
+            // Was hereinkommt, ist zwar entschluesselt und damit echt - aber echt
+            // heisst nicht wohlgeformt. Eine aeltere oder neuere App darf hier
+            // nichts umwerfen.
+        }
+    }
+
+    private void SendPreview()
+    {
+        try
+        {
+            RenderJob? job = _monitor.Job;
+
+            byte[]? jpeg = PreviewEncoder.Encode(job?.LatestFrameFile);
+            if (jpeg is null) return;
+
+            _client.Send(Envelope.Preview(job?.CurrentFrame ?? 0, jpeg));
+        }
+        catch (Exception)
+        {
+            // Siehe oben: Diese Kette haengt an der Vorschau und darf nichts werfen.
         }
     }
 
@@ -210,6 +263,7 @@ public sealed class RemoteLink : IAsyncDisposable
     public async ValueTask DisposeAsync()
     {
         _monitor.Changed -= OnChanged;
+        _client.PayloadReceived -= OnCommand;
         await _ticker.DisposeAsync();
         _gpu.Dispose();
         await _client.DisposeAsync();

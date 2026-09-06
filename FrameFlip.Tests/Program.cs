@@ -29,6 +29,7 @@ static int RunAll()
     RemoteInvariants.Run();
     MachineInvariants.Run();
     SettingsInvariants.Run();
+    PreviewInvariants.Run();
 
     return Check.Report();
 }
