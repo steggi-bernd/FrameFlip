@@ -27,6 +27,7 @@ static int RunAll()
     BridgeInvariants.Run();
     LocalizationInvariants.Run();
     RemoteInvariants.Run();
+    MachineInvariants.Run();
 
     return Check.Report();
 }

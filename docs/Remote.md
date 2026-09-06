@@ -71,7 +71,15 @@ short because every byte crosses a mobile network:
   "sample": 2304,
   "samples": 4096,
   "memMb": 6543,
-  "activity": "Path Tracing Sample 2304/4096"
+  "activity": "Path Tracing Sample 2304/4096",
+
+  "cpu": 41.5,
+  "ramUsedMb": 45536,
+  "ramTotalMb": 65536,
+  "gpu": 97,
+  "vramUsedMb": 11000,
+  "vramTotalMb": 12282,
+  "gpuTemp": 71
 }
 ```
 
@@ -81,6 +89,24 @@ Every field after `engine` may be missing. Blender decides what goes into its st
 text, and it is not an interface — Cycles builds it one way, EEVEE another, and it
 changes between versions. A reader that requires a field will eventually be wrong; a
 reader that treats each as optional will not.
+
+The last block is the machine rather than the render, and it is sent **in the idle
+message too** — when nothing is rendering, the question is whether the PC is even
+awake, and a screen that then shows nothing does not answer it.
+
+Those fields have their own reasons to be absent. `cpu` and the RAM pair come from
+FrameFlip's own load monitor and disappear when adaptive resources are switched off.
+`gpu` comes from a Windows performance counter that does not exist before Windows 10,
+and falls back to `nvidia-smi`. `vramUsedMb`, `vramTotalMb` and `gpuTemp` come only
+from `nvidia-smi` — on an AMD or Intel card there is no vendor-neutral source for
+them under Windows, so they are simply not there.
+
+**The totals are sent, not assumed.** `ramTotalMb` and `vramTotalMb` are what that
+machine actually has. A client that hardcodes "/ 24 GB" will be wrong on a 12 GB
+card, and the bar next to it will be wrong by a factor of two.
+
+Absent means absent — never `0`. A zero in `gpu` looks like a sleeping machine, and a
+reader cannot tell it from a real idle GPU. Show a dash instead.
 
 ## Why once a second
 

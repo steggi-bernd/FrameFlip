@@ -450,7 +450,7 @@ public sealed class AppHost : IDisposable
         {
             var invite = new Remote.PairingInvite(key!, _settings.RelayHost);
 
-            _remote = new Remote.RemoteLink(invite, _renderMonitor);
+            _remote = new Remote.RemoteLink(invite, _renderMonitor, () => _loadMonitor?.LastSnapshot);
             _remote.Start();
         }
         catch (ArgumentException)

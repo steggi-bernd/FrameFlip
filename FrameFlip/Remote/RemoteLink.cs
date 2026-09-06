@@ -23,12 +23,19 @@ public sealed class RemoteLink : IAsyncDisposable
     private readonly RelayClient _client;
     private readonly object _gate = new();
 
+    /// <summary>Liefert CPU, RAM und GPU-Last. Null, wenn die Lasterkennung aus ist.</summary>
+    private readonly Func<Diagnostics.LoadSnapshot?> _load;
+
+    /// <summary>VRAM und Temperatur. Still, wenn nvidia-smi nicht erreichbar ist.</summary>
+    private readonly Diagnostics.NvidiaProbe _gpu = new();
+
     private DateTime _lastSent = DateTime.MinValue;
     private string? _lastShape;
 
-    public RemoteLink(PairingInvite invite, RenderMonitor monitor)
+    public RemoteLink(PairingInvite invite, RenderMonitor monitor, Func<Diagnostics.LoadSnapshot?>? load = null)
     {
         _monitor = monitor;
+        _load = load ?? (() => null);
         _client = new RelayClient(invite);
 
         _monitor.Changed += OnChanged;
@@ -48,7 +55,7 @@ public sealed class RemoteLink : IAsyncDisposable
     {
         try
         {
-            string json = Describe(_monitor.Job);
+            string json = Describe(_monitor.Job, _load(), _gpu.Read());
 
             lock (_gate)
             {
@@ -84,7 +91,10 @@ public sealed class RemoteLink : IAsyncDisposable
     /// jede Sekunde faellt. Was fehlt, fehlt - die App muss ohnehin damit umgehen,
     /// dass Blender nicht jede Zahl liefert.
     /// </summary>
-    public static string Describe(RenderJob? job)
+    public static string Describe(
+        RenderJob? job,
+        Diagnostics.LoadSnapshot? load = null,
+        Diagnostics.GpuReading gpu = default)
     {
         var buffer = new System.IO.MemoryStream(256);
 
@@ -95,6 +105,7 @@ public sealed class RemoteLink : IAsyncDisposable
             if (job is null)
             {
                 writer.WriteString("t", "idle");
+                WriteMachine(writer, load, gpu);
                 writer.WriteEndObject();
             }
             else
@@ -125,6 +136,7 @@ public sealed class RemoteLink : IAsyncDisposable
                 if (stats.MemoryMb is long memory) writer.WriteNumber("memMb", memory);
                 if (stats.Activity is { Length: > 0 } activity) writer.WriteString("activity", activity);
 
+                WriteMachine(writer, load, gpu);
                 writer.WriteEndObject();
             }
         }
@@ -132,9 +144,47 @@ public sealed class RemoteLink : IAsyncDisposable
         return System.Text.Encoding.UTF8.GetString(buffer.ToArray());
     }
 
+    /// <summary>
+    /// Der Zustand der Maschine - auch im Leerlauf.
+    ///
+    /// Gerade wenn kein Render laeuft ist es die Frage, ob der Rechner ueberhaupt
+    /// noch wach ist. Ein Bildschirm, der dann gar nichts zeigt, beantwortet sie
+    /// nicht.
+    ///
+    /// Jeder Wert einzeln optional: GPU-Last kommt aus einem Zaehler, den es nur
+    /// unter Windows 10 aufwaerts gibt, VRAM und Temperatur nur von NVIDIA. Was
+    /// fehlt, wird weggelassen und nicht als Null geschickt - die App zeigt dafuer
+    /// einen Gedankenstrich, und der sagt die Wahrheit.
+    /// </summary>
+    private static void WriteMachine(Utf8JsonWriter writer, Diagnostics.LoadSnapshot? load, Diagnostics.GpuReading gpu)
+    {
+        if (load is not null)
+        {
+            writer.WriteNumber("cpu", Math.Round(load.CpuPercent, 1));
+
+            if (load.TotalMb > 0)
+            {
+                writer.WriteNumber("ramUsedMb", Math.Max(0, load.TotalMb - load.AvailableMb));
+                writer.WriteNumber("ramTotalMb", load.TotalMb);
+            }
+
+            if (load.GpuPercent is double percent) writer.WriteNumber("gpu", Math.Round(percent, 1));
+        }
+
+        // Der Zaehler oben ist herstellerunabhaengig und deshalb die bessere Quelle
+        // fuer die Auslastung; nvidia-smi ergaenzt nur, was er nicht kennt.
+        if (load?.GpuPercent is null && gpu.UtilizationPercent is int utilization)
+            writer.WriteNumber("gpu", utilization);
+
+        if (gpu.MemoryUsedMb is long used) writer.WriteNumber("vramUsedMb", used);
+        if (gpu.MemoryTotalMb is long total) writer.WriteNumber("vramTotalMb", total);
+        if (gpu.TemperatureCelsius is int temperature) writer.WriteNumber("gpuTemp", temperature);
+    }
+
     public async ValueTask DisposeAsync()
     {
         _monitor.Changed -= OnChanged;
+        _gpu.Dispose();
         await _client.DisposeAsync();
     }
 }
