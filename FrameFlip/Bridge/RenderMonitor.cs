@@ -47,6 +47,7 @@ public sealed class RenderMonitor : IDisposable
 
         _server = new BridgeServer(port, token);
         _server.MessageReceived += Apply;
+        _server.Disconnected += OnBlenderGone;
 
         _server.Start();
 
@@ -110,9 +111,41 @@ public sealed class RenderMonitor : IDisposable
             }
         }
 
-        // Ausserhalb der Sperre benachrichtigen: Ein Empfaenger, der auf den
-        // UI-Thread marshallt, wuerde hier sonst eine Sperre ueber einen
-        // Threadwechsel halten.
+        NotifyChanged(message);
+    }
+
+    /// <summary>
+    /// Blender ist weg.
+    ///
+    /// Am Ende eines Renders kommt "done" oder "cancel"; danach steht kein Auftrag
+    /// mehr offen. Faellt die Verbindung, waehrend noch einer laeuft, ist Blender
+    /// mitten darin verschwunden. Ob abgestuerzt, abgeschossen oder zugeklappt,
+    /// laesst sich von hier nicht unterscheiden - fuer den, der wartet, ist es
+    /// dasselbe: Der Render wird nicht fertig.
+    ///
+    /// Nur beim LAUFENDEN Auftrag. Blender nach getaner Arbeit zu schliessen ist
+    /// der Normalfall und keine Meldung wert.
+    /// </summary>
+    private void OnBlenderGone()
+    {
+        lock (_gate)
+        {
+            if (Job is not { IsRunning: true } job) return;
+
+            job.NoteGone();
+        }
+
+        try { Changed?.Invoke(); } catch (Exception) { }
+    }
+
+    /// <summary>
+    /// Empfaenger benachrichtigen - ausserhalb der Sperre.
+    ///
+    /// Ein Empfaenger, der auf den UI-Thread marshallt, hielte sonst eine Sperre
+    /// ueber einen Threadwechsel.
+    /// </summary>
+    private void NotifyChanged(BridgeMessage message)
+    {
         if (message.Type == "write" && !string.IsNullOrEmpty(message.Path))
         {
             try { FrameWritten?.Invoke(message.Path); } catch (Exception) { }
@@ -179,6 +212,7 @@ public sealed class RenderMonitor : IDisposable
         _disposed = true;
 
         _server.MessageReceived -= Apply;
+        _server.Disconnected -= OnBlenderGone;
         _server.Dispose();
 
         // Die Datei nennt einen Port, an dem niemand mehr lauscht.

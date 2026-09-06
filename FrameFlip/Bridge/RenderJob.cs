@@ -49,6 +49,30 @@ public sealed class RenderJob
     public int CurrentFrame { get; private set; }
     public int FramesWritten { get; private set; }
 
+    /// <summary>
+    /// Blender ist mitten im Render verschwunden - abgestuerzt, abgeschossen oder
+    /// zugeklappt. Von aussen ist das dasselbe Bild.
+    /// </summary>
+    public bool Vanished { get; private set; }
+
+    /// <summary>
+    /// Wieviele Frames begonnen wurden. Zaehlt anders als <see cref="FramesWritten"/>
+    /// auch die, die Blender nicht auf die Platte schreibt.
+    /// </summary>
+    public int FramesSeen { get; private set; }
+
+    /// <summary>
+    /// Ob das hier eine Animation ist - oder ein Einzelbild.
+    ///
+    /// Sicher weiss man es erst, wenn ein zweiter Frame begonnen oder einer
+    /// geschrieben wurde. Waehrend des allerersten Frames ist beides moeglich, und
+    /// dann gilt es als Einzelbild: Ein Fortschrittsbalken, der "0 von 250" zeigt,
+    /// waere bei einem Still schlicht falsch, waehrend er beim ersten Frame einer
+    /// Animation nur wenig aussagt. Lieber kurz zu wenig anzeigen als dauerhaft
+    /// etwas Unwahres.
+    /// </summary>
+    public bool IsAnimation => FramesWritten > 0 || FramesSeen > 1;
+
     /// <summary>Zuletzt geschriebene Datei. Das ist die Live-Vorschau.</summary>
     public string? LatestFrameFile { get; private set; }
 
@@ -135,8 +159,15 @@ public sealed class RenderJob
     public void BeginFrame(int frame)
     {
         CurrentFrame = frame;
+        FramesSeen++;
         State = JobState.Rendering;
         _frameStartedTicks = Environment.TickCount64;
+    }
+
+    public void NoteGone()
+    {
+        Vanished = true;
+        Finish(JobState.Failed);
     }
 
     /// <summary>

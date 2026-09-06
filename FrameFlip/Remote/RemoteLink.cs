@@ -131,7 +131,13 @@ public sealed class RemoteLink : IAsyncDisposable
             if (!document.RootElement.TryGetProperty("c", out JsonElement command)) return;
             if (command.GetString() != "preview") return;
 
-            Task.Run(SendPreview);
+            // Die gewuenschte Breite. Ohne Angabe die volle - so verhaelt sich eine
+            // aeltere App wie bisher.
+            int width = document.RootElement.TryGetProperty("w", out JsonElement w) && w.TryGetInt32(out int value)
+                ? value
+                : PreviewEncoder.Width;
+
+            Task.Run(() => SendPreview(width));
         }
         catch (Exception)
         {
@@ -152,7 +158,7 @@ public sealed class RemoteLink : IAsyncDisposable
     /// Render, der gerade erst angelaufen ist, hat schlicht noch keinen Frame
     /// geschrieben.
     /// </summary>
-    private void SendPreview()
+    private void SendPreview(int width)
     {
         try
         {
@@ -166,7 +172,7 @@ public sealed class RemoteLink : IAsyncDisposable
 
             if (why is null)
             {
-                byte[]? jpeg = PreviewEncoder.Encode(job!.LatestFrameFile);
+                byte[]? jpeg = PreviewEncoder.Encode(job!.LatestFrameFile, width);
 
                 if (jpeg is not null)
                 {
@@ -218,6 +224,14 @@ public sealed class RemoteLink : IAsyncDisposable
             {
                 writer.WriteString("t", "job");
                 writer.WriteString("state", job.State.ToString().ToLowerInvariant());
+
+                // Ob Fortschrittsbalken und Framezaehler ueberhaupt etwas aussagen.
+                writer.WriteBoolean("anim", job.IsAnimation);
+
+                // Blender ist mitten im Render verschwunden. Das ist etwas anderes
+                // als ein Render, der von sich aus gescheitert ist, und die App
+                // soll es anders benennen duerfen.
+                if (job.Vanished) writer.WriteBoolean("gone", true);
                 writer.WriteString("scene", job.Scene);
                 writer.WriteString("engine", job.Engine);
                 writer.WriteString("file", System.IO.Path.GetFileName(job.BlendFile));

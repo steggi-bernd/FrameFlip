@@ -56,6 +56,9 @@ public sealed class BridgeServer : IDisposable
     /// <summary>Wird auf einem Hintergrundthread ausgeloest. Empfaenger muss marshallen.</summary>
     public event Action<BridgeMessage>? MessageReceived;
 
+    /// <summary>Die Gegenseite ist weg - sauber beendet oder abgestuerzt.</summary>
+    public event Action? Disconnected;
+
     /// <summary>Zahl der verbundenen Blender-Instanzen.</summary>
     public int Connections => Volatile.Read(ref _connections);
     private int _connections;
@@ -159,6 +162,15 @@ public sealed class BridgeServer : IDisposable
         finally
         {
             Interlocked.Decrement(ref _connections);
+
+            // Der Abschied ist eine Nachricht fuer sich.
+            //
+            // Blender schickt am Ende eines Renders "done" oder "cancel". Faellt die
+            // Verbindung OHNE eine davon weg, ist Blender mitten im Render
+            // verschwunden - abgestuerzt, abgeschossen oder zugeklappt. Von aussen
+            // ist das dasselbe Bild, und es ist genau der Fall, in dem jemand am
+            // anderen Ende der Welt gerne Bescheid wuesste.
+            try { Disconnected?.Invoke(); } catch (Exception) { }
         }
     }
 

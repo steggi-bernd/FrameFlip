@@ -39,9 +39,13 @@ public static class PreviewEncoder
     /// null heisst: ging nicht. Datei weg, halb geschrieben, unbekanntes Format -
     /// alles derselbe Fall, und keiner davon darf hier etwas werfen.
     /// </summary>
-    public static byte[]? Encode(string? path)
+    public static byte[]? Encode(string? path, int width = Width)
     {
         if (string.IsNullOrWhiteSpace(path) || !File.Exists(path)) return null;
+
+        // Geklemmt, nicht geprueft: Die Zahl kommt vom Handy, und ein Tippfehler
+        // dort soll hier keine 40000 Pixel breite Datei erzeugen.
+        width = Math.Clamp(width, 240, 1920);
 
         try
         {
@@ -56,10 +60,10 @@ public static class PreviewEncoder
                 BitmapCreateOptions.PreservePixelFormat | BitmapCreateOptions.IgnoreColorProfile,
                 BitmapCacheOption.OnLoad);
 
-            var source = decoded.PixelWidth > Width
+            var source = decoded.PixelWidth > width
                 ? (BitmapSource)new TransformedBitmap(decoded, new System.Windows.Media.ScaleTransform(
-                    Width / (double)decoded.PixelWidth,
-                    Width / (double)decoded.PixelWidth))
+                    width / (double)decoded.PixelWidth,
+                    width / (double)decoded.PixelWidth))
                 : decoded;
 
             var encoder = new JpegBitmapEncoder { QualityLevel = Quality };
