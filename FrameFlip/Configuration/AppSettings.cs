@@ -127,6 +127,33 @@ public sealed class AppSettings
     public int BridgePort { get; set; } = 47823;
 
     /// <summary>
+    /// Renderfortschritt an ein gekoppeltes Handy weiterreichen.
+    ///
+    /// Bleibt aus, solange kein Relay eingetragen und kein Handy gekoppelt ist.
+    /// Nichts davon laeuft nebenher mit: Ohne Kopplung wird keine Verbindung
+    /// aufgebaut und kein Schluessel erzeugt.
+    /// </summary>
+    public bool RemoteEnabled { get; set; }
+
+    /// <summary>
+    /// Wirtsname des Relays, ohne Schema und Pfad - die Verbindung wird immer als
+    /// wss aufgebaut.
+    ///
+    /// Bewusst leer voreingestellt. Ein fester Standard waere hier die Adresse
+    /// eines fremden Servers: Wer dieses Projekt klont und baut, wuerde seinen
+    /// Renderfortschritt sonst ungefragt ueber eine Maschine schicken, die ihm
+    /// nicht gehoert. Lesen koennte sie zwar nichts, aber gefragt wurde trotzdem
+    /// niemand. Wie man einen eigenen aufsetzt, steht in docs/Blender-Bridge.md.
+    /// </summary>
+    public string RelayHost { get; set; } = string.Empty;
+
+    /// <summary>
+    /// Der Kopplungsschluessel, mit DPAPI gegen das Windows-Konto verschluesselt.
+    /// Siehe <see cref="Remote.PairingStore"/> - im Klartext steht er nirgends.
+    /// </summary>
+    public string PairingSecret { get; set; } = string.Empty;
+
+    /// <summary>
     /// Zuletzt eingestellte Anzeigekorrektur. Betrifft nur die Darstellung; die
     /// Dateien bleiben unberuehrt.
     /// </summary>
@@ -156,6 +183,12 @@ public sealed class AppSettings
         WarmupFrames = Math.Clamp(WarmupFrames, 0, 2000);
         DraftStep = Math.Clamp(DraftStep, 0, 2);
         RawCacheMaxGb = Math.Clamp(RawCacheMaxGb, 1, 512);
+
+        RelayHost = RelayHost?.Trim() ?? string.Empty;
+
+        // Eingeschaltet ohne Relay oder ohne Schluessel waere ein Zustand, den die
+        // Oberflaeche anzeigt und der nichts tut. Lieber ehrlich aus.
+        if (RelayHost.Length == 0 || PairingSecret.Length == 0) RemoteEnabled = false;
     }
 
     /// <summary>Abgeleitet - gehoert nicht in die Konfigurationsdatei.</summary>

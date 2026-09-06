@@ -7,6 +7,7 @@ using FrameFlip.Configuration;
 using FrameFlip.Localization;
 using FrameFlip.Interop;
 using FrameFlip.Playback;
+using FrameFlip.Remote;
 
 namespace FrameFlip.Views;
 
@@ -19,6 +20,16 @@ public partial class SettingsWindow : Window
 
     private HotKeyDefinition _hotkey;
 
+    /// <summary>
+    /// Der Kopplungsschluessel, solange der Dialog offen ist.
+    ///
+    /// Er entsteht erst, wenn eine brauchbare Relais-Adresse dasteht - ohne Relais
+    /// gaebe es nichts zu koppeln, und ein Geheimnis auf Vorrat zu erzeugen und in
+    /// die Konfiguration zu schreiben waere Unfug. Gespeichert wird er beim Sichern,
+    /// nicht beim Erzeugen: Wer den Dialog abbricht, hat nichts angefasst.
+    /// </summary>
+    private PairingKey? _pairing;
+
     /// <param name="apply">Uebernimmt die Einstellungen. Rueckgabe: Fehlertext oder null.</param>
     public SettingsWindow(AppSettings current, Func<AppSettings, string?> apply)
     {
@@ -30,7 +41,7 @@ public partial class SettingsWindow : Window
         _hotkey = HotKeyDefinition.TryParse(current.Hotkey, out var parsed) ? parsed : HotKeyDefinition.Default;
         HotkeyBox.Text = _hotkey.ToString();
         HotkeyBox.PreviewKeyDown += OnHotkeyKeyDown;
-        HotkeyBox.GotKeyboardFocus += (_, _) => ShowStatus("Kombination druecken …");
+        HotkeyBox.GotKeyboardFocus += (_, _) => ShowStatus(Strings.T("S_HotkeyPrompt"));
 
         // Die Sprachen stehen in ihrer EIGENEN Sprache da - "Deutsch" und "English",
         // nicht uebersetzt. Wer die Oberflaeche gerade nicht lesen kann, findet den
@@ -51,8 +62,28 @@ public partial class SettingsWindow : Window
         AdaptiveBox.IsChecked = current.AdaptiveResources;
         IntervalBox.Text = current.LoadIntervalSeconds.ToString(CultureInfo.InvariantCulture);
         ThreadsBox.Text = current.MaxDecoderThreads.ToString(CultureInfo.InvariantCulture);
-        ThreadsHint.Text = $"auf diesem Rechner hoechstens {FrameFlip.Diagnostics.SystemLoadMonitor.ThreadCeiling} von {Environment.ProcessorCount} Kernen";
+
+        UpdateThreadHint();
+        Strings.Changed += UpdateThreadHint;
+        Closed += (_, _) => Strings.Changed -= UpdateThreadHint;
+
+        PairingStore.TryUnprotect(current.PairingSecret, out _pairing);
+
+        RelayBox.Text = current.RelayHost;
+        RemoteBox.IsChecked = current.RemoteEnabled;
+
+        UpdatePairing();
     }
+
+    /// <summary>
+    /// Der Hinweis unter den Decoder-Threads traegt Zahlen und kann deshalb nicht
+    /// als fertiger Text im Woerterbuch stehen. Beim Sprachwechsel im laufenden
+    /// Dialog muss er neu gesetzt werden - DynamicResource kann das hier nicht.
+    /// </summary>
+    private void UpdateThreadHint()
+        => ThreadsHint.Text = Strings.T("S_ThreadCeiling",
+                                       FrameFlip.Diagnostics.SystemLoadMonitor.ThreadCeiling,
+                                       Environment.ProcessorCount);
 
     private void OnHotkeyKeyDown(object sender, KeyEventArgs e)
     {
@@ -75,7 +106,7 @@ public partial class SettingsWindow : Window
         var modifiers = Keyboard.Modifiers;
         if (modifiers == ModifierKeys.None)
         {
-            ShowStatus("Mindestens ein Modifikator (Strg, Alt, Shift, Win) ist noetig.");
+            ShowStatus(Strings.T("S_HotkeyNeedsModifier"));
             return;
         }
 
@@ -84,35 +115,118 @@ public partial class SettingsWindow : Window
         ShowStatus(null);
     }
 
+    private void OnRelayChanged(object sender, System.Windows.Controls.TextChangedEventArgs e)
+    {
+        if (!IsLoaded) return;
+
+        UpdatePairing();
+    }
+
+    /// <summary>
+    /// Zeigt den QR-Code, sobald eine brauchbare Adresse dasteht - und nur dann.
+    ///
+    /// Ein Code, der beim Tippen mitwaechst, waere unruhig und im Zweifel falsch
+    /// abfotografiert. Deshalb erscheint er erst, wenn die Adresse als Ganzes
+    /// aufgeht.
+    /// </summary>
+    private void UpdatePairing()
+    {
+        string host = RelayBox.Text.Trim();
+
+        if (host.Length == 0 || !TryInvite(host, out PairingInvite? invite))
+        {
+            PairingCode.Text = null;
+            RoomText.Text = string.Empty;
+            CopyLinkButton.IsEnabled = false;
+            NewKeyButton.IsEnabled = false;
+            PairingHint.Text = Strings.T("S_NoRelayYet");
+            return;
+        }
+
+        PairingCode.Text = invite!.Text;
+        RoomText.Text = Strings.T("S_RoomLabel", invite.Key.RoomId);
+        CopyLinkButton.IsEnabled = true;
+        NewKeyButton.IsEnabled = true;
+        PairingHint.Text = Strings.T("S_ScanHint");
+    }
+
+    private bool TryInvite(string host, out PairingInvite? invite)
+    {
+        invite = null;
+
+        // Erst hier entsteht ein Schluessel, und nur einmal je Dialog.
+        _pairing ??= PairingKey.Create();
+
+        try
+        {
+            invite = new PairingInvite(_pairing, host);
+            return true;
+        }
+        catch (ArgumentException)
+        {
+            return false;
+        }
+    }
+
+    private void OnCopyLinkClicked(object sender, RoutedEventArgs e)
+    {
+        if (PairingCode.Text is not { Length: > 0 } link) return;
+
+        try
+        {
+            Clipboard.SetText(link);
+            ShowStatus(Strings.T("S_Copied"));
+        }
+        catch (Exception)
+        {
+            // Die Zwischenablage kann von einem anderen Programm belegt sein.
+            ShowStatus(Strings.T("S_NoClipboard"));
+        }
+    }
+
+    private void OnNewKeyClicked(object sender, RoutedEventArgs e)
+    {
+        _pairing = PairingKey.Create();
+        UpdatePairing();
+    }
+
     private void OnSaveClicked(object sender, RoutedEventArgs e)
     {
         if (!TryReadInt(BudgetBox.Text, 64, 8192, out int budget))
         {
-            ShowStatus("RAM-Budget muss zwischen 64 und 8192 MB liegen.");
+            ShowStatus(Strings.T("S_RangeMemory", 64, 8192));
             return;
         }
 
         if (!TryReadInt(AheadBox.Text, 1, 2000, out int ahead))
         {
-            ShowStatus("Puffer voraus muss zwischen 1 und 2000 Frames liegen.");
+            ShowStatus(Strings.T("S_RangeAhead", 1, 2000));
             return;
         }
 
         if (!TryReadInt(BehindBox.Text, 0, 2000, out int behind))
         {
-            ShowStatus("Puffer zurueck muss zwischen 0 und 2000 Frames liegen.");
+            ShowStatus(Strings.T("S_RangeBehind", 0, 2000));
             return;
         }
 
         if (!TryReadInt(IntervalBox.Text, 2, 300, out int interval))
         {
-            ShowStatus("Der Messtakt muss zwischen 2 und 300 Sekunden liegen.");
+            ShowStatus(Strings.T("S_RangeInterval", 2, 300));
             return;
         }
 
         if (!TryReadInt(ThreadsBox.Text, 1, 16, out int threads))
         {
-            ShowStatus("Decoder-Threads muessen zwischen 1 und 16 liegen.");
+            ShowStatus(Strings.T("S_RangeThreads", 1, 16));
+            return;
+        }
+
+        string relay = RelayBox.Text.Trim();
+
+        if (relay.Length > 0 && !TryInvite(relay, out _))
+        {
+            ShowStatus(Strings.T("S_RelayHostBad"));
             return;
         }
 
@@ -139,6 +253,15 @@ public partial class SettingsWindow : Window
         settings.LoadIntervalSeconds = interval;
         settings.MaxDecoderThreads = threads;
 
+        settings.RelayHost = relay;
+        settings.RemoteEnabled = RemoteBox.IsChecked == true;
+
+        // Ohne Relais wird der Schluessel nicht abgelegt. Er waere ein Geheimnis auf
+        // der Platte, das nichts sichert.
+        settings.PairingSecret = relay.Length > 0 && _pairing is not null
+            ? PairingStore.Protect(_pairing)
+            : string.Empty;
+
         string? error = _apply(settings);
         if (error is not null)
         {
@@ -162,6 +285,9 @@ public partial class SettingsWindow : Window
         if (LanguageBox.SelectedItem is not LanguageOption option) return;
 
         Strings.Apply(option.Value);
+
+        // Die zusammengesetzten Texte haengen nicht an DynamicResource.
+        UpdatePairing();
     }
 
     private void OnCancelClicked(object sender, RoutedEventArgs e)
@@ -187,7 +313,7 @@ public partial class SettingsWindow : Window
         }
         catch (Exception)
         {
-            ShowStatus("Der Ordner konnte nicht geoeffnet werden.");
+            ShowStatus(Strings.T("S_FolderFailed"));
         }
     }
 

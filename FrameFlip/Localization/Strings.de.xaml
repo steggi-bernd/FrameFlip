@@ -145,4 +145,31 @@
     <sys:String x:Key="S_DecoderHintDraft">Taste 2 verkleinert die Dekodiergröße, mehr Threads in den Einstellungen.</sys:String>
     <sys:String x:Key="S_DecoderHintThreads">Mehr Decoder-Threads in den Einstellungen.</sys:String>
 
+    <sys:String x:Key="S_HotkeyPrompt">Kombination drücken …</sys:String>
+    <sys:String x:Key="S_HotkeyNeedsModifier">Mindestens ein Modifikator (Strg, Alt, Shift, Win) ist nötig.</sys:String>
+    <sys:String x:Key="S_RangeMemory">RAM-Budget muss zwischen {0} und {1} MB liegen.</sys:String>
+    <sys:String x:Key="S_RangeAhead">Puffer voraus muss zwischen {0} und {1} Frames liegen.</sys:String>
+    <sys:String x:Key="S_RangeBehind">Puffer zurück muss zwischen {0} und {1} Frames liegen.</sys:String>
+    <sys:String x:Key="S_RangeInterval">Der Messtakt muss zwischen {0} und {1} Sekunden liegen.</sys:String>
+    <sys:String x:Key="S_RangeThreads">Decoder-Threads müssen zwischen {0} und {1} liegen.</sys:String>
+    <sys:String x:Key="S_ThreadCeiling">auf diesem Rechner höchstens {0} von {1} Kernen</sys:String>
+    <sys:String x:Key="S_FolderFailed">Der Ordner konnte nicht geöffnet werden.</sys:String>
+    <sys:String x:Key="S_TabGeneral">Allgemein</sys:String>
+    <sys:String x:Key="S_TabPlayback">Wiedergabe</sys:String>
+    <sys:String x:Key="S_TabPerformance">Leistung</sys:String>
+    <sys:String x:Key="S_TabRemote">Fernsteuerung</sys:String>
+    <sys:String x:Key="S_RemoteEnable">Renderfortschritt ans Handy senden</sys:String>
+    <sys:String x:Key="S_RemoteHint">Ohne Kopplung wird keine Verbindung aufgebaut. Der Relais-Server reicht nur Bytes weiter – lesen kann er sie nicht.</sys:String>
+    <sys:String x:Key="S_RelayHost">Relais-Adresse</sys:String>
+    <sys:String x:Key="S_RelayHostHint">Wirtsname ohne https:// – die Verbindung wird immer verschlüsselt aufgebaut.</sys:String>
+    <sys:String x:Key="S_RelayHostBad">Das ist keine brauchbare Adresse.</sys:String>
+    <sys:String x:Key="S_Pairing">Kopplung</sys:String>
+    <sys:String x:Key="S_ScanHint">Mit der App abfotografieren. Der Schlüssel verlässt den Rechner nur über den Bildschirm, nie über das Netz.</sys:String>
+    <sys:String x:Key="S_NoRelayYet">Erst eine Relais-Adresse eintragen, dann erscheint hier der Code.</sys:String>
+    <sys:String x:Key="S_NewKey">Neuer Schlüssel</sys:String>
+    <sys:String x:Key="S_NewKeyHint">Trennt alle bisher gekoppelten Geräte.</sys:String>
+    <sys:String x:Key="S_CopyLink">Link kopieren</sys:String>
+    <sys:String x:Key="S_Copied">Kopiert.</sys:String>
+    <sys:String x:Key="S_RoomLabel">Raum {0}</sys:String>
+
 </ResourceDictionary>

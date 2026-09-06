@@ -188,6 +188,40 @@ public static class RemoteInvariants
 
         Check.Throws<ArgumentException>(() => new PairingInvite(key, "kein wirt"),
                                         "unbrauchbare Adresse wird nicht angenommen");
+
+        Check.Group("Steuermeldungen des Relays");
+
+        Check.That(RelayControl.Parse("{\"t\":\"waiting\"}", out _) == RelayMessage.Waiting, "waiting");
+        Check.That(RelayControl.Parse("{\"t\":\"peer\",\"up\":true}", out _) == RelayMessage.PeerUp, "peer up");
+        Check.That(RelayControl.Parse("{\"t\":\"peer\",\"up\":false}", out _) == RelayMessage.PeerDown, "peer down");
+
+        Check.That(RelayControl.Parse("{\"t\":\"error\",\"why\":\"role already taken\"}", out string? why)
+                   == RelayMessage.Error && why == "role already taken",
+                   "error mit Begruendung", why);
+
+        // Was sich nicht lesen laesst, wird verworfen - nicht geworfen. Eine spaetere
+        // Fassung des Relays darf Meldungen hinzufuegen, ohne diese Seite zu brechen.
+        string[] junk =
+        {
+            "", "   ", "kein json", "[]", "\"text\"", "42", "null",
+            "{}", "{\"t\":42}", "{\"t\":\"peer\"}", "{\"t\":\"peer\",\"up\":\"ja\"}",
+            "{\"t\":\"etwas-neues\"}", "{\"t\":\"waiting\"", "{\"t\":\"error\"}"
+        };
+
+        int surprises = 0;
+
+        foreach (string text in junk)
+        {
+            var parsed2 = RelayControl.Parse(text, out _);
+
+            // "error" ohne Grund ist immer noch ein Fehler - der Rest ist unbekannt.
+            var expected = text == "{\"t\":\"error\"}" ? RelayMessage.Error : RelayMessage.Unknown;
+
+            if (parsed2 != expected) surprises++;
+        }
+
+        Check.That(surprises == 0, "Unlesbares wird verworfen, nicht geworfen", surprises.ToString());
+        Check.That(RelayControl.Parse(null, out _) == RelayMessage.Unknown, "nichts wird verworfen");
     }
 
     private static byte[] Salt()

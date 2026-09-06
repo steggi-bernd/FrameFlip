@@ -145,4 +145,31 @@
     <sys:String x:Key="S_DecoderHintDraft">Key 2 reduces the decode size; more threads in the settings.</sys:String>
     <sys:String x:Key="S_DecoderHintThreads">More decoder threads in the settings.</sys:String>
 
+    <sys:String x:Key="S_HotkeyPrompt">Press a combination …</sys:String>
+    <sys:String x:Key="S_HotkeyNeedsModifier">At least one modifier (Ctrl, Alt, Shift, Win) is required.</sys:String>
+    <sys:String x:Key="S_RangeMemory">Memory budget must be between {0} and {1} MB.</sys:String>
+    <sys:String x:Key="S_RangeAhead">Prefetch ahead must be between {0} and {1} frames.</sys:String>
+    <sys:String x:Key="S_RangeBehind">Prefetch behind must be between {0} and {1} frames.</sys:String>
+    <sys:String x:Key="S_RangeInterval">The sampling interval must be between {0} and {1} seconds.</sys:String>
+    <sys:String x:Key="S_RangeThreads">Decoder threads must be between {0} and {1}.</sys:String>
+    <sys:String x:Key="S_ThreadCeiling">at most {0} of {1} cores on this machine</sys:String>
+    <sys:String x:Key="S_FolderFailed">The folder could not be opened.</sys:String>
+    <sys:String x:Key="S_TabGeneral">General</sys:String>
+    <sys:String x:Key="S_TabPlayback">Playback</sys:String>
+    <sys:String x:Key="S_TabPerformance">Performance</sys:String>
+    <sys:String x:Key="S_TabRemote">Remote</sys:String>
+    <sys:String x:Key="S_RemoteEnable">Send render progress to the phone</sys:String>
+    <sys:String x:Key="S_RemoteHint">Nothing connects until a phone is paired. The relay only forwards bytes — it cannot read them.</sys:String>
+    <sys:String x:Key="S_RelayHost">Relay address</sys:String>
+    <sys:String x:Key="S_RelayHostHint">Host name without https:// — the connection is always encrypted.</sys:String>
+    <sys:String x:Key="S_RelayHostBad">That is not a usable address.</sys:String>
+    <sys:String x:Key="S_Pairing">Pairing</sys:String>
+    <sys:String x:Key="S_ScanHint">Scan it with the app. The key leaves this machine only through the screen, never over the network.</sys:String>
+    <sys:String x:Key="S_NoRelayYet">Enter a relay address first and the code appears here.</sys:String>
+    <sys:String x:Key="S_NewKey">New key</sys:String>
+    <sys:String x:Key="S_NewKeyHint">Disconnects every device paired so far.</sys:String>
+    <sys:String x:Key="S_CopyLink">Copy link</sys:String>
+    <sys:String x:Key="S_Copied">Copied.</sys:String>
+    <sys:String x:Key="S_RoomLabel">Room {0}</sys:String>
+
 </ResourceDictionary>

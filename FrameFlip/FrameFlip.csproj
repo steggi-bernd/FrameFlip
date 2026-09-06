@@ -28,6 +28,15 @@
   <ItemGroup>
     <Using Remove="System.Windows.Forms" />
   </ItemGroup>
+  <!-- Die einzigen zwei Fremdpakete im Projekt, beide fuer die Kopplung mit dem Handy.
+       QRCoder liefert nur die Modulmatrix; gezeichnet wird sie hier, damit der Code
+       bei jeder Skalierung scharf bleibt und System.Drawing aussen vor bleibt.
+       ProtectedData ist DPAPI: der Kopplungsschluessel liegt damit nicht im Klartext
+       in der config.json. Version 8, passend zum Zielframework. -->
+  <ItemGroup>
+    <PackageReference Include="QRCoder" Version="1.8.0" />
+    <PackageReference Include="System.Security.Cryptography.ProtectedData" Version="8.0.0" />
+  </ItemGroup>
 
   <!-- Publish: self-contained single file, kein Trimming (COM-Late-Binding auf Shell.Application). -->
   <PropertyGroup>
