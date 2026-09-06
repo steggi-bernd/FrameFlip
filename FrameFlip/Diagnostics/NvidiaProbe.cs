@@ -1,5 +1,6 @@
 using System.Diagnostics;
 using System.Globalization;
+using System.Linq;
 
 namespace FrameFlip.Diagnostics;
 
@@ -8,7 +9,8 @@ public readonly record struct GpuReading(
     int? UtilizationPercent,
     long? MemoryUsedMb,
     long? MemoryTotalMb,
-    int? TemperatureCelsius)
+    int? TemperatureCelsius,
+    string? Name = null)
 {
     public bool IsEmpty => UtilizationPercent is null && MemoryUsedMb is null && TemperatureCelsius is null;
 }
@@ -38,7 +40,7 @@ public sealed class NvidiaProbe : IDisposable
     private static readonly TimeSpan Interval = TimeSpan.FromSeconds(5);
 
     private const string Arguments =
-        "--query-gpu=utilization.gpu,memory.used,memory.total,temperature.gpu " +
+        "--query-gpu=utilization.gpu,memory.used,memory.total,temperature.gpu,name " +
         "--format=csv,noheader,nounits";
 
     private readonly object _gate = new();
@@ -118,7 +120,8 @@ public sealed class NvidiaProbe : IDisposable
     }
 
     /// <summary>
-    /// Erwartet "97, 18234, 24576, 71" - Auslastung, belegt, gesamt, Grad.
+    /// Erwartet "97, 18234, 24576, 71, NVIDIA GeForce RTX 4070 Ti" - Auslastung,
+    /// belegt, gesamt, Grad, Name.
     ///
     /// Fehlende Werte gibt nvidia-smi als "[N/A]" aus, etwa die Temperatur auf
     /// manchen Notebook-Karten. Was sich nicht als Zahl lesen laesst, fehlt eben.
@@ -130,11 +133,19 @@ public sealed class NvidiaProbe : IDisposable
         string[] parts = line.Split(',', StringSplitOptions.TrimEntries);
         if (parts.Length < 4) return default;
 
+        // Der Name steht bewusst hinten und wird wieder zusammengesetzt: Er ist das
+        // einzige Feld, in dem ein Komma vorkommen koennte, und wuerde sonst alle
+        // Zahlen dahinter verschieben.
+        string? name = parts.Length > 4
+            ? string.Join(", ", parts.Skip(4)).Trim()
+            : null;
+
         return new GpuReading(
             ReadInt(parts[0]),
             ReadLong(parts[1]),
             ReadLong(parts[2]),
-            ReadInt(parts[3]));
+            ReadInt(parts[3]),
+            string.IsNullOrWhiteSpace(name) ? null : name);
     }
 
     private static int? ReadInt(string text)

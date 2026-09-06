@@ -179,6 +179,7 @@ public sealed class RemoteLink : IAsyncDisposable
         if (gpu.MemoryUsedMb is long used) writer.WriteNumber("vramUsedMb", used);
         if (gpu.MemoryTotalMb is long total) writer.WriteNumber("vramTotalMb", total);
         if (gpu.TemperatureCelsius is int temperature) writer.WriteNumber("gpuTemp", temperature);
+        if (gpu.Name is { Length: > 0 } card) writer.WriteString("gpuName", card);
     }
 
     public async ValueTask DisposeAsync()

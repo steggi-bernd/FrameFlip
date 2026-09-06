@@ -21,13 +21,20 @@ public static class MachineInvariants
         Check.Group("nvidia-smi - Ausgabe lesen");
 
         // So sieht die echte Zeile aus, gemessen auf dem Entwicklungsrechner.
-        var full = NvidiaProbe.Parse("33, 2988, 12282, 49");
+        var full = NvidiaProbe.Parse("33, 2988, 12282, 49, NVIDIA GeForce RTX 4070 Ti");
 
         Check.That(full.UtilizationPercent == 33, "Auslastung", full.UtilizationPercent?.ToString());
         Check.That(full.MemoryUsedMb == 2988, "belegter Speicher", full.MemoryUsedMb?.ToString());
         Check.That(full.MemoryTotalMb == 12282, "Gesamtspeicher", full.MemoryTotalMb?.ToString());
         Check.That(full.TemperatureCelsius == 49, "Temperatur", full.TemperatureCelsius?.ToString());
+        Check.That(full.Name == "NVIDIA GeForce RTX 4070 Ti", "Kartenname", full.Name);
         Check.That(!full.IsEmpty, "die Zeile gilt als brauchbar");
+
+        // Ein Komma im Namen darf die Zahlen davor nicht verschieben - deshalb steht
+        // er hinten und wird wieder zusammengesetzt.
+        var comma = NvidiaProbe.Parse("5, 1, 2, 3, Karte, Sonderausgabe");
+        Check.That(comma.Name == "Karte, Sonderausgabe", "Komma im Namen", comma.Name);
+        Check.That(comma.UtilizationPercent == 5, "die Zahlen bleiben stehen");
 
         // Einzelne Werte fehlen auf manchen Karten - nvidia-smi schreibt dann [N/A].
         var partial = NvidiaProbe.Parse("12, 1024, 8192, [N/A]");
@@ -53,10 +60,12 @@ public static class MachineInvariants
         foreach (string field in new[] { "cpu", "gpu", "ramUsedMb", "ramTotalMb", "vramUsedMb", "vramTotalMb", "gpuTemp" })
             Check.That(!bare.TryGetProperty(field, out _), $"ohne Messung kein Feld \"{field}\"");
 
+        Check.That(!bare.TryGetProperty("gpuName", out _), "ohne Messung kein Kartenname");
+
         // Mit Messung stehen sie da - und zwar mit den echten Gesamtgroessen, nicht
         // mit den Zahlen aus dem Entwurf. Der Rechner hat 12 GB, nicht 24.
         var load = new LoadSnapshot(41.5, null, AvailableMb: 20000, LoadLevel.Moderate) { TotalMb = 65536 };
-        var gpu = new GpuReading(97, 11000, 12282, 71);
+        var gpu = new GpuReading(97, 11000, 12282, 71, "NVIDIA GeForce RTX 4070 Ti");
 
         var filled = Read(RemoteLink.Describe(null, load, gpu));
 
@@ -66,6 +75,7 @@ public static class MachineInvariants
         Check.That(filled.GetProperty("ramTotalMb").GetInt64() == 65536, "Gesamt-RAM geht mit");
         Check.That(filled.GetProperty("vramTotalMb").GetInt64() == 12282, "die echte VRAM-Groesse geht mit");
         Check.That(filled.GetProperty("gpuTemp").GetInt32() == 71, "Temperatur geht mit");
+        Check.That(filled.GetProperty("gpuName").GetString() == "NVIDIA GeForce RTX 4070 Ti", "der Kartenname geht mit");
         Check.That(filled.GetProperty("gpu").GetDouble() == 97, "GPU-Last kommt von nvidia-smi, wenn der Zaehler schweigt");
 
         // Der PDH-Zaehler ist herstellerunabhaengig und hat deshalb Vorrang.
