@@ -1,4 +1,5 @@
 using System.Text.Json;
+using System.Threading;
 using FrameFlip.Bridge;
 
 namespace FrameFlip.Remote;
@@ -17,7 +18,19 @@ namespace FrameFlip.Remote;
 /// </summary>
 public sealed class RemoteLink : IAsyncDisposable
 {
+    /// <summary>Takt waehrend eines Renders.</summary>
     private static readonly TimeSpan Interval = TimeSpan.FromSeconds(1);
+
+    /// <summary>
+    /// Takt im Leerlauf.
+    ///
+    /// Auch ohne Render soll etwas ankommen - gerade dann ist die Frage, ob der
+    /// Rechner ueberhaupt noch wach ist und was die Karte macht. Aber nicht im
+    /// Sekundentakt: Eine Leerlaufmeldung sind rund 120 Bytes, im Sekundentakt
+    /// waeren das ueber ein Mobilnetz gut 400 KB je Stunde fuer die Nachricht
+    /// "hier passiert nichts".
+    /// </summary>
+    private static readonly TimeSpan IdleInterval = TimeSpan.FromSeconds(5);
 
     private readonly RenderMonitor _monitor;
     private readonly RelayClient _client;
@@ -29,6 +42,8 @@ public sealed class RemoteLink : IAsyncDisposable
     /// <summary>VRAM und Temperatur. Still, wenn nvidia-smi nicht erreichbar ist.</summary>
     private readonly Diagnostics.NvidiaProbe _gpu = new();
 
+    private readonly Timer _ticker;
+
     private DateTime _lastSent = DateTime.MinValue;
     private string? _lastShape;
 
@@ -39,6 +54,13 @@ public sealed class RemoteLink : IAsyncDisposable
         _client = new RelayClient(invite);
 
         _monitor.Changed += OnChanged;
+
+        // Der eigene Takt ist nicht Beiwerk, sondern die Grundlage: Das Ereignis der
+        // Bruecke feuert nur, wenn Blender etwas meldet. Ohne laufenden Render - und
+        // ohne installiertes Addon - kommt es nie, und dann ginge ueberhaupt nichts
+        // ans Handy. Der Bildschirm dort blieb leer, ohne dass jemand sagen koennte
+        // warum.
+        _ticker = new Timer(_ => OnChanged(), null, Interval, Interval);
     }
 
     public RelayState State => _client.State;
@@ -65,7 +87,10 @@ public sealed class RemoteLink : IAsyncDisposable
                 string shape = Shape(_monitor.Job);
                 bool changed = shape != _lastShape;
 
-                if (!changed && DateTime.UtcNow - _lastSent < Interval) return;
+                // Im Leerlauf seltener - siehe IdleInterval.
+                var wait = _monitor.Job?.IsRunning == true ? Interval : IdleInterval;
+
+                if (!changed && DateTime.UtcNow - _lastSent < wait) return;
 
                 _lastShape = shape;
                 _lastSent = DateTime.UtcNow;
@@ -185,6 +210,7 @@ public sealed class RemoteLink : IAsyncDisposable
     public async ValueTask DisposeAsync()
     {
         _monitor.Changed -= OnChanged;
+        await _ticker.DisposeAsync();
         _gpu.Dispose();
         await _client.DisposeAsync();
     }

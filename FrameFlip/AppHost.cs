@@ -262,7 +262,7 @@ public sealed class AppHost : IDisposable
             return;
         }
 
-        StartLoadMonitor();
+        EnsureLoadMonitor();
         int maxWorkers = _settings.AdaptiveResources && _loadMonitor is not null ? _loadMonitor.MaxDecoderThreads : 1;
 
         var bounds = WindowBoundsFor(explorerWindow, sourceWidth, sourceHeight);
@@ -280,7 +280,7 @@ public sealed class AppHost : IDisposable
         viewer.Closed += (_, _) =>
         {
             _viewer = null;
-            StopLoadMonitor();
+            EnsureLoadMonitor();
         };
 
         _viewer = viewer;
@@ -300,10 +300,33 @@ public sealed class AppHost : IDisposable
 
     // ------------------------------------------------------------ Lasterkennung
 
+    /// <summary>
+    /// Die Lastmessung laufen lassen, solange jemand sie braucht.
+    ///
+    /// Sie haengt nicht mehr allein am Vorschaufenster. Das war richtig, solange sie
+    /// nur die Decoder-Threads regelte - jetzt speist sie auch die Werte, die ans
+    /// Handy gehen, und die sollen gerade dann kommen, wenn keine Vorschau offen
+    /// ist. Ohne diese Unterscheidung blieb der Live-Bildschirm leer, sobald man das
+    /// Fenster schloss.
+    /// </summary>
+    private void EnsureLoadMonitor()
+    {
+        bool wanted = _viewer is not null || _remote is not null;
+
+        if (wanted) StartLoadMonitor();
+        else StopLoadMonitor();
+    }
+
     private void StartLoadMonitor()
     {
+        // Schon am Laufen - ein Neustart wuerde nur die Messreihe abschneiden.
+        if (_loadMonitor is not null) return;
+
         StopLoadMonitor();
-        if (!_settings.AdaptiveResources) return;
+
+        // Die Messung selbst ist billig und wird auch fuer die Fernsteuerung
+        // gebraucht; geregelt wird nur, wenn es eingeschaltet ist.
+        if (!_settings.AdaptiveResources && _remote is null) return;
 
         var monitor = new SystemLoadMonitor(_settings.MaxDecoderThreads,
                                             TimeSpan.FromSeconds(_settings.LoadIntervalSeconds));
@@ -443,8 +466,8 @@ public sealed class AppHost : IDisposable
         // darauf soll niemand im Einstellungsdialog warten.
         if (previous is not null) _ = previous.DisposeAsync().AsTask();
 
-        if (!_settings.RemoteEnabled || _renderMonitor is null) return;
-        if (!Remote.PairingStore.TryUnprotect(_settings.PairingSecret, out var key)) return;
+        if (!_settings.RemoteEnabled || _renderMonitor is null) { EnsureLoadMonitor(); return; }
+        if (!Remote.PairingStore.TryUnprotect(_settings.PairingSecret, out var key)) { EnsureLoadMonitor(); return; }
 
         try
         {
@@ -452,6 +475,9 @@ public sealed class AppHost : IDisposable
 
             _remote = new Remote.RemoteLink(invite, _renderMonitor, () => _loadMonitor?.LastSnapshot);
             _remote.Start();
+
+            // Erst jetzt, denn sie haengt daran, ob die Fernsteuerung steht.
+            EnsureLoadMonitor();
         }
         catch (ArgumentException)
         {
