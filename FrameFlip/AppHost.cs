@@ -28,6 +28,9 @@ public sealed class AppHost : IDisposable
 
     /// <summary>Nimmt Meldungen des Blender-Addons entgegen. Null, wenn abgeschaltet.</summary>
     private Bridge.RenderMonitor? _renderMonitor;
+
+    /// <summary>Reicht den Renderfortschritt ans Handy weiter. Null, solange nicht gekoppelt.</summary>
+    private Remote.RemoteLink? _remote;
     private SettingsWindow? _settingsWindow;
     private SystemLoadMonitor? _loadMonitor;
     private bool _disposed;
@@ -49,7 +52,7 @@ public sealed class AppHost : IDisposable
 
         if (!_hotkeys.Register(definition))
         {
-            Notify($"Der Hotkey {definition} ist belegt. Bitte in den Einstellungen aendern.");
+            Notify(Localization.Strings.T("S_HotkeyTaken", definition));
         }
 
         UpdateTooltip();
@@ -66,6 +69,8 @@ public sealed class AppHost : IDisposable
                 _loadMonitor?.SetRenderMode(_renderMonitor?.HasRunningJob == true);
         }
 
+        StartRemote();
+
         // Startballast (JIT, XAML-Parser, Icon-Erzeugung) wieder abgeben. Die App
         // steht danach nur noch am Hotkey und soll im Leerlauf nichts festhalten.
         Task.Delay(3000).ContinueWith(_ => MemoryTrimmer.TrimNow(), TaskScheduler.Default);
@@ -76,11 +81,24 @@ public sealed class AppHost : IDisposable
     private void CreateTrayIcon()
     {
         var menu = new WinForms.ContextMenuStrip();
-        menu.Items.Add("Vorschau öffnen", null, (_, _) => Toggle());
+
+        var open = menu.Items.Add(string.Empty, null, (_, _) => Toggle());
         menu.Items.Add(new WinForms.ToolStripSeparator());
-        menu.Items.Add("Einstellungen …", null, (_, _) => ShowSettings());
+        var settings = menu.Items.Add(string.Empty, null, (_, _) => ShowSettings());
         menu.Items.Add(new WinForms.ToolStripSeparator());
-        menu.Items.Add("Beenden", null, (_, _) => Exit());
+        var exit = menu.Items.Add(string.Empty, null, (_, _) => Exit());
+
+        // Das Menue entsteht einmal beim Start und wuerde einen Sprachwechsel sonst
+        // nicht mitbekommen - es haengt an WinForms und kann kein DynamicResource.
+        void Relabel()
+        {
+            open.Text = Localization.Strings.T("S_TrayOpen");
+            settings.Text = Localization.Strings.T("S_TraySettings");
+            exit.Text = Localization.Strings.T("S_TrayExit");
+        }
+
+        Relabel();
+        Localization.Strings.Changed += Relabel;
 
         _trayIcon = new WinForms.NotifyIcon
         {
@@ -164,7 +182,7 @@ public sealed class AppHost : IDisposable
             // Schliessbefehl fuer die offene Vorschau.
             if (_viewer is not null) { _viewer.BeginClose(); return; }
 
-            Notify("Kein Explorer-Fenster gefunden. Ordner mit der Bildsequenz oeffnen und erneut versuchen.");
+            Notify(Localization.Strings.T("S_NoExplorer"));
             return;
         }
 
@@ -181,7 +199,7 @@ public sealed class AppHost : IDisposable
         {
             if (_viewer is not null) { _viewer.BeginClose(); return; }
 
-            Notify("Im aktiven Ordner liegt kein unterstuetztes Bild (PNG, JPG, TIFF, BMP, WebP).");
+            Notify(Localization.Strings.T("S_NoImageInFolder"));
             return;
         }
 
@@ -190,7 +208,7 @@ public sealed class AppHost : IDisposable
         {
             if (_viewer is not null) { _viewer.BeginClose(); return; }
 
-            Notify("Die Sequenz konnte nicht gelesen werden.");
+            Notify(Localization.Strings.T("S_SequenceUnreadable"));
             return;
         }
 
@@ -205,14 +223,14 @@ public sealed class AppHost : IDisposable
     {
         if (!File.Exists(path) || !_decoders.IsSupported(Path.GetExtension(path)))
         {
-            Notify("Die angegebene Datei ist kein unterstuetztes Bild.");
+            Notify(Localization.Strings.T("S_FileUnsupported"));
             return;
         }
 
         var sequence = SequenceScanner.Scan(path, _decoders);
         if (sequence is null || sequence.Count == 0)
         {
-            Notify("Die Sequenz konnte nicht gelesen werden.");
+            Notify(Localization.Strings.T("S_SequenceUnreadable"));
             return;
         }
 
@@ -229,7 +247,7 @@ public sealed class AppHost : IDisposable
         // Fenster in Mediengroesse: dafuer wird nur der Header der Datei gelesen.
         if (!_decoders.TryProbeSize(sequence.Frames[start].Path, out int sourceWidth, out int sourceHeight))
         {
-            if (_viewer is null) Notify("Das Bild konnte nicht gelesen werden.");
+            if (_viewer is null) Notify(Localization.Strings.T("S_ImageUnreadable"));
             return;
         }
 
@@ -378,7 +396,7 @@ public sealed class AppHost : IDisposable
         settings.Normalize();
 
         if (!HotKeyDefinition.TryParse(settings.Hotkey, out var definition))
-            return "Die Tastenkombination ist ungueltig.";
+            return Localization.Strings.T("S_HotkeyInvalid");
 
         if (definition != _hotkeys.Current)
         {
@@ -386,17 +404,61 @@ public sealed class AppHost : IDisposable
             if (!_hotkeys.Register(definition))
             {
                 _hotkeys.Register(previous);
-                return "Die Kombination ist bereits von einer anderen Anwendung belegt.";
+                return Localization.Strings.T("S_HotkeyBusy");
             }
         }
+
+        bool remoteChanged = settings.RemoteEnabled != _settings.RemoteEnabled
+                             || settings.RelayHost != _settings.RelayHost
+                             || settings.PairingSecret != _settings.PairingSecret;
 
         _settings = settings;
         Localization.Strings.Apply(Localization.Strings.Parse(_settings.Language));
         SettingsStore.Save(_settings);
         UpdateTooltip();
 
+        // Nur bei echter Aenderung neu aufbauen. Sonst risse jedes Speichern im
+        // Einstellungsdialog eine stehende Verbindung ab.
+        if (remoteChanged) StartRemote();
+
         // Puffer- und Budgetwerte greifen beim naechsten Oeffnen des Viewers.
         return null;
+    }
+
+    /// <summary>
+    /// Baut die Leitung zum Handy auf - oder raeumt sie weg, wenn eine der
+    /// Voraussetzungen fehlt.
+    ///
+    /// Voraussetzungen sind drei: eingeschaltet, eine brauchbare Relais-Adresse, und
+    /// ein Schluessel, der sich auf diesem Konto entschluesseln laesst. Fehlt eine,
+    /// passiert nichts - kein Verbindungsversuch, kein Hinweis, keine Last. Wer die
+    /// Fernsteuerung nicht benutzt, soll von ihr auch nichts merken.
+    /// </summary>
+    private void StartRemote()
+    {
+        var previous = _remote;
+        _remote = null;
+
+        // Im Hintergrund abraeumen: Das Schliessen wartet auf die Leseschleife, und
+        // darauf soll niemand im Einstellungsdialog warten.
+        if (previous is not null) _ = previous.DisposeAsync().AsTask();
+
+        if (!_settings.RemoteEnabled || _renderMonitor is null) return;
+        if (!Remote.PairingStore.TryUnprotect(_settings.PairingSecret, out var key)) return;
+
+        try
+        {
+            var invite = new Remote.PairingInvite(key!, _settings.RelayHost);
+
+            _remote = new Remote.RemoteLink(invite, _renderMonitor);
+            _remote.Start();
+        }
+        catch (ArgumentException)
+        {
+            // Unbrauchbare Adresse. Der Dialog weist sie ab; kommt sie aus einer von
+            // Hand bearbeiteten config.json, bleibt die Fernsteuerung eben aus.
+            _remote = null;
+        }
     }
 
     private void Exit()
@@ -412,6 +474,12 @@ public sealed class AppHost : IDisposable
         _disposed = true;
 
         StopLoadMonitor();
+
+        if (_remote is not null)
+        {
+            _ = _remote.DisposeAsync().AsTask();
+            _remote = null;
+        }
 
         _renderMonitor?.Dispose();
         _renderMonitor = null;

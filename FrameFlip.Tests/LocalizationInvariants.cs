@@ -68,6 +68,44 @@ public static class LocalizationInvariants
 
         Check.That(untranslated.Count == 0,
             "im Englischen steht kein deutscher Text mehr", Join(untranslated));
+
+        // Und die andere Richtung: ein Schluessel, den der Code benutzt, den es aber
+        // nicht gibt. Zur Laufzeit steht dann "S_TrayOpen" im Menue - kein Absturz,
+        // keine Meldung, nur ein Wort, das niemand geschrieben hat. Beim Umbenennen
+        // eines Schluessels passiert genau das.
+        var source = Directory.GetParent(folder)?.FullName;
+
+        if (source is null)
+        {
+            Check.That(false, "der Quellordner wurde gefunden");
+            return;
+        }
+
+        var used = new SortedSet<string>(StringComparer.Ordinal);
+
+        foreach (string file in Directory.EnumerateFiles(source, "*.*", SearchOption.AllDirectories))
+        {
+            string extension = Path.GetExtension(file);
+            if (extension is not (".cs" or ".xaml")) continue;
+            if (file.Contains($"{Path.DirectorySeparatorChar}obj{Path.DirectorySeparatorChar}")) continue;
+            if (file.Contains($"{Path.DirectorySeparatorChar}bin{Path.DirectorySeparatorChar}")) continue;
+
+            string text = File.ReadAllText(file);
+
+            // Nur Schluessel mit dem S_-Praefix: DynamicResource traegt auch Pinsel
+            // und Vorlagen, und die stehen nicht im Woerterbuch.
+            foreach (Match match in Regex.Matches(text, @"Strings\.T\(""(?<key>S_[A-Za-z0-9_]+)"""))
+                used.Add(match.Groups["key"].Value);
+
+            foreach (Match match in Regex.Matches(text, @"(?:Dynamic|Static)Resource\s+(?<key>S_[A-Za-z0-9_]+)\s*\}"))
+                used.Add(match.Groups["key"].Value);
+        }
+
+        Check.That(used.Count > 100, "die benutzten Schluessel wurden gefunden", $"{used.Count} Fundstellen");
+
+        var missing = used.Where(key => !german.ContainsKey(key)).ToList();
+
+        Check.That(missing.Count == 0, "jeder benutzte Schluessel steht im Woerterbuch", Join(missing));
     }
 
     private static string Join(List<string> keys)

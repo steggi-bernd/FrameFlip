@@ -172,4 +172,18 @@
     <sys:String x:Key="S_Copied">Kopiert.</sys:String>
     <sys:String x:Key="S_RoomLabel">Raum {0}</sys:String>
 
+    <sys:String x:Key="S_HotkeyTaken">Der Hotkey {0} ist belegt. Bitte in den Einstellungen ändern.</sys:String>
+    <sys:String x:Key="S_HotkeyInvalid">Die Tastenkombination ist ungültig.</sys:String>
+    <sys:String x:Key="S_HotkeyBusy">Die Kombination ist bereits von einer anderen Anwendung belegt.</sys:String>
+
+    <sys:String x:Key="S_TrayOpen">Vorschau öffnen</sys:String>
+    <sys:String x:Key="S_TraySettings">Einstellungen …</sys:String>
+    <sys:String x:Key="S_TrayExit">Beenden</sys:String>
+    <sys:String x:Key="S_NoExplorer">Kein Explorer-Fenster gefunden. Ordner mit der Bildsequenz öffnen und erneut versuchen.</sys:String>
+    <sys:String x:Key="S_NoImageInFolder">Im aktiven Ordner liegt kein unterstütztes Bild (PNG, JPG, TIFF, BMP, WebP).</sys:String>
+    <sys:String x:Key="S_SequenceUnreadable">Die Sequenz konnte nicht gelesen werden.</sys:String>
+    <sys:String x:Key="S_FileUnsupported">Die angegebene Datei ist kein unterstütztes Bild.</sys:String>
+    <sys:String x:Key="S_ImageUnreadable">Das Bild konnte nicht gelesen werden.</sys:String>
+    <sys:String x:Key="S_FfmpegWrong">Diese Datei antwortet nicht wie ffmpeg. Bitte den Pfad prüfen.</sys:String>
+
 </ResourceDictionary>

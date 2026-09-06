@@ -150,7 +150,7 @@ public partial class ExportWindow : Window
 
         if (version is null)
         {
-            FfmpegHint.Text = "Diese Datei antwortet nicht wie ffmpeg. Bitte den Pfad prüfen.";
+            FfmpegHint.Text = Localization.Strings.T("S_FfmpegWrong");
             FfmpegHint.Foreground = (System.Windows.Media.Brush)FindResource("GapBrush");
             StartButton.IsEnabled = false;
             return;

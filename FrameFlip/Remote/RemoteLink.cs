@@ -1,0 +1,140 @@
+using System.Text.Json;
+using FrameFlip.Bridge;
+
+namespace FrameFlip.Remote;
+
+/// <summary>
+/// Verbindet den Renderfortschritt mit der Leitung zum Handy.
+///
+/// Zwischen <see cref="RenderMonitor"/> und <see cref="RelayClient"/> fehlt genau
+/// zweierlei: eine Form, in der sich der Zustand uebertragen laesst, und ein Takt,
+/// der den Kanal nicht flutet. Beides steht hier.
+///
+/// Der Takt ist nicht Sparsamkeit: Blender meldet den Statustext mehrmals je
+/// Sekunde, und jede Meldung waere ein verschluesseltes Paket ueber ein Mobilnetz.
+/// Eine Sekunde ist feiner, als ein Mensch auf ein Handy schaut. Zustandswechsel -
+/// Frame fertig, Render zu Ende - gehen sofort durch; auf die wartet jemand.
+/// </summary>
+public sealed class RemoteLink : IAsyncDisposable
+{
+    private static readonly TimeSpan Interval = TimeSpan.FromSeconds(1);
+
+    private readonly RenderMonitor _monitor;
+    private readonly RelayClient _client;
+    private readonly object _gate = new();
+
+    private DateTime _lastSent = DateTime.MinValue;
+    private string? _lastShape;
+
+    public RemoteLink(PairingInvite invite, RenderMonitor monitor)
+    {
+        _monitor = monitor;
+        _client = new RelayClient(invite);
+
+        _monitor.Changed += OnChanged;
+    }
+
+    public RelayState State => _client.State;
+
+    public event Action<RelayState>? StateChanged
+    {
+        add => _client.StateChanged += value;
+        remove => _client.StateChanged -= value;
+    }
+
+    public void Start() => _client.Start();
+
+    private void OnChanged()
+    {
+        try
+        {
+            string json = Describe(_monitor.Job);
+
+            lock (_gate)
+            {
+                // Ein Zustandswechsel wartet nicht auf den Takt. Verglichen wird nur
+                // der grobe Umriss, nicht der ganze Text - sonst waere jede neue
+                // Restzeit ein "Wechsel" und der Takt wirkungslos.
+                string shape = Shape(_monitor.Job);
+                bool changed = shape != _lastShape;
+
+                if (!changed && DateTime.UtcNow - _lastSent < Interval) return;
+
+                _lastShape = shape;
+                _lastSent = DateTime.UtcNow;
+            }
+
+            _client.Send(System.Text.Encoding.UTF8.GetBytes(json));
+        }
+        catch (Exception)
+        {
+            // Diese Kette haengt an der Vorschau. Sie darf unter keinen Umstaenden
+            // etwas nach oben werfen.
+        }
+    }
+
+    /// <summary>Woran ein echter Wechsel erkannt wird - nicht am Zahlenrauschen.</summary>
+    private static string Shape(RenderJob? job)
+        => job is null ? "-" : $"{job.Id}/{job.State}/{job.CurrentFrame}/{job.FramesWritten}";
+
+    /// <summary>
+    /// Der Zustand als JSON, so wie die App ihn liest.
+    ///
+    /// Kurze Namen, weil jedes Byte durch ein Mobilnetz geht und die Nachricht
+    /// jede Sekunde faellt. Was fehlt, fehlt - die App muss ohnehin damit umgehen,
+    /// dass Blender nicht jede Zahl liefert.
+    /// </summary>
+    public static string Describe(RenderJob? job)
+    {
+        var buffer = new System.IO.MemoryStream(256);
+
+        using (var writer = new Utf8JsonWriter(buffer))
+        {
+            writer.WriteStartObject();
+
+            if (job is null)
+            {
+                writer.WriteString("t", "idle");
+                writer.WriteEndObject();
+            }
+            else
+            {
+                writer.WriteString("t", "job");
+                writer.WriteString("state", job.State.ToString().ToLowerInvariant());
+                writer.WriteString("scene", job.Scene);
+                writer.WriteString("engine", job.Engine);
+                writer.WriteString("file", System.IO.Path.GetFileName(job.BlendFile));
+
+                writer.WriteNumber("frame", job.CurrentFrame);
+                writer.WriteNumber("first", job.FirstFrame);
+                writer.WriteNumber("last", job.LastFrame);
+                writer.WriteNumber("written", job.FramesWritten);
+                writer.WriteNumber("progress", Math.Round(job.Progress, 4));
+                writer.WriteNumber("elapsed", Math.Round(job.Elapsed.TotalSeconds, 1));
+
+                if (job.Remaining is TimeSpan left)
+                    writer.WriteNumber("remaining", Math.Round(left.TotalSeconds, 1));
+
+                if (job.SecondsPerFrame is double spf)
+                    writer.WriteNumber("spf", Math.Round(spf, 2));
+
+                RenderStats stats = job.Stats;
+
+                if (stats.Sample is int sample) writer.WriteNumber("sample", sample);
+                if (stats.SampleTotal is int total) writer.WriteNumber("samples", total);
+                if (stats.MemoryMb is long memory) writer.WriteNumber("memMb", memory);
+                if (stats.Activity is { Length: > 0 } activity) writer.WriteString("activity", activity);
+
+                writer.WriteEndObject();
+            }
+        }
+
+        return System.Text.Encoding.UTF8.GetString(buffer.ToArray());
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        _monitor.Changed -= OnChanged;
+        await _client.DisposeAsync();
+    }
+}

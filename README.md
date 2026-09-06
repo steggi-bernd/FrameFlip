@@ -182,12 +182,17 @@ was, and a thumbnail of the last one written. The add-on lives in its own reposi
 [FrameFlipBridge](https://github.com/steggi-bernd/FrameFlipBridge); the design and
 the API research are in [docs/Blender-Bridge.md](docs/Blender-Bridge.md).
 
+The PC side of the phone link works too: pairing by QR code, AES-256-GCM in both
+directions, and the render state going out over a relay that cannot read it. See
+[docs/Remote.md](docs/Remote.md), and the transport in
+[frameflip-relay](https://github.com/steggi-bernd/frameflip-relay).
+
 Still missing:
 
 * Live mode: play the frames of a running render as they are written
 * Cancelling and a render queue — both require FrameFlip to start renders as
   processes of its own, because Blender offers no way to cancel one from the inside
-* Remote control from a phone, end-to-end encrypted
+* The phone app itself — the other end of the link above
 
 ## Licence
 
