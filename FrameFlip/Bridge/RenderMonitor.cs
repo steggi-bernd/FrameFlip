@@ -25,6 +25,7 @@ public sealed class RenderMonitor : IDisposable
     private readonly BridgeServer _server;
     private readonly object _gate = new();
     private bool _disposed;
+    private string? _jobConnection;
 
     /// <summary>Wird auf einem Hintergrundthread ausgeloest.</summary>
     public event Action? Changed;
@@ -46,8 +47,8 @@ public sealed class RenderMonitor : IDisposable
         string token = CreateToken();
 
         _server = new BridgeServer(port, token);
-        _server.MessageReceived += Apply;
-        _server.Disconnected += OnBlenderGone;
+        _server.MessageReceivedFrom += OnBridgeMessage;
+        _server.DisconnectedFrom += OnBlenderGone;
 
         _server.Start();
 
@@ -66,10 +67,15 @@ public sealed class RenderMonitor : IDisposable
     /// Vorschau, Warnungen und die Anzeige am Handy funktionieren, ohne dass irgend
     /// etwas davon ein zweites Mal gebaut werden muesste.
     /// </summary>
-    public void Feed(BridgeMessage message) => Apply(message);
+    public void Feed(BridgeMessage message) => Apply(message, connection: null);
 
-    private void Apply(BridgeMessage message)
+    private void OnBridgeMessage(BridgeMessage message, string connection)
+        => Apply(message, connection);
+
+    private void Apply(BridgeMessage message, string? connection)
     {
+        bool changed = false;
+
         lock (_gate)
         {
             switch (message.Type)
@@ -87,6 +93,8 @@ public sealed class RenderMonitor : IDisposable
                         Height = message.Height,
                         OutputDirectory = message.Output ?? string.Empty,
                     };
+                    _jobConnection = connection;
+                    changed = true;
 
                     // Damit ein Projekt im Browser auftaucht, ohne dass jemand einen
                     // Ordner eintragen muss: Was gerendert hat, ist bekannt. Auf einem
@@ -98,11 +106,19 @@ public sealed class RenderMonitor : IDisposable
                     break;
 
                 case "pre":
-                    Current(message)?.BeginFrame(message.Frame);
+                    if (Current(message, connection) is RenderJob pre)
+                    {
+                        pre.BeginFrame(message.Frame);
+                        changed = true;
+                    }
                     break;
 
                 case "write":
-                    Current(message)?.FrameWritten(message.Frame, message.Path);
+                    if (Current(message, connection) is RenderJob write)
+                    {
+                        write.FrameWritten(message.Frame, message.Path);
+                        changed = true;
+                    }
                     break;
 
                 // Ein Einzelbild-Render schreibt keine Datei - das Ergebnis liegt
@@ -111,19 +127,35 @@ public sealed class RenderMonitor : IDisposable
                 // geschriebener Frame: Im Ausgabeordner des Benutzers liegt nichts,
                 // und der Fortschrittsbalken wuerde sonst luegen.
                 case "still":
-                    Current(message)?.NoteStill(message.Frame, message.Path);
+                    if (Current(message, connection) is RenderJob still)
+                    {
+                        still.NoteStill(message.Frame, message.Path);
+                        changed = true;
+                    }
                     break;
 
                 case "stats":
-                    Current(message)?.UpdateStats(StatsParser.Parse(message.Text));
+                    if (Current(message, connection) is RenderJob stats)
+                    {
+                        stats.UpdateStats(StatsParser.Parse(message.Text));
+                        changed = true;
+                    }
                     break;
 
                 case "done":
-                    Current(message)?.Finish(JobState.Finished);
+                    if (Current(message, connection) is RenderJob done)
+                    {
+                        done.Finish(JobState.Finished);
+                        changed = true;
+                    }
                     break;
 
                 case "cancel":
-                    Current(message)?.Finish(JobState.Cancelled);
+                    if (Current(message, connection) is RenderJob cancel)
+                    {
+                        cancel.Finish(JobState.Cancelled);
+                        changed = true;
+                    }
                     break;
 
                 default:
@@ -131,7 +163,7 @@ public sealed class RenderMonitor : IDisposable
             }
         }
 
-        NotifyChanged(message);
+        if (changed) NotifyChanged(message);
     }
 
     /// <summary>
@@ -146,11 +178,12 @@ public sealed class RenderMonitor : IDisposable
     /// Nur beim LAUFENDEN Auftrag. Blender nach getaner Arbeit zu schliessen ist
     /// der Normalfall und keine Meldung wert.
     /// </summary>
-    private void OnBlenderGone()
+    private void OnBlenderGone(string connection)
     {
         lock (_gate)
         {
             if (Job is not { IsRunning: true } job) return;
+            if (!string.Equals(_jobConnection, connection, StringComparison.Ordinal)) return;
 
             job.NoteGone();
         }
@@ -181,9 +214,10 @@ public sealed class RenderMonitor : IDisposable
     /// melden koennen. Ohne sie schriebe die zweite in den Auftrag der ersten, und
     /// der Fortschrittsbalken spraenge zwischen beiden hin und her.
     /// </summary>
-    private RenderJob? Current(BridgeMessage message)
+    private RenderJob? Current(BridgeMessage message, string? connection)
     {
         if (Job is null) return null;
+        if (!string.Equals(_jobConnection, connection, StringComparison.Ordinal)) return null;
         if (message.Job is null) return Job;
 
         return string.Equals(Job.Id, message.Job, StringComparison.Ordinal) ? Job : null;
@@ -231,8 +265,8 @@ public sealed class RenderMonitor : IDisposable
         if (_disposed) return;
         _disposed = true;
 
-        _server.MessageReceived -= Apply;
-        _server.Disconnected -= OnBlenderGone;
+        _server.MessageReceivedFrom -= OnBridgeMessage;
+        _server.DisconnectedFrom -= OnBlenderGone;
         _server.Dispose();
 
         // Die Datei nennt einen Port, an dem niemand mehr lauscht.

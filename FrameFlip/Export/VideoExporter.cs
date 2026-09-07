@@ -124,7 +124,7 @@ public sealed class VideoExporter
         }
         catch (OperationCanceledException)
         {
-            KillTree(process);
+            await KillTreeAsync(process);
             throw;
         }
 
@@ -137,7 +137,7 @@ public sealed class VideoExporter
         // halbe Datei bliebe liegen.
         if (cancellation.IsCancellationRequested)
         {
-            KillTree(process);
+            await KillTreeAsync(process);
             throw new OperationCanceledException(cancellation);
         }
 
@@ -226,14 +226,17 @@ public sealed class VideoExporter
     /// der halben Datei schlaegt dann fehl, und ein verwaister Encoder arbeitet
     /// weiter an einem Ergebnis, das niemand mehr erwartet.
     /// </summary>
-    private static void KillTree(Process process)
+    private static async Task KillTreeAsync(Process process)
     {
         try
         {
             if (process.HasExited) return;
 
             process.Kill(entireProcessTree: true);
-            process.WaitForExit(5000);
+            // Erst zurueckkehren, wenn Windows den Prozess wirklich freigegeben
+            // hat. Danach darf RunAsync die angefangene Ausgabedatei loeschen,
+            // ohne gegen einen noch schreibenden ffmpeg zu verlieren.
+            await process.WaitForExitAsync().ConfigureAwait(false);
         }
         catch (Exception)
         {

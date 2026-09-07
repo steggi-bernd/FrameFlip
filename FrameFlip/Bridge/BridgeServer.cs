@@ -53,11 +53,20 @@ public sealed class BridgeServer : IDisposable
     private TcpListener? _listener;
     private bool _disposed;
 
-    /// <summary>Wird auf einem Hintergrundthread ausgeloest. Empfaenger muss marshallen.</summary>
+    /// <summary>Wird auf einem Hintergrundthread ausgeloest.</summary>
     public event Action<BridgeMessage>? MessageReceived;
 
-    /// <summary>Die Gegenseite ist weg - sauber beendet oder abgestuerzt.</summary>
+    /// <summary>
+    /// Wie <see cref="MessageReceived"/>, aber mit der Kennung genau der
+    /// authentifizierten Socket-Verbindung, aus der die Nachricht kam.
+    /// </summary>
+    public event Action<BridgeMessage, string>? MessageReceivedFrom;
+
+    /// <summary>Eine authentifizierte Gegenseite ist weg - sauber beendet oder abgestuerzt.</summary>
     public event Action? Disconnected;
+
+    /// <summary>Wie <see cref="Disconnected"/>, aber mit der Kennung der Verbindung.</summary>
+    public event Action<string>? DisconnectedFrom;
 
     /// <summary>Zahl der verbundenen Blender-Instanzen.</summary>
     public int Connections => Volatile.Read(ref _connections);
@@ -116,7 +125,7 @@ public sealed class BridgeServer : IDisposable
 
     private async Task ServeAsync(TcpClient client)
     {
-        Interlocked.Increment(ref _connections);
+        string? connection = null;
 
         try
         {
@@ -147,10 +156,18 @@ public sealed class BridgeServer : IDisposable
                         if (!TokensMatch(message.Token)) return;
 
                         greeted = true;
+                        connection = Guid.NewGuid().ToString("N");
+                        Interlocked.Increment(ref _connections);
                         continue;
                     }
 
+                    // Die einfachen Ereignisse bleiben fuer bestehende Nutzer
+                    // erhalten. Wer eine Verbindung einem Auftrag zuordnen muss,
+                    // nimmt die variante mit Herkunft.
                     try { MessageReceived?.Invoke(message); }
+                    catch (Exception) { /* ein Empfaenger darf die Bruecke nicht reissen */ }
+
+                    try { MessageReceivedFrom?.Invoke(message, connection!); }
                     catch (Exception) { /* ein Empfaenger darf die Bruecke nicht reissen */ }
                 }
             }
@@ -161,16 +178,19 @@ public sealed class BridgeServer : IDisposable
         }
         finally
         {
-            Interlocked.Decrement(ref _connections);
+            // Ein falsches Token oder ein nackter Port-Scan ist kein Blender und
+            // darf deshalb weder den Verbindungszaehler noch einen laufenden Auftrag
+            // beeinflussen.
+            if (connection is not null)
+            {
+                Interlocked.Decrement(ref _connections);
 
-            // Der Abschied ist eine Nachricht fuer sich.
-            //
-            // Blender schickt am Ende eines Renders "done" oder "cancel". Faellt die
-            // Verbindung OHNE eine davon weg, ist Blender mitten im Render
-            // verschwunden - abgestuerzt, abgeschossen oder zugeklappt. Von aussen
-            // ist das dasselbe Bild, und es ist genau der Fall, in dem jemand am
-            // anderen Ende der Welt gerne Bescheid wuesste.
-            try { Disconnected?.Invoke(); } catch (Exception) { }
+                // Der Abschied ist an genau diese Verbindung gebunden. Ein alter
+                // oder fremder Blender darf niemals den aktuell sichtbaren Job
+                // beenden.
+                try { Disconnected?.Invoke(); } catch (Exception) { }
+                try { DisconnectedFrom?.Invoke(connection); } catch (Exception) { }
+            }
         }
     }
 

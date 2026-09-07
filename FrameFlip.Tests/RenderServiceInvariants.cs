@@ -1,5 +1,6 @@
 using System.IO;
 using System.Text.Json;
+using FrameFlip.Bridge;
 using FrameFlip.Configuration;
 using FrameFlip.Projects;
 using FrameFlip.Remote;
@@ -187,6 +188,8 @@ public static class RenderServiceInvariants
 
             Check.That(wild.Samples <= 100_000 && wild.Width >= 4, "unsinnige Zahlen werden begrenzt",
                        $"{wild.Samples} / {wild.Width}");
+
+            FastRenderPublishesInitFirst(root, blend);
         }
         finally
         {
@@ -205,4 +208,56 @@ public static class RenderServiceInvariants
 
     private static JsonElement Parse(object payload)
         => JsonDocument.Parse(JsonSerializer.Serialize(payload)).RootElement.Clone();
+
+    private static void FastRenderPublishesInitFirst(string root, string blend)
+    {
+        Check.Group("Render - ein schneller Prozess bleibt geordnet");
+
+        string helper = Path.Combine(root, "frameflip-fast-render.cmd");
+        File.WriteAllText(helper,
+            "@echo off\r\necho Fra:1 ^| Sample 1/1\r\necho Saved: 'C:\\out\\frame_0001.png'\r\nexit /b 0\r\n");
+
+        var settings = new AppSettings
+        {
+            HeadlessRenderEnabled = true,
+            BlenderPath = helper,
+        };
+        var reported = new List<BridgeMessage>();
+
+        using var runner = new RenderRunner(() => settings, message =>
+        {
+            lock (reported) reported.Add(message);
+        });
+
+        string? trouble = runner.Start(new RenderRequest(
+            blend, new RenderOptions { Frame = 1 }, Path.Combine(root, "quick-output")));
+
+        Check.That(trouble is null, "der kurze Testlauf startet", trouble);
+
+        DateTime deadline = DateTime.UtcNow.AddSeconds(2);
+        while (DateTime.UtcNow < deadline)
+        {
+            lock (reported)
+            {
+                if (reported.Any(message => message.Type is "done" or "cancel")) break;
+            }
+
+            Thread.Sleep(10);
+        }
+
+        lock (reported)
+        {
+            Check.That(reported.Count >= 2, "Start und Ende wurden beide gemeldet", $"{reported.Count} Meldungen");
+            Check.That(reported.Count > 0 && reported[0].Type == "init",
+                       "init kommt vor jedem Abschluss", string.Join(", ", reported.Select(message => message.Type)));
+            Check.That(reported.Any(message => message.Type == "done"),
+                       "der saubere kurze Lauf endet mit done", string.Join(", ", reported.Select(message => message.Type)));
+            Check.That(reported.FindIndex(message => message.Type == "write")
+                       < reported.FindIndex(message => message.Type == "done"),
+                       "die letzte gespeicherte Datei kommt vor done",
+                       string.Join(", ", reported.Select(message => message.Type)));
+            Check.That(reported.Select(message => message.Job).Distinct().Count() == 1,
+                       "alle Meldungen bleiben bei derselben Sitzung");
+        }
+    }
 }

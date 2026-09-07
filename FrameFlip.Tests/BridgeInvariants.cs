@@ -238,9 +238,11 @@ public static class BridgeInvariants
         int port = FreePort();
         string token = "";
 
-        var received = new List<BridgeMessage>();
+        var received = new List<(BridgeMessage Message, string Connection)>();
         using var server = new BridgeServer(port, token = "0123456789abcdef");
-        server.MessageReceived += m => { lock (received) received.Add(m); };
+        var disconnected = new List<string>();
+        server.MessageReceivedFrom += (m, id) => { lock (received) received.Add((m, id)); };
+        server.DisconnectedFrom += id => { lock (disconnected) disconnected.Add(id); };
         server.Start();
 
         Check.That(server.IsListening, "der Empfaenger lauscht", $"Port {port}");
@@ -259,12 +261,24 @@ public static class BridgeInvariants
                 "fuenf gueltige Zeilen kommen an, die unbrauchbare wird verworfen",
                 $"{received.Count}");
 
-            Check.That(received[0].Type == "init" && received[0].Last == 4,
+            Check.That(received[0].Message.Type == "init" && received[0].Message.Last == 4,
                 "der Auftrag wird vollstaendig gelesen");
-            Check.That(received[2].Path!.EndsWith("f_0001.png"),
-                "Pfade ueberstehen die Uebertragung", received[2].Path!);
-            Check.That(received[^1].Type == "done", "und das Ende kommt an");
+            Check.That(received[2].Message.Path!.EndsWith("f_0001.png"),
+                "Pfade ueberstehen die Uebertragung", received[2].Message.Path!);
+            Check.That(received[^1].Message.Type == "done", "und das Ende kommt an");
         }
+
+        WaitUntil(() => { lock (disconnected) return disconnected.Count == 1; });
+
+        lock (disconnected)
+        {
+            Check.That(disconnected.Count == 1 && disconnected[0].Length > 0,
+                       "nur die authentifizierte Verbindung meldet ihren Abschied");
+            Check.That(received.All(item => item.Connection == disconnected[0]),
+                       "Nachrichten und Abschied gehoeren zu derselben Verbindung");
+        }
+
+        Check.That(server.Connections == 0, "nach dem Abschied bleibt keine Blender-Verbindung stehen");
     }
 
     private static void RejectsWrongToken()
@@ -274,14 +288,18 @@ public static class BridgeInvariants
         int port = FreePort();
 
         int count = 0;
+        int departed = 0;
         using var server = new BridgeServer(port, "richtiges-token-0123");
-        server.MessageReceived += _ => Interlocked.Increment(ref count);
+        server.MessageReceivedFrom += (_, _) => Interlocked.Increment(ref count);
+        server.DisconnectedFrom += _ => Interlocked.Increment(ref departed);
         server.Start();
 
         Send(port, "falsches-token-9999", """{"type":"init","job":"x","first":1,"last":9}""");
 
         Check.That(Volatile.Read(ref count) == 0,
             "mit falschem Token kommt nichts durch", $"{count} Meldungen");
+        Check.That(Volatile.Read(ref departed) == 0 && server.Connections == 0,
+                   "ein falsches Token ist keine Blender-Verbindung");
 
         // Ohne Begruessung ebenso: die erste Zeile MUSS der Handschlag sein.
         using (var client = new TcpClient())
@@ -293,10 +311,19 @@ public static class BridgeInvariants
         }
 
         Check.That(Volatile.Read(ref count) == 0, "und ohne Begruessung auch nicht");
+        Check.That(Volatile.Read(ref departed) == 0 && server.Connections == 0,
+                   "auch ein nackter Socket beendet keinen Render");
 
         // Mit dem richtigen Token dagegen schon - sonst prueft der Test nichts.
         Send(port, "richtiges-token-0123", """{"type":"init","job":"z","first":1,"last":9}""");
         Check.That(Volatile.Read(ref count) == 1,
             "mit richtigem Token geht es durch", $"{count}");
+    }
+
+    private static void WaitUntil(Func<bool> done)
+    {
+        DateTime deadline = DateTime.UtcNow.AddSeconds(2);
+
+        while (!done() && DateTime.UtcNow < deadline) Thread.Sleep(10);
     }
 }
