@@ -17,18 +17,17 @@ namespace FrameFlip.Remote;
 /// Neustart von FrameFlip verhaengnisvoll: gleicher Schluessel, Zaehler wieder bei
 /// null, dieselbe Nonce fuer anderen Klartext - der Fall, in dem GCM auseinanderfaellt.
 ///
-/// Was das nicht leistet: Der Handschlag ist unbeglaubigt. Wer die Raumkennung kennt,
-/// kann sich in einen freien Platz setzen und ein Salz schicken. Lesen kann er
-/// dennoch nichts, und die Gegenseite verwirft seine Nachrichten bei der ersten
-/// Pruefsumme. Er kann stoeren, nicht mithoeren.
+/// Ein Kanal gilt erst nach einem verschluesselten, an beide Salze gebundenen
+/// Schluesselnachweis als gekoppelt. Ein Fremder kann daher keinen freien Platz als
+/// echtes Geraet erscheinen lassen.
 /// </summary>
 public sealed class SecureChannel : IDisposable
 {
     /// <summary>Laenge des Sitzungssalzes je Seite.</summary>
     public const int SaltBytes = 16;
 
-    /// <summary>Erste Fassung des Handschlags. Steht vorn, damit spaetere erkennbar sind.</summary>
-    public const byte Version = 1;
+    /// <summary>Zweite Fassung: verlangt nach den Salzen einen Schluesselnachweis.</summary>
+    public const byte Version = 2;
 
     private const int CounterBytes = 8;
     private const int TagBytes = 16;

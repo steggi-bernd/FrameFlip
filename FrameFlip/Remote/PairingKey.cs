@@ -36,6 +36,7 @@ public sealed class PairingKey
     private const string RoomInfo = "frameflip/v1/room";
     private const string HostInfo = "frameflip/v1/host";
     private const string ClientInfo = "frameflip/v1/client";
+    private static readonly byte[] ConfirmationInfo = Encoding.UTF8.GetBytes("frameflip/v2/confirm");
 
     private readonly byte[] _key;
 
@@ -101,6 +102,33 @@ public sealed class PairingKey
         clientSalt.CopyTo(salt[SecureChannel.SaltBytes..]);
 
         return Derive(sender == RelayRole.Host ? HostInfo : ClientInfo, KeyBytes, salt);
+    }
+
+    /// <summary>
+    /// Beweist nach dem offenen Salzaustausch den Besitz des Kopplungsschluessels.
+    /// Der Nachweis bindet beide Salze und die Senderrolle, damit ein Platzhalter im
+    /// Raum nicht als gekoppeltes Geraet erscheint.
+    /// </summary>
+    public byte[] Confirmation(RelayRole sender, ReadOnlySpan<byte> hostSalt, ReadOnlySpan<byte> clientSalt)
+    {
+        if (hostSalt.Length != SecureChannel.SaltBytes || clientSalt.Length != SecureChannel.SaltBytes)
+            throw new ArgumentException($"Salze muessen je {SecureChannel.SaltBytes} Bytes haben.");
+
+        byte[] transcript = new byte[ConfirmationInfo.Length + 1 + SecureChannel.SaltBytes * 2];
+        ConfirmationInfo.CopyTo(transcript, 0);
+        transcript[ConfirmationInfo.Length] = sender == RelayRole.Host ? (byte)1 : (byte)2;
+        hostSalt.CopyTo(transcript.AsSpan(ConfirmationInfo.Length + 1));
+        clientSalt.CopyTo(transcript.AsSpan(ConfirmationInfo.Length + 1 + SecureChannel.SaltBytes));
+
+        using var hmac = new HMACSHA256(_key);
+        return hmac.ComputeHash(transcript);
+    }
+
+    public bool IsConfirmation(ReadOnlySpan<byte> proof, RelayRole sender, ReadOnlySpan<byte> hostSalt, ReadOnlySpan<byte> clientSalt)
+    {
+        byte[] expected = Confirmation(sender, hostSalt, clientSalt);
+        try { return CryptographicOperations.FixedTimeEquals(proof, expected); }
+        finally { CryptographicOperations.ZeroMemory(expected); }
     }
 
     private byte[] Derive(string info, int length, ReadOnlySpan<byte> salt)
