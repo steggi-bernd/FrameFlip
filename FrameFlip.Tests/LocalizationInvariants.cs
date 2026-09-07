@@ -29,6 +29,26 @@ public static class LocalizationInvariants
         var english = Read(Path.Combine(folder, "Strings.en.xaml"));
 
         Check.That(german.Count > 100, "Deutsch enthaelt die Texte", $"{german.Count} Schluessel");
+
+        // Ein Schluessel zweimal in derselben Datei: Das Woerterbuch laesst sich dann
+        // gar nicht erst laden, und die Oberflaeche steht ohne jeden Text da. Beim
+        // Ergaenzen von Hand ist das der leichteste Fehler ueberhaupt - und einer,
+        // den man erst beim Starten sieht.
+        foreach (var (name, path) in new[]
+                 {
+                     ("Deutsch", Path.Combine(folder, "Strings.de.xaml")),
+                     ("Englisch", Path.Combine(folder, "Strings.en.xaml")),
+                 })
+        {
+            var keys = Regex.Matches(File.ReadAllText(path), @"x:Key=""(?<key>[^""]+)""")
+                            .Select(match => match.Groups["key"].Value)
+                            .ToList();
+
+            var twice = keys.GroupBy(key => key).Where(group => group.Count() > 1)
+                            .Select(group => group.Key).ToList();
+
+            Check.That(twice.Count == 0, $"kein Schluessel steht zweimal in {name}", Join(twice));
+        }
         Check.That(english.Count > 100, "Englisch enthaelt die Texte", $"{english.Count} Schluessel");
 
         var onlyGerman = german.Keys.Except(english.Keys).OrderBy(k => k).ToList();
