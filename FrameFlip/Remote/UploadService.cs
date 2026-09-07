@@ -145,7 +145,10 @@ public sealed class UploadService : IDisposable
 
             try
             {
-                sink = new FileStream(partial, FileMode.Create, FileAccess.Write, FileShare.None, 64 * 1024);
+                // CreateNew statt Create: Zwischen dem Namenscheck und diesem
+                // Moment darf weder eine vorhandene Teildatei ueberschrieben noch
+                // ein fremder Dateieintrag verfolgt werden.
+                sink = new FileStream(partial, FileMode.CreateNew, FileAccess.Write, FileShare.None, 64 * 1024);
             }
             catch (Exception)
             {
@@ -204,7 +207,8 @@ public sealed class UploadService : IDisposable
 
         if (resolved is null) return VaultRefusal.BadName;
 
-        target = Path.Combine(resolved, FileVault.FreeName(resolved, name!, File.Exists));
+        target = Path.Combine(resolved, FileVault.FreeName(resolved, name!, candidate =>
+            File.Exists(candidate) || File.Exists(FileVault.PartialPath(candidate))));
 
         return VaultRefusal.None;
     }
@@ -218,38 +222,58 @@ public sealed class UploadService : IDisposable
     /// </summary>
     public void OnChunk(int transfer, int index, bool last, byte[] data)
     {
-        Incoming? incoming;
-
-        lock (_gate) incoming = _current;
-
-        if (incoming is null || incoming.Id != transfer || incoming.Expected != index) return;
-
-        try
+        lock (_gate)
         {
-            incoming.Sink.Write(data, 0, data.Length);
+            Incoming? incoming = _current;
 
-            incoming.Written += data.Length;
-            incoming.Expected++;
+            if (incoming is null || incoming.Id != transfer || incoming.Expected != index) return;
 
-            // Mehr, als angekuendigt war: Das ist kein Ueberlauf, sondern ein
-            // Grund, aufzuhoeren - der Platz war nach der Ankuendigung bemessen.
-            if (incoming.Bytes >= 0 && incoming.Written > incoming.Bytes + Envelope.ChunkBytes)
+            // Ein gueltiger Handy-Client verwendet diese Groesse auch beim Senden.
+            // Die Gegenpruefung laesst ein einzelnes Relay-Paket nicht unverhaeltnis-
+            // maessig viel Arbeit auf einmal ausloesen.
+            if (data.Length > Envelope.ChunkBytes)
+            {
+                Abandon("chunk is too large");
+                return;
+            }
+
+            // Vor dem Schreiben pruefen: Die angekuendigte Groesse ist ein hartes
+            // Budget, keine grobe Schaetzung. Sonst koennte ein letzter grosser
+            // Block den reservierten Platz erst beschreiben und danach auffallen.
+            if (data.LongLength > incoming.Bytes - incoming.Written)
             {
                 Abandon("more data than announced");
                 return;
             }
 
-            if (!last)
+            try
             {
-                _send(new { t = "ack", id = transfer, i = index });
-                return;
-            }
+                incoming.Sink.Write(data, 0, data.Length);
 
-            Finish(incoming);
-        }
-        catch (Exception)
-        {
-            Abandon("writing failed");
+                incoming.Written += data.Length;
+                incoming.Expected++;
+
+                if (!last)
+                {
+                    _send(new { t = "ack", id = transfer, i = index });
+                    return;
+                }
+
+                // Ein letztes Stueck ist nur dann wirklich das letzte, wenn die
+                // exakte angekuendigte Laenge erreicht ist. Eine kurze .blend
+                // waere sonst unter einem vertrauenerweckenden Namen gelandet.
+                if (incoming.Written != incoming.Bytes)
+                {
+                    Abandon("file length does not match announcement");
+                    return;
+                }
+
+                Finish(incoming);
+            }
+            catch (Exception)
+            {
+                Abandon("writing failed");
+            }
         }
     }
 
@@ -257,7 +281,7 @@ public sealed class UploadService : IDisposable
     {
         lock (_gate)
         {
-            incoming.Sink.Flush();
+            incoming.Sink.Flush(flushToDisk: true);
             incoming.Dispose();
 
             try

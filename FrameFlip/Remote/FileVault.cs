@@ -210,7 +210,11 @@ public sealed class FileVault
         // Mit Markierung und freiem Namen. Ueberschrieben wird dadurch nie - eine
         // Datei, an der jemand seit Wochen arbeitet, ist der denkbar schlechteste
         // Ort fuer ein Missverstaendnis -, und am Namen sieht man, was von aussen kam.
-        path = System.IO.Path.Combine(Folder, FreeName(Folder, name!, File.Exists));
+        // Auch eine liegengebliebene .teil-Datei belegt ihren Namen. Mit CreateNew
+        // beim eigentlichen Oeffnen ist das die zweite Haelfte gegen versehentliches
+        // Ueberschreiben zwischen Pruefung und Schreiben.
+        path = System.IO.Path.Combine(Folder, FreeName(Folder, name!, candidate =>
+            File.Exists(candidate) || File.Exists(PartialPath(candidate))));
 
         return VaultRefusal.None;
     }
