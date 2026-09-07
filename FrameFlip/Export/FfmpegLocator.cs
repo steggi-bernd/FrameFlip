@@ -1,5 +1,6 @@
 using System.Diagnostics;
 using System.IO;
+using System.Text;
 
 namespace FrameFlip.Export;
 
@@ -14,6 +15,7 @@ namespace FrameFlip.Export;
 public static class FfmpegLocator
 {
     public const string ExecutableName = "ffmpeg.exe";
+    private const int MaxVersionOutputChars = 64 * 1024;
 
     /// <summary>
     /// Suchreihenfolge: eingestellter Pfad, Unterordner neben der Exe, PATH, dann die
@@ -107,7 +109,15 @@ public static class FfmpegLocator
     {
         if (string.IsNullOrWhiteSpace(path)) return false;
 
-        try { return File.Exists(path); }
+        try
+        {
+            // Der Dialog sucht bewusst nach ffmpeg.exe. Skripte und Verknuepfungen
+            // duerfen dort nicht als "Encoder" laufen: Sie wuerden ueber cmd.exe
+            // gestartet und koennten einen Prozessbaum hinterlassen, den das
+            // Programm nicht zuverlaessig kontrollieren kann.
+            if (!string.Equals(Path.GetExtension(path), ".exe", StringComparison.OrdinalIgnoreCase)) return false;
+            return File.Exists(path);
+        }
         catch (Exception) { return false; }
     }
 
@@ -117,32 +127,127 @@ public static class FfmpegLocator
     /// allein sagt darueber nichts.
     /// </summary>
     public static string? TryReadVersion(string executable, int timeoutMs = 4000)
+        => TryReadVersionAsync(executable, timeoutMs).GetAwaiter().GetResult();
+
+    /// <summary>
+    /// Liest die Versionszeile, ohne einen Aufrufer am UI-Thread festzuhalten.
+    /// Beide Ausgabekanaele werden gleichzeitig geleert: Auch ein fremdes Programm,
+    /// das nur stderr fuellt oder nie eine Zeile auf stdout schreibt, kann die
+    /// Pruefung damit weder blockieren noch unbegrenzt Speicher belegen.
+    /// </summary>
+    public static async Task<string?> TryReadVersionAsync(string executable, int timeoutMs = 4000,
+                                                           CancellationToken cancellation = default)
     {
+        if (!IsUsable(executable) || timeoutMs <= 0) return null;
+
+        Process? process = null;
+        Task<string>? output = null;
+        Task<string>? errors = null;
+
         try
         {
-            using var process = Process.Start(new ProcessStartInfo(executable, "-version")
+            var info = new ProcessStartInfo(executable)
             {
                 RedirectStandardOutput = true,
                 RedirectStandardError = true,
                 UseShellExecute = false,
                 CreateNoWindow = true,
-            });
+            };
+            info.ArgumentList.Add("-version");
+
+            process = Process.Start(info);
 
             if (process is null) return null;
 
-            var first = process.StandardOutput.ReadLine();
-            if (!process.WaitForExit(timeoutMs))
-            {
-                try { process.Kill(entireProcessTree: true); } catch (Exception) { }
-                return null;
-            }
+            using var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellation);
+            timeout.CancelAfter(TimeSpan.FromMilliseconds(timeoutMs));
 
-            return string.IsNullOrWhiteSpace(first) ? null : first.Trim();
+            // Der Timeout gilt dem Prozess. Die Reader laufen bis zum Pipe-Ende,
+            // damit sie nach dem Kill noch sauber fertig werden koennen.
+            output = DrainBoundedAsync(process.StandardOutput);
+            errors = DrainBoundedAsync(process.StandardError);
+            Task exited = process.WaitForExitAsync(timeout.Token);
+
+            await Task.WhenAll(output, errors, exited).ConfigureAwait(false);
+
+            return FirstLine(await output.ConfigureAwait(false));
         }
         catch (Exception)
         {
+            Stop(process);
+            await FinishDraining(process, output, errors).ConfigureAwait(false);
             return null;
         }
+        finally
+        {
+            process?.Dispose();
+        }
+    }
+
+    private static async Task<string> DrainBoundedAsync(StreamReader reader)
+    {
+        var buffer = new char[4096];
+        var kept = new StringBuilder();
+
+        while (true)
+        {
+            int read = await reader.ReadAsync(buffer.AsMemory()).ConfigureAwait(false);
+            if (read == 0) return kept.ToString();
+
+            // Weiter lesen, auch wenn die nutzbare Ausgabe voll ist. Sonst kann der
+            // Kindprozess auf einer vollen Pipe haengen. Nur behalten wird, was fuer
+            // die erste Versionszeile wirklich reichen kann.
+            int left = MaxVersionOutputChars - kept.Length;
+            if (left > 0) kept.Append(buffer, 0, Math.Min(left, read));
+        }
+    }
+
+    private static string? FirstLine(string text)
+    {
+        foreach (string line in text.Split(['\r', '\n'], StringSplitOptions.RemoveEmptyEntries))
+            if (!string.IsNullOrWhiteSpace(line)) return line.Trim();
+
+        return null;
+    }
+
+    private static void Stop(Process? process)
+    {
+        if (process is null) return;
+
+        try
+        {
+            if (!process.HasExited) process.Kill(entireProcessTree: true);
+        }
+        catch (Exception)
+        {
+            // Der Prozess kann zwischen Timeout und Kill selbst enden.
+        }
+    }
+
+    private static async Task FinishDraining(Process? process, params Task?[] tasks)
+    {
+        var pending = tasks.Where(task => task is not null).Cast<Task>().ToList();
+
+        if (process is not null)
+        {
+            try { pending.Add(process.WaitForExitAsync()); }
+            catch (Exception) { }
+        }
+
+        if (pending.Count == 0) return;
+
+        // Ein abgebrochener Reader ist erwartbar. Sein Cancellation-Status darf
+        // aber nicht das Warten auf den tatsaechlich beendeten Prozess abkuerzen.
+        var settled = pending.Select(IgnoreFailure).ToArray();
+
+        try { await Task.WhenAll(settled).WaitAsync(TimeSpan.FromSeconds(5)).ConfigureAwait(false); }
+        catch (Exception) { }
+    }
+
+    private static async Task IgnoreFailure(Task task)
+    {
+        try { await task.ConfigureAwait(false); }
+        catch (Exception) { }
     }
 
     /// <summary>Hinweis fuer den Dialog, wenn nichts gefunden wurde.</summary>

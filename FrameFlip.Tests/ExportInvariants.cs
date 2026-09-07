@@ -20,6 +20,7 @@ public static class ExportInvariants
         Arguments();
         Presets();
         Locator();
+        RejectsScripts();
         AdjustmentHandover();
     }
 
@@ -299,7 +300,7 @@ public static class ExportInvariants
 
             // Die Datei existiert, ist aber kein ffmpeg - genau dafuer gibt es die
             // Versionspruefung im Dialog.
-            Check.That(FfmpegLocator.TryReadVersion(fake) is null,
+            Check.That(FfmpegLocator.TryReadVersionAsync(fake).GetAwaiter().GetResult() is null,
                 "eine gleichnamige Datei besteht die Versionspruefung nicht");
         }
         finally
@@ -318,6 +319,26 @@ public static class ExportInvariants
         Console.WriteLine(found is null
             ? "  (Hinweis: auf diesem Rechner wurde kein ffmpeg gefunden)"
             : $"  (Hinweis: ffmpeg gefunden unter {found})");
+    }
+
+    private static void RejectsScripts()
+    {
+        Check.Group("ffmpeg-Pruefung startet keine Skripte");
+
+        string script = Path.Combine(Path.GetTempPath(), "frameflip-not-ffmpeg-" + Guid.NewGuid().ToString("N") + ".cmd");
+
+        try
+        {
+            File.WriteAllText(script, "@echo off\r\necho this must never run\r\n");
+            Check.That(!string.Equals(FfmpegLocator.Locate(script), script, StringComparison.OrdinalIgnoreCase),
+                       "ein Skript wird nicht als eingestellter Encoder akzeptiert");
+            Check.That(FfmpegLocator.TryReadVersionAsync(script).GetAwaiter().GetResult() is null,
+                       "ein Skript wird auch zur Pruefung nicht gestartet");
+        }
+        finally
+        {
+            try { File.Delete(script); } catch (IOException) { }
+        }
     }
 
     // ---------------------------------------------------------------- Auftrag

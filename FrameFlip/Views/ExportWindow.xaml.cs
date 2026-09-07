@@ -31,6 +31,8 @@ public partial class ExportWindow : Window
     private readonly ImageAdjustments _adjustments;
 
     private CancellationTokenSource? _cancellation;
+    private CancellationTokenSource? _ffmpegValidation;
+    private bool _closing;
     private bool _running;
 
     private sealed record ScaleOption(string Name, int Width)
@@ -131,22 +133,61 @@ public partial class ExportWindow : Window
     {
         var found = FfmpegLocator.Locate(_settings.FfmpegPath);
         FfmpegBox.Text = found ?? string.Empty;
-        ValidateFfmpeg(found);
+        BeginFfmpegValidation(found);
     }
 
-    private void ValidateFfmpeg(string? path)
+    private void BeginFfmpegValidation(string? path)
     {
+        _ffmpegValidation?.Cancel();
+
         if (string.IsNullOrWhiteSpace(path))
         {
+            _ffmpegValidation = null;
             FfmpegHint.Text = FfmpegLocator.InstallHint;
             FfmpegHint.Foreground = (System.Windows.Media.Brush)FindResource("GapBrush");
             StartButton.IsEnabled = false;
             return;
         }
 
-        // Nicht nur auf den Dateinamen verlassen: eine gleichnamige Datei belegt
-        // nicht, dass dahinter ein lauffaehiges ffmpeg steckt.
-        var version = FfmpegLocator.TryReadVersion(path);
+        var validation = new CancellationTokenSource();
+        _ffmpegValidation = validation;
+        StartButton.IsEnabled = false;
+        FfmpegHint.Text = "ffmpeg wird geprüft …";
+        FfmpegHint.Foreground = (System.Windows.Media.Brush)FindResource("MutedBrush");
+
+        _ = ValidateFfmpegAsync(path, validation);
+    }
+
+    private async Task ValidateFfmpegAsync(string path, CancellationTokenSource validation)
+    {
+        string? version;
+
+        try
+        {
+            // Nicht nur auf den Dateinamen verlassen: eine gleichnamige Datei belegt
+            // nicht, dass dahinter ein lauffaehiges ffmpeg steckt. Die Pruefung
+            // findet bewusst neben dem UI-Thread statt und hat eine feste Frist.
+            version = await FfmpegLocator.TryReadVersionAsync(path, cancellation: validation.Token);
+        }
+        catch (Exception)
+        {
+            // Ein fremdes Programm darf den Dispatcher nie mit einer Ausnahme
+            // erreichen. Der Locator faengt bereits ab; dies sichert den Dialog.
+            version = null;
+        }
+
+        if (!ReferenceEquals(_ffmpegValidation, validation))
+        {
+            validation.Dispose();
+            return;
+        }
+
+        _ffmpegValidation = null;
+
+        bool cancelled = validation.IsCancellationRequested;
+        validation.Dispose();
+
+        if (_closing || cancelled) return;
 
         if (version is null)
         {
@@ -179,7 +220,7 @@ public partial class ExportWindow : Window
         if (dialog.ShowDialog(this) != true) return;
 
         FfmpegBox.Text = dialog.FileName;
-        ValidateFfmpeg(dialog.FileName);
+        BeginFfmpegValidation(dialog.FileName);
     }
 
     // ---------------------------------------------------------------- Eingaben
@@ -556,6 +597,8 @@ public partial class ExportWindow : Window
             return;
         }
 
+        _closing = true;
+        _ffmpegValidation?.Cancel();
         base.OnClosing(e);
     }
 }
