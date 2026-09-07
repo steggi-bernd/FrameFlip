@@ -56,6 +56,18 @@ public sealed class RenderMonitor : IDisposable
 
     // ---------------------------------------------------------------- Meldungen
 
+    /// <summary>
+    /// Eine Meldung von hier statt vom Addon.
+    ///
+    /// Ein Render ohne Fenster hat kein Addon; die Meldungen baut
+    /// <see cref="Rendering.RenderRunner"/> aus Blenders Ausgabe. Sie gehen durch
+    /// dieselbe Tuer wie alle anderen - damit ist so ein Render fuer den Rest des
+    /// Programms von einem gewoehnlichen nicht zu unterscheiden, und Fortschritt,
+    /// Vorschau, Warnungen und die Anzeige am Handy funktionieren, ohne dass irgend
+    /// etwas davon ein zweites Mal gebaut werden muesste.
+    /// </summary>
+    public void Feed(BridgeMessage message) => Apply(message);
+
     private void Apply(BridgeMessage message)
     {
         lock (_gate)
@@ -75,6 +87,14 @@ public sealed class RenderMonitor : IDisposable
                         Height = message.Height,
                         OutputDirectory = message.Output ?? string.Empty,
                     };
+
+                    // Damit ein Projekt im Browser auftaucht, ohne dass jemand einen
+                    // Ordner eintragen muss: Was gerendert hat, ist bekannt. Auf einem
+                    // eigenen Thread, weil hier eine Datei geschrieben wird und der
+                    // Zustand des Renders darauf nicht warten soll.
+                    if (message.File is { Length: > 0 } blend)
+                        Task.Run(() => Projects.ProjectLibrary.Note(blend));
+
                     break;
 
                 case "pre":

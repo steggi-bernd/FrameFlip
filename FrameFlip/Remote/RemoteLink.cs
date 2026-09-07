@@ -47,13 +47,50 @@ public sealed class RemoteLink : IAsyncDisposable
     private DateTime _lastSent = DateTime.MinValue;
     private string? _lastShape;
 
-    public RemoteLink(PairingInvite invite, RenderMonitor monitor, Func<Diagnostics.LoadSnapshot?>? load = null)
+    /// <summary>
+    /// Ob das Handy jedem neuen Frame folgen will.
+    ///
+    /// Vorher fragte es von sich aus alle paar Sekunden nach - und lag damit
+    /// zwangslaeufig daneben: Wer im falschen Moment fragt, bekommt das vorige Bild,
+    /// und wer oft fragt, verbraucht Daten fuer Bilder, die es noch gar nicht gibt.
+    /// Der Rechner weiss dagegen genau, wann eines fertig ist.
+    /// </summary>
+    private volatile bool _follow;
+
+    /// <summary>Breite der Bilder, denen gefolgt wird. Klein - es ist eine Kachel, kein Vollbild.</summary>
+    private int _followWidth = 480;
+
+    private DateTime _lastFollow = DateTime.MinValue;
+
+    /// <summary>Blaettern, Ansehen und Holen in der Bibliothek. Antwortet selbst.</summary>
+    private readonly BrowseService _browse;
+
+    /// <summary>Rendern auf Zuruf. Nur mit Erlaubnis, und nur mit freigegebenen Dateien.</summary>
+    private readonly RenderService _render;
+
+    /// <summary>Dateien entgegennehmen. Die einzige Stelle, an der etwas hereinkommt.</summary>
+    private readonly UploadService _upload;
+
+    public RemoteLink(PairingInvite invite, RenderMonitor monitor, Func<Diagnostics.LoadSnapshot?>? load = null,
+                      Func<Configuration.AppSettings>? settings = null)
     {
         _monitor = monitor;
         _load = load ?? (() => null);
         _client = new RelayClient(invite);
 
+        // Ohne Einstellungen bleibt die Bibliothek zu: Was hier nicht durchgereicht
+        // wird, kann auch niemand freigeschaltet haben.
+        var read = settings ?? (() => new Configuration.AppSettings());
+
+        _browse = new BrowseService(read, payload => _client.Send(payload));
+
+        void Answer(object payload) => _client.Send(Envelope.Json(JsonSerializer.Serialize(payload)));
+
+        _render = new RenderService(read, Answer, new Rendering.RenderRunner(read, monitor.Feed));
+        _upload = new UploadService(read, Answer);
+
         _monitor.Changed += OnChanged;
+        _monitor.FrameWritten += OnFrameWritten;
         _client.PayloadReceived += OnCommand;
 
         // Der eigene Takt ist nicht Beiwerk, sondern die Grundlage: Das Ereignis der
@@ -124,12 +161,81 @@ public sealed class RemoteLink : IAsyncDisposable
         try
         {
             if (!Envelope.TryRead(payload, out PayloadKind kind, out byte[] body)) return;
+
+            // Ein Stueck einer Datei, die hereinkommt. Es traegt keinen Befehl - die
+            // Zuordnung steht in seiner Vorgangsnummer.
+            if (kind == PayloadKind.Chunk)
+            {
+                if (Envelope.TryReadChunk(body, out int transfer, out int index, out bool last, out byte[] data))
+                    _upload.OnChunk(transfer, index, last, data);
+
+                return;
+            }
+
             if (kind != PayloadKind.Json) return;
 
             using var document = JsonDocument.Parse(body);
 
             if (!document.RootElement.TryGetProperty("c", out JsonElement command)) return;
-            if (command.GetString() != "preview") return;
+
+            string? name = command.GetString();
+
+            if (name is null) return;
+
+            // Alles rund um die Bibliothek beantwortet der Browser-Dienst selbst -
+            // samt Ablehnung, falls sie gar nicht freigegeben ist.
+            //
+            // Auf dem Threadpool, und mit einer losgeloesten Kopie des Befehls: Das
+            // Blaettern geht auf die Platte, und diese Kette haengt am Netzwerk-Thread
+            // der Verbindung. Ohne Clone() zeigte die Kopie in ein JsonDocument, das
+            // beim Verlassen dieser Methode schon weg ist.
+            if (BrowseService.Handles(name))
+            {
+                JsonElement copy = document.RootElement.Clone();
+
+                Task.Run(() => _browse.Handle(name, copy));
+                return;
+            }
+
+            // Der Render geht denselben Weg: eigener Thread, losgeloeste Kopie. Das
+            // Nachsehen in einer .blend-Datei startet Blender und dauert Sekunden.
+            if (RenderService.Handles(name))
+            {
+                JsonElement copy = document.RootElement.Clone();
+
+                Task.Run(() => _render.Handle(name, copy));
+                return;
+            }
+
+            if (UploadService.Handles(name))
+            {
+                JsonElement copy = document.RootElement.Clone();
+
+                Task.Run(() => _upload.Handle(name, copy));
+                return;
+            }
+
+            // Dem Render folgen: Ab jetzt schickt der Rechner jedes fertige Bild von
+            // selbst. Das ist der Unterschied zwischen "alle sechs Sekunden fragen"
+            // und "da ist es".
+            if (name == "follow")
+            {
+                _follow = !document.RootElement.TryGetProperty("on", out JsonElement on) || on.GetBoolean();
+
+                if (document.RootElement.TryGetProperty("w", out JsonElement followWidth)
+                    && followWidth.TryGetInt32(out int wanted))
+                {
+                    _followWidth = Math.Clamp(wanted, 240, 1920);
+                }
+
+                // Sofort eines schicken, damit nicht bis zum naechsten Frame ein
+                // leeres Feld dasteht.
+                if (_follow) Task.Run(() => SendPreview(_followWidth));
+
+                return;
+            }
+
+            if (name != "preview") return;
 
             // Die gewuenschte Breite. Ohne Angabe die volle - so verhaelt sich eine
             // aeltere App wie bisher.
@@ -165,9 +271,9 @@ public sealed class RemoteLink : IAsyncDisposable
             RenderJob? job = _monitor.Job;
 
             string? why = job is null
-                ? "Auf dem Rechner laeuft gerade kein Render."
+                ? "No render is running on the machine."
                 : string.IsNullOrEmpty(job.LatestFrameFile)
-                    ? "Noch kein Frame geschrieben."
+                    ? "No frame written yet."
                     : null;
 
             if (why is null)
@@ -180,7 +286,7 @@ public sealed class RemoteLink : IAsyncDisposable
                     return;
                 }
 
-                why = "Das Bild liess sich nicht lesen.";
+                why = "The image could not be read.";
             }
 
             _client.Send(Envelope.Json(
@@ -190,6 +296,29 @@ public sealed class RemoteLink : IAsyncDisposable
         {
             // Siehe oben: Diese Kette haengt an der Vorschau und darf nichts werfen.
         }
+    }
+
+    /// <summary>
+    /// Ein Frame ist auf der Platte - und das Handy will ihn sehen.
+    ///
+    /// Gedrosselt, weil ein schneller Render mehrere Bilder je Sekunde schreiben
+    /// kann und jedes ein paar hundert Kilobyte kostet. Zwei Sekunden sind fuer das
+    /// Auge fluessig genug und fuer ein Mobilnetz vertretbar.
+    /// </summary>
+    private void OnFrameWritten(string path)
+    {
+        if (!_follow) return;
+
+        var now = DateTime.UtcNow;
+
+        lock (_gate)
+        {
+            if (now - _lastFollow < TimeSpan.FromSeconds(2)) return;
+
+            _lastFollow = now;
+        }
+
+        Task.Run(() => SendPreview(_followWidth));
     }
 
     /// <summary>Woran ein echter Wechsel erkannt wird - nicht am Zahlenrauschen.</summary>
@@ -305,7 +434,10 @@ public sealed class RemoteLink : IAsyncDisposable
     public async ValueTask DisposeAsync()
     {
         _monitor.Changed -= OnChanged;
+        _monitor.FrameWritten -= OnFrameWritten;
         _client.PayloadReceived -= OnCommand;
+        _browse.Dispose();
+        _upload.Dispose();
         await _ticker.DisposeAsync();
         _gpu.Dispose();
         await _client.DisposeAsync();

@@ -84,6 +84,7 @@ public partial class SettingsWindow : Window
 
         RelayBox.Text = current.RelayHost;
         RemoteBox.IsChecked = current.RemoteEnabled;
+        LibraryBox.IsChecked = current.LibraryAccessEnabled;
 
         UpdatePairing();
 
@@ -340,6 +341,7 @@ public partial class SettingsWindow : Window
 
         settings.RelayHost = relay;
         settings.RemoteEnabled = RemoteBox.IsChecked == true;
+        settings.LibraryAccessEnabled = LibraryBox.IsChecked == true;
 
         // Ohne Relais wird der Schluessel nicht abgelegt. Er waere ein Geheimnis auf
         // der Platte, das nichts sichert.

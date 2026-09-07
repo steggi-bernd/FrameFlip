@@ -122,7 +122,7 @@
                     <TextBox x:Name="BehindBox" Grid.Row="2" Grid.Column="1" Style="{StaticResource DialogTextBox}"
                              HorizontalAlignment="Left" Width="140" Margin="0,0,0,4" />
 
-                    <Separator Grid.Row="3" Grid.ColumnSpan="2" Margin="0,8,0,14"
+                    <Separator Grid.Row="4" Grid.ColumnSpan="2" Margin="0,8,0,14"
                                Background="{StaticResource PanelBorder}" />
 
                     <TextBlock Grid.Row="4" Grid.Column="0" Text="{DynamicResource S_AdaptiveLoad}"
@@ -158,6 +158,7 @@
                         <RowDefinition Height="Auto" />
                         <RowDefinition Height="Auto" />
                         <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
                     </Grid.RowDefinitions>
 
                     <TextBlock Grid.Row="0" Grid.Column="0" Text="{DynamicResource S_RelayHost}"
@@ -178,13 +179,25 @@
                                Foreground="{StaticResource MutedBrush}" FontSize="11"
                                Text="{DynamicResource S_RemoteHint}" />
 
-                    <Separator Grid.Row="3" Grid.ColumnSpan="2" Margin="0,16,0,14"
+                    <!-- Der Dateizugriff steht bewusst hier und nicht bei den Projekten:
+                         Er gehört zur Fernsteuerung, hängt an ihr, und wer ihn sucht,
+                         sucht ihn dort, wo er das Handy eingerichtet hat. -->
+                    <StackPanel Grid.Row="3" Grid.Column="1" Margin="0,14,0,0">
+                        <CheckBox x:Name="LibraryBox" Style="{StaticResource DialogCheckBox}"
+                                  Content="{DynamicResource S_LibraryEnable}" />
+
+                        <TextBlock Margin="0,6,0,0" TextWrapping="Wrap"
+                                   Foreground="{StaticResource MutedBrush}" FontSize="11"
+                                   Text="{DynamicResource S_LibraryHint}" />
+                    </StackPanel>
+
+                    <Separator Grid.Row="4" Grid.ColumnSpan="2" Margin="0,16,0,14"
                                Background="{StaticResource PanelBorder}" />
 
-                    <TextBlock Grid.Row="4" Grid.Column="0" Text="{DynamicResource S_Pairing}"
+                    <TextBlock Grid.Row="5" Grid.Column="0" Text="{DynamicResource S_Pairing}"
                                Style="{StaticResource DialogLabel}" VerticalAlignment="Top" Margin="0,6,12,0" />
 
-                    <StackPanel Grid.Row="4" Grid.Column="1">
+                    <StackPanel Grid.Row="5" Grid.Column="1">
                         <Border Background="White" CornerRadius="{StaticResource SurfaceCorner}"
                                 Width="176" Height="176" HorizontalAlignment="Left">
                             <views:QrCodeView x:Name="PairingCode" />

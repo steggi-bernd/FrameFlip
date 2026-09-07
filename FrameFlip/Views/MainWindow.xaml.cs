@@ -4,7 +4,6 @@ using System.Windows.Media;
 using System.Windows.Threading;
 using FrameFlip.Bridge;
 using FrameFlip.Configuration;
-using FrameFlip.Configuration;
 using FrameFlip.Remote;
 
 // UseWindowsForms zieht System.Drawing implizit ein, und dort heissen diese Typen ebenso.
@@ -90,6 +89,19 @@ public partial class MainWindow : Window
         BuildNav();
         Show("live");
 
+        // Die Reiter entstehen einmal und koennen kein DynamicResource. Beim
+        // Sprachwechsel muessten sie sonst bis zum naechsten Start deutsch bleiben.
+        void Relabel()
+        {
+            NavItems.Children.Clear();
+            _navItems.Clear();
+            BuildNav();
+            Show(_page);
+        }
+
+        Localization.Strings.Changed += Relabel;
+        Closed += (_, _) => Localization.Strings.Changed -= Relabel;
+
         // Ein Takt statt vieler Ereignisse: Der Renderzustand aendert sich ohnehin
         // im Sekundentakt, und ein Fenster, das nur offen ist, waehrend jemand
         // hinsieht, darf so gemessen werden.
@@ -143,9 +155,9 @@ public partial class MainWindow : Window
     {
         foreach (var (key, label) in new[]
                  {
-                     ("live", "LIVE"),
-                     ("sequences", "SEQUENZEN"),
-                     ("settings", "EINSTELLUNGEN"),
+                     ("live", Localization.Strings.T("S_NavLive")),
+                     ("projects", Localization.Strings.T("S_NavProjects")),
+                     ("settings", Localization.Strings.T("S_NavSettings")),
                  })
         {
             var mark = new Border
@@ -204,7 +216,7 @@ public partial class MainWindow : Window
 
         Page.Content = key switch
         {
-            "sequences" => new SequencesPage(_openSequence),
+            "projects" => new ProjectsPage(_openSequence),
             "settings" => new SettingsPage(_showSettings, _remoteState, _showPairing),
             _ => new LivePage(),
         };
@@ -224,12 +236,12 @@ public partial class MainWindow : Window
 
         StatusWord.Text = job switch
         {
-            null => "LEERLAUF",
-            { IsRunning: true } => "RENDERT",
-            { Vanished: true } => "BLENDER WEG",
-            { State: JobState.Finished } => "FERTIG",
-            { State: JobState.Cancelled } => "ABGEBROCHEN",
-            _ => "GESCHEITERT",
+            null => Localization.Strings.T("S_StateIdle"),
+            { IsRunning: true } => Localization.Strings.T("S_StateRendering"),
+            { Vanished: true } => Localization.Strings.T("S_StateGone"),
+            { State: JobState.Finished } => Localization.Strings.T("S_StateFinished"),
+            { State: JobState.Cancelled } => Localization.Strings.T("S_StateCancelled"),
+            _ => Localization.Strings.T("S_StateFailed"),
         };
 
         StatusWord.Foreground = (Brush)FindResource(
@@ -252,14 +264,14 @@ public partial class MainWindow : Window
 
         var (brush, word) = state switch
         {
-            RelayState.Paired => ("AppCyan", "HANDY VERBUNDEN"),
-            RelayState.Waiting => ("AccentBrush", "WARTET AUF HANDY"),
-            RelayState.Connecting => ("MutedBrush", "VERBINDET …"),
-            _ => ("DisabledBrush", "FERNSTEUERUNG AUS"),
+            RelayState.Paired => ("AppCyan", Localization.Strings.T("S_PhoneConnected")),
+            RelayState.Waiting => ("AccentBrush", Localization.Strings.T("S_LinkWaiting")),
+            RelayState.Connecting => ("MutedBrush", Localization.Strings.T("S_Connecting")),
+            _ => ("DisabledBrush", Localization.Strings.T("S_LinkOff")),
         };
 
         LinkDot.Fill = (Brush)FindResource(brush);
         LinkText.Text = word;
-        LinkDetail.Text = state is null ? "in den Einstellungen einschalten" : string.Empty;
+        LinkDetail.Text = state is null ? Localization.Strings.T("S_LinkTurnOn") : string.Empty;
     }
 }

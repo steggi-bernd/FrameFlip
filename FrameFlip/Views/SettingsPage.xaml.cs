@@ -55,19 +55,19 @@ public partial class SettingsPage : UserControl
 
         var (brush, word, detail) = state switch
         {
-            RelayState.Paired => ("AppCyan", "Handy verbunden",
-                "Der Renderfortschritt geht gerade an das gekoppelte Gerät."),
+            RelayState.Paired => ("AppCyan", Localization.Strings.T("S_LinkPaired"),
+                Localization.Strings.T("S_LinkPairedWhy")),
 
-            RelayState.Waiting => ("AccentBrush", "Gekoppelt, Handy nicht da",
-                "Die Leitung steht. Sobald die App geöffnet wird, kommen die Werte an."),
+            RelayState.Waiting => ("AccentBrush", Localization.Strings.T("S_LinkAway"),
+                Localization.Strings.T("S_LinkAwayWhy")),
 
-            RelayState.Connecting => ("MutedBrush", "Verbindet …",
-                "Der nächste Versuch läuft."),
+            RelayState.Connecting => ("MutedBrush", Localization.Strings.T("S_LinkConnecting"),
+                Localization.Strings.T("S_LinkConnectingWhy")),
 
-            RelayState.Off => ("DisabledBrush", "Aus", "Die Fernsteuerung ist abgeschaltet."),
+            RelayState.Off => ("DisabledBrush", "Aus", Localization.Strings.T("S_LinkOffWhy")),
 
-            _ => ("DisabledBrush", "Nicht eingerichtet",
-                "Im Einstellungsdialog unter Fernsteuerung den QR-Code mit der App abfotografieren."),
+            _ => ("DisabledBrush", Localization.Strings.T("S_LinkNotSet"),
+                Localization.Strings.T("S_LinkNotSetWhy")),
         };
 
         LinkDot.Fill = (Brush)FindResource(brush);

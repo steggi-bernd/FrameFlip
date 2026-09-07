@@ -160,6 +160,8 @@
     <sys:String x:Key="S_TabRemote">Fernsteuerung</sys:String>
     <sys:String x:Key="S_RemoteEnable">Renderfortschritt ans Handy senden</sys:String>
     <sys:String x:Key="S_RemoteHint">Ohne Kopplung wird keine Verbindung aufgebaut. Der Relais-Server reicht nur Bytes weiter – lesen kann er sie nicht.</sys:String>
+    <sys:String x:Key="S_LibraryEnable">Projektordner am Handy sichtbar machen</sys:String>
+    <sys:String x:Key="S_LibraryHint">Erlaubt der gekoppelten App, in den Projektordnern zu blättern, Bilder verkleinert anzusehen und Dateien zu holen. Nur Lesen – abgelegt oder verändert wird nichts. Es gelten dieselben Ordner wie im Projektbrowser.</sys:String>
     <sys:String x:Key="S_RelayHost">Relais-Adresse</sys:String>
     <sys:String x:Key="S_RelayHostHint">Wirtsname ohne https:// – die Verbindung wird immer verschlüsselt aufgebaut.</sys:String>
     <sys:String x:Key="S_RelayHostBad">Das ist keine brauchbare Adresse.</sys:String>
@@ -192,5 +194,116 @@
     <sys:String x:Key="S_RemoteOff">Fernsteuerung aus</sys:String>
 
     <sys:String x:Key="S_TrayMain">FrameFlip öffnen</sys:String>
+
+
+    <!-- ================================================================ Projektbrowser -->
+    <sys:String x:Key="S_ProjectsTitle">PROJEKTE</sys:String>
+    <sys:String x:Key="S_ProjectsIntro">Jeder Ordner im durchsuchten Verzeichnis ist ein Projekt, samt seiner Unterordner. Was lose danebenliegt, wird nach dem Namen zusammengefasst.</sys:String>
+    <sys:String x:Key="S_ProjectsEmpty">Noch keine Projekte. Oben einen Ordner hinzufügen – oder einmal aus Blender heraus rendern: FrameFlip merkt sich dabei, welche .blend-Datei gelaufen ist. Ordner und .blend-Dateien lassen sich auch hierher ziehen.</sys:String>
+    <sys:String x:Key="S_BlenderProjects">BLENDER-PROJEKTE · {0}</sys:String>
+    <sys:String x:Key="S_RecentlyOpened">ZULETZT GEÖFFNET</sys:String>
+    <sys:String x:Key="S_VersionsTitle">FASSUNGEN</sys:String>
+    <sys:String x:Key="S_FoldersTitle">ORDNER</sys:String>
+    <sys:String x:Key="S_FramesTitle">FRAMES · {0}</sys:String>
+    <sys:String x:Key="S_MoreVersions">… und {0} weitere, überwiegend Autosicherungen aus Blenders Temp-Ordner.</sys:String>
+    <sys:String x:Key="S_MoreFrames">… und {0} weitere. Zum Ansehen ein Bild öffnen und zusammenfügen.</sys:String>
+    <sys:String x:Key="S_EmptyFolder">In diesem Ordner liegen keine Bilder und keine Unterordner. Blender legt seine Ausgaben dort ab, wo die Ausgabe im Projekt eingestellt ist – das muss nicht neben der .blend-Datei sein.</sys:String>
+    <sys:String x:Key="S_OnlyBackups">nur Sicherungen</sys:String>
+    <sys:String x:Key="S_OneVersion">eine Fassung</sys:String>
+    <sys:String x:Key="S_ManyVersions">{0} Fassungen</sys:String>
+    <sys:String x:Key="S_ManyBackups">{0} Sicherungen</sys:String>
+    <sys:String x:Key="S_ManyAutosaves">{0} Autosicherungen</sys:String>
+    <sys:String x:Key="S_OneImage">ein Bild</sys:String>
+    <sys:String x:Key="S_ManyImages">{0} Bilder</sys:String>
+    <sys:String x:Key="S_OneFolder">ein Ordner</sys:String>
+    <sys:String x:Key="S_ManyFolders">{0} Ordner</sys:String>
+    <sys:String x:Key="S_EmptyShort">leer</sys:String>
+    <sys:String x:Key="S_FramesOf">{0} Frames</sys:String>
+    <sys:String x:Key="S_MissingCount">{0} fehlen</sys:String>
+    <sys:String x:Key="S_FolderGone">Ordner nicht mehr da</sys:String>
+    <sys:String x:Key="S_BlenderFile">BLENDER-DATEI</sys:String>
+    <sys:String x:Key="S_NoBlend">keine .blend</sys:String>
+    <sys:String x:Key="S_ShowInExplorer">Im Explorer zeigen</sys:String>
+    <sys:String x:Key="S_DetachVersion">Aus diesem Projekt herauslösen</sys:String>
+    <sys:String x:Key="S_PickProjectFolder">Ordner mit Blender-Projekten</sys:String>
+    <sys:String x:Key="S_AddFolderButton">ORDNER HINZUFÜGEN</sys:String>
+    <sys:String x:Key="S_RescanButton">NEU EINLESEN</sys:String>
+    <sys:String x:Key="S_JustNow">gerade eben</sys:String>
+    <sys:String x:Key="S_MinutesAgo">vor {0} min</sys:String>
+    <sys:String x:Key="S_HoursAgo">vor {0} h</sys:String>
+    <sys:String x:Key="S_Yesterday">gestern</sys:String>
+    <sys:String x:Key="S_DaysAgo">vor {0} Tagen</sys:String>
+
+
+    <!-- ================================================================ Vorschau, Koppeln, Hauptfenster -->
+    <sys:String x:Key="S_PreviewTitle">Vorschau</sys:String>
+    <sys:String x:Key="S_CombineButton">ZUSAMMENFÜGEN</sys:String>
+    <sys:String x:Key="S_CannotShow">{0} lässt sich hier nicht anzeigen, oder die Datei wird gerade geschrieben.</sys:String>
+    <sys:String x:Key="S_OfCount">{0} von {1}</sys:String>
+    <sys:String x:Key="S_PairTitle">Koppeln</sys:String>
+    <sys:String x:Key="S_PairHeading">KOPPELN</sys:String>
+    <sys:String x:Key="S_PhoneConnected">HANDY VERBUNDEN</sys:String>
+    <sys:String x:Key="S_PairedNoPhone">GEKOPPELT · HANDY NICHT DA</sys:String>
+    <sys:String x:Key="S_Connecting">VERBINDET …</sys:String>
+    <sys:String x:Key="S_RemoteOffState">FERNSTEUERUNG AUS</sys:String>
+    <sys:String x:Key="S_NoDevice">NOCH KEIN GERÄT</sys:String>
+    <sys:String x:Key="S_CopyFailed">Ging nicht</sys:String>
+    <sys:String x:Key="S_PhoneMayTitle">WAS DAS HANDY DARF</sys:String>
+    <sys:String x:Key="S_LibraryShort">Projektordner ansehen und Dateien holen</sys:String>
+    <sys:String x:Key="S_NoWebYet">Eine Weboberfläche mit demselben Inhalt wie die App gibt es noch nicht. Der Link oben ist der Kopplungscode selbst – ihn versteht bisher nur die Android-App.</sys:String>
+    <sys:String x:Key="S_NavLive">LIVE</sys:String>
+    <sys:String x:Key="S_NavProjects">PROJEKTE</sys:String>
+    <sys:String x:Key="S_NavSettings">EINSTELLUNGEN</sys:String>
+    <sys:String x:Key="S_StateIdle">LEERLAUF</sys:String>
+    <sys:String x:Key="S_StateRendering">RENDERT</sys:String>
+    <sys:String x:Key="S_StateGone">BLENDER WEG</sys:String>
+    <sys:String x:Key="S_StateFinished">FERTIG</sys:String>
+    <sys:String x:Key="S_StateCancelled">ABGEBROCHEN</sys:String>
+    <sys:String x:Key="S_StateFailed">GESCHEITERT</sys:String>
+    <sys:String x:Key="S_LinkWaiting">WARTET AUF HANDY</sys:String>
+    <sys:String x:Key="S_LinkOff">FERNSTEUERUNG AUS</sys:String>
+    <sys:String x:Key="S_LinkTurnOn">in den Einstellungen einschalten</sys:String>
+    <sys:String x:Key="S_LabelAutosaveOf">Autosicherung zu v{0}</sys:String>
+    <sys:String x:Key="S_LabelAutosave">Autosicherung</sys:String>
+    <sys:String x:Key="S_LabelBackupOf">Sicherung {0} zu v{1}</sys:String>
+    <sys:String x:Key="S_LabelBackup">Sicherung {0}</sys:String>
+    <sys:String x:Key="S_LabelVersion">v{0}</sys:String>
+    <sys:String x:Key="S_LabelNoNumber">ohne Nummer</sys:String>
+
+
+    <!-- ================================================================ Einstellungsseite -->
+    <sys:String x:Key="S_SettingsHeading">EINSTELLUNGEN</sys:String>
+    <sys:String x:Key="S_SettingsIntro">Hotkey, Sprache, Puffer und Fernsteuerung stehen im Einstellungsdialog. Er ist derselbe wie aus dem Tray-Menü – hier steht nur, was ohne ihn nicht zu sehen wäre.</sys:String>
+    <sys:String x:Key="S_RemoteHeading">FERNSTEUERUNG</sys:String>
+    <sys:String x:Key="S_OpenDialog">Einstellungsdialog öffnen</sys:String>
+    <sys:String x:Key="S_ShowConfigFolder">Konfigurationsordner zeigen</sys:String>
+    <sys:String x:Key="S_LinkPaired">Handy verbunden</sys:String>
+    <sys:String x:Key="S_LinkAway">Gekoppelt, Handy nicht da</sys:String>
+    <sys:String x:Key="S_LinkConnecting">Verbindet …</sys:String>
+    <sys:String x:Key="S_LinkNotSet">Nicht eingerichtet</sys:String>
+    <sys:String x:Key="S_LinkPairedWhy">Der Renderfortschritt geht gerade an das gekoppelte Gerät.</sys:String>
+    <sys:String x:Key="S_LinkAwayWhy">Die Leitung steht. Sobald die App geöffnet wird, kommen die Werte an.</sys:String>
+    <sys:String x:Key="S_LinkConnectingWhy">Der nächste Versuch läuft.</sys:String>
+    <sys:String x:Key="S_LinkOffWhy">Die Fernsteuerung ist abgeschaltet.</sys:String>
+    <sys:String x:Key="S_LinkNotSetWhy">Im Einstellungsdialog unter Fernsteuerung den QR-Code mit der App abfotografieren.</sys:String>
+
+
+    <!-- ================================================================ Render aus der Ferne -->
+    <sys:String x:Key="S_RenderEnable">Renders auf diesem Rechner starten</sys:String>
+    <sys:String x:Key="S_RenderHint">Die App darf dann eine freigegebene .blend-Datei rendern lassen. Geschrieben wird nur in einen Ordner, den FrameFlip dafür neu anlegt – nichts wird überschrieben. Ein Render startet ein Programm auf diesem Rechner; deshalb steht das hier getrennt.</sys:String>
+    <sys:String x:Key="S_BlenderLabel">Blender</sys:String>
+    <sys:String x:Key="S_AddBlender">Andere Fassung …</sys:String>
+    <sys:String x:Key="S_PickBlender">blender.exe auswählen</sys:String>
+    <sys:String x:Key="S_NoBlender">Keine Fassung gefunden</sys:String>
+    <sys:String x:Key="S_Programs">Programme</sys:String>
+
+
+    <!-- ================================================================ Dateien annehmen -->
+    <sys:String x:Key="S_PushEnable">Dateien vom Handy annehmen</sys:String>
+    <sys:String x:Key="S_PushHint">Die App darf .blend-Dateien ablegen – in den Austauschordner unten oder in einen freigegebenen Projektordner. Jede angenommene Datei bekommt „_exchanged“ in den Namen: Man sieht sofort, welche von außen kam, und eine vorhandene wird nie überschrieben.</sys:String>
+    <sys:String x:Key="S_ExchangeFolder">Austauschordner</sys:String>
+    <sys:String x:Key="S_PickExchange">Ordner für den Austausch wählen</sys:String>
+    <sys:String x:Key="S_NoFolderSet">kein Ordner gewählt</sys:String>
+    <sys:String x:Key="S_ChooseFolder">Wählen …</sys:String>
 
 </ResourceDictionary>

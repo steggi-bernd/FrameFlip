@@ -160,6 +160,8 @@
     <sys:String x:Key="S_TabRemote">Remote</sys:String>
     <sys:String x:Key="S_RemoteEnable">Send render progress to the phone</sys:String>
     <sys:String x:Key="S_RemoteHint">Nothing connects until a phone is paired. The relay only forwards bytes — it cannot read them.</sys:String>
+    <sys:String x:Key="S_LibraryEnable">Let the phone see the project folders</sys:String>
+    <sys:String x:Key="S_LibraryHint">Lets the paired app browse the project folders, view images downscaled and fetch files. Reading only — nothing is written or changed. The folders are the same ones the project browser uses.</sys:String>
     <sys:String x:Key="S_RelayHost">Relay address</sys:String>
     <sys:String x:Key="S_RelayHostHint">Host name without https:// — the connection is always encrypted.</sys:String>
     <sys:String x:Key="S_RelayHostBad">That is not a usable address.</sys:String>
@@ -192,5 +194,116 @@
     <sys:String x:Key="S_RemoteOff">Remote is off</sys:String>
 
     <sys:String x:Key="S_TrayMain">Open FrameFlip</sys:String>
+
+
+    <!-- ================================================================ Projektbrowser -->
+    <sys:String x:Key="S_ProjectsTitle">PROJECTS</sys:String>
+    <sys:String x:Key="S_ProjectsIntro">Every folder inside a scanned directory is a project, including its subfolders. Anything lying loose beside them is grouped by name.</sys:String>
+    <sys:String x:Key="S_ProjectsEmpty">No projects yet. Add a folder above – or render once from Blender: FrameFlip remembers which .blend file ran. Folders and .blend files can also be dropped here.</sys:String>
+    <sys:String x:Key="S_BlenderProjects">BLENDER PROJECTS · {0}</sys:String>
+    <sys:String x:Key="S_RecentlyOpened">RECENTLY OPENED</sys:String>
+    <sys:String x:Key="S_VersionsTitle">VERSIONS</sys:String>
+    <sys:String x:Key="S_FoldersTitle">FOLDERS</sys:String>
+    <sys:String x:Key="S_FramesTitle">FRAMES · {0}</sys:String>
+    <sys:String x:Key="S_MoreVersions">… and {0} more, mostly auto-saves from Blender's temp folder.</sys:String>
+    <sys:String x:Key="S_MoreFrames">… and {0} more. Open one image and combine to watch them.</sys:String>
+    <sys:String x:Key="S_EmptyFolder">This folder holds no images and no subfolders. Blender writes its output wherever the project says – that need not be next to the .blend file.</sys:String>
+    <sys:String x:Key="S_OnlyBackups">backups only</sys:String>
+    <sys:String x:Key="S_OneVersion">one version</sys:String>
+    <sys:String x:Key="S_ManyVersions">{0} versions</sys:String>
+    <sys:String x:Key="S_ManyBackups">{0} backups</sys:String>
+    <sys:String x:Key="S_ManyAutosaves">{0} auto-saves</sys:String>
+    <sys:String x:Key="S_OneImage">one image</sys:String>
+    <sys:String x:Key="S_ManyImages">{0} images</sys:String>
+    <sys:String x:Key="S_OneFolder">one folder</sys:String>
+    <sys:String x:Key="S_ManyFolders">{0} folders</sys:String>
+    <sys:String x:Key="S_EmptyShort">empty</sys:String>
+    <sys:String x:Key="S_FramesOf">{0} frames</sys:String>
+    <sys:String x:Key="S_MissingCount">{0} missing</sys:String>
+    <sys:String x:Key="S_FolderGone">folder is gone</sys:String>
+    <sys:String x:Key="S_BlenderFile">BLENDER FILE</sys:String>
+    <sys:String x:Key="S_NoBlend">no .blend</sys:String>
+    <sys:String x:Key="S_ShowInExplorer">Show in Explorer</sys:String>
+    <sys:String x:Key="S_DetachVersion">Detach from this project</sys:String>
+    <sys:String x:Key="S_PickProjectFolder">Folder with Blender projects</sys:String>
+    <sys:String x:Key="S_AddFolderButton">ADD FOLDER</sys:String>
+    <sys:String x:Key="S_RescanButton">RESCAN</sys:String>
+    <sys:String x:Key="S_JustNow">just now</sys:String>
+    <sys:String x:Key="S_MinutesAgo">{0} min ago</sys:String>
+    <sys:String x:Key="S_HoursAgo">{0} h ago</sys:String>
+    <sys:String x:Key="S_Yesterday">yesterday</sys:String>
+    <sys:String x:Key="S_DaysAgo">{0} days ago</sys:String>
+
+
+    <!-- ================================================================ Vorschau, Koppeln, Hauptfenster -->
+    <sys:String x:Key="S_PreviewTitle">Preview</sys:String>
+    <sys:String x:Key="S_CombineButton">COMBINE</sys:String>
+    <sys:String x:Key="S_CannotShow">{0} cannot be shown here, or the file is being written right now.</sys:String>
+    <sys:String x:Key="S_OfCount">{0} of {1}</sys:String>
+    <sys:String x:Key="S_PairTitle">Pair</sys:String>
+    <sys:String x:Key="S_PairHeading">PAIR</sys:String>
+    <sys:String x:Key="S_PhoneConnected">PHONE CONNECTED</sys:String>
+    <sys:String x:Key="S_PairedNoPhone">PAIRED · PHONE AWAY</sys:String>
+    <sys:String x:Key="S_Connecting">CONNECTING …</sys:String>
+    <sys:String x:Key="S_RemoteOffState">REMOTE OFF</sys:String>
+    <sys:String x:Key="S_NoDevice">NO DEVICE YET</sys:String>
+    <sys:String x:Key="S_CopyFailed">Failed</sys:String>
+    <sys:String x:Key="S_PhoneMayTitle">WHAT THE PHONE MAY DO</sys:String>
+    <sys:String x:Key="S_LibraryShort">Browse project folders and fetch files</sys:String>
+    <sys:String x:Key="S_NoWebYet">A web interface with the same content as the app does not exist yet. The link above is the pairing code itself – only the Android app understands it so far.</sys:String>
+    <sys:String x:Key="S_NavLive">LIVE</sys:String>
+    <sys:String x:Key="S_NavProjects">PROJECTS</sys:String>
+    <sys:String x:Key="S_NavSettings">SETTINGS</sys:String>
+    <sys:String x:Key="S_StateIdle">IDLE</sys:String>
+    <sys:String x:Key="S_StateRendering">RENDERING</sys:String>
+    <sys:String x:Key="S_StateGone">BLENDER GONE</sys:String>
+    <sys:String x:Key="S_StateFinished">DONE</sys:String>
+    <sys:String x:Key="S_StateCancelled">CANCELLED</sys:String>
+    <sys:String x:Key="S_StateFailed">FAILED</sys:String>
+    <sys:String x:Key="S_LinkWaiting">WAITING FOR PHONE</sys:String>
+    <sys:String x:Key="S_LinkOff">REMOTE OFF</sys:String>
+    <sys:String x:Key="S_LinkTurnOn">switch it on in the settings</sys:String>
+    <sys:String x:Key="S_LabelAutosaveOf">Auto-save of v{0}</sys:String>
+    <sys:String x:Key="S_LabelAutosave">Auto-save</sys:String>
+    <sys:String x:Key="S_LabelBackupOf">Backup {0} of v{1}</sys:String>
+    <sys:String x:Key="S_LabelBackup">Backup {0}</sys:String>
+    <sys:String x:Key="S_LabelVersion">v{0}</sys:String>
+    <sys:String x:Key="S_LabelNoNumber">no number</sys:String>
+
+
+    <!-- ================================================================ Einstellungsseite -->
+    <sys:String x:Key="S_SettingsHeading">SETTINGS</sys:String>
+    <sys:String x:Key="S_SettingsIntro">Hotkey, language, buffers and remote control live in the settings dialog. It is the same one as from the tray menu – here stands only what it cannot show.</sys:String>
+    <sys:String x:Key="S_RemoteHeading">REMOTE CONTROL</sys:String>
+    <sys:String x:Key="S_OpenDialog">Open settings dialog</sys:String>
+    <sys:String x:Key="S_ShowConfigFolder">Show configuration folder</sys:String>
+    <sys:String x:Key="S_LinkPaired">Phone connected</sys:String>
+    <sys:String x:Key="S_LinkAway">Paired, phone away</sys:String>
+    <sys:String x:Key="S_LinkConnecting">Connecting …</sys:String>
+    <sys:String x:Key="S_LinkNotSet">Not set up</sys:String>
+    <sys:String x:Key="S_LinkPairedWhy">Render progress is going to the paired device right now.</sys:String>
+    <sys:String x:Key="S_LinkAwayWhy">The line is up. As soon as the app is opened, the numbers arrive.</sys:String>
+    <sys:String x:Key="S_LinkConnectingWhy">The next attempt is running.</sys:String>
+    <sys:String x:Key="S_LinkOffWhy">Remote control is switched off.</sys:String>
+    <sys:String x:Key="S_LinkNotSetWhy">In the settings dialog under Remote control, scan the QR code with the app.</sys:String>
+
+
+    <!-- ================================================================ Render aus der Ferne -->
+    <sys:String x:Key="S_RenderEnable">Start renders on this machine</sys:String>
+    <sys:String x:Key="S_RenderHint">The app may then have a shared .blend file rendered. Output goes only into a folder FrameFlip creates for it – nothing is overwritten. A render starts a program on this machine; that is why this stands apart.</sys:String>
+    <sys:String x:Key="S_BlenderLabel">Blender</sys:String>
+    <sys:String x:Key="S_AddBlender">Other version …</sys:String>
+    <sys:String x:Key="S_PickBlender">Choose blender.exe</sys:String>
+    <sys:String x:Key="S_NoBlender">No version found</sys:String>
+    <sys:String x:Key="S_Programs">Programs</sys:String>
+
+
+    <!-- ================================================================ Dateien annehmen -->
+    <sys:String x:Key="S_PushEnable">Accept files from the phone</sys:String>
+    <sys:String x:Key="S_PushHint">The app may store .blend files – in the exchange folder below or in a shared project folder. Every accepted file gets “_exchanged” in its name: you see at once which one came from outside, and an existing file is never overwritten.</sys:String>
+    <sys:String x:Key="S_ExchangeFolder">Exchange folder</sys:String>
+    <sys:String x:Key="S_PickExchange">Choose the exchange folder</sys:String>
+    <sys:String x:Key="S_NoFolderSet">no folder chosen</sys:String>
+    <sys:String x:Key="S_ChooseFolder">Choose …</sys:String>
 
 </ResourceDictionary>

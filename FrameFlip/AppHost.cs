@@ -118,36 +118,36 @@ public sealed class AppHost : IDisposable
         _trayIcon.DoubleClick += (_, _) => ShowMain();
     }
 
-    /// <summary>Zur Laufzeit gezeichnet - so bleibt das Projekt ohne Binaerassets.</summary>
-    private static Drawing.Icon BuildIcon(out IntPtr handle)
+    /// <summary>
+    /// Das Symbol fuer den Infobereich.
+    ///
+    /// Aus der mitgelieferten .ico und nicht zur Laufzeit gezeichnet: Dort stehen
+    /// mehrere Groessen nebeneinander, und die kleinen sind eigens dafuer gezeichnet
+    /// worden. Windows sucht sich die passende heraus - bei 200 Prozent Skalierung
+    /// ist das nicht die 16er.
+    ///
+    /// Faellt das Laden aus, bleibt das Programm ohne Symbol im Tray sichtbar. Ein
+    /// fehlendes Bildchen ist kein Grund, den Start abzubrechen.
+    /// </summary>
+    private static Drawing.Icon? BuildIcon(out IntPtr handle)
     {
-        using var bitmap = new Drawing.Bitmap(32, 32);
-        using (var g = Drawing.Graphics.FromImage(bitmap))
+        handle = IntPtr.Zero;
+
+        try
         {
-            g.SmoothingMode = Drawing.Drawing2D.SmoothingMode.AntiAlias;
-            g.Clear(Drawing.Color.Transparent);
+            var uri = new Uri("pack://application:,,,/FrameFlip;component/Assets/FrameFlip.ico");
+            using var stream = System.Windows.Application.GetResourceStream(uri)?.Stream;
 
-            using var body = new Drawing.SolidBrush(Drawing.Color.FromArgb(255, 28, 28, 28));
-            g.FillRectangle(body, 2, 5, 28, 22);
+            if (stream is null) return null;
 
-            using var perforation = new Drawing.SolidBrush(Drawing.Color.FromArgb(255, 150, 150, 150));
-            for (int y = 8; y <= 22; y += 7)
-            {
-                g.FillRectangle(perforation, 4, y, 3, 3);
-                g.FillRectangle(perforation, 25, y, 3, 3);
-            }
+            int wanted = WinForms.SystemInformation.SmallIconSize.Width;
 
-            using var play = new Drawing.SolidBrush(Drawing.Color.FromArgb(255, 224, 138, 60));
-            g.FillPolygon(play, new[]
-            {
-                new Drawing.Point(13, 10),
-                new Drawing.Point(23, 16),
-                new Drawing.Point(13, 22)
-            });
+            return new Drawing.Icon(stream, new Drawing.Size(wanted, wanted));
         }
-
-        handle = bitmap.GetHicon();
-        return Drawing.Icon.FromHandle(handle);
+        catch (Exception)
+        {
+            return null;
+        }
     }
 
     private void UpdateTooltip()
@@ -565,7 +565,11 @@ public sealed class AppHost : IDisposable
         {
             var invite = new Remote.PairingInvite(key!, _settings.RelayHost);
 
-            _remote = new Remote.RemoteLink(invite, _renderMonitor, () => _loadMonitor?.LastSnapshot);
+            // Die Einstellungen als Funktion, nicht als Kopie: Der Dateizugriff wird
+            // im Dialog umgeschaltet, und die Leitung soll das sofort merken statt
+            // erst beim naechsten Verbindungsaufbau.
+            _remote = new Remote.RemoteLink(invite, _renderMonitor, () => _loadMonitor?.LastSnapshot,
+                                            () => _settings);
             _remote.Start();
 
             // Erst jetzt, denn sie haengt daran, ob die Fernsteuerung steht.

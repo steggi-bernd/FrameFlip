@@ -20,6 +20,17 @@ public partial class App : Application
     {
         base.OnStartup(e);
 
+        // Jedes Fenster bekommt die dunkle Titelleiste, ohne dass es jemand einzeln
+        // eintragen muss - vergessen wuerde man genau das eine, das man selten oeffnet.
+        EventManager.RegisterClassHandler(typeof(Window), FrameworkElement.LoadedEvent,
+                                          new RoutedEventHandler((sender, _) =>
+                                          {
+                                              if (sender is not Window window) return;
+
+                                              Views.DarkTitleBar.Apply(window);
+                                              Views.WindowIcon.Apply(window);
+                                          }));
+
         // Mit eigenem Konfigurationspfad darf eine Testinstanz neben der normalen laufen.
         string mutexName = FrameFlip.Configuration.SettingsStore.Override is { Length: > 0 }
             ? @"Local\FrameFlip.SingleInstance.Test"

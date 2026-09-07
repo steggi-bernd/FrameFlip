@@ -73,7 +73,7 @@
             </Grid.RowDefinitions>
 
             <!-- Der Haarstrich mit dem Fortschritt, wie in der App. -->
-            <Border Grid.Row="0" Height="3" Background="{StaticResource TrackBrush}">
+            <Border Grid.Row="0" Height="3" Background="{StaticResource AppSurface}">
                 <Border x:Name="Hairline" HorizontalAlignment="Left" Width="0"
                         Background="{StaticResource AccentBrush}" />
             </Border>
