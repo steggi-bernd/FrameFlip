@@ -1,0 +1,22 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: windows-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 8.0.x
+      - run: dotnet restore FrameFlip.Tests/FrameFlip.Tests.csproj
+      - run: dotnet build FrameFlip.Tests/FrameFlip.Tests.csproj --configuration Release --no-restore
+      - run: dotnet run --project FrameFlip.Tests/FrameFlip.Tests.csproj --configuration Release --no-build
