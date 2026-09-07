@@ -168,6 +168,75 @@ public sealed class AppSettings
     public string PairingSecret { get; set; } = string.Empty;
 
     /// <summary>
+    /// Dem Handy erlauben, .blend-Dateien aus dem Austauschordner zu holen.
+    ///
+    /// Aus, und zwar nicht nur als Voreinstellung: Solange das hier aus ist, kennt
+    /// die Gegenseite den Ordner nicht einmal. Bis hierher konnte das Handy nur
+    /// zusehen - Zahlen und ein Vorschaubild. Dateien sind der Punkt, an dem ein
+    /// verlorenes Handy mehr waere als ein Mithoerer, deshalb muss das jemand hier
+    /// von Hand einschalten.
+    /// </summary>
+    public bool FileAccessEnabled { get; set; }
+
+    /// <summary>
+    /// Zusaetzlich erlauben, Dateien ABZULEGEN.
+    ///
+    /// Getrennt vom Holen, weil es etwas anderes ist: Lesen kostet eine Kopie,
+    /// Schreiben legt etwas auf dieser Platte an. Ueberschrieben wird trotzdem nie -
+    /// siehe <see cref="Remote.FileVault"/>.
+    /// </summary>
+    public bool FilePushEnabled { get; set; }
+
+    /// <summary>
+    /// Dem Handy erlauben, in den Projektordnern zu blaettern und Bilder anzusehen.
+    ///
+    /// Etwas anderes als der Austauschordner und deshalb ein eigener Schalter: Hier
+    /// geht es um alles, was im Projektbrowser steht - jeden Unterordner, jeden
+    /// gerenderten Frame. Dafuer ist es ausdruecklich NUR Lesen. Wer unterwegs einen
+    /// Frame ansehen will, muss dafuer nichts ablegen duerfen.
+    /// </summary>
+    public bool LibraryAccessEnabled { get; set; }
+
+    /// <summary>
+    /// Dem Handy erlauben, hier einen Render zu starten.
+    ///
+    /// Die weitreichendste der Erlaubnisse, und deshalb die letzte: Bis hierher
+    /// konnte die Gegenseite lesen. Ein Render startet ein Programm auf diesem
+    /// Rechner. Er tut das nur mit einer .blend-Datei, die ohnehin schon freigegeben
+    /// ist, und schreibt nur in einen Ordner, den FrameFlip selbst dafuer anlegt -
+    /// aber ein gestartetes Programm bleibt ein gestartetes Programm.
+    /// </summary>
+    public bool HeadlessRenderEnabled { get; set; }
+
+    /// <summary>
+    /// Weitere Blender-Fassungen, die von Hand eingetragen wurden.
+    ///
+    /// FrameFlip findet die ueblichen Orte von selbst - Steam, den
+    /// Installationsordner, die Dateiverknuepfung, den Suchpfad. Ein entpacktes
+    /// Blender auf einer Datenplatte findet es nicht, und genau dafuer ist das hier:
+    /// Was hier steht, erscheint in der Auswahl wie jedes andere.
+    /// </summary>
+    public List<string> ExtraBlenders { get; set; } = new();
+
+    /// <summary>
+    /// Wo blender.exe liegt. Leer heisst: kein Render aus der Ferne.
+    ///
+    /// Ausdruecklich eingetragen und nicht gesucht: Auf einem Rechner mit vier
+    /// Blender-Fassungen ist die Frage, WELCHE rechnet, keine, die ein Programm fuer
+    /// jemanden entscheiden sollte.
+    /// </summary>
+    public string BlenderPath { get; set; } = string.Empty;
+
+    /// <summary>
+    /// Der EINE Ordner, in dem das stattfindet. Leer heisst: nichts geht.
+    ///
+    /// Kein Suchpfad, keine Liste, keine Unterordner - ein Ordner. Was sich nicht
+    /// aufzaehlen laesst, laesst sich auch nicht ueberblicken, und ein Zugriff, den
+    /// man nicht ueberblickt, ist keiner, den man erlauben will.
+    /// </summary>
+    public string FileFolder { get; set; } = string.Empty;
+
+    /// <summary>
     /// Wo das Hauptfenster zuletzt stand. NaN heisst "noch nie" - dann wird
     /// zentriert.
     ///
@@ -221,6 +290,31 @@ public sealed class AppSettings
         // Eingeschaltet ohne Schluessel waere ein Zustand, den die Oberflaeche
         // anzeigt und der nichts tut. Lieber ehrlich aus.
         if (PairingSecret.Length == 0) RemoteEnabled = false;
+
+        // Dasselbe fuer den Dateizugriff, nur strenger: Ohne Ordner gibt es nichts
+        // zuzugreifen, ohne Fernsteuerung niemanden, der zugreift, und Ablegen ohne
+        // Holen waere ein blinder Briefkasten. Jede dieser Ecken einzeln zu pruefen
+        // hiesse, sich an jeder Stelle daran zu erinnern.
+        FileFolder = FileFolder?.Trim() ?? string.Empty;
+
+        if (FileFolder.Length == 0 || !RemoteEnabled) FileAccessEnabled = false;
+        if (!FileAccessEnabled) FilePushEnabled = false;
+
+        // Die Bibliothek haengt nicht am Austauschordner - aber ohne Fernsteuerung
+        // ist auch sie sinnlos.
+        if (!RemoteEnabled) LibraryAccessEnabled = false;
+
+        // Und der Render aus der Ferne braucht beides: jemanden, der ihn ausloest,
+        // und ein Blender, das rechnet.
+        BlenderPath = BlenderPath?.Trim() ?? string.Empty;
+
+        ExtraBlenders = (ExtraBlenders ?? new List<string>())
+                        .Select(path => path?.Trim() ?? string.Empty)
+                        .Where(path => path.Length > 0)
+                        .Distinct(StringComparer.OrdinalIgnoreCase)
+                        .ToList();
+
+        if (!RemoteEnabled || BlenderPath.Length == 0) HeadlessRenderEnabled = false;
     }
 
     /// <summary>Abgeleitet - gehoert nicht in die Konfigurationsdatei.</summary>
