@@ -58,7 +58,10 @@ public static class BlenderInvocation
     public static List<string> Arguments(string blendFile, string pattern, RenderOptions options)
     {
         var settings = options.Normalized();
-        var args = new List<string> { "-b", blendFile };
+        // Eine .blend aus dem Austauschordner ist Eingabe von aussen. Sie darf
+        // Einstellungen tragen, aber beim Laden kein eingebettetes Python oder
+        // registrierte Auto-Run-Skripte ausfuehren.
+        var args = new List<string> { "--disable-autoexec", "-b", blendFile };
 
         // Die Szene muss vor allem anderen stehen, sonst richtet sich der Rest nach
         // der falschen.

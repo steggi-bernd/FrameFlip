@@ -145,12 +145,17 @@ public sealed class LibraryVault
 
         if (use == FileUse.None) return null;
 
+        string? boundary = BoundaryFor(full, includeBoundary: false);
+
+        if (boundary is null) return null;
+
         try
         {
             var info = new FileInfo(full);
 
             if (!info.Exists) return null;
             if (info.Attributes.HasFlag(FileAttributes.ReparsePoint)) return null;
+            if (HasReparsePoint(boundary, full, includeLeaf: false)) return null;
 
             return full;
         }
@@ -170,11 +175,9 @@ public sealed class LibraryVault
         if (full.Length == 0) return null;
 
         // Ein Wurzelordner selbst ist erlaubt - sonst kaeme man nie hinein.
-        bool allowed = _roots.Concat(_outputs)
-                             .Any(root => string.Equals(root, full, StringComparison.OrdinalIgnoreCase)
-                                          || Inside(root, full));
+        string? boundary = BoundaryFor(full, includeBoundary: true);
 
-        if (!allowed) return null;
+        if (boundary is null) return null;
 
         try
         {
@@ -182,6 +185,7 @@ public sealed class LibraryVault
 
             if (!info.Exists) return null;
             if (info.Attributes.HasFlag(FileAttributes.ReparsePoint)) return null;
+            if (HasReparsePoint(boundary, full, includeLeaf: true)) return null;
 
             return full;
         }
@@ -205,6 +209,41 @@ public sealed class LibraryVault
         char next = full[root.Length];
 
         return next == Path.DirectorySeparatorChar || next == Path.AltDirectorySeparatorChar;
+    }
+
+    // Liefert die freigegebene Grenze, unter der full liegt. Sie ist zugleich der
+    // Punkt, bis zu dem auf Reparse Points geprueft wird: Eine Verknuepfung auf dem
+    // Weg darf nicht aus einer freigegebenen Bibliothek auf einen beliebigen Ort der
+    // Platte hinausspringen.
+    private string? BoundaryFor(string full, bool includeBoundary)
+        => _roots.Concat(_outputs).FirstOrDefault(root =>
+            (includeBoundary && string.Equals(root, full, StringComparison.OrdinalIgnoreCase))
+            || Inside(root, full));
+
+    private static bool HasReparsePoint(string boundary, string full, bool includeLeaf)
+    {
+        string? current = includeLeaf ? full : Path.GetDirectoryName(full);
+
+        while (!string.IsNullOrEmpty(current))
+        {
+            try
+            {
+                var info = new DirectoryInfo(current);
+
+                if (!info.Exists || info.Attributes.HasFlag(FileAttributes.ReparsePoint)) return true;
+
+                if (string.Equals(current, boundary, StringComparison.OrdinalIgnoreCase)) return false;
+
+                current = info.Parent?.FullName;
+            }
+            catch (Exception)
+            {
+                return true;
+            }
+        }
+
+        // Die Schleife darf die freigegebene Grenze nie nach oben verlassen.
+        return true;
     }
 
     private static string Full(string path)

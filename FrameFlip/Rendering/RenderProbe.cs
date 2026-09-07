@@ -61,7 +61,7 @@ public static class RenderProbe
 
     /// <summary>Die Argumente, mit denen Blender nur nachschaut und nichts rendert.</summary>
     public static List<string> Arguments(string blendFile)
-        => new() { "-b", blendFile, "--factory-startup", "--python-expr", Script };
+        => new() { "--disable-autoexec", "-b", blendFile, "--factory-startup", "--python-expr", Script };
 
     /// <summary>
     /// Die Antwort aus Blenders Ausgabe herauslesen.

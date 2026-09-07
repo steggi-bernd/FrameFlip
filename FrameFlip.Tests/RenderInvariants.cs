@@ -106,8 +106,9 @@ public static class RenderInvariants
         var args = BlenderInvocation.Arguments(@"F:\P\TRACER\tracer.blend", @"F:\P\TRACER\render\tracer_001\frame_",
                                               options);
 
-        Check.That(args[0] == "-b", "der Hintergrundlauf steht vorn", args[0]);
-        Check.That(args[1] == @"F:\P\TRACER\tracer.blend", "dann die Datei", args[1]);
+        Check.That(args[0] == "--disable-autoexec", "Auto-Run-Skripte bleiben beim Laden aus", args[0]);
+        Check.That(args[1] == "-b", "der Hintergrundlauf folgt darauf", args[1]);
+        Check.That(args[2] == @"F:\P\TRACER\tracer.blend", "dann die Datei", args[2]);
 
         // Der Fallstrick, um den es geht.
         Check.That(args[^1] == "-a", "der Start steht ganz am Ende", args[^1]);
@@ -399,6 +400,9 @@ public static class RenderInvariants
 
         Check.That(RenderProbe.Arguments(@"F:.blend").Contains("-b"), "gefragt wird ohne Fenster");
         Check.That(!RenderProbe.Arguments(@"F:.blend").Contains("-f"), "und ohne zu rendern");
+
+        Check.That(RenderProbe.Arguments("scene.blend").Contains("--disable-autoexec"),
+                   "auch das Nachsehen laedt ohne Auto-Run-Skripte");
 
         foreach (string field in new[] { "resolution_x", "file_format", "samples", "use_denoising", "scenes" })
             Check.That(RenderProbe.Script.Contains(field), $"das Skript fragt nach {field}");

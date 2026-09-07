@@ -131,6 +131,36 @@ public static class UploadInvariants
             Check.That(File.ReadAllBytes(Path.Combine(root, "neu_exchanged.blend")).SequenceEqual(payload),
                        "Byte fuer Byte dasselbe");
 
+            Check.Group("Ablegen - die Ankuendigung gilt exakt");
+
+            // Ein vorzeitiges Schlussstueck darf nie als fertige Datei landen. Die
+            // alte Toleranz von einem ganzen Chunk haette genau das zugelassen.
+            answers.Clear();
+            Ask(service, """{"c":"put","n":"kurz.blend","s":10}""");
+            int shortId = answers[^1].GetProperty("id").GetInt32();
+
+            answers.Clear();
+            service.OnChunk(shortId, 0, true, new byte[9]);
+
+            Check.That(answers.Count == 1 && !answers[^1].GetProperty("ok").GetBoolean(),
+                       "ein zu kurzes Schlussstueck wird abgelehnt");
+            Check.That(!File.Exists(Path.Combine(root, "kurz_exchanged.blend.teil")),
+                       "die kurze Teildatei wird entfernt");
+            Check.That(!File.Exists(Path.Combine(root, "kurz_exchanged.blend")),
+                       "und nie als fertige .blend sichtbar");
+
+            answers.Clear();
+            Ask(service, """{"c":"put","n":"gross.blend","s":10}""");
+            int largeId = answers[^1].GetProperty("id").GetInt32();
+
+            answers.Clear();
+            service.OnChunk(largeId, 0, true, new byte[11]);
+
+            Check.That(answers.Count == 1 && !answers[^1].GetProperty("ok").GetBoolean(),
+                       "mehr Daten als angekuendigt werden vor dem Schreiben abgelehnt");
+            Check.That(!File.Exists(Path.Combine(root, "gross_exchanged.blend")),
+                       "auch die zu grosse Datei landet nicht im Zielordner");
+
             Check.Group("Ablegen - ein Abbruch hinterlaesst nichts");
 
             answers.Clear();
