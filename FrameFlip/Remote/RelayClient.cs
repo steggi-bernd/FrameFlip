@@ -159,15 +159,14 @@ public sealed class RelayClient : IAsyncDisposable
 
         SetState(RelayState.Waiting);
 
-        // Der Handschlag steht offen im Raum; das Salz ist kein Geheimnis. Erst wenn
-        // beide da sind, entsteht daraus ein Schluessel.
-        byte[] hello = SecureChannel.Hello(out byte[] ourSalt);
-
         using var linked = CancellationTokenSource.CreateLinkedTokenSource(token);
 
         try
         {
             SecureChannel? channel = null;
+            byte[]? ourSalt = null;
+            byte[]? theirSalt = null;
+            bool confirmed = false;
             var pump = Task.CompletedTask;
 
             await foreach (var (kind, data) in ReadAsync(socket, linked.Token))
@@ -188,13 +187,18 @@ public sealed class RelayClient : IAsyncDisposable
                             // gegen ein Handy gerichtet, das nicht mehr dran ist.
                             channel?.Dispose();
                             channel = null;
-
+                            confirmed = false;
+                            theirSalt = null;
+                            byte[] hello = SecureChannel.Hello(out ourSalt);
                             await SendFrameAsync(socket, hello, linked.Token);
                             break;
 
                         case RelayMessage.PeerDown:
                             channel?.Dispose();
                             channel = null;
+                            confirmed = false;
+                            ourSalt = null;
+                            theirSalt = null;
                             SetState(RelayState.Waiting);
                             break;
 
@@ -210,13 +214,26 @@ public sealed class RelayClient : IAsyncDisposable
                     // Das erste Binaerpaket nach einem peer:true ist die Begruessung
                     // der Gegenseite. Alles andere an dieser Stelle ist Unsinn oder
                     // ein Fremder im Raum - beides wird verworfen.
-                    if (!SecureChannel.TryReadHello(data, out byte[]? theirSalt)) continue;
+                    if (ourSalt is null || !SecureChannel.TryReadHello(data, out theirSalt)) continue;
 
                     channel = SecureChannel.Establish(_invite.Key, RelayRole.Host, ourSalt, theirSalt!);
+                    byte[] proof = _invite.Key.Confirmation(RelayRole.Host, ourSalt, theirSalt);
+                    try { await SendFrameAsync(socket, channel.Seal(proof), linked.Token); }
+                    finally { System.Security.Cryptography.CryptographicOperations.ZeroMemory(proof); }
+                    continue;
+                }
 
-                    SetState(RelayState.Paired);
+                if (!confirmed)
+                {
+                    if (ourSalt is not null && theirSalt is not null &&
+                        channel.TryOpen(data, out byte[]? proof) &&
+                        _invite.Key.IsConfirmation(proof!, RelayRole.Client, ourSalt, theirSalt))
+                    {
+                        confirmed = true;
+                        SetState(RelayState.Paired);
+                        pump = PumpAsync(socket, channel, linked.Token);
+                    }
 
-                    pump = PumpAsync(socket, channel, linked.Token);
                     continue;
                 }
 

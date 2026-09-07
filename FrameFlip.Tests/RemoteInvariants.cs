@@ -64,6 +64,14 @@ public static class RemoteInvariants
         Check.That(!PairingKey.Create().SessionKey(RelayRole.Host, hostSalt, clientSalt).SequenceEqual(toPhone),
                    "anderer Kopplungsschluessel, anderer Sitzungsschluessel");
 
+        byte[] hostProof = key.Confirmation(RelayRole.Host, hostSalt, clientSalt);
+        Check.That(key.IsConfirmation(hostProof, RelayRole.Host, hostSalt, clientSalt),
+                   "Schluesselnachweis stimmt nur mit Schluessel, Rolle und Salzen");
+        Check.That(!key.IsConfirmation(hostProof, RelayRole.Client, hostSalt, clientSalt),
+                   "Schluesselnachweis gilt nicht fuer die Gegenrolle");
+        Check.That(!key.IsConfirmation(hostProof, RelayRole.Host, hostSalt, nudged),
+                   "Schluesselnachweis bindet beide Salze");
+
         Check.Group("Kanal - der Normalfall");
 
         byte[] helloHost = SecureChannel.Hello(out byte[] saltHost);
@@ -71,6 +79,8 @@ public static class RemoteInvariants
 
         Check.That(SecureChannel.TryReadHello(helloHost, out byte[]? readBack) && readBack!.SequenceEqual(saltHost),
                    "Begruessung traegt das Salz");
+        Check.That(helloHost[0] == SecureChannel.Version && SecureChannel.Version == 2,
+                   "Begruessung verlangt die beglaubigte Fassung");
         Check.That(!saltHost.SequenceEqual(saltClient), "beide Seiten wuerfeln verschieden");
 
         Check.That(!SecureChannel.TryReadHello(helloHost.AsSpan(0, 8), out _), "zu kurze Begruessung wird abgelehnt");
