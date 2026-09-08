@@ -1,5 +1,7 @@
 using System.IO;
 using System.Net.WebSockets;
+using System.Runtime.ExceptionServices;
+using System.Security.Cryptography;
 using System.Threading.Channels;
 
 namespace FrameFlip.Remote;
@@ -56,13 +58,32 @@ public sealed class RelayClient : IAsyncDisposable
     private readonly PairingInvite _invite;
     private readonly CancellationTokenSource _stopping = new();
     private readonly Channel<byte[]> _outgoing;
+    private readonly Func<IRelaySocket> _socketFactory;
+    private readonly Func<TimeSpan, CancellationToken, Task> _delay;
+    private readonly object _lifecycle = new();
 
     private Task? _loop;
+    private Task? _dispose;
+    private bool _disposing;
     private RelayState _state = RelayState.Off;
 
     public RelayClient(PairingInvite invite)
+        : this(invite, static () => new ClientRelaySocket(), static (delay, token) => Task.Delay(delay, token))
     {
-        _invite = invite;
+    }
+
+    /// <summary>
+    /// Interner Testeingang. Die Produktfassung verwendet ausschliesslich
+    /// <see cref="ClientRelaySocket"/> und <see cref="Task.Delay(TimeSpan, CancellationToken)"/>.
+    /// </summary>
+    internal RelayClient(
+        PairingInvite invite,
+        Func<IRelaySocket> socketFactory,
+        Func<TimeSpan, CancellationToken, Task> delay)
+    {
+        _invite = invite ?? throw new ArgumentNullException(nameof(invite));
+        _socketFactory = socketFactory ?? throw new ArgumentNullException(nameof(socketFactory));
+        _delay = delay ?? throw new ArgumentNullException(nameof(delay));
 
         // DropOldest statt Warten: Ein voller Puffer darf den Aufrufer nicht anhalten.
         _outgoing = Channel.CreateBounded<byte[]>(new BoundedChannelOptions(SendQueue)
@@ -82,9 +103,15 @@ public sealed class RelayClient : IAsyncDisposable
 
     public void Start()
     {
-        if (_loop is not null) return;
+        lock (_lifecycle)
+        {
+            // Der Ausgangskanal hat genau einen Leser. Ohne das Schloss konnten zwei
+            // gleichzeitige Start-Aufrufe zwei Verbindungsloops und damit zwei Leser
+            // erzeugen.
+            if (_loop is not null || _disposing) return;
 
-        _loop = Task.Run(() => RunAsync(_stopping.Token));
+            _loop = Task.Run(() => RunAsync(_stopping.Token));
+        }
     }
 
     /// <summary>
@@ -97,9 +124,13 @@ public sealed class RelayClient : IAsyncDisposable
     public void Send(ReadOnlySpan<byte> payload)
     {
         if (payload.Length == 0 || payload.Length > MaxMessage - SecureChannel.Overhead) return;
-        if (_stopping.IsCancellationRequested) return;
 
-        _outgoing.Writer.TryWrite(payload.ToArray());
+        lock (_lifecycle)
+        {
+            if (_disposing) return;
+
+            _outgoing.Writer.TryWrite(payload.ToArray());
+        }
     }
 
     private async Task RunAsync(CancellationToken token)
@@ -135,7 +166,7 @@ public sealed class RelayClient : IAsyncDisposable
 
             try
             {
-                await Task.Delay(wait, token);
+                await _delay(wait, token);
             }
             catch (OperationCanceledException)
             {
@@ -152,24 +183,18 @@ public sealed class RelayClient : IAsyncDisposable
     {
         SetState(RelayState.Connecting);
 
-        using var socket = new ClientWebSocket();
-        socket.Options.KeepAliveInterval = TimeSpan.FromSeconds(30);
-
+        using var socket = _socketFactory();
         await socket.ConnectAsync(new Uri(_invite.SocketUrl(RelayRole.Host)), token);
 
         SetState(RelayState.Waiting);
 
-        using var linked = CancellationTokenSource.CreateLinkedTokenSource(token);
+        using var connection = CancellationTokenSource.CreateLinkedTokenSource(token);
+        using var sends = new SemaphoreSlim(1, 1);
+        PeerSession? peer = null;
 
         try
         {
-            SecureChannel? channel = null;
-            byte[]? ourSalt = null;
-            byte[]? theirSalt = null;
-            bool confirmed = false;
-            var pump = Task.CompletedTask;
-
-            await foreach (var (kind, data) in ReadAsync(socket, linked.Token))
+            await foreach (var (kind, data) in ReadAsync(socket, connection.Token))
             {
                 if (kind == WebSocketMessageType.Text)
                 {
@@ -178,27 +203,27 @@ public sealed class RelayClient : IAsyncDisposable
                     switch (RelayControl.Parse(text, out _))
                     {
                         case RelayMessage.Waiting:
+                            await StopPeerSessionAsync(peer);
+                            peer = null;
                             SetState(RelayState.Waiting);
                             break;
 
                         case RelayMessage.PeerUp:
                             // Beim Wiedersehen faengt alles von vorn an: neues Salz,
-                            // neuer Schluessel, Zaehler bei null. Ein alter Kanal waere
-                            // gegen ein Handy gerichtet, das nicht mehr dran ist.
-                            channel?.Dispose();
-                            channel = null;
-                            confirmed = false;
-                            theirSalt = null;
-                            byte[] hello = SecureChannel.Hello(out ourSalt);
-                            await SendFrameAsync(socket, hello, linked.Token);
+                            // neuer Schluessel, Zaehler bei null. Der alte Sender muss
+                            // vollstaendig enden, bevor die neue Sitzung den einzigen
+                            // Leser des Ausgangskanals bekommt.
+                            await StopPeerSessionAsync(peer);
+
+                            byte[] hello = SecureChannel.Hello(out byte[] ourSalt);
+                            peer = new PeerSession(ourSalt);
+                            SetState(RelayState.Waiting);
+                            await SendFrameAsync(socket, sends, hello, WebSocketMessageType.Binary, connection.Token);
                             break;
 
                         case RelayMessage.PeerDown:
-                            channel?.Dispose();
-                            channel = null;
-                            confirmed = false;
-                            ourSalt = null;
-                            theirSalt = null;
+                            await StopPeerSessionAsync(peer);
+                            peer = null;
                             SetState(RelayState.Waiting);
                             break;
 
@@ -209,71 +234,155 @@ public sealed class RelayClient : IAsyncDisposable
                     continue;
                 }
 
-                if (channel is null)
+                if (kind != WebSocketMessageType.Binary || peer is null) continue;
+
+                if (peer.Channel is null)
                 {
                     // Das erste Binaerpaket nach einem peer:true ist die Begruessung
                     // der Gegenseite. Alles andere an dieser Stelle ist Unsinn oder
                     // ein Fremder im Raum - beides wird verworfen.
-                    if (ourSalt is null || !SecureChannel.TryReadHello(data, out theirSalt)) continue;
+                    if (!SecureChannel.TryReadHello(data, out byte[]? theirSalt)) continue;
 
-                    channel = SecureChannel.Establish(_invite.Key, RelayRole.Host, ourSalt, theirSalt!);
-                    byte[] proof = _invite.Key.Confirmation(RelayRole.Host, ourSalt, theirSalt);
-                    try { await SendFrameAsync(socket, channel.Seal(proof), linked.Token); }
-                    finally { System.Security.Cryptography.CryptographicOperations.ZeroMemory(proof); }
-                    continue;
-                }
+                    peer.TheirSalt = theirSalt!;
+                    peer.Channel = SecureChannel.Establish(_invite.Key, RelayRole.Host, peer.OurSalt, peer.TheirSalt);
 
-                if (!confirmed)
-                {
-                    if (ourSalt is not null && theirSalt is not null &&
-                        channel.TryOpen(data, out byte[]? proof) &&
-                        _invite.Key.IsConfirmation(proof!, RelayRole.Client, ourSalt, theirSalt))
+                    byte[] proof = _invite.Key.Confirmation(RelayRole.Host, peer.OurSalt, peer.TheirSalt);
+                    try
                     {
-                        confirmed = true;
-                        SetState(RelayState.Paired);
-                        pump = PumpAsync(socket, channel, linked.Token);
+                        await SendFrameAsync(socket, sends, peer.Channel.Seal(proof), WebSocketMessageType.Binary, connection.Token);
+                    }
+                    finally
+                    {
+                        CryptographicOperations.ZeroMemory(proof);
                     }
 
                     continue;
                 }
 
-                if (channel.TryOpen(data, out byte[]? payload))
+                if (!peer.Confirmed)
+                {
+                    if (peer.TheirSalt is not null &&
+                        peer.Channel.TryOpen(data, out byte[]? proof) &&
+                        _invite.Key.IsConfirmation(proof!, RelayRole.Client, peer.OurSalt, peer.TheirSalt))
+                    {
+                        peer.Confirmed = true;
+                        SetState(RelayState.Paired);
+                        peer.Pump = PumpAsync(socket, sends, peer, connection);
+                    }
+
+                    continue;
+                }
+
+                if (peer.Channel.TryOpen(data, out byte[]? payload))
                 {
                     try { PayloadReceived?.Invoke(payload!); }
                     catch (Exception) { /* ein Empfaenger darf die Leitung nicht reissen */ }
                 }
             }
 
-            await linked.CancelAsync();
-            await pump;
-
-            channel?.Dispose();
+            Exception? sendFailure = peer is null ? null : Volatile.Read(ref peer.Failure);
+            if (sendFailure is not null) ExceptionDispatchInfo.Capture(sendFailure).Throw();
         }
         finally
         {
-            await linked.CancelAsync();
+            connection.Cancel();
+            await StopPeerSessionAsync(peer);
         }
     }
 
-    /// <summary>Schaufelt den Sendepuffer auf die Leitung, solange der Kanal steht.</summary>
-    private async Task PumpAsync(ClientWebSocket socket, SecureChannel channel, CancellationToken token)
+    /// <summary>
+    /// Schaufelt den Sendepuffer auf die Leitung, solange genau diese Sitzung steht.
+    /// Ein Sendefehler beendet auch den Leser der Verbindung; nur so beginnt der
+    /// aeussere Loop verlaesslich einen neuen Aufbau.
+    /// </summary>
+    private async Task PumpAsync(IRelaySocket socket, SemaphoreSlim sends, PeerSession peer, CancellationTokenSource connection)
     {
+        using var linked = CancellationTokenSource.CreateLinkedTokenSource(connection.Token, peer.Stopping.Token);
+        CancellationToken token = linked.Token;
+        SecureChannel channel = peer.Channel!;
+
         try
         {
             while (await _outgoing.Reader.WaitToReadAsync(token))
             {
                 while (_outgoing.Reader.TryRead(out byte[]? payload))
-                    await SendFrameAsync(socket, channel.Seal(payload), token);
+                {
+                    byte[] frame = channel.Seal(payload);
+                    await SendFrameAsync(socket, sends, frame, WebSocketMessageType.Binary, token);
+                }
             }
         }
-        catch (Exception)
+        catch (OperationCanceledException) when (token.IsCancellationRequested)
         {
-            // Bricht die Leitung, endet auch der Leser - der Aufbau faengt von vorn an.
+            // peer:false, ein Verbindungsende oder Dispose: der Besitzer wartet in
+            // StopPeerSessionAsync auf dieses Ende, bevor der Kanal entsorgt wird.
+        }
+        catch (Exception ex)
+        {
+            Interlocked.CompareExchange(ref peer.Failure, ex, null);
+            connection.Cancel();
         }
     }
 
-    private static Task SendFrameAsync(ClientWebSocket socket, byte[] frame, CancellationToken token)
-        => socket.SendAsync(frame, WebSocketMessageType.Binary, endOfMessage: true, token);
+    private static async Task SendFrameAsync(
+        IRelaySocket socket,
+        SemaphoreSlim sends,
+        byte[] frame,
+        WebSocketMessageType kind,
+        CancellationToken token)
+    {
+        // ClientWebSocket erlaubt keine parallelen Sends. Begruessung, Nachweis und
+        // Pump laufen deshalb durch dasselbe Tor.
+        await sends.WaitAsync(token);
+        try
+        {
+            await socket.SendAsync(new ArraySegment<byte>(frame), kind, endOfMessage: true, token);
+        }
+        finally
+        {
+            sends.Release();
+        }
+    }
+
+    private static async Task StopPeerSessionAsync(PeerSession? peer)
+    {
+        if (peer is null) return;
+
+        peer.Stopping.Cancel();
+
+        try
+        {
+            await peer.Pump;
+        }
+        catch (Exception)
+        {
+            // Der Pump hat den eigentlichen Fehler bereits beim Verbindungsbesitzer
+            // hinterlegt. Beim Aufraeumen darf er keine Ressource offen lassen.
+        }
+        finally
+        {
+            peer.Channel?.Dispose();
+            CryptographicOperations.ZeroMemory(peer.OurSalt);
+
+            if (peer.TheirSalt is not null) CryptographicOperations.ZeroMemory(peer.TheirSalt);
+
+            peer.Stopping.Dispose();
+        }
+    }
+
+    /// <summary>Ein zusammengehoeriger Besitzblock fuer eine einzelne Gegenstelle.</summary>
+    private sealed class PeerSession
+    {
+        public PeerSession(byte[] ourSalt) => OurSalt = ourSalt;
+
+        public CancellationTokenSource Stopping { get; } = new();
+        public byte[] OurSalt { get; }
+        public byte[]? TheirSalt { get; set; }
+        public SecureChannel? Channel { get; set; }
+        public bool Confirmed { get; set; }
+        public Task Pump { get; set; } = Task.CompletedTask;
+        public Exception? Failure;
+    }
 
     /// <summary>
     /// Setzt die Bruchstuecke eines WebSocket-Frames zusammen.
@@ -283,11 +392,11 @@ public sealed class RelayClient : IAsyncDisposable
     /// Vorschau ein halbes Bild.
     /// </summary>
     private static async IAsyncEnumerable<(WebSocketMessageType Kind, byte[] Data)> ReadAsync(
-        ClientWebSocket socket,
+        IRelaySocket socket,
         [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken token)
     {
         byte[] chunk = new byte[ReceiveChunk];
-        var assembled = new MemoryStream();
+        using var assembled = new MemoryStream();
 
         while (socket.State == WebSocketState.Open && !token.IsCancellationRequested)
         {
@@ -295,7 +404,7 @@ public sealed class RelayClient : IAsyncDisposable
 
             try
             {
-                result = await socket.ReceiveAsync(chunk, token);
+                result = await socket.ReceiveAsync(new ArraySegment<byte>(chunk), token);
             }
             catch (Exception)
             {
@@ -326,13 +435,27 @@ public sealed class RelayClient : IAsyncDisposable
         catch (Exception) { /* wie oben: der Empfaenger darf nichts umwerfen */ }
     }
 
-    public async ValueTask DisposeAsync()
+    public ValueTask DisposeAsync()
     {
-        await _stopping.CancelAsync();
-
-        if (_loop is not null)
+        lock (_lifecycle)
         {
-            try { await _loop; }
+            if (_dispose is null)
+            {
+                _disposing = true;
+                _outgoing.Writer.TryComplete();
+                _stopping.Cancel();
+                _dispose = DisposeCoreAsync(_loop);
+            }
+
+            return new ValueTask(_dispose);
+        }
+    }
+
+    private async Task DisposeCoreAsync(Task? loop)
+    {
+        if (loop is not null)
+        {
+            try { await loop; }
             catch (Exception) { /* beim Beenden interessiert kein Fehler mehr */ }
         }
 

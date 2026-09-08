@@ -29,6 +29,7 @@ static int RunAll()
     BridgeInvariants.Run();
     LocalizationInvariants.Run();
     RemoteInvariants.Run();
+    RelayClientInvariants.Run();
     MachineInvariants.Run();
     SettingsInvariants.Run();
     PreviewInvariants.Run();
