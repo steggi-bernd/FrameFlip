@@ -84,7 +84,12 @@ public static class SettingsInvariants
 
         Check.That(!PairingStore.TryUnprotect("", out _), "nichts ergibt nichts");
         Check.That(!PairingStore.TryUnprotect("kein base64!", out _), "Unsinn ergibt nichts");
-        Check.That(!PairingStore.TryUnprotect(sealed_[..^4] + "AAAA", out _),
+        // Base64-Endzeichen durch AAAA zu ersetzen kann die Originalbytes
+        // unveraendert lassen und nur Nullbytes anhaengen. Ein Bit im Paket
+        // selbst kippen, damit dieser Test immer eine echte Aenderung prueft.
+        byte[] tampered = Convert.FromBase64String(sealed_);
+        tampered[^1] ^= 1;
+        Check.That(!PairingStore.TryUnprotect(Convert.ToBase64String(tampered), out _),
                    "ein veraendertes Paket wird abgelehnt");
 
         Check.Group("Einstellungen - die Einladung");
