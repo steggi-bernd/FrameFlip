@@ -8,32 +8,15 @@ namespace FrameFlip.Remote;
 ///
 /// Das ist die eingehende Seite von <see cref="RemoteLink"/>. Sie kennt weder
 /// QR-Kopplung noch Relay-Zustand; die Fassade verdrahtet sie nur mit der Leitung.
-/// Vorschau und Follow gehoeren hierher, weil sie ebenfalls auf einem Befehl vom
-/// Handy beginnen.
+/// Vorschau und Follow werden dabei an ihren eigenen, zeitgedrosselten Dienst
+/// weitergegeben.
 /// </summary>
 internal sealed class RemoteCommandRouter
 {
-    private readonly Func<RenderJob?> _job;
     private readonly BrowseService _browse;
     private readonly RenderService _render;
     private readonly UploadService _upload;
-    private readonly Action<byte[]> _send;
-    private readonly object _followGate = new();
-
-    /// <summary>
-    /// Ob das Handy jedem neuen Frame folgen will.
-    ///
-    /// Vorher fragte es von sich aus alle paar Sekunden nach - und lag damit
-    /// zwangslaeufig daneben: Wer im falschen Moment fragt, bekommt das vorige Bild,
-    /// und wer oft fragt, verbraucht Daten fuer Bilder, die es noch gar nicht gibt.
-    /// Der Rechner weiss dagegen genau, wann eines fertig ist.
-    /// </summary>
-    private volatile bool _follow;
-
-    /// <summary>Breite der Bilder, denen gefolgt wird. Klein - es ist eine Kachel, kein Vollbild.</summary>
-    private int _followWidth = 480;
-
-    private DateTime _lastFollow = DateTime.MinValue;
+    private readonly RemotePreviewFollowService _preview;
 
     internal RemoteCommandRouter(
         Func<RenderJob?> job,
@@ -42,11 +25,10 @@ internal sealed class RemoteCommandRouter
         UploadService upload,
         Action<byte[]> send)
     {
-        _job = job ?? throw new ArgumentNullException(nameof(job));
         _browse = browse ?? throw new ArgumentNullException(nameof(browse));
         _render = render ?? throw new ArgumentNullException(nameof(render));
         _upload = upload ?? throw new ArgumentNullException(nameof(upload));
-        _send = send ?? throw new ArgumentNullException(nameof(send));
+        _preview = new RemotePreviewFollowService(job, send);
     }
 
     /// <summary>
@@ -115,35 +97,7 @@ internal sealed class RemoteCommandRouter
                 return;
             }
 
-            // Dem Render folgen: Ab jetzt schickt der Rechner jedes fertige Bild von
-            // selbst. Das ist der Unterschied zwischen "alle sechs Sekunden fragen"
-            // und "da ist es".
-            if (name == "follow")
-            {
-                _follow = !document.RootElement.TryGetProperty("on", out JsonElement on) || on.GetBoolean();
-
-                if (document.RootElement.TryGetProperty("w", out JsonElement followWidth)
-                    && followWidth.TryGetInt32(out int wanted))
-                {
-                    _followWidth = Math.Clamp(wanted, 240, 1920);
-                }
-
-                // Sofort eines schicken, damit nicht bis zum naechsten Frame ein
-                // leeres Feld dasteht.
-                if (_follow) Task.Run(() => SendPreview(_followWidth));
-
-                return;
-            }
-
-            if (name != "preview") return;
-
-            // Die gewuenschte Breite. Ohne Angabe die volle - so verhaelt sich eine
-            // aeltere App wie bisher.
-            int width = document.RootElement.TryGetProperty("w", out JsonElement w) && w.TryGetInt32(out int value)
-                ? value
-                : PreviewEncoder.Width;
-
-            Task.Run(() => SendPreview(width));
+            _preview.Handle(name, document.RootElement);
         }
         catch (Exception)
         {
@@ -153,71 +107,6 @@ internal sealed class RemoteCommandRouter
         }
     }
 
-    /// <summary>
-    /// Die Vorschau beantworten - immer, auch wenn es keine gibt.
-    ///
-    /// Vorher wurde in diesem Fall einfach nichts geschickt, und in der App stand
-    /// dauerhaft "Bild wird geholt". Eine Anfrage ohne Antwort ist die schlechteste
-    /// Art zu scheitern: Der Fragende wartet, und niemand sagt ihm, worauf.
-    ///
-    /// Die haeufigsten Gruende sind harmlos und sollen genau so dastehen - ein
-    /// Render, der gerade erst angelaufen ist, hat schlicht noch keinen Frame
-    /// geschrieben.
-    /// </summary>
-    private void SendPreview(int width)
-    {
-        try
-        {
-            RenderJob? job = _job();
-
-            string? why = job is null
-                ? "No render is running on the machine."
-                : string.IsNullOrEmpty(job.LatestFrameFile)
-                    ? "No frame written yet."
-                    : null;
-
-            if (why is null)
-            {
-                byte[]? jpeg = PreviewEncoder.Encode(job!.LatestFrameFile, width);
-
-                if (jpeg is not null)
-                {
-                    _send(Envelope.Preview(job.CurrentFrame, jpeg));
-                    return;
-                }
-
-                why = "The image could not be read.";
-            }
-
-            _send(Envelope.Json(
-                $$"""{"t":"preview","ok":false,"why":{{JsonSerializer.Serialize(why)}}}"""));
-        }
-        catch (Exception)
-        {
-            // Siehe oben: Diese Kette haengt an der Vorschau und darf nichts werfen.
-        }
-    }
-
-    /// <summary>
-    /// Ein Frame ist auf der Platte - und das Handy will ihn sehen.
-    ///
-    /// Gedrosselt, weil ein schneller Render mehrere Bilder je Sekunde schreiben
-    /// kann und jedes ein paar hundert Kilobyte kostet. Zwei Sekunden sind fuer das
-    /// Auge fluessig genug und fuer ein Mobilnetz vertretbar.
-    /// </summary>
     internal void OnFrameWritten(string path)
-    {
-        if (!_follow) return;
-
-        var now = DateTime.UtcNow;
-
-        lock (_followGate)
-        {
-            if (now - _lastFollow < TimeSpan.FromSeconds(2)) return;
-
-            _lastFollow = now;
-        }
-
-        Task.Run(() => SendPreview(_followWidth));
-    }
+        => _preview.OnFrameWritten(path);
 }
