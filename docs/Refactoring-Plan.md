@@ -28,7 +28,7 @@ fest. Jeder Schnitt baut auf einem getesteten Sicherheits- und Funktionsstand au
   Fehler an die Seite. Charakterisierungstests sichern Reihenfolge und
   Ordnernavigation; zusätzliche Tests prüfen blockierte Leser, Abbruch,
   Dispatcher-Rückkehr und erneutes Einlesen nach Fehlern.
-- `ProjectThumbnailService` übernimmt Bitmap-Dekodierung und den gemeinsamen,
+- `ProjectThumbnailService` ist mit PR #14 integriert und übernimmt Bitmap-Dekodierung und den gemeinsamen,
   nach Dateipfad und Breite getrennten Cache. Größen, Farbprofilbehandlung und
   die bisherige Cache-Grenze bleiben erhalten. Ein eigener Dateistream wird
   auch nach defekten Bildern sofort geschlossen. Abgelöste Ladevorgänge liefern
@@ -36,6 +36,15 @@ fest. Jeder Schnitt baut auf einem getesteten Sicherheits- und Funktionsstand au
   prüft dabei die aktuelle Ansicht. Tests sichern Dateifreigabe, erneutes Laden,
   gemeinsame Cache-Nutzung, parallele Zugriffe und verspätete Rückgaben ab.
   Kacheln, Navigationseingaben und WPF-Darstellung bleiben in `ProjectsPage`.
+- `AppWindowController` übernimmt die Lebenszyklen von Hauptfenster,
+  Einstellungen und Kopplungsdialog aus `AppHost`: einmaliges Erzeugen,
+  Wiederverwenden, Owner-Zuordnung und Freigabe nach `Closed`. Der Host stellt
+  die Fenster mit aktuellen Einstellungen und Callbacks bereit. Er entscheidet
+  weiter über die Lastmessung; der Controller meldet das neue Hauptfenster vor
+  `Show` und sein Ende nach dem Freigeben der Referenz. Charakterisierungs- und
+  Controller-Tests sichern minimierte Fenster, Owner-Schließung, abgebrochene
+  Schließvorgänge und den Fokusverlust-Schutz des ursprünglichen Viewers ab.
+  Viewer-Öffnung und Sequenzwechsel bleiben als nächster eigener Schnitt offen.
 
 ## Ausgangspunkt und Sperre
 
@@ -102,8 +111,7 @@ sofort koppeln, ohne zusätzliche Schritte.
 
 ## Nächster Startpunkt
 
-Nach Navigation, Scan-Ausführung und Thumbnail-Laden aus `ProjectsPage` wird
-der Lebenszyklus in `AppHost` in kleinen Schritten aufgeteilt. Zuerst werden
-Erzeugung, Wiederverwendung und Schließen der Fenster charakterisiert; danach
-folgen Tray-, Remote- und Load-Monitor-Zuständigkeiten. Erst anschließend
-beginnt der Android-Umbau.
+Nach Hauptfenster und Dialogen folgen Viewer-Öffnung und Sequenzwechsel aus
+`AppHost`. Zuerst werden Hotkey-Umschalten, explizites Dateiöffnen und die
+Wiederverwendung des Viewers charakterisiert. Danach folgen Tray-, Remote- und
+Load-Monitor-Zuständigkeiten. Erst anschließend beginnt der Android-Umbau.

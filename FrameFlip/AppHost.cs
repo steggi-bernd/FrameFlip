@@ -4,10 +4,12 @@ using FrameFlip.Configuration;
 using FrameFlip.Decoding;
 using FrameFlip.Diagnostics;
 using FrameFlip.Interop;
+using FrameFlip.Lifecycle;
 using FrameFlip.Sequencing;
 using FrameFlip.Views;
 using Drawing = System.Drawing;
 using WinForms = System.Windows.Forms;
+using Window = System.Windows.Window;
 
 namespace FrameFlip;
 
@@ -31,11 +33,26 @@ public sealed class AppHost : IDisposable
 
     /// <summary>Reicht den Renderfortschritt ans Handy weiter. Null, solange nicht gekoppelt.</summary>
     private Remote.RemoteLink? _remote;
-    private SettingsWindow? _settingsWindow;
-    private MainWindow? _mainWindow;
-    private PairingWindow? _pairingWindow;
+    private readonly AppWindowController _windows;
     private SystemLoadMonitor? _loadMonitor;
     private bool _disposed;
+
+    public AppHost() : this(null, null, null) { }
+
+    /// <summary>Fenstertests brauchen weder persoenliche Einstellungen noch eine Kopplung anzulegen.</summary>
+    internal AppHost(Func<Window>? createMain, Func<Window>? createSettings, Func<Window>? createPairing)
+    {
+        _windows = new AppWindowController(
+            () =>
+            {
+                LivePage.Load = () => _loadMonitor?.LastSnapshot;
+                return createMain?.Invoke() ?? new MainWindow(_renderMonitor, () => _remote?.State,
+                    ShowSettings, OpenFile, ShowPairing, _settings, settings => SettingsStore.Save(settings));
+            },
+            createSettings ?? (() => new SettingsWindow(_settings, ApplySettings, () => _remote?.State)),
+            createPairing ?? (() => new PairingWindow(_settings, ApplySettings, () => _remote?.State)),
+            EnsureLoadMonitor);
+    }
 
     public void Start()
     {
@@ -345,7 +362,7 @@ public sealed class AppHost : IDisposable
 
     private void EnsureLoadMonitor()
     {
-        bool wanted = _viewer is not null || _remote is not null || _mainWindow is not null;
+        bool wanted = _viewer is not null || _remote is not null || _windows.Main is not null;
 
         if (wanted) StartLoadMonitor();
         else StopLoadMonitor();
@@ -421,88 +438,20 @@ public sealed class AppHost : IDisposable
     /// Genau eines: Zwei Fenster mit demselben Inhalt waeren zwei Stellen, an denen
     /// derselbe Render steht, und die zweite wuerde niemand schliessen.
     /// </summary>
-    public void ShowMain()
-    {
-        if (_mainWindow is not null)
-        {
-            if (_mainWindow.WindowState == System.Windows.WindowState.Minimized)
-                _mainWindow.WindowState = System.Windows.WindowState.Normal;
-
-            _mainWindow.Activate();
-            return;
-        }
-
-        LivePage.Load = () => _loadMonitor?.LastSnapshot;
-
-        var window = new MainWindow(_renderMonitor, () => _remote?.State, ShowSettings, OpenFile, ShowPairing,
-                                    _settings, settings => SettingsStore.Save(settings));
-        window.Closed += (_, _) =>
-        {
-            _mainWindow = null;
-
-            // Die Lastmessung lief womoeglich nur fuer dieses Fenster.
-            EnsureLoadMonitor();
-        };
-
-        _mainWindow = window;
-
-        // Ohne offene Vorschau laeuft die Messung sonst nicht, und die Kacheln
-        // blieben leer - ausgerechnet auf der Seite, die sie zeigt.
-        EnsureLoadMonitor();
-
-        window.Show();
-        window.Activate();
-    }
+    public void ShowMain() => _windows.ShowMain();
 
     /// <summary>Der Kopplungscode als eigenes Fenster, ueber dem Hauptfenster.</summary>
-    private void ShowPairing()
-    {
-        if (_pairingWindow is not null) { _pairingWindow.Activate(); return; }
-
-        var window = new PairingWindow(_settings, ApplySettings, () => _remote?.State)
-        {
-            Owner = _mainWindow,
-            WindowStartupLocation = _mainWindow is null
-                ? System.Windows.WindowStartupLocation.CenterScreen
-                : System.Windows.WindowStartupLocation.CenterOwner,
-        };
-
-        window.Closed += (_, _) => _pairingWindow = null;
-        _pairingWindow = window;
-
-        window.Show();
-    }
+    private void ShowPairing() => _windows.ShowPairing();
 
     private void ShowSettings()
     {
-        if (_settingsWindow is not null)
-        {
-            _settingsWindow.Activate();
-            return;
-        }
-
-        // Die Vorschau darf nicht wegschliessen, waehrend der Dialog den Fokus hat.
+        // Der Callback gehoert zu diesem Viewer, auch wenn inzwischen ein
+        // anderer geoeffnet wurde. Der Controller besitzt keine Viewer-Sitzung.
         var viewer = _viewer;
-        if (viewer is not null) viewer.ModalDialogOpen = true;
-
-        var window = new SettingsWindow(_settings, ApplySettings, () => _remote?.State);
-
-        // Die Vorschau liegt ueber allem. Ohne dasselbe fuer den Dialog erschiene er
-        // dahinter - man klickt auf "Einstellungen" und es passiert scheinbar nichts.
-        if (viewer is not null && viewer.IsVisible)
+        _windows.ShowSettings(viewer, open =>
         {
-            window.Owner = viewer;
-            window.Topmost = true;
-            window.WindowStartupLocation = System.Windows.WindowStartupLocation.CenterOwner;
-        }
-
-        window.Closed += (_, _) =>
-        {
-            _settingsWindow = null;
-            if (viewer is not null) viewer.ModalDialogOpen = false;
-        };
-        _settingsWindow = window;
-        window.Show();
+            if (viewer is not null) viewer.ModalDialogOpen = open;
+        });
     }
 
     /// <summary>Rueckgabe: Fehlertext fuer den Dialog, oder null bei Erfolg.</summary>
@@ -586,7 +535,7 @@ public sealed class AppHost : IDisposable
     private void Exit()
     {
         _viewer?.Close();
-        _settingsWindow?.Close();
+        _windows.CloseSettings();
         System.Windows.Application.Current?.Shutdown();
     }
 
