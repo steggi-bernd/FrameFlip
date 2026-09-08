@@ -91,6 +91,39 @@ public static class MachineInvariants
         // Gerade ohne Render ist die Frage, ob der Rechner ueberhaupt wach ist.
         Check.That(filled.GetProperty("t").GetString() == "idle" && filled.TryGetProperty("cpu", out _),
                    "die Maschinenwerte stehen auch ohne Render da");
+
+        Check.Group("Nutzlast - ein Render bleibt gleich beschrieben");
+
+        var job = new RenderJob
+        {
+            Id = "job-42",
+            BlendFile = @"C:\shots\opening.blend",
+            Scene = "Opening",
+            Engine = "CYCLES",
+            FirstFrame = 1,
+            LastFrame = 24,
+            StartedUtc = DateTime.UtcNow - TimeSpan.FromMinutes(2),
+        };
+
+        job.BeginFrame(12);
+        job.FrameWritten(12, @"C:\shots\frames\opening_0012.png");
+        job.UpdateStats(new RenderStats(8, 64, 512, null, null, "Rendering the hero frame"));
+
+        var running = Read(RemoteLink.Describe(job, counted, gpu));
+
+        Check.That(running.GetProperty("t").GetString() == "job", "Render bleibt ein Job");
+        Check.That(running.GetProperty("state").GetString() == "rendering", "Renderzustand bleibt klein geschrieben");
+        Check.That(running.GetProperty("anim").GetBoolean(), "geschriebener Frame markiert die Animation");
+        Check.That(running.GetProperty("scene").GetString() == "Opening", "Szene bleibt erhalten");
+        Check.That(running.GetProperty("engine").GetString() == "CYCLES", "Engine bleibt erhalten");
+        Check.That(running.GetProperty("file").GetString() == "opening.blend", "nur der Dateiname geht ueber die Leitung");
+        Check.That(running.GetProperty("frame").GetInt32() == 12 && running.GetProperty("written").GetInt32() == 1,
+                   "Frame- und Schreibzaehler bleiben erhalten");
+        Check.That(running.GetProperty("sample").GetInt32() == 8 && running.GetProperty("samples").GetInt32() == 64,
+                   "Samplefortschritt bleibt erhalten");
+        Check.That(running.GetProperty("memMb").GetInt64() == 512 &&
+                   running.GetProperty("activity").GetString() == "Rendering the hero frame",
+                   "optionale Renderwerte bleiben erhalten");
     }
 
     private static JsonElement Read(string json) => JsonDocument.Parse(json).RootElement.Clone();
