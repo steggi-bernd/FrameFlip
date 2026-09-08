@@ -54,8 +54,12 @@ public partial class ProjectsPage : UserControl
     private static readonly Dictionary<string, BitmapSource> Cache = new();
 
     private readonly Action<string> _openSequence;
-    private readonly Func<List<BlendProject>> _scan;
-    private readonly Func<List<RecentSequence>> _recent;
+    private readonly ProjectScanService _scans;
+    private CancellationTokenSource _libraryScan = new();
+    private CancellationTokenSource _contentScan = new();
+    private Task _libraryTask = Task.CompletedTask;
+    private Task _contentTask = Task.CompletedTask;
+    private TextBlock? _libraryError;
 
     private readonly ProjectNavigation _navigation = new();
 
@@ -70,17 +74,21 @@ public partial class ProjectsPage : UserControl
     private bool _dragging;
 
     public ProjectsPage(Action<string> openSequence)
-        : this(openSequence, ProjectLibrary.Scan, RecentSequences.Load)
+        : this(openSequence, new ProjectScanService())
     {
     }
 
     /// <summary>Die Datenquellen sind austauschbar; Navigationstests lesen keine persoenliche Bibliothek.</summary>
     internal ProjectsPage(Action<string> openSequence, Func<List<BlendProject>> scan,
                           Func<List<RecentSequence>> recent)
+        : this(openSequence, new ProjectScanService(scan, recent))
+    {
+    }
+
+    internal ProjectsPage(Action<string> openSequence, ProjectScanService scans)
     {
         _openSequence = openSequence;
-        _scan = scan;
-        _recent = recent;
+        _scans = scans;
 
         InitializeComponent();
 
@@ -160,21 +168,10 @@ public partial class ProjectsPage : UserControl
 
     private void Reload()
     {
-        // Der Suchlauf geht auf die Platte. Das gehoert nicht in den Thread, der die
-        // Oberflaeche zeichnet - bei einem Ordner mit tausend Dateien saehe man es.
-        //
-        // Zurueck geht es ueber den Dispatcher DIESES Steuerelements, nicht ueber den
-        // Synchronisationskontext: Der ist nur gesetzt, solange eine Dispatcher-
-        // Schleife laeuft. Fehlt er, laeuft die Fortsetzung im Thread-Pool weiter und
-        // greift von dort auf die Oberflaeche zu - das wirft.
-        var dispatcher = Dispatcher;
-
-        Task.Run(() =>
-        {
-            var found = _scan();
-
-            dispatcher.InvokeAsync(() => Apply(found));
-        });
+        if (_libraryError is not null) Body.Children.Remove(_libraryError);
+        var token = RenewScan(ref _libraryScan);
+        _libraryTask = ApplyScanAsync(_scans.LibraryAsync(token), token, Apply,
+            () => Body.Children.Insert(0, _libraryError = ScanNotice(T("S_ProjectsReadFailed"))));
     }
 
     private void Apply(List<BlendProject> projects)
@@ -188,6 +185,7 @@ public partial class ProjectsPage : UserControl
     private void Render()
     {
         _generation++;
+        RenewScan(ref _contentScan);
 
         Body.Children.Clear();
         Crumbs.Children.Clear();
@@ -197,6 +195,63 @@ public partial class ProjectsPage : UserControl
         if (_navigation.Project is null) Overview();
         else Inside();
     }
+
+    private static CancellationToken RenewScan(ref CancellationTokenSource source)
+    {
+        source.Cancel();
+        source.Dispose();
+        source = new CancellationTokenSource();
+        return source.Token;
+    }
+
+    private void LoadContent<TResult>(Func<CancellationToken, Task<TResult>> read, Action<TResult> show)
+    {
+        var token = _contentScan.Token;
+        var notice = ScanNotice(T("S_ProjectsLoading"));
+        Body.Children.Add(notice);
+        _contentTask = ApplyScanAsync(read(token), token, result =>
+        {
+            Body.Children.Remove(notice);
+            show(result);
+        }, () => notice.Text = T("S_ProjectsReadFailed"));
+    }
+
+    /// <summary>
+    /// Immer ueber den Dispatcher dieser Seite zurueck, auch wenn sie vor der
+    /// Dispatcher-Schleife konstruiert wurde. Ein inzwischen abgeloester Scan
+    /// darf weder alte Kacheln noch einen alten Fehler in die neue Ansicht setzen.
+    /// </summary>
+    private async Task ApplyScanAsync<T>(Task<T> scan, CancellationToken token, Action<T> apply, Action failed)
+    {
+        Action update;
+        try
+        {
+            var result = await scan.ConfigureAwait(false);
+            update = () => apply(result);
+        }
+        catch (OperationCanceledException) when (token.IsCancellationRequested) { return; }
+        catch (Exception) { update = failed; }
+
+        if (token.IsCancellationRequested || Dispatcher.HasShutdownStarted) return;
+        try
+        {
+            await Dispatcher.InvokeAsync(() =>
+            {
+                if (!token.IsCancellationRequested) update();
+            });
+        }
+        catch (TaskCanceledException) when (Dispatcher.HasShutdownStarted) { }
+    }
+
+    private TextBlock ScanNotice(string text) => new()
+    {
+        Text = text,
+        Margin = new Thickness(2, 6, 0, 12),
+        TextWrapping = TextWrapping.Wrap,
+        FontFamily = (FontFamily)FindResource("BodyFont"),
+        FontSize = 12.5,
+        Foreground = (Brush)FindResource("FaintBrush"),
+    };
 
     private void Overview()
     {
@@ -212,7 +267,12 @@ public partial class ProjectsPage : UserControl
             Foreground = (Brush)FindResource("MutedBrush"),
         });
 
-        if (_navigation.Projects.Count == 0)
+        LoadContent(token => _scans.OverviewAsync(_navigation.Projects, token), ShowOverviewContents);
+    }
+
+    private void ShowOverviewContents(ProjectOverviewScan scan)
+    {
+        if (scan.Projects.Count == 0)
         {
             Note.Text = T("S_ProjectsEmpty");
 
@@ -220,18 +280,18 @@ public partial class ProjectsPage : UserControl
         }
         else
         {
-            Body.Children.Add(Section(T("S_BlenderProjects", _navigation.Projects.Count)));
+            Body.Children.Add(Section(T("S_BlenderProjects", scan.Projects.Count)));
 
             var tiles = Wrap();
 
-            foreach (var project in _navigation.Projects) tiles.Children.Add(ProjectTile(project));
+            foreach (var project in scan.Projects) tiles.Children.Add(ProjectTile(project.Project, project.Thumbnail));
 
             Body.Children.Add(tiles);
         }
 
         // Was FrameFlip schon einmal geoeffnet hat. Das sind Bildordner, keine
         // Projekte - deshalb eine eigene Reihe und nicht dazwischengemischt.
-        var recent = _recent();
+        var recent = scan.Recent;
 
         if (recent.Count > 0)
         {
@@ -239,7 +299,7 @@ public partial class ProjectsPage : UserControl
 
             var tiles = Wrap();
 
-            foreach (var entry in recent.Take(12)) tiles.Children.Add(RecentTile(entry));
+            foreach (var entry in recent) tiles.Children.Add(RecentTile(entry.Sequence, entry.Exists));
 
             Body.Children.Add(tiles);
         }
@@ -293,7 +353,12 @@ public partial class ProjectsPage : UserControl
             }
         }
 
-        var folders = ProjectScanner.Children(folder);
+        LoadContent(token => _scans.FolderAsync(folder, token), ShowFolderContents);
+    }
+
+    private void ShowFolderContents(ProjectFolderScan scan)
+    {
+        var folders = scan.Folders;
 
         if (folders.Count > 0)
         {
@@ -306,7 +371,7 @@ public partial class ProjectsPage : UserControl
             Body.Children.Add(tiles);
         }
 
-        var frames = ProjectScanner.Images(folder);
+        var frames = scan.Frames;
 
         if (frames.Count > 0)
         {
@@ -348,7 +413,7 @@ public partial class ProjectsPage : UserControl
 
     // ---------------------------------------------------------------- Kacheln
 
-    private Border ProjectTile(BlendProject project)
+    private Border ProjectTile(BlendProject project, string? thumbnail)
     {
         string root = ProjectNavigation.RootOf(project);
 
@@ -364,7 +429,7 @@ public partial class ProjectsPage : UserControl
 
         string detail = $"{count} · {Ago(project.TouchedUtc)}";
 
-        var tile = Tile(project.Name, detail, ProjectScanner.Thumbnail(root), 480, 320, 180,
+        var tile = Tile(project.Name, detail, thumbnail, 480, 320, 180,
                         () => { _navigation.OpenProject(project); Render(); });
 
         tile.ToolTip = project.Newest?.Path ?? root;
@@ -406,10 +471,8 @@ public partial class ProjectsPage : UserControl
         return tile;
     }
 
-    private Border RecentTile(RecentSequence entry)
+    private Border RecentTile(RecentSequence entry, bool alive)
     {
-        bool alive = entry.Exists;
-
         string detail = alive
             ? (entry.Missing > 0 ? T("S_MissingCount", entry.Missing) : T("S_FramesOf", entry.Count))
               + " · " + Ago(entry.OpenedUtc)

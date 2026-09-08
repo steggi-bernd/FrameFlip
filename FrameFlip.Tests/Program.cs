@@ -42,6 +42,9 @@ static int RunAll()
     ProjectInvariants.Frames();
     ProjectNavigationInvariants.Run();
     ProjectNavigationStateInvariants.Run();
+    ProjectScanPageInvariants.Run();
+    ProjectScanServiceInvariants.Run();
+    ProjectScanConcurrencyInvariants.Run();
     ResourceInvariants.Run();
     VaultInvariants.Run();
     BrowseInvariants.Run();

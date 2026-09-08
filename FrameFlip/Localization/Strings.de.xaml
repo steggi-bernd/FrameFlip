@@ -200,6 +200,8 @@
     <sys:String x:Key="S_ProjectsTitle">PROJEKTE</sys:String>
     <sys:String x:Key="S_ProjectsIntro">Jeder Ordner im durchsuchten Verzeichnis ist ein Projekt, samt seiner Unterordner. Was lose danebenliegt, wird nach dem Namen zusammengefasst.</sys:String>
     <sys:String x:Key="S_ProjectsEmpty">Noch keine Projekte. Oben einen Ordner hinzufügen – oder einmal aus Blender heraus rendern: FrameFlip merkt sich dabei, welche .blend-Datei gelaufen ist. Ordner und .blend-Dateien lassen sich auch hierher ziehen.</sys:String>
+    <sys:String x:Key="S_ProjectsLoading">Wird geladen …</sys:String>
+    <sys:String x:Key="S_ProjectsReadFailed">Der Inhalt konnte nicht gelesen werden. Bitte erneut einlesen.</sys:String>
     <sys:String x:Key="S_BlenderProjects">BLENDER-PROJEKTE · {0}</sys:String>
     <sys:String x:Key="S_RecentlyOpened">ZULETZT GEÖFFNET</sys:String>
     <sys:String x:Key="S_VersionsTitle">FASSUNGEN</sys:String>
