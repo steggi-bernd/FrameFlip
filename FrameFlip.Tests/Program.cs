@@ -31,6 +31,7 @@ static int RunAll()
     RemoteInvariants.Run();
     RelayClientInvariants.Run();
     MachineInvariants.Run();
+    RemoteCommandRouterInvariants.Run();
     SettingsInvariants.Run();
     PreviewInvariants.Run();
     PlacementRegression.Run();
