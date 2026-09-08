@@ -15,19 +15,27 @@ fest. Jeder Schnitt baut auf einem getesteten Sicherheits- und Funktionsstand au
   Cache, Fensterlebenszyklus und Bilddarstellung bleiben im `ViewerWindow`.
   Die Bedienung ist am Fenster charakterisiert; zusätzliche Controller-Tests
   prüfen Pufferfristen ohne reale Wartezeit.
-- `ProjectNavigation` ist mit PR #12 integriert und übernimmt die Projekt-/Ordnerauswahl, Zurück-Navigation,
+- `ProjectNavigation` ist mit PR #12 integriert und übernimmt die
+  Projekt-/Ordnerauswahl, Zurück-Navigation,
   Brotkrumen und den Zustand der Versionsansicht aus `ProjectsPage`. Die Seite
   schließt weiterhin zuerst eine offene Bildvorschau.
   Navigationstests verwenden austauschbare Scan-/Verlaufsquellen, damit sie
   keine persönliche Projektbibliothek lesen.
-- `ProjectScanService` übernimmt Bibliotheks-, Ordner-, Frame- und
+- `ProjectScanService` ist mit PR #13 integriert und übernimmt Bibliotheks-, Ordner-, Frame- und
   Verlaufslesezugriffe sowie die Suche nach Thumbnail-Pfaden. Die Quellen laufen
   außerhalb des UI-Threads; Bibliothek und Inhalt haben getrennte, jeweils
   begrenzte Worker. Überholte Anfragen liefern weder alte Kacheln noch alte
   Fehler an die Seite. Charakterisierungstests sichern Reihenfolge und
   Ordnernavigation; zusätzliche Tests prüfen blockierte Leser, Abbruch,
-  Dispatcher-Rückkehr und erneutes Einlesen nach Fehlern. Bitmap-Dekodierung,
-  Thumbnail-Cache und WPF-Darstellung bleiben in `ProjectsPage`.
+  Dispatcher-Rückkehr und erneutes Einlesen nach Fehlern.
+- `ProjectThumbnailService` übernimmt Bitmap-Dekodierung und den gemeinsamen,
+  nach Dateipfad und Breite getrennten Cache. Größen, Farbprofilbehandlung und
+  die bisherige Cache-Grenze bleiben erhalten. Ein eigener Dateistream wird
+  auch nach defekten Bildern sofort geschlossen. Abgelöste Ladevorgänge liefern
+  keine Bilder mehr; die Seite zeichnet nur noch über ihren Dispatcher und
+  prüft dabei die aktuelle Ansicht. Tests sichern Dateifreigabe, erneutes Laden,
+  gemeinsame Cache-Nutzung, parallele Zugriffe und verspätete Rückgaben ab.
+  Kacheln, Navigationseingaben und WPF-Darstellung bleiben in `ProjectsPage`.
 
 ## Ausgangspunkt und Sperre
 
@@ -94,6 +102,8 @@ sofort koppeln, ohne zusätzliche Schritte.
 
 ## Nächster Startpunkt
 
-Nach Navigation und Scan-Ausführung folgt das Thumbnail-Laden mit Cache aus
-`ProjectsPage` als eigener überprüfbarer Schnitt. Danach wird der
-Lebenszyklus in `AppHost` aufgeteilt; erst anschließend beginnt der Android-Umbau.
+Nach Navigation, Scan-Ausführung und Thumbnail-Laden aus `ProjectsPage` wird
+der Lebenszyklus in `AppHost` in kleinen Schritten aufgeteilt. Zuerst werden
+Erzeugung, Wiederverwendung und Schließen der Fenster charakterisiert; danach
+folgen Tray-, Remote- und Load-Monitor-Zuständigkeiten. Erst anschließend
+beginnt der Android-Umbau.

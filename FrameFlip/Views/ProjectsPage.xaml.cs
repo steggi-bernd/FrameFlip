@@ -50,11 +50,9 @@ public partial class ProjectsPage : UserControl
     /// <summary>Soviele Fassungen als Zeile - der Rest sind ohnehin Autosicherungen.</summary>
     private const int VersionLimit = 40;
 
-    /// <summary>Vorschaubilder, damit ein Zurueck nicht alles neu von der Platte holt.</summary>
-    private static readonly Dictionary<string, BitmapSource> Cache = new();
-
     private readonly Action<string> _openSequence;
     private readonly ProjectScanService _scans;
+    private readonly ProjectThumbnailService _thumbnails;
     private CancellationTokenSource _libraryScan = new();
     private CancellationTokenSource _contentScan = new();
     private Task _libraryTask = Task.CompletedTask;
@@ -85,10 +83,12 @@ public partial class ProjectsPage : UserControl
     {
     }
 
-    internal ProjectsPage(Action<string> openSequence, ProjectScanService scans)
+    internal ProjectsPage(Action<string> openSequence, ProjectScanService scans,
+                          ProjectThumbnailService? thumbnails = null)
     {
         _openSequence = openSequence;
         _scans = scans;
+        _thumbnails = thumbnails ?? ProjectThumbnailService.Shared;
 
         InitializeComponent();
 
@@ -969,61 +969,27 @@ public partial class ProjectsPage : UserControl
     private async void LoadThumb(Rectangle target, string path, int width)
     {
         int generation = _generation;
-        string key = path + "|" + width;
-
-        if (Cache.TryGetValue(key, out var known))
+        var token = _contentScan.Token;
+        try
         {
-            Paint(target, known);
-            return;
+            var image = await _thumbnails.LoadAsync(path, width, token).ConfigureAwait(false);
+            if (image is null || token.IsCancellationRequested || Dispatcher.HasShutdownStarted) return;
+
+            void Apply()
+            {
+                if (generation == _generation) Paint(target, image);
+            }
+
+            // Cache-Treffer bleiben sofort sichtbar. Worker-Ergebnisse gehen
+            // auch ohne SynchronizationContext an den Dispatcher dieser Seite.
+            if (Dispatcher.CheckAccess()) Apply();
+            else await Dispatcher.InvokeAsync(Apply);
         }
-
-        var image = await Task.Run(() => Decode(path, width));
-
-        if (image is null || generation != _generation) return;
-
-        // Der Cache ist eine Bequemlichkeit, kein Verwaltungsproblem: Wird er zu
-        // gross, faengt er von vorne an.
-        if (Cache.Count > 400) Cache.Clear();
-
-        Cache[key] = image;
-        Paint(target, image);
+        catch (OperationCanceledException) when (token.IsCancellationRequested || Dispatcher.HasShutdownStarted) { }
     }
 
     private static void Paint(Rectangle target, BitmapSource image)
         => target.Fill = new ImageBrush(image) { Stretch = Stretch.UniformToFill };
-
-    /// <summary>
-    /// Ein Vorschaubild laden - verkleinert, und ohne die Datei offen zu halten.
-    ///
-    /// DecodePixelWidth entpackt gleich in der gebrauchten Groesse; ein 4K-Frame
-    /// kostet so einen Bruchteil. OnLoad liest die Datei sofort ganz ein, damit sie
-    /// nicht gesperrt bleibt - waehrend eines Renders schreibt Blender daneben
-    /// weiter.
-    /// </summary>
-    private static BitmapSource? Decode(string path, int width)
-    {
-        try
-        {
-            var image = new BitmapImage();
-
-            image.BeginInit();
-            image.UriSource = new Uri(path);
-            image.DecodePixelWidth = width;
-            image.CacheOption = BitmapCacheOption.OnLoad;
-            image.CreateOptions = BitmapCreateOptions.IgnoreColorProfile;
-            image.EndInit();
-            image.Freeze();
-
-            return image;
-        }
-        catch (Exception)
-        {
-            // EXR, ein halb geschriebener Frame, ein defektes PNG - die Kachel
-            // bleibt dann eben leer. Ein Vorschaubild ist nichts, wofuer man eine
-            // Fehlermeldung aufmacht.
-            return null;
-        }
-    }
 
     /// <summary>Kurz fuer Localization.Strings.T - der Name steht hier oft genug.</summary>
     private static string T(string key) => Localization.Strings.T(key);
