@@ -10,11 +10,17 @@ fest. Jeder Schnitt baut auf einem getesteten Sicherheits- und Funktionsstand au
 - `RemoteLink` bleibt die öffentliche Fassade. Status-Telemetrie (PR #8),
   Befehlsverteilung (PR #9) sowie Vorschau/Follow (PR #10) sind ausgelagert und
   gemergt.
-- Der nächste Desktop-Schnitt führt `ViewerPlaybackController` ein. Er besitzt
+- `ViewerPlaybackController` ist mit PR #11 integriert. Er besitzt
   Uhr, Position, Wiedergabe-/Pufferzustand und den aktiven Framebereich. WPF-Timer,
   Cache, Fensterlebenszyklus und Bilddarstellung bleiben im `ViewerWindow`.
-  Die vorhandene Bedienung wird zuerst am Fenster charakterisiert; zusätzliche
-  Controller-Tests prüfen Pufferfristen ohne reale Wartezeit.
+  Die Bedienung ist am Fenster charakterisiert; zusätzliche Controller-Tests
+  prüfen Pufferfristen ohne reale Wartezeit.
+- `ProjectNavigation` übernimmt die Projekt-/Ordnerauswahl, Zurück-Navigation,
+  Brotkrumen und den Zustand der Versionsansicht aus `ProjectsPage`. Die Seite
+  schließt weiterhin zuerst eine offene Bildvorschau. Scan-Ausführung,
+  Thumbnail-Laden und WPF-Darstellung bleiben für separate Schritte bestehen.
+  Navigationstests verwenden austauschbare Scan-/Verlaufsquellen, damit sie
+  keine persönliche Projektbibliothek lesen.
 
 ## Ausgangspunkt und Sperre
 
@@ -81,6 +87,6 @@ sofort koppeln, ohne zusätzliche Schritte.
 
 ## Nächster Startpunkt
 
-Nach dem getesteten Viewer-Controller folgen Scan/Navigation/Thumbnails aus
+Nach der Projektnavigation folgen Scan-Ausführung und Thumbnail-Laden aus
 `ProjectsPage`, jeweils als eigener überprüfbarer Schnitt. Danach wird der
 Lebenszyklus in `AppHost` aufgeteilt; erst anschließend beginnt der Android-Umbau.

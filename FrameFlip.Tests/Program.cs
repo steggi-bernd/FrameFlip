@@ -40,6 +40,8 @@ static int RunAll()
     PlacementRegression.Run();
     ProjectInvariants.Run();
     ProjectInvariants.Frames();
+    ProjectNavigationInvariants.Run();
+    ProjectNavigationStateInvariants.Run();
     ResourceInvariants.Run();
     VaultInvariants.Run();
     BrowseInvariants.Run();
@@ -76,6 +78,9 @@ static void LoadDictionaries()
             if (System.IO.File.Exists(candidate))
             {
                 var app = System.Windows.Application.Current ?? new System.Windows.Application();
+                // Fenster-Tests duerfen beim Schliessen nicht die gemeinsame
+                // Application samt Ressourcen und Dispatcher beenden.
+                app.ShutdownMode = System.Windows.ShutdownMode.OnExplicitShutdown;
 
                 using var stream = System.IO.File.OpenRead(candidate);
 
