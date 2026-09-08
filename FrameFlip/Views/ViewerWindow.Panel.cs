@@ -241,7 +241,7 @@ public partial class ViewerWindow
         _settings.Adjustments = _adjustments;
         _persist(_settings);
 
-        if (!_playing) RedrawCurrentFrame();
+        if (!_playback.IsPlaying) RedrawCurrentFrame();
         ShowBar();
     }
 
@@ -289,7 +289,7 @@ public partial class ViewerWindow
     {
         if (_closing) return;
 
-        int index = _shownIndex >= 0 ? _shownIndex : _index;
+        int index = _playback.ShownIndex >= 0 ? _playback.ShownIndex : _playback.Index;
         if (_showingReference) { ShowReferenceFrame(); return; }
 
         _cache?.TryPresent(index, Blit);
@@ -319,7 +319,7 @@ public partial class ViewerWindow
             return;
         }
 
-        int index = _shownIndex >= 0 ? _shownIndex : _index;
+        int index = _playback.ShownIndex >= 0 ? _playback.ShownIndex : _playback.Index;
 
         _cache?.TryPresent(index, frame =>
         {
@@ -361,7 +361,7 @@ public partial class ViewerWindow
         _captureRequested = true;
 
         // Im Stillstand kommt kein neuer Frame - also einen zeichnen lassen.
-        if (!_playing) RedrawCurrentFrame();
+        if (!_playback.IsPlaying) RedrawCurrentFrame();
     }
 
     private void CaptureReference(FrameBuffer buffer)
@@ -412,7 +412,7 @@ public partial class ViewerWindow
 
         // Der Vergleich ist eine Standaufnahme - bei laufender Wiedergabe waere das
         // gemerkte Bild nach einem Bildwechsel sofort wieder weg.
-        if (show && (_playing || _buffering)) Pause();
+        if (show && (_playback.IsPlaying || _playback.IsBuffering)) Pause();
 
         _showingReference = show;
 
@@ -423,7 +423,7 @@ public partial class ViewerWindow
 
         FileNameText.Text = show
             ? Strings.T("S_CompareBadge", _referenceNumber.ToString(_numberFormat))
-            : _sequence.Frames[Math.Clamp(_shownIndex >= 0 ? _shownIndex : _index, 0, _sequence.Count - 1)].FileName;
+            : _sequence.Frames[Math.Clamp(_playback.ShownIndex >= 0 ? _playback.ShownIndex : _playback.Index, 0, _sequence.Count - 1)].FileName;
     }
 
     private void ShowReferenceFrame()
@@ -433,7 +433,7 @@ public partial class ViewerWindow
         // Denselben Weg wie ein normaler Frame nehmen, damit Korrektur, Zoom und
         // Bitmapgroesse identisch behandelt werden.
         Blit(new FrameBuffer(_referencePixels, _referenceWidth, _referenceHeight,
-                             _referenceStride, _shownIndex));
+                             _referenceStride, _playback.ShownIndex));
     }
 
     // ---------------------------------------------------------------- Vorlagen
