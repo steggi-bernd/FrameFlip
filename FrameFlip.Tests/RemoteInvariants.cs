@@ -72,6 +72,94 @@ public static class RemoteInvariants
         Check.That(!key.IsConfirmation(hostProof, RelayRole.Host, hostSalt, nudged),
                    "Schluesselnachweis bindet beide Salze");
 
+        Check.Group("Kopplung - Konformitaetsvektor v2.0");
+
+        // Dieser Satz ist kein Zufallstest. Seine Bytes stehen ebenso in
+        // PROTOCOL.md und im Android-Test, damit eine Aenderung an HKDF, HMAC,
+        // Zaehlern oder dem AES-GCM-Layout sofort als Protokollbruch auffaellt.
+        var vectorKey = PairingKey.FromBytes(Hex("030a11181f262d343b424950575e656c737a81888f969da4abb2b9c0c7ced5dc"));
+        byte[] vectorHostSalt = Hex("0102030405060708090a0b0c0d0e0f10");
+        byte[] vectorClientSalt = Hex("c8c7c6c5c4c3c2c1c0bfbebdbcbbbab9");
+        byte[] vectorHelloHost = Hex("020102030405060708090a0b0c0d0e0f10");
+        byte[] vectorHelloClient = Hex("02c8c7c6c5c4c3c2c1c0bfbebdbcbbbab9");
+
+        Check.That(vectorKey.Text == "AwoRGB8mLTQ7QklQV15lbHN6gYiPlp2kq7K5wMfO1dw", "Schluesseltext ist festgelegt");
+        Check.That(vectorKey.RoomId == "dc5bf478cd0687cb55a2a0ea208c92a3", "Raumkennung ist festgelegt");
+        Check.That(SecureChannel.TryReadHello(vectorHelloHost, out byte[]? readHostSalt) &&
+                   readHostSalt!.SequenceEqual(vectorHostSalt), "Host-Hello ist festgelegt");
+        Check.That(SecureChannel.TryReadHello(vectorHelloClient, out byte[]? readClientSalt) &&
+                   readClientSalt!.SequenceEqual(vectorClientSalt), "Client-Hello ist festgelegt");
+
+        Check.That(Convert.ToHexString(vectorKey.SessionKey(RelayRole.Host, vectorHostSalt, vectorClientSalt)).ToLowerInvariant() ==
+                   "2bc9e65f2ec34761e7ad45a07b447082459673031dbaaaeeedfe8b8c5988441a",
+                   "Host-Sitzungsschluessel ist festgelegt");
+        Check.That(Convert.ToHexString(vectorKey.SessionKey(RelayRole.Client, vectorHostSalt, vectorClientSalt)).ToLowerInvariant() ==
+                   "bb294b4c98ec57245a38dfa549653763d23028cdbcc6c416424dbedea782de52",
+                   "Client-Sitzungsschluessel ist festgelegt");
+
+        byte[] vectorHostProof = vectorKey.Confirmation(RelayRole.Host, vectorHostSalt, vectorClientSalt);
+        byte[] vectorClientProof = vectorKey.Confirmation(RelayRole.Client, vectorHostSalt, vectorClientSalt);
+
+        try
+        {
+            Check.That(Convert.ToHexString(vectorHostProof).ToLowerInvariant() ==
+                       "3a2196944745d99953f86e5546196025e45d0726473a3cf8dd5c641bde87a55c",
+                       "Host-Nachweis ist festgelegt");
+            Check.That(Convert.ToHexString(vectorClientProof).ToLowerInvariant() ==
+                       "e71dfd45149334fc580cbc43b70f8d70831e400715c12dbd78a092f7e1062bf5",
+                       "Client-Nachweis ist festgelegt");
+
+            using var vectorHost = SecureChannel.Establish(vectorKey, RelayRole.Host, vectorHostSalt, vectorClientSalt);
+            using var vectorClient = SecureChannel.Establish(vectorKey, RelayRole.Client, vectorHostSalt, vectorClientSalt);
+
+            byte[] hostProofFrame = vectorHost.Seal(vectorHostProof);
+            Check.That(Convert.ToHexString(hostProofFrame).ToLowerInvariant() ==
+                       "000000000000000042afa7ac0010fbc7ed549bb70abe72dff29089132d7f7b3414d428cf77979ee65144da862b5288d8121e42f862feb2e4",
+                       "Host-Nachweisrahmen hat Zaehler null");
+            Check.That(vectorClient.TryOpen(hostProofFrame, out byte[]? openedHostProof) &&
+                       vectorKey.IsConfirmation(openedHostProof!, RelayRole.Host, vectorHostSalt, vectorClientSalt),
+                       "Client nimmt den Host-Nachweis an");
+            Check.That(!vectorClient.TryOpen(hostProofFrame, out _), "Nachweisrahmen ist nicht wiederholbar");
+
+            byte[] clientProofFrame = vectorClient.Seal(vectorClientProof);
+            Check.That(Convert.ToHexString(clientProofFrame).ToLowerInvariant() ==
+                       "0000000000000000ef721540948959a82f51bdc57f48a793b352c89fcd2c94d61a34fa98bae8792815f64e205736145d53d736d233a3c92f",
+                       "Client-Nachweisrahmen hat Zaehler null");
+            Check.That(vectorHost.TryOpen(clientProofFrame, out byte[]? openedClientProof) &&
+                       vectorKey.IsConfirmation(openedClientProof!, RelayRole.Client, vectorHostSalt, vectorClientSalt),
+                       "Host nimmt den Client-Nachweis an");
+
+            byte[] hostApplication = Encoding.UTF8.GetBytes("\u0001{\"t\":\"idle\"}");
+            byte[] clientApplication = Encoding.UTF8.GetBytes("\u0001{\"c\":\"preview\",\"w\":320}");
+
+            byte[] hostApplicationFrame = vectorHost.Seal(hostApplication);
+            Check.That(Convert.ToHexString(hostApplicationFrame).ToLowerInvariant() ==
+                       "000000000000000160f51443554daabc863b543103f01b9d0f8a3306a3a2f4ebd6209d15fe",
+                       "erste Host-Nutzlast hat Zaehler eins");
+            Check.That(vectorClient.TryOpen(hostApplicationFrame, out byte[]? openedHostApplication) &&
+                       openedHostApplication!.SequenceEqual(hostApplication), "Client liest die feste Host-Nutzlast");
+
+            byte[] clientApplicationFrame = vectorClient.Seal(clientApplication);
+            Check.That(Convert.ToHexString(clientApplicationFrame).ToLowerInvariant() ==
+                       "00000000000000016de0475377372c0f9342cfb7eee029ebc35254a5f8df4b67782ddae84184a6bd826fea4c1698a57a",
+                       "erste Client-Nutzlast hat Zaehler eins");
+            Check.That(vectorHost.TryOpen(clientApplicationFrame, out byte[]? openedClientApplication) &&
+                       openedClientApplication!.SequenceEqual(clientApplication), "Host liest die feste Client-Nutzlast");
+
+            byte[] tampered = (byte[])hostApplicationFrame.Clone();
+            tampered[SecureChannel.Overhead - 1] ^= 0x01;
+
+            using var untouchedClient = SecureChannel.Establish(vectorKey, RelayRole.Client, vectorHostSalt, vectorClientSalt);
+            Check.That(!untouchedClient.TryOpen(tampered, out _), "gekippter Tag wird verworfen");
+            Check.That(!vectorKey.IsConfirmation(vectorHostProof, RelayRole.Client, vectorHostSalt, vectorClientSalt),
+                       "Nachweis gilt nicht mit vertauschter Rolle");
+        }
+        finally
+        {
+            System.Security.Cryptography.CryptographicOperations.ZeroMemory(vectorHostProof);
+            System.Security.Cryptography.CryptographicOperations.ZeroMemory(vectorClientProof);
+        }
+
         Check.Group("Kanal - der Normalfall");
 
         byte[] helloHost = SecureChannel.Hello(out byte[] saltHost);
@@ -240,4 +328,6 @@ public static class RemoteInvariants
         Random.Shared.NextBytes(salt);
         return salt;
     }
+
+    private static byte[] Hex(string text) => Convert.FromHexString(text);
 }
