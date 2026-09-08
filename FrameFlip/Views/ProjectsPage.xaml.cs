@@ -54,10 +54,10 @@ public partial class ProjectsPage : UserControl
     private static readonly Dictionary<string, BitmapSource> Cache = new();
 
     private readonly Action<string> _openSequence;
+    private readonly Func<List<BlendProject>> _scan;
+    private readonly Func<List<RecentSequence>> _recent;
 
-    private List<BlendProject> _projects = new();
-    private BlendProject? _project;
-    private string? _folder;
+    private readonly ProjectNavigation _navigation = new();
 
     /// <summary>
     /// Laufende Nummer der Ansicht. Ein Vorschaubild, das aus dem Hintergrund
@@ -65,16 +65,22 @@ public partial class ProjectsPage : UserControl
     /// </summary>
     private int _generation;
 
-    /// <summary>Ob der Stapel der Fassungen aufgeklappt ist. Zu, bis jemand ihn oeffnet.</summary>
-    private bool _versionsOpen;
-
     private Window? _preview;
     private Point _pressed;
     private bool _dragging;
 
     public ProjectsPage(Action<string> openSequence)
+        : this(openSequence, ProjectLibrary.Scan, RecentSequences.Load)
+    {
+    }
+
+    /// <summary>Die Datenquellen sind austauschbar; Navigationstests lesen keine persoenliche Bibliothek.</summary>
+    internal ProjectsPage(Action<string> openSequence, Func<List<BlendProject>> scan,
+                          Func<List<RecentSequence>> recent)
     {
         _openSequence = openSequence;
+        _scan = scan;
+        _recent = recent;
 
         InitializeComponent();
 
@@ -144,22 +150,7 @@ public partial class ProjectsPage : UserControl
             return true;
         }
 
-        if (_project is null) return false;
-
-        string root = RootOf(_project);
-        string folder = _folder ?? root;
-
-        if (!string.Equals(folder, root, StringComparison.OrdinalIgnoreCase))
-        {
-            string? up = Path.GetDirectoryName(folder);
-
-            _folder = up is not null && up.Length >= root.Length ? up : root;
-            Render();
-            return true;
-        }
-
-        _project = null;
-        _folder = null;
+        if (!_navigation.Back()) return false;
         Render();
 
         return true;
@@ -180,7 +171,7 @@ public partial class ProjectsPage : UserControl
 
         Task.Run(() =>
         {
-            var found = ProjectLibrary.Scan();
+            var found = _scan();
 
             dispatcher.InvokeAsync(() => Apply(found));
         });
@@ -188,15 +179,7 @@ public partial class ProjectsPage : UserControl
 
     private void Apply(List<BlendProject> projects)
     {
-        _projects = projects;
-
-        // Ein Projekt, das gerade offen ist, kann verschwunden sein - etwa, weil
-        // jemand seinen Ordner entfernt hat.
-        if (_project is not null)
-            _project = _projects.FirstOrDefault(p => p.Key == _project.Key);
-
-        if (_project is null) _folder = null;
-
+        _navigation.Apply(projects);
         Render();
     }
 
@@ -211,7 +194,7 @@ public partial class ProjectsPage : UserControl
         StackBar.Content = null;
         Note.Visibility = Visibility.Collapsed;
 
-        if (_project is null) Overview();
+        if (_navigation.Project is null) Overview();
         else Inside();
     }
 
@@ -229,7 +212,7 @@ public partial class ProjectsPage : UserControl
             Foreground = (Brush)FindResource("MutedBrush"),
         });
 
-        if (_projects.Count == 0)
+        if (_navigation.Projects.Count == 0)
         {
             Note.Text = T("S_ProjectsEmpty");
 
@@ -237,18 +220,18 @@ public partial class ProjectsPage : UserControl
         }
         else
         {
-            Body.Children.Add(Section(T("S_BlenderProjects", _projects.Count)));
+            Body.Children.Add(Section(T("S_BlenderProjects", _navigation.Projects.Count)));
 
             var tiles = Wrap();
 
-            foreach (var project in _projects) tiles.Children.Add(ProjectTile(project));
+            foreach (var project in _navigation.Projects) tiles.Children.Add(ProjectTile(project));
 
             Body.Children.Add(tiles);
         }
 
         // Was FrameFlip schon einmal geoeffnet hat. Das sind Bildordner, keine
         // Projekte - deshalb eine eigene Reihe und nicht dazwischengemischt.
-        var recent = RecentSequences.Load();
+        var recent = _recent();
 
         if (recent.Count > 0)
         {
@@ -264,28 +247,19 @@ public partial class ProjectsPage : UserControl
 
     private void Inside()
     {
-        var project = _project!;
-        string root = RootOf(project);
-        string folder = _folder ?? root;
+        var project = _navigation.Project!;
+        string root = _navigation.Root;
+        string folder = _navigation.CurrentFolder;
 
         Heading.Text = project.Name.ToUpperInvariant();
 
-        Crumbs.Children.Add(Crumb("PROJEKTE", () => { _project = null; _folder = null; Render(); }));
-        Crumbs.Children.Add(Crumb(project.Name, () => { _folder = root; Render(); }));
+        Crumbs.Children.Add(Crumb("PROJEKTE", () => { _navigation.ShowOverview(); Render(); }));
+        Crumbs.Children.Add(Crumb(project.Name, () => { _navigation.OpenFolder(root); Render(); }));
 
         // Der Weg von der .blend-Datei bis hierher, Ordner fuer Ordner.
-        if (folder.Length > root.Length && folder.StartsWith(root, StringComparison.OrdinalIgnoreCase))
+        foreach (var crumb in _navigation.Breadcrumbs())
         {
-            string walked = root;
-
-            foreach (string part in folder[root.Length..].Split(Path.DirectorySeparatorChar,
-                                                                StringSplitOptions.RemoveEmptyEntries))
-            {
-                walked = Path.Combine(walked, part);
-                string here = walked;
-
-                Crumbs.Children.Add(Crumb(part, () => { _folder = here; Render(); }));
-            }
+            Crumbs.Children.Add(Crumb(crumb.Name, () => { _navigation.OpenFolder(crumb.Path); Render(); }));
         }
 
         // Die .blend-Dateien gehoeren in die Kopfzeile, nicht in den Inhalt: Sie sind
@@ -296,7 +270,7 @@ public partial class ProjectsPage : UserControl
         {
             StackBar.Content = VersionStack(project);
 
-            if (_versionsOpen)
+            if (_navigation.VersionsOpen)
             {
                 Body.Children.Add(Section(T("S_VersionsTitle")));
 
@@ -376,7 +350,7 @@ public partial class ProjectsPage : UserControl
 
     private Border ProjectTile(BlendProject project)
     {
-        string root = RootOf(project);
+        string root = ProjectNavigation.RootOf(project);
 
         // Ein Projekt ohne echte Fassung gibt es wirklich: Die .blend wurde geloescht,
         // Blenders Sicherung liegt noch da. "0 Fassungen" waere die schlechtere
@@ -391,7 +365,7 @@ public partial class ProjectsPage : UserControl
         string detail = $"{count} · {Ago(project.TouchedUtc)}";
 
         var tile = Tile(project.Name, detail, ProjectScanner.Thumbnail(root), 480, 320, 180,
-                        () => { _project = project; _folder = root; Render(); });
+                        () => { _navigation.OpenProject(project); Render(); });
 
         tile.ToolTip = project.Newest?.Path ?? root;
 
@@ -415,7 +389,7 @@ public partial class ProjectsPage : UserControl
                 : T("S_EmptyShort");
 
         var view = Tile(tile.Name, detail, tile.Thumbnail, 480, 320, 180,
-                        () => { _folder = tile.Path; Render(); });
+                        () => { _navigation.OpenFolder(tile.Path); Render(); });
 
         view.ToolTip = tile.Path;
 
@@ -614,7 +588,7 @@ public partial class ProjectsPage : UserControl
         var arrow = new TextBlock
         {
             Margin = new Thickness(14, 0, 0, 0),
-            Text = _versionsOpen ? "▴" : "▾",
+            Text = _navigation.VersionsOpen ? "▴" : "▾",
             VerticalAlignment = VerticalAlignment.Center,
             FontSize = 10,
             Foreground = (Brush)FindResource("MutedBrush"),
@@ -644,7 +618,7 @@ public partial class ProjectsPage : UserControl
 
         bar.MouseLeftButtonUp += (_, _) =>
         {
-            _versionsOpen = !_versionsOpen;
+            _navigation.ToggleVersions();
             Render();
         };
 
@@ -726,8 +700,7 @@ public partial class ProjectsPage : UserControl
         detach.Click += (_, _) =>
         {
             ProjectLibrary.Assign(version.Path, Path.GetFileNameWithoutExtension(version.FileName));
-            _project = null;
-            _folder = null;
+            _navigation.ShowOverview();
             Reload();
         };
 
@@ -797,7 +770,7 @@ public partial class ProjectsPage : UserControl
         // Ein ganzes Projekt: alle seine Fassungen wandern hinueber.
         if (e.Data.GetDataPresent(ProjectFormat)
             && e.Data.GetData(ProjectFormat) is string key
-            && _projects.FirstOrDefault(p => p.Key == key) is BlendProject source
+            && _navigation.Projects.FirstOrDefault(p => p.Key == key) is BlendProject source
             && source.Key != target.Key)
         {
             foreach (var version in source.Versions) ProjectLibrary.Assign(version.Path, target.Key);
@@ -916,16 +889,6 @@ public partial class ProjectsPage : UserControl
         button.MouseLeftButtonUp += (_, _) => action();
         button.MouseEnter += (_, _) => button.Background = (Brush)FindResource("SurfaceBrush");
         button.MouseLeave += (_, _) => button.Background = (Brush)FindResource("AppSurface");
-    }
-
-    /// <summary>Der Ordner, in dem das Projekt liegt - der Ausgangspunkt fuers Blaettern.</summary>
-    private static string RootOf(BlendProject project)
-    {
-        if (project.Folder.Length > 0) return project.Folder;
-
-        string? path = project.Newest?.Path ?? project.Versions.FirstOrDefault()?.Path;
-
-        return path is null ? string.Empty : Path.GetDirectoryName(path) ?? string.Empty;
     }
 
     private static void Reveal(string path)
