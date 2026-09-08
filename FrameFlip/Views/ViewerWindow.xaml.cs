@@ -48,7 +48,7 @@ public partial class ViewerWindow : Window
     private readonly Action<AppSettings> _persist;
     private readonly PixelRect _bounds;
     private readonly int _maxWorkers;
-    private readonly PlaybackClock _clock = new();
+    private readonly ViewerPlaybackController _playback;
     private readonly DispatcherTimer _hideTimer;
     private readonly DispatcherTimer _bufferTimer;
     private readonly DispatcherTimer _redecodeTimer;
@@ -58,26 +58,14 @@ public partial class ViewerWindow : Window
     private WriteableBitmap? _surface;
     private ResourceProfile _profile = ResourceProfile.Conservative;
 
-    private int _index;
-    private int _shownIndex = -1;
-    private int _direction = 1;
     private int _pendingIndex = -1;
-    private bool _loop;
-    private volatile bool _playing;
     private volatile bool _closing;
-    private bool _buffering;
-    private bool _resumeAfterBuffering;
-    private long _bufferingSince;
 
     private bool _initializing = true;
     private bool _suppressScrubber;
     private bool _scrubbing;
     private bool _resumeAfterScrub;
     private bool _barVisible = true;
-
-    /// <summary>In- und Out-Punkt als Listenposition, -1 wenn nicht gesetzt.</summary>
-    private int _inPoint = -1;
-    private int _outPoint = -1;
 
     private bool _closeAnimating;
     private ExportWindow? _exportWindow;
@@ -126,8 +114,7 @@ public partial class ViewerWindow : Window
         _sourceWidth = Math.Max(1, sourceWidth);
         _sourceHeight = Math.Max(1, sourceHeight);
         _maxWorkers = Math.Max(1, maxWorkers);
-        _index = Math.Clamp(startIndex, 0, Math.Max(0, sequence.Count - 1));
-        _loop = settings.Loop;
+        _playback = new ViewerPlaybackController(sequence.Count, startIndex, settings.Loop);
         _numberFormat = sequence.NumberFormat;
 
         InitializeComponent();
@@ -137,18 +124,18 @@ public partial class ViewerWindow : Window
         _view.SetNativeSize(_sourceWidth, _sourceHeight);
         _view.Changed += OnViewChanged;
 
-        _clock.Fps = settings.Fps;
-        _clock.LockToDisplay = settings.LockToDisplay;
+        _playback.Clock.Fps = settings.Fps;
+        _playback.Clock.LockToDisplay = settings.LockToDisplay;
 
         FpsBox.ItemsSource = FpsOption.All;
         FpsBox.SelectedItem = FpsOption.Closest(settings.Fps);
-        LoopButton.IsChecked = _loop;
+        LoopButton.IsChecked = _playback.Loop;
 
         // Die Zeitleiste laeuft ueber Framenummern, nicht ueber Listenpositionen -
         // sonst waeren Luecken nicht darstellbar.
         Scrubber.Minimum = sequence.StartNumber;
         Scrubber.Maximum = Math.Max(sequence.StartNumber, sequence.EndNumber);
-        Scrubber.Value = sequence.Frames[_index].Number;
+        Scrubber.Value = sequence.Frames[_playback.Index].Number;
         Scrubber.ValueChanged += OnScrubberValueChanged;
         Scrubber.AddHandler(Thumb.DragStartedEvent, new DragStartedEventHandler(OnScrubStarted));
         Scrubber.AddHandler(Thumb.DragCompletedEvent, new DragCompletedEventHandler(OnScrubCompleted));
@@ -224,14 +211,14 @@ public partial class ViewerWindow : Window
 
         CreateCache(RequiredDecodeWidth(), RequiredDecodeHeight());
 
-        Volatile.Write(ref _pendingIndex, _index);
-        PresentFrame(_index);
+        Volatile.Write(ref _pendingIndex, _playback.Index);
+        PresentFrame(_playback.Index);
 
-        FileNameText.Text = _sequence.Frames[_index].FileName;
-        UpdateCounter(_index);
+        FileNameText.Text = _sequence.Frames[_playback.Index].FileName;
+        UpdateCounter(_playback.Index);
 
         ProbeBitDepth();
-        UpdateMetadata(_index);
+        UpdateMetadata(_playback.Index);
 
         // Erst puffern, dann abspielen. Sonst laeuft die Uhr los, waehrend der
         // Decoder noch fuellt - genau das erzeugt das Ruckeln beim Start.
@@ -255,7 +242,7 @@ public partial class ViewerWindow : Window
         _bitsPerChannel = 0;
         if (_sequence.Count == 0) return;
 
-        if (_decoders.TryProbeInfo(_sequence.Frames[_index].Path, out var info))
+        if (_decoders.TryProbeInfo(_sequence.Frames[_playback.Index].Path, out var info))
             _bitsPerChannel = info.BitsPerChannel;
     }
 
@@ -319,18 +306,14 @@ public partial class ViewerWindow : Window
         _numberFormat = sequence.NumberFormat;
         _sourceWidth = Math.Max(1, sourceWidth);
         _sourceHeight = Math.Max(1, sourceHeight);
-        _index = Math.Clamp(startIndex, 0, Math.Max(0, sequence.Count - 1));
-        _shownIndex = -1;
-        _direction = 1;
-        _inPoint = -1;
-        _outPoint = -1;
+        _playback.ResetSequence(sequence.Count, startIndex);
 
         _view.SetNativeSize(_sourceWidth, _sourceHeight);
 
         _suppressScrubber = true;
         Scrubber.Minimum = sequence.StartNumber;
         Scrubber.Maximum = Math.Max(sequence.StartNumber, sequence.EndNumber);
-        Scrubber.Value = sequence.Frames[_index].Number;
+        Scrubber.Value = sequence.Frames[_playback.Index].Number;
         _suppressScrubber = false;
 
         ShowGaps();
@@ -348,12 +331,12 @@ public partial class ViewerWindow : Window
 
         CreateCache(RequiredDecodeWidth(), RequiredDecodeHeight());
 
-        Volatile.Write(ref _pendingIndex, _index);
-        PresentFrame(_index);
+        Volatile.Write(ref _pendingIndex, _playback.Index);
+        PresentFrame(_playback.Index);
 
-        FileNameText.Text = sequence.Frames[_index].FileName;
-        UpdateCounter(_index);
-        UpdateMetadata(_index);
+        FileNameText.Text = sequence.Frames[_playback.Index].FileName;
+        UpdateCounter(_playback.Index);
+        UpdateMetadata(_playback.Index);
 
         Activate();
         ShowBar();
@@ -371,13 +354,12 @@ public partial class ViewerWindow : Window
 
         DisposeMetrics();
 
-        if (_playing)
+        if (_playback.IsPlaying)
         {
             CompositionTarget.Rendering -= OnRendering;
-            _playing = false;
         }
 
-        _clock.Stop();
+        _playback.Stop();
         _hideTimer.Stop();
         _hideTimer.Tick -= OnHideTick;
         _bufferTimer.Stop();
@@ -458,9 +440,9 @@ public partial class ViewerWindow : Window
 
         var cache = new FrameCache(_sequence, _decoders, decodeWidth, decodeHeight,
                                    _settings.MemoryBudgetBytes, PrefetchAhead(), PrefetchBehind(),
-                                   _loop, _maxWorkers, _profile, _rawCache);
+                                   _playback.Loop, _maxWorkers, _profile, _rawCache);
         cache.FrameReady += OnFrameReady;
-        cache.SetPosition(_index, _direction, _loop, urgent: true);
+        cache.SetPosition(_playback.Index, _playback.Direction, _playback.Loop, urgent: true);
         _cache = cache;
     }
 
@@ -507,7 +489,7 @@ public partial class ViewerWindow : Window
     /// </summary>
     private int PrefetchAhead()
     {
-        int fromSeconds = (int)Math.Ceiling(_clock.Fps * PrefetchSeconds);
+        int fromSeconds = (int)Math.Ceiling(_playback.Clock.Fps * PrefetchSeconds);
         return Math.Clamp(Math.Max(_settings.PrefetchAhead, fromSeconds), 1, 2000);
     }
 
@@ -535,7 +517,7 @@ public partial class ViewerWindow : Window
         _redecodeTimer.Stop();
         if (_closing || _cache is null) return;
 
-        if (_deferRedecode && (_playing || _buffering))
+        if (_deferRedecode && (_playback.IsPlaying || _playback.IsBuffering))
         {
             _redecodeDeferred = true;   // wird beim Pausieren eingeloest
             return;
@@ -550,12 +532,12 @@ public partial class ViewerWindow : Window
         double delta = Math.Abs(wanted - current) / (double)current;
         if (delta < RedecodeThreshold) return;
 
-        bool wasPlaying = _playing;
+        bool wasPlaying = _playback.IsPlaying;
         CreateCache(wanted, RequiredDecodeHeight());
 
-        Volatile.Write(ref _pendingIndex, _index);
-        if (wasPlaying || _buffering)
-            EnterBuffering(resume: wasPlaying || _resumeAfterBuffering, reason: Strings.T("S_NewResolution"));
+        Volatile.Write(ref _pendingIndex, _playback.Index);
+        if (wasPlaying || _playback.IsBuffering)
+            EnterBuffering(resume: wasPlaying || _playback.ResumeAfterBuffering, reason: Strings.T("S_NewResolution"));
     }
 
     /// <param name="deferWhilePlaying">
@@ -633,7 +615,7 @@ public partial class ViewerWindow : Window
     /// <summary>Wird auf einem Decoder-Thread ausgeloest - relevant, solange auf einen Frame gewartet wird.</summary>
     private void OnFrameReady(int index)
     {
-        if (_closing || _playing) return;
+        if (_closing || _playback.IsPlaying) return;
         if (Volatile.Read(ref _pendingIndex) != index) return;
 
         Dispatcher.BeginInvoke(DispatcherPriority.Render, new Action(() =>
@@ -650,14 +632,14 @@ public partial class ViewerWindow : Window
         if (cache is null || index < 0 || index >= _sequence.Count) return false;
         if (!cache.TryPresent(index, Blit)) return false;
 
-        _shownIndex = index;
+        _playback.MarkPresented(index);
         _presentedInWindow++;
         FileNameText.Text = _sequence.Frames[index].FileName;
         UpdateCounter(index);
         UpdateScrubber(index);
 
         // Waehrend der Wiedergabe entfaellt der Dateisystemzugriff fuer die Groesse.
-        if (!_playing) UpdateMetadata(index);
+        if (!_playback.IsPlaying) UpdateMetadata(index);
         return true;
     }
 
@@ -896,36 +878,33 @@ public partial class ViewerWindow : Window
     private void OnRendering(object? sender, EventArgs e)
     {
         var cache = _cache;
-        if (!_clock.IsRunning || cache is null) return;
+        if (!_playback.Clock.IsRunning || cache is null) return;
 
         // Erst messen, dann schalten: RawTarget liest im gekoppelten Betrieb den
         // Zaehler, den Tick gerade fortschreibt.
         _refresh.Sample(_refreshWatch.Elapsed.TotalMilliseconds);
-        _clock.ObserveDisplay(_refresh.NominalHz, _refresh.EffectiveHz);
-        _clock.Tick();
+        _playback.Clock.ObserveDisplay(_refresh.NominalHz, _refresh.EffectiveHz);
+        _playback.Clock.Tick();
 
-        var (first, last) = ActiveRange();
-        int target = SequenceMath.ResolveInRange(_clock.RawTarget, first, last, _loop, out bool pastEnd);
+        int target = _playback.ResolveTarget(_playback.Clock.RawTarget, out bool pastEnd);
         if (pastEnd)
         {
             PresentFrame(target);
-            _index = target;
             Pause();
             return;
         }
 
         UpdateMeasuredRate();
 
-        if (target < 0 || target == _shownIndex) return;
+        if (target < 0 || target == _playback.ShownIndex) return;
 
-        _index = target;
-        cache.SetPosition(target, _direction, _loop, urgent: false);
+        cache.SetPosition(target, _playback.Direction, _playback.Loop, urgent: false);
 
         if (PresentFrame(target)) return;
 
         // Fehlt der Zielframe, aber es liegt noch etwas voraus: Frame verwerfen und
         // weiterlaufen. Ist der Ring leergelaufen, wird angehalten und nachgeladen.
-        int fallback = cache.BestAvailableBefore(target, _shownIndex, FallbackLookback);
+        int fallback = cache.BestAvailableBefore(target, _playback.ShownIndex, FallbackLookback);
         if (fallback >= 0)
         {
             PresentFrame(fallback);
@@ -953,11 +932,11 @@ public partial class ViewerWindow : Window
         double rate = _presentedInWindow * 1000.0 / _rateWindow.ElapsedMilliseconds;
 
         RateText.Text = $"{rate:0.0} fps";
-        RateText.Foreground = (Brush)FindResource(rate < _clock.Fps * 0.9 ? "AccentBrush" : "MutedBrush");
-        RateText.ToolTip = _clock.IsLockedToDisplay
-            ? Strings.T("S_LockedToDisplay", $"{_clock.DisplayHz:0.#}")
-            : _clock.DisplayHz > 0
-                ? Strings.T("S_TimeBased", $"{_clock.DisplayHz:0.#}")
+        RateText.Foreground = (Brush)FindResource(rate < _playback.Clock.Fps * 0.9 ? "AccentBrush" : "MutedBrush");
+        RateText.ToolTip = _playback.Clock.IsLockedToDisplay
+            ? Strings.T("S_LockedToDisplay", $"{_playback.Clock.DisplayHz:0.#}")
+            : _playback.Clock.DisplayHz > 0
+                ? Strings.T("S_TimeBased", $"{_playback.Clock.DisplayHz:0.#}")
                 : null;
 
         UpdateBufferReadout();
@@ -977,7 +956,7 @@ public partial class ViewerWindow : Window
     private void UpdateBufferReadout()
     {
         var cache = _cache;
-        if (cache is null || _clock.Fps <= 0) { BufferText.Text = string.Empty; return; }
+        if (cache is null || _playback.Clock.Fps <= 0) { BufferText.Text = string.Empty; return; }
 
         var stats = cache.GetStats();
 
@@ -998,7 +977,7 @@ public partial class ViewerWindow : Window
         // fuer eine Zeitangabe nicht: mehr als die Sequenz selbst kann nicht
         // vorausliegen.
         int ahead = Math.Min(stats.AheadReady, Math.Max(0, rangeLength - 1));
-        double seconds = ahead / _clock.Fps;
+        double seconds = ahead / _playback.Clock.Fps;
 
         BufferText.Text = Strings.T("S_BufferSeconds", $"{seconds:0.0}");
 
@@ -1009,21 +988,7 @@ public partial class ViewerWindow : Window
 
     /// <summary>Frames, die vor dem Start bereitliegen muessen.</summary>
     private int WarmupTarget()
-    {
-        int configured = _settings.WarmupFrames;
-        int frames = configured > 0 ? configured : (int)Math.Ceiling(_clock.Fps * 1.5);
-
-        // Nie mehr verlangen, als der Ring ueberhaupt bereitstellen kann. Sonst
-        // wartet das Puffern auf eine Zahl, die nie erreicht wird, und endet erst
-        // im Notausstieg nach acht Sekunden.
-        // Auf den aktiven Bereich bezogen: Bei einem Ausschnitt von zehn Frames
-        // wartet das Puffern sonst auf neunzig, die es dort gar nicht gibt.
-        var (first, last) = ActiveRange();
-        int reachable = Math.Min(PrefetchAhead(), Math.Max(1, last - first));
-        int fitsInRing = _cache?.GetStats().Capacity - 1 ?? reachable;
-
-        return Math.Clamp(frames, 2, Math.Max(2, Math.Min(reachable, fitsInRing)));
-    }
+        => _playback.WarmupTarget(_settings.WarmupFrames, PrefetchAhead(), _cache?.GetStats().Capacity);
 
     /// <param name="reason">
     /// Woher der Anstoss kam. Steht im Hinweis, damit sichtbar wird, ob der Ring
@@ -1032,19 +997,10 @@ public partial class ViewerWindow : Window
     /// </param>
     private void EnterBuffering(bool resume, string? reason = null)
     {
-        if (_closing || _sequence.Count <= 1) return;
-
-        if (_playing)
-        {
-            CompositionTarget.Rendering -= OnRendering;
-            _playing = false;
-            _clock.Stop();
-            if (_shownIndex >= 0) _index = _shownIndex;
-        }
-
-        _buffering = true;
-        _resumeAfterBuffering = resume;
-        _bufferingSince = Environment.TickCount64;
+        if (_closing) return;
+        bool wasPlaying = _playback.IsPlaying;
+        if (!_playback.EnterBuffering(resume)) return;
+        if (wasPlaying) CompositionTarget.Rendering -= OnRendering;
 
         PlayButton.Content = "▶";
         ShowStatus(reason is null ? Strings.T("S_Buffering") : Strings.T("S_BufferingReason", reason));
@@ -1057,48 +1013,31 @@ public partial class ViewerWindow : Window
         if (_closing || cache is null) { _bufferTimer.Stop(); return; }
 
         // Solange noch kein Bild steht, zuerst das aktuelle zeigen.
-        if (_shownIndex < 0 && PresentFrame(_index)) Volatile.Write(ref _pendingIndex, -1);
+        if (_playback.ShownIndex < 0 && PresentFrame(_playback.Index)) Volatile.Write(ref _pendingIndex, -1);
 
-        int ready = cache.ReadyAhead();
-        int target = WarmupTarget();
-
-        var (rangeFirst, rangeLast) = ActiveRange();
-        bool wholeSequence = cache.GetStats().CachedFrames >= rangeLast - rangeFirst + 1;
-
-        // Notausstieg, damit eine langsame Platte die Wiedergabe nicht endlos blockiert.
-        bool timedOut = Environment.TickCount64 - _bufferingSince > 8000;
-
-        if (ready < target && !wholeSequence && !timedOut) return;
+        var completion = _playback.CompleteBuffering(cache.ReadyAhead(), WarmupTarget(), cache.GetStats().CachedFrames);
+        if (completion == BufferCompletion.Waiting) return;
 
         _bufferTimer.Stop();
-        _buffering = false;
         HideStatus();
-
-        if (_resumeAfterBuffering)
+        if (completion == BufferCompletion.Resume)
         {
-            _resumeAfterBuffering = false;
             Play();
             return;
         }
 
-        // Gepuffert, aber nicht weitergespielt: jetzt sind die Dateidaten wieder dran.
         RefreshMetadata();
     }
 
     private void Play()
     {
-        if (_playing || _sequence.Count <= 1 || _closing) return;
+        if (_closing || !_playback.Play()) return;
 
-        _buffering = false;
         _bufferTimer.Stop();
         HideStatus();
-
-        _playing = true;
-        _direction = 1;
         Volatile.Write(ref _pendingIndex, -1);
         _refresh.Reset();
-        _clock.Start(_index);
-        _cache?.SetPosition(_index, 1, _loop, urgent: false);
+        _cache?.SetPosition(_playback.Index, 1, _playback.Loop, urgent: false);
 
         CompositionTarget.Rendering += OnRendering;
         PlayButton.Content = "❙❙";
@@ -1106,26 +1045,22 @@ public partial class ViewerWindow : Window
 
     private void Pause()
     {
-        _resumeAfterBuffering = false;
+        bool wasBuffering = _playback.IsBuffering;
+        bool wasPlaying = _playback.Pause();
 
-        if (_buffering)
+        if (wasBuffering)
         {
-            _buffering = false;
             _bufferTimer.Stop();
             HideStatus();
         }
 
-        if (!_playing)
+        if (!wasPlaying)
         {
             PlayButton.Content = "▶";
             return;
         }
 
-        _playing = false;
         CompositionTarget.Rendering -= OnRendering;
-        _clock.Stop();
-
-        if (_shownIndex >= 0) _index = _shownIndex;
 
         PlayButton.Content = "▶";
         _rateWindow.Reset();
@@ -1143,7 +1078,7 @@ public partial class ViewerWindow : Window
         if (_redecodeDeferred) ScheduleRedecode();
     }
 
-    private void RefreshMetadata() => UpdateMetadata(_shownIndex >= 0 ? _shownIndex : _index);
+    private void RefreshMetadata() => UpdateMetadata(_playback.ShownIndex >= 0 ? _playback.ShownIndex : _playback.Index);
 
     /// <summary>
     /// Sagt es, wenn die eingestellte Bildrate nicht zu halten ist.
@@ -1158,8 +1093,8 @@ public partial class ViewerWindow : Window
     {
         // Nur bei anhaltendem Rueckstand und leerem Vorrat: ein einzelner Aussetzer
         // ist normal und soll nicht kommentiert werden.
-        bool behind = rate < _clock.Fps * 0.85;
-        bool starved = (_cache?.ReadyAhead() ?? 0) < _clock.Fps * 0.25;
+        bool behind = rate < _playback.Clock.Fps * 0.85;
+        bool starved = (_cache?.ReadyAhead() ?? 0) < _playback.Clock.Fps * 0.25;
 
         if (!behind || !starved) { _slowRounds = 0; return; }
 
@@ -1186,7 +1121,7 @@ public partial class ViewerWindow : Window
 
     private void TogglePlay()
     {
-        if (_playing || _buffering) Pause();
+        if (_playback.IsPlaying || _playback.IsBuffering) Pause();
         else EnterBuffering(resume: true, reason: "Wiedergabe startet");
         ShowBar();
     }
@@ -1198,33 +1133,24 @@ public partial class ViewerWindow : Window
     /// </summary>
     private void Step(int delta)
     {
-        if (_playing || _buffering) Pause();
+        if (_playback.IsPlaying || _playback.IsBuffering) Pause();
 
-        var (first, last) = ActiveRange();
-        int next = SequenceMath.OffsetInRange(_index, delta, first, last, _loop);
-        if (next < 0) return;   // Bereichsende ohne Loop: stehenbleiben
-
-        _index = next;
-        _direction = delta >= 0 ? 1 : -1;
+        if (!_playback.Step(delta)) return;
 
         // Richtungswechsel dreht auch die Vorausladerichtung des Ringpuffers um.
-        _cache?.SetPosition(_index, _direction, _loop, urgent: true);
+        _cache?.SetPosition(_playback.Index, _playback.Direction, _playback.Loop, urgent: true);
 
-        Volatile.Write(ref _pendingIndex, _index);
-        if (PresentFrame(_index)) Volatile.Write(ref _pendingIndex, -1);
+        Volatile.Write(ref _pendingIndex, _playback.Index);
+        if (PresentFrame(_playback.Index)) Volatile.Write(ref _pendingIndex, -1);
 
-        UpdateScrubber(_index);
+        UpdateScrubber(_playback.Index);
         ShowBar();
     }
 
     private void SeekTo(int index)
     {
-        if (index < 0 || index >= _sequence.Count || index == _index) return;
-
-        _direction = index >= _index ? 1 : -1;
-        _index = index;
-        _cache?.SetPosition(index, _direction, _loop, urgent: true);
-        if (_playing) _clock.Seek(index);
+        if (!_playback.Seek(index)) return;
+        _cache?.SetPosition(index, _playback.Direction, _playback.Loop, urgent: true);
 
         Volatile.Write(ref _pendingIndex, index);
         if (PresentFrame(index)) Volatile.Write(ref _pendingIndex, -1);
@@ -1388,7 +1314,7 @@ public partial class ViewerWindow : Window
         e.Handled = true;
 
         bool control = (Keyboard.Modifiers & ModifierKeys.Control) != 0;
-        bool running = _playing || _buffering;
+        bool running = _playback.IsPlaying || _playback.IsBuffering;
         bool scrub = running ? !control : control;
 
         if (scrub) Step(e.Delta > 0 ? 1 : -1);
@@ -1478,7 +1404,7 @@ public partial class ViewerWindow : Window
     private void OnScrubStarted(object sender, DragStartedEventArgs e)
     {
         _scrubbing = true;
-        _resumeAfterScrub = _playing || _buffering;
+        _resumeAfterScrub = _playback.IsPlaying || _playback.IsBuffering;
         Pause();
     }
 
@@ -1488,7 +1414,7 @@ public partial class ViewerWindow : Window
 
         // Auf die Nummer des tatsaechlich gezeigten Frames einrasten; nach einem
         // Halt in einer Luecke stuende der Regler sonst neben dem Bild.
-        UpdateScrubber(_index);
+        UpdateScrubber(_playback.Index);
 
         if (_resumeAfterScrub)
         {
@@ -1511,11 +1437,11 @@ public partial class ViewerWindow : Window
 
     private void OnLoopChanged(object sender, RoutedEventArgs e)
     {
-        _loop = LoopButton.IsChecked == true;
-        _cache?.SetPosition(_index, _direction, _loop, urgent: false);
+        _playback.Loop = LoopButton.IsChecked == true;
+        _cache?.SetPosition(_playback.Index, _playback.Direction, _playback.Loop, urgent: false);
 
         if (_initializing) return;
-        _settings.Loop = _loop;
+        _settings.Loop = _playback.Loop;
         _persist(_settings);
     }
 
@@ -1524,7 +1450,7 @@ public partial class ViewerWindow : Window
         if (FpsBox.SelectedItem is not FpsOption option) return;
 
         // Rebasing steckt im Setter: die Wiedergabe springt beim Umschalten nicht.
-        _clock.Fps = option.Value;
+        _playback.Clock.Fps = option.Value;
 
         // Der Vorlauf ist in Frames angegeben und bedeutet bei jeder Bildrate etwas
         // anderes - er muss mitgezogen werden, sonst schrumpft die Reserve beim
@@ -1556,7 +1482,7 @@ public partial class ViewerWindow : Window
         // Nur kurzlebige Rueckmeldungen wieder wegnehmen. Der Pufferhinweis wird
         // vom Puffervorgang selbst gesteuert und darf hier nicht verschwinden.
         _statusTimer.Stop();
-        if (!_buffering) HideStatus();
+        if (!_playback.IsBuffering) HideStatus();
     }
 
     // ------------------------------------------------------------ In- und Out-Punkt
@@ -1565,37 +1491,26 @@ public partial class ViewerWindow : Window
     /// Der aktive Bereich als Listenpositionen. Ohne gesetzte Punkte ist das die
     /// ganze Sequenz - dadurch braucht die Wiedergabe keine Fallunterscheidung.
     /// </summary>
-    private (int First, int Last) ActiveRange()
-    {
-        int first = _inPoint >= 0 ? _inPoint : 0;
-        int last = _outPoint >= 0 ? _outPoint : _sequence.Count - 1;
+    private (int First, int Last) ActiveRange() => _playback.ActiveRange();
 
-        // Vertauschte Punkte sind kein Fehler des Benutzers, sondern eine
-        // Reihenfolge, die sich beim Setzen ergibt. Still korrigieren.
-        return first <= last ? (first, last) : (last, first);
-    }
-
-    private bool HasRange => _inPoint >= 0 || _outPoint >= 0;
+    private bool HasRange => _playback.HasRange;
 
     private void SetInPoint()
     {
-        _inPoint = _index;
-        if (_outPoint >= 0 && _outPoint < _inPoint) _outPoint = -1;
+        _playback.SetInPoint();
         AfterRangeChanged();
     }
 
     private void SetOutPoint()
     {
-        _outPoint = _index;
-        if (_inPoint >= 0 && _inPoint > _outPoint) _inPoint = -1;
+        _playback.SetOutPoint();
         AfterRangeChanged();
     }
 
     private void ClearInOut()
     {
         if (!HasRange) return;
-        _inPoint = -1;
-        _outPoint = -1;
+        _playback.ClearRange();
         AfterRangeChanged();
     }
 
@@ -1606,13 +1521,13 @@ public partial class ViewerWindow : Window
         // Steht die Wiedergabe ausserhalb des neuen Bereichs, an den Anfang springen -
         // sonst laeuft sie bis zum Ende weiter und der Bereich waere wirkungslos.
         var (first, last) = ActiveRange();
-        if (_index < first || _index > last) SeekTo(first);
+        if (_playback.Index < first || _playback.Index > last) SeekTo(first);
 
         // Der Ring muss den Bereich kennen. Ohne das lud er beim Loop-Sprung die
         // Frames hinter dem Out-Punkt, die nie gezeigt werden, und hielt den
         // In-Punkt nicht - jede Runde endete im Nachpuffern.
         _cache?.SetRange(first, last);
-        _cache?.SetPosition(_index, _direction, _loop, urgent: false);
+        _cache?.SetPosition(_playback.Index, _playback.Direction, _playback.Loop, urgent: false);
         ShowBar();
     }
 
@@ -1671,7 +1586,7 @@ public partial class ViewerWindow : Window
 
         if (_bitsPerChannel > 0) text += $" · {_bitsPerChannel} bit";
 
-        if (!_playing && !_buffering && index >= 0 && index < _sequence.Count)
+        if (!_playback.IsPlaying && !_playback.IsBuffering && index >= 0 && index < _sequence.Count)
         {
             try
             {
@@ -1700,7 +1615,7 @@ public partial class ViewerWindow : Window
     {
         _settings.ShowMetadata = !_settings.ShowMetadata;
         _persist(_settings);
-        UpdateMetadata(_shownIndex >= 0 ? _shownIndex : _index);
+        UpdateMetadata(_playback.ShownIndex >= 0 ? _playback.ShownIndex : _playback.Index);
         ShowBar();
     }
 
@@ -1741,7 +1656,7 @@ public partial class ViewerWindow : Window
             ? _sequence.Frames.Skip(first).Take(last - first + 1).ToArray()
             : Array.Empty<SequenceFrame>();
 
-        var window = new ExportWindow(_sequence, inOut, _clock.Fps, _sourceWidth, _sourceHeight,
+        var window = new ExportWindow(_sequence, inOut, _playback.Clock.Fps, _sourceWidth, _sourceHeight,
                                       _settings, _persist, () => _profile.DecoderThreads,
                                       _adjustments)
         {

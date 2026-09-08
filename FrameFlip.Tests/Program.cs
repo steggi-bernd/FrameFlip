@@ -26,6 +26,8 @@ static int RunAll()
     RawCacheInvariants.Run();
     CadenceInvariants.Run();
     RangeInvariants.Run();
+    ViewerPlaybackInvariants.Run();
+    ViewerControllerInvariants.Run();
     BridgeInvariants.Run();
     LocalizationInvariants.Run();
     RemoteInvariants.Run();

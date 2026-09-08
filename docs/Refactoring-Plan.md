@@ -1,8 +1,20 @@
 # Refactoring-Fahrplan
 
-Dieses Dokument bereitet die Strukturarbeit vor. Es verschiebt bewusst noch keine
-Produktionslogik: Zuerst braucht FrameFlip einen getesteten Sicherheits- und
-Funktionsstand, auf den sich jeder einzelne Schnitt zurückführen lässt.
+Dieser Fahrplan hält die Reihenfolge und den erreichten Stand der Strukturarbeit
+fest. Jeder Schnitt baut auf einem getesteten Sicherheits- und Funktionsstand auf.
+
+## Stand am 8. September 2026
+
+- Der gemeinsame Ausgangspunkt ist mit `v2-secure-baseline` markiert; die
+  v2-Konformitätstests und der Relay-Reconnect-Fix sind integriert.
+- `RemoteLink` bleibt die öffentliche Fassade. Status-Telemetrie (PR #8),
+  Befehlsverteilung (PR #9) sowie Vorschau/Follow (PR #10) sind ausgelagert und
+  gemergt.
+- Der nächste Desktop-Schnitt führt `ViewerPlaybackController` ein. Er besitzt
+  Uhr, Position, Wiedergabe-/Pufferzustand und den aktiven Framebereich. WPF-Timer,
+  Cache, Fensterlebenszyklus und Bilddarstellung bleiben im `ViewerWindow`.
+  Die vorhandene Bedienung wird zuerst am Fenster charakterisiert; zusätzliche
+  Controller-Tests prüfen Pufferfristen ohne reale Wartezeit.
 
 ## Ausgangspunkt und Sperre
 
@@ -69,7 +81,6 @@ sofort koppeln, ohne zusätzliche Schritte.
 
 ## Nächster Startpunkt
 
-Sobald der QR-Kopplungstest die v2-PRs freigibt, werden sie gemeinsam gemergt
-und getaggt. Danach kommen zuerst die v2-Charakterisierungstests und die noch
-offene RelayClient-Session-/Reconnect-Korrektur. Erst dann beginnt Schritt 2 mit
-`RemoteLink`.
+Nach dem getesteten Viewer-Controller folgen Scan/Navigation/Thumbnails aus
+`ProjectsPage`, jeweils als eigener überprüfbarer Schnitt. Danach wird der
+Lebenszyklus in `AppHost` aufgeteilt; erst anschließend beginnt der Android-Umbau.
