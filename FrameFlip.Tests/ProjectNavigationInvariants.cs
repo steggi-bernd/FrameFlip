@@ -74,10 +74,12 @@ public static class ProjectNavigationInvariants
         Check.That(Navigation(page).Project is null, "die Projekte-Brotkrume kehrt direkt zur Uebersicht zurueck");
         Open(page, project);
         Check.That(Navigation(page).VersionsOpen, "die Versionsansicht bleibt nach dem Zurueckkehren erhalten");
+        PumpUntil(() => Read<Task>(page, "_contentTask").IsCompleted);
+        Read<Task>(page, "_contentTask").GetAwaiter().GetResult();
     }
 
     private static void Open(ProjectsPage page, BlendProject project)
-        => Click((Border)Call(page, "ProjectTile", project)!);
+        => Click((Border)Call(page, "ProjectTile", project, null)!);
 
     private static void OpenFolder(ProjectsPage page, string path)
         => Click((Border)Call(page, "FolderTileView", new FolderTile(path, Path.GetFileName(path), 0, 0, null))!);

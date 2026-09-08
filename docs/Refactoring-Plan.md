@@ -15,12 +15,19 @@ fest. Jeder Schnitt baut auf einem getesteten Sicherheits- und Funktionsstand au
   Cache, Fensterlebenszyklus und Bilddarstellung bleiben im `ViewerWindow`.
   Die Bedienung ist am Fenster charakterisiert; zusätzliche Controller-Tests
   prüfen Pufferfristen ohne reale Wartezeit.
-- `ProjectNavigation` übernimmt die Projekt-/Ordnerauswahl, Zurück-Navigation,
+- `ProjectNavigation` ist mit PR #12 integriert und übernimmt die Projekt-/Ordnerauswahl, Zurück-Navigation,
   Brotkrumen und den Zustand der Versionsansicht aus `ProjectsPage`. Die Seite
-  schließt weiterhin zuerst eine offene Bildvorschau. Scan-Ausführung,
-  Thumbnail-Laden und WPF-Darstellung bleiben für separate Schritte bestehen.
+  schließt weiterhin zuerst eine offene Bildvorschau.
   Navigationstests verwenden austauschbare Scan-/Verlaufsquellen, damit sie
   keine persönliche Projektbibliothek lesen.
+- `ProjectScanService` übernimmt Bibliotheks-, Ordner-, Frame- und
+  Verlaufslesezugriffe sowie die Suche nach Thumbnail-Pfaden. Die Quellen laufen
+  außerhalb des UI-Threads; Bibliothek und Inhalt haben getrennte, jeweils
+  begrenzte Worker. Überholte Anfragen liefern weder alte Kacheln noch alte
+  Fehler an die Seite. Charakterisierungstests sichern Reihenfolge und
+  Ordnernavigation; zusätzliche Tests prüfen blockierte Leser, Abbruch,
+  Dispatcher-Rückkehr und erneutes Einlesen nach Fehlern. Bitmap-Dekodierung,
+  Thumbnail-Cache und WPF-Darstellung bleiben in `ProjectsPage`.
 
 ## Ausgangspunkt und Sperre
 
@@ -87,6 +94,6 @@ sofort koppeln, ohne zusätzliche Schritte.
 
 ## Nächster Startpunkt
 
-Nach der Projektnavigation folgen Scan-Ausführung und Thumbnail-Laden aus
-`ProjectsPage`, jeweils als eigener überprüfbarer Schnitt. Danach wird der
+Nach Navigation und Scan-Ausführung folgt das Thumbnail-Laden mit Cache aus
+`ProjectsPage` als eigener überprüfbarer Schnitt. Danach wird der
 Lebenszyklus in `AppHost` aufgeteilt; erst anschließend beginnt der Android-Umbau.

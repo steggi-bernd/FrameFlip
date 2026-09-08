@@ -200,6 +200,8 @@
     <sys:String x:Key="S_ProjectsTitle">PROJECTS</sys:String>
     <sys:String x:Key="S_ProjectsIntro">Every folder inside a scanned directory is a project, including its subfolders. Anything lying loose beside them is grouped by name.</sys:String>
     <sys:String x:Key="S_ProjectsEmpty">No projects yet. Add a folder above – or render once from Blender: FrameFlip remembers which .blend file ran. Folders and .blend files can also be dropped here.</sys:String>
+    <sys:String x:Key="S_ProjectsLoading">Loading …</sys:String>
+    <sys:String x:Key="S_ProjectsReadFailed">The content could not be read. Please rescan.</sys:String>
     <sys:String x:Key="S_BlenderProjects">BLENDER PROJECTS · {0}</sys:String>
     <sys:String x:Key="S_RecentlyOpened">RECENTLY OPENED</sys:String>
     <sys:String x:Key="S_VersionsTitle">VERSIONS</sys:String>
