@@ -44,7 +44,7 @@ fest. Jeder Schnitt baut auf einem getesteten Sicherheits- und Funktionsstand au
   `Show` und sein Ende nach dem Freigeben der Referenz. Charakterisierungs- und
   Controller-Tests sichern minimierte Fenster, Owner-Schließung, abgebrochene
   Schließvorgänge und den Fokusverlust-Schutz des ursprünglichen Viewers ab.
-- `ViewerOpenController` übernimmt die Öffnungsentscheidungen aus `AppHost`:
+- `ViewerOpenController` ist mit PR #16 integriert und übernimmt die Öffnungsentscheidungen aus `AppHost`:
   Explorer-Auswahl und Ordner-Fallback, explizites Dateiöffnen, Headerprüfung,
   Hotkey-Schließen, Aktivieren derselben Sequenz und Laden einer anderen Sequenz
   im vorhandenen Fenster. Austauschbare Quellen und ein internes Viewer-Ziel
@@ -53,6 +53,15 @@ fest. Jeder Schnitt baut auf einem getesteten Sicherheits- und Funktionsstand au
   Render-/Lastmonitor und Verlauf. Tests am echten WPF-Viewer haben außerdem
   eine ungültige Dekodier-Untergrenze bei Bildern unter 16 Pixeln aufgedeckt;
   sie ist für Breite und Höhe korrigiert und bis 1 × 1 Pixel abgesichert.
+- `AppTrayController` übernimmt Tray-Menü, Doppelklick, Sprachwechsel,
+  Hotkey-Tooltip und Benachrichtigungen aus `AppHost`. Der Host liefert die
+  Anwendungsaktionen und besitzt weiterhin Start und Ende der Anwendung.
+  Der Controller gibt Menü, NotifyIcon und das geladene Icon frei und meldet
+  seinen Sprachwechsel-Handler ab. Die letzten beiden Freigaben fehlten zuvor
+  und sind vor der Korrektur mit Regressionstests nachgewiesen worden.
+  Tests mit echten, unsichtbaren WinForms-Komponenten sichern Menüaktionen,
+  beide Sprachen, Tooltip-Grenzen, abgewiesene Meldungen, wiederholtes Beenden,
+  unabhängige Instanzen und die Freigabe durch den Host ab.
 
 ## Ausgangspunkt und Sperre
 
@@ -119,7 +128,7 @@ sofort koppeln, ohne zusätzliche Schritte.
 
 ## Nächster Startpunkt
 
-Nach Fenster- und Viewer-Öffnungssteuerung folgt der Tray-Lebenszyklus aus
-`AppHost`: Menüaktionen, Sprachwechsel, Benachrichtigungen und Freigabe beim
-Beenden werden zuerst charakterisiert. Danach folgen Remote- und
-Load-Monitor-Zuständigkeiten. Erst anschließend beginnt der Android-Umbau.
+Nach Fenster-, Viewer-Öffnungs- und Tray-Steuerung folgen Remote- und
+Load-Monitor-Zuständigkeiten aus `AppHost`. Zuerst werden Start, Austausch und
+Beenden sowie die Abhängigkeiten von Viewer, Hauptfenster und Kopplung
+charakterisiert. Erst anschließend beginnt der Android-Umbau.

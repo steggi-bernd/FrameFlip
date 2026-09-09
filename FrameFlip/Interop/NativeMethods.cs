@@ -79,9 +79,6 @@ internal static class NativeMethods
     [DllImport("kernel32.dll")]
     public static extern bool SetProcessWorkingSetSize(IntPtr hProcess, IntPtr min, IntPtr max);
 
-    [DllImport("user32.dll")]
-    public static extern bool DestroyIcon(IntPtr hIcon);
-
     // ---------------------------------------------------------------- DPI
 
     [DllImport("user32.dll", SetLastError = true)]

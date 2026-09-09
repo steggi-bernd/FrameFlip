@@ -7,8 +7,6 @@ using FrameFlip.Interop;
 using FrameFlip.Lifecycle;
 using FrameFlip.Sequencing;
 using FrameFlip.Views;
-using Drawing = System.Drawing;
-using WinForms = System.Windows.Forms;
 using Window = System.Windows.Window;
 
 namespace FrameFlip;
@@ -24,8 +22,7 @@ public sealed class AppHost : IDisposable
     private readonly HotKeyService _hotkeys = new();
 
     private AppSettings _settings = new();
-    private WinForms.NotifyIcon? _trayIcon;
-    private IntPtr _iconHandle;
+    private AppTrayController? _tray;
     private ViewerWindow? _viewer;
     private readonly ViewerOpenController _viewerOpening;
 
@@ -70,7 +67,7 @@ public sealed class AppHost : IDisposable
         // erscheinen, nicht erst nach dem ersten Fensterwechsel.
         Localization.Strings.Apply(Localization.Strings.Parse(_settings.Language));
 
-        CreateTrayIcon();
+        _tray = new AppTrayController(ShowMain, Toggle, ShowSettings, Exit);
 
         _hotkeys.Pressed += Toggle;
 
@@ -105,95 +102,9 @@ public sealed class AppHost : IDisposable
 
     // ------------------------------------------------------------ Tray
 
-    private void CreateTrayIcon()
-    {
-        var menu = new WinForms.ContextMenuStrip();
+    private void UpdateTooltip() => _tray?.UpdateTooltip(_hotkeys.Current.ToString());
 
-        var main = menu.Items.Add(string.Empty, null, (_, _) => ShowMain());
-        var open = menu.Items.Add(string.Empty, null, (_, _) => Toggle());
-        menu.Items.Add(new WinForms.ToolStripSeparator());
-        var settings = menu.Items.Add(string.Empty, null, (_, _) => ShowSettings());
-        menu.Items.Add(new WinForms.ToolStripSeparator());
-        var exit = menu.Items.Add(string.Empty, null, (_, _) => Exit());
-
-        // Das Menue entsteht einmal beim Start und wuerde einen Sprachwechsel sonst
-        // nicht mitbekommen - es haengt an WinForms und kann kein DynamicResource.
-        void Relabel()
-        {
-            main.Text = Localization.Strings.T("S_TrayMain");
-            open.Text = Localization.Strings.T("S_TrayOpen");
-            settings.Text = Localization.Strings.T("S_TraySettings");
-            exit.Text = Localization.Strings.T("S_TrayExit");
-        }
-
-        Relabel();
-        Localization.Strings.Changed += Relabel;
-
-        _trayIcon = new WinForms.NotifyIcon
-        {
-            Icon = BuildIcon(out _iconHandle),
-            Visible = true,
-            Text = "FrameFlip",
-            ContextMenuStrip = menu
-        };
-
-        // Doppelklick oeffnet das Hauptfenster, nicht die Vorschau: Die haengt am
-        // Hotkey und an dem, was im Explorer markiert ist - ein Doppelklick auf ein
-        // Tray-Symbol weiss davon nichts.
-        _trayIcon.DoubleClick += (_, _) => ShowMain();
-    }
-
-    /// <summary>
-    /// Das Symbol fuer den Infobereich.
-    ///
-    /// Aus der mitgelieferten .ico und nicht zur Laufzeit gezeichnet: Dort stehen
-    /// mehrere Groessen nebeneinander, und die kleinen sind eigens dafuer gezeichnet
-    /// worden. Windows sucht sich die passende heraus - bei 200 Prozent Skalierung
-    /// ist das nicht die 16er.
-    ///
-    /// Faellt das Laden aus, bleibt das Programm ohne Symbol im Tray sichtbar. Ein
-    /// fehlendes Bildchen ist kein Grund, den Start abzubrechen.
-    /// </summary>
-    private static Drawing.Icon? BuildIcon(out IntPtr handle)
-    {
-        handle = IntPtr.Zero;
-
-        try
-        {
-            var uri = new Uri("pack://application:,,,/FrameFlip;component/Assets/FrameFlip.ico");
-            using var stream = System.Windows.Application.GetResourceStream(uri)?.Stream;
-
-            if (stream is null) return null;
-
-            int wanted = WinForms.SystemInformation.SmallIconSize.Width;
-
-            return new Drawing.Icon(stream, new Drawing.Size(wanted, wanted));
-        }
-        catch (Exception)
-        {
-            return null;
-        }
-    }
-
-    private void UpdateTooltip()
-    {
-        if (_trayIcon is null) return;
-
-        var text = $"FrameFlip – {_hotkeys.Current}";
-        _trayIcon.Text = text.Length > 62 ? text[..62] : text;   // NotifyIcon.Text ist begrenzt
-    }
-
-    private void Notify(string message)
-    {
-        try
-        {
-            _trayIcon?.ShowBalloonTip(4000, "FrameFlip", message, WinForms.ToolTipIcon.Info);
-        }
-        catch (Exception)
-        {
-            // Benachrichtigungen koennen systemseitig unterdrueckt sein.
-        }
-    }
+    private void Notify(string message) => _tray?.Notify(message);
 
     // ------------------------------------------------------------ Viewer
 
@@ -487,18 +398,7 @@ public sealed class AppHost : IDisposable
         _hotkeys.Pressed -= Toggle;
         _hotkeys.Dispose();
 
-        if (_trayIcon is not null)
-        {
-            _trayIcon.Visible = false;
-            _trayIcon.ContextMenuStrip?.Dispose();
-            _trayIcon.Dispose();
-            _trayIcon = null;
-        }
-
-        if (_iconHandle != IntPtr.Zero)
-        {
-            NativeMethods.DestroyIcon(_iconHandle);
-            _iconHandle = IntPtr.Zero;
-        }
+        _tray?.Dispose();
+        _tray = null;
     }
 }
