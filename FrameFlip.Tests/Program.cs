@@ -47,6 +47,8 @@ static int RunAll()
     ProjectScanConcurrencyInvariants.Run();
     ProjectThumbnailPageInvariants.Run();
     ProjectThumbnailServiceInvariants.Run();
+    AppHostWindowInvariants.Run();
+    AppWindowControllerInvariants.Run();
     ResourceInvariants.Run();
     VaultInvariants.Run();
     BrowseInvariants.Run();
