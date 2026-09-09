@@ -53,7 +53,7 @@ fest. Jeder Schnitt baut auf einem getesteten Sicherheits- und Funktionsstand au
   Render-/Lastmonitor und Verlauf. Tests am echten WPF-Viewer haben außerdem
   eine ungültige Dekodier-Untergrenze bei Bildern unter 16 Pixeln aufgedeckt;
   sie ist für Breite und Höhe korrigiert und bis 1 × 1 Pixel abgesichert.
-- `AppTrayController` übernimmt Tray-Menü, Doppelklick, Sprachwechsel,
+- `AppTrayController` ist mit PR #17 integriert und übernimmt Tray-Menü, Doppelklick, Sprachwechsel,
   Hotkey-Tooltip und Benachrichtigungen aus `AppHost`. Der Host liefert die
   Anwendungsaktionen und besitzt weiterhin Start und Ende der Anwendung.
   Der Controller gibt Menü, NotifyIcon und das geladene Icon frei und meldet
@@ -62,6 +62,18 @@ fest. Jeder Schnitt baut auf einem getesteten Sicherheits- und Funktionsstand au
   Tests mit echten, unsichtbaren WinForms-Komponenten sichern Menüaktionen,
   beide Sprachen, Tooltip-Grenzen, abgewiesene Meldungen, wiederholtes Beenden,
   unabhängige Instanzen und die Freigabe durch den Host ab.
+- `AppRemoteController` übernimmt Aufbau, Austausch und Beenden der optionalen
+  Remote-Verbindung sowie den Vergleich verbindungsrelevanter Einstellungen.
+  Der Host liefert Bridge-Verfügbarkeit und Verbindungsfabrik; Einstellungen
+  und Lastwerte werden weiterhin live gelesen. Ein interner Adapter hält die
+  öffentliche `RemoteLink`-Fassade unverändert. Das Ende alter Verbindungen
+  blockiert den UI-Thread nicht und kann eine neue Verbindung nicht freigeben.
+  Auch bei ungültiger Relay-Adresse wird der Lastbedarf jetzt neu bewertet;
+  zuvor konnte der Lastmonitor nach einem fehlgeschlagenen Wechsel weiterlaufen.
+  Charakterisierungs- und Regressionstests sichern Voraussetzungen, relevante
+  Einstellungswechsel, Zustandsweitergabe, ausstehende Freigaben, Startfehler
+  und wiederholtes Beenden ab. Ein Integrationstest prüft dabei die Freigabe
+  des echten Lastmonitors ohne Netzwerk oder persönliche Konfigurationsdateien.
 
 ## Ausgangspunkt und Sperre
 
@@ -128,7 +140,8 @@ sofort koppeln, ohne zusätzliche Schritte.
 
 ## Nächster Startpunkt
 
-Nach Fenster-, Viewer-Öffnungs- und Tray-Steuerung folgen Remote- und
-Load-Monitor-Zuständigkeiten aus `AppHost`. Zuerst werden Start, Austausch und
-Beenden sowie die Abhängigkeiten von Viewer, Hauptfenster und Kopplung
-charakterisiert. Erst anschließend beginnt der Android-Umbau.
+Nach Fenster-, Viewer-Öffnungs-, Tray- und Remote-Steuerung folgt die
+Lastmonitor-Zuständigkeit aus `AppHost`. Zuerst werden Bedarf durch Viewer,
+Hauptfenster und Remote-Verbindung, Messtakt während des Renderns sowie die
+Weitergabe von Lastwerten und Prozesspriorität charakterisiert. Erst
+anschließend beginnt der Android-Umbau.
