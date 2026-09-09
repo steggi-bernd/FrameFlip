@@ -29,8 +29,8 @@ public sealed class AppHost : IDisposable
     /// <summary>Nimmt Meldungen des Blender-Addons entgegen. Null, wenn abgeschaltet.</summary>
     private Bridge.RenderMonitor? _renderMonitor;
 
-    /// <summary>Reicht den Renderfortschritt ans Handy weiter. Null, solange nicht gekoppelt.</summary>
-    private Remote.RemoteLink? _remote;
+    /// <summary>Besitzt die optionale Verbindung zum Handy.</summary>
+    private readonly AppRemoteController _remote;
     private readonly AppWindowController _windows;
     private SystemLoadMonitor? _loadMonitor;
     private bool _disposed;
@@ -40,16 +40,21 @@ public sealed class AppHost : IDisposable
     /// <summary>Fenstertests brauchen weder persoenliche Einstellungen noch eine Kopplung anzulegen.</summary>
     internal AppHost(Func<Window>? createMain, Func<Window>? createSettings, Func<Window>? createPairing)
     {
+        // Die Verbindung liest Einstellungen und Lastwerte weiter live aus dem Host.
+        _remote = new AppRemoteController(() => _settings, new AppRemoteSources(
+            () => _renderMonitor is not null,
+            invite => new AppRemoteLink(new Remote.RemoteLink(invite, _renderMonitor!,
+                () => _loadMonitor?.LastSnapshot, () => _settings))), EnsureLoadMonitor);
         _viewerOpening = new ViewerOpenController(new ViewerOpenSources(_decoders), () => _viewer, OpenNewViewer, Notify);
         _windows = new AppWindowController(
             () =>
             {
                 LivePage.Load = () => _loadMonitor?.LastSnapshot;
-                return createMain?.Invoke() ?? new MainWindow(_renderMonitor, () => _remote?.State,
+                return createMain?.Invoke() ?? new MainWindow(_renderMonitor, () => _remote.State,
                     ShowSettings, OpenFile, ShowPairing, _settings, settings => SettingsStore.Save(settings));
             },
-            createSettings ?? (() => new SettingsWindow(_settings, ApplySettings, () => _remote?.State)),
-            createPairing ?? (() => new PairingWindow(_settings, ApplySettings, () => _remote?.State)),
+            createSettings ?? (() => new SettingsWindow(_settings, ApplySettings, () => _remote.State)),
+            createPairing ?? (() => new PairingWindow(_settings, ApplySettings, () => _remote.State)),
             EnsureLoadMonitor);
     }
 
@@ -57,6 +62,11 @@ public sealed class AppHost : IDisposable
                      Action<ViewerOpenRequest> create, Action<string> notify) : this(null, null, null)
     {
         _viewerOpening = new ViewerOpenController(sources, current, create, notify);
+    }
+
+    internal AppHost(AppRemoteSources sources, Action remoteChanged) : this(null, null, null)
+    {
+        _remote = new AppRemoteController(() => _settings, sources, remoteChanged);
     }
 
     public void Start()
@@ -202,7 +212,7 @@ public sealed class AppHost : IDisposable
 
     private void EnsureLoadMonitor()
     {
-        bool wanted = _viewer is not null || _remote is not null || _windows.Main is not null;
+        bool wanted = _viewer is not null || _remote.HasConnection || _windows.Main is not null;
 
         if (wanted) StartLoadMonitor();
         else StopLoadMonitor();
@@ -217,7 +227,7 @@ public sealed class AppHost : IDisposable
 
         // Die Messung selbst ist billig und wird auch fuer die Fernsteuerung
         // gebraucht; geregelt wird nur, wenn es eingeschaltet ist.
-        if (!_settings.AdaptiveResources && _remote is null) return;
+        if (!_settings.AdaptiveResources && !_remote.HasConnection) return;
 
         var monitor = new SystemLoadMonitor(_settings.MaxDecoderThreads,
                                             TimeSpan.FromSeconds(_settings.LoadIntervalSeconds));
@@ -312,10 +322,7 @@ public sealed class AppHost : IDisposable
             }
         }
 
-        bool remoteChanged = settings.RemoteEnabled != _settings.RemoteEnabled
-                             || settings.RelayHost != _settings.RelayHost
-                             || settings.PairingSecret != _settings.PairingSecret;
-
+        var previousSettings = _settings;
         _settings = settings;
         Localization.Strings.Apply(Localization.Strings.Parse(_settings.Language));
         SettingsStore.Save(_settings);
@@ -323,54 +330,13 @@ public sealed class AppHost : IDisposable
 
         // Nur bei echter Aenderung neu aufbauen. Sonst risse jedes Speichern im
         // Einstellungsdialog eine stehende Verbindung ab.
-        if (remoteChanged) StartRemote();
+        _remote.SettingsChanged(previousSettings);
 
         // Puffer- und Budgetwerte greifen beim naechsten Oeffnen des Viewers.
         return null;
     }
 
-    /// <summary>
-    /// Baut die Leitung zum Handy auf - oder raeumt sie weg, wenn eine der
-    /// Voraussetzungen fehlt.
-    ///
-    /// Voraussetzungen sind drei: eingeschaltet, eine brauchbare Relais-Adresse, und
-    /// ein Schluessel, der sich auf diesem Konto entschluesseln laesst. Fehlt eine,
-    /// passiert nichts - kein Verbindungsversuch, kein Hinweis, keine Last. Wer die
-    /// Fernsteuerung nicht benutzt, soll von ihr auch nichts merken.
-    /// </summary>
-    private void StartRemote()
-    {
-        var previous = _remote;
-        _remote = null;
-
-        // Im Hintergrund abraeumen: Das Schliessen wartet auf die Leseschleife, und
-        // darauf soll niemand im Einstellungsdialog warten.
-        if (previous is not null) _ = previous.DisposeAsync().AsTask();
-
-        if (!_settings.RemoteEnabled || _renderMonitor is null) { EnsureLoadMonitor(); return; }
-        if (!Remote.PairingStore.TryUnprotect(_settings.PairingSecret, out var key)) { EnsureLoadMonitor(); return; }
-
-        try
-        {
-            var invite = new Remote.PairingInvite(key!, _settings.RelayHost);
-
-            // Die Einstellungen als Funktion, nicht als Kopie: Der Dateizugriff wird
-            // im Dialog umgeschaltet, und die Leitung soll das sofort merken statt
-            // erst beim naechsten Verbindungsaufbau.
-            _remote = new Remote.RemoteLink(invite, _renderMonitor, () => _loadMonitor?.LastSnapshot,
-                                            () => _settings);
-            _remote.Start();
-
-            // Erst jetzt, denn sie haengt daran, ob die Fernsteuerung steht.
-            EnsureLoadMonitor();
-        }
-        catch (ArgumentException)
-        {
-            // Unbrauchbare Adresse. Der Dialog weist sie ab; kommt sie aus einer von
-            // Hand bearbeiteten config.json, bleibt die Fernsteuerung eben aus.
-            _remote = null;
-        }
-    }
+    private void StartRemote() => _remote.Restart();
 
     private void Exit()
     {
@@ -386,11 +352,7 @@ public sealed class AppHost : IDisposable
 
         StopLoadMonitor();
 
-        if (_remote is not null)
-        {
-            _ = _remote.DisposeAsync().AsTask();
-            _remote = null;
-        }
+        _remote.Dispose();
 
         _renderMonitor?.Dispose();
         _renderMonitor = null;
