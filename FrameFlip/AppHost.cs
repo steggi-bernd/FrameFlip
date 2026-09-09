@@ -27,6 +27,7 @@ public sealed class AppHost : IDisposable
     private WinForms.NotifyIcon? _trayIcon;
     private IntPtr _iconHandle;
     private ViewerWindow? _viewer;
+    private readonly ViewerOpenController _viewerOpening;
 
     /// <summary>Nimmt Meldungen des Blender-Addons entgegen. Null, wenn abgeschaltet.</summary>
     private Bridge.RenderMonitor? _renderMonitor;
@@ -42,6 +43,7 @@ public sealed class AppHost : IDisposable
     /// <summary>Fenstertests brauchen weder persoenliche Einstellungen noch eine Kopplung anzulegen.</summary>
     internal AppHost(Func<Window>? createMain, Func<Window>? createSettings, Func<Window>? createPairing)
     {
+        _viewerOpening = new ViewerOpenController(new ViewerOpenSources(_decoders), () => _viewer, OpenNewViewer, Notify);
         _windows = new AppWindowController(
             () =>
             {
@@ -52,6 +54,12 @@ public sealed class AppHost : IDisposable
             createSettings ?? (() => new SettingsWindow(_settings, ApplySettings, () => _remote?.State)),
             createPairing ?? (() => new PairingWindow(_settings, ApplySettings, () => _remote?.State)),
             EnsureLoadMonitor);
+    }
+
+    internal AppHost(ViewerOpenSources sources, Func<IViewerOpenTarget?> current,
+                     Action<ViewerOpenRequest> create, Action<string> notify) : this(null, null, null)
+    {
+        _viewerOpening = new ViewerOpenController(sources, current, create, notify);
     }
 
     public void Start()
@@ -195,96 +203,17 @@ public sealed class AppHost : IDisposable
     /// geschlossen. Andernfalls muesste man zweimal druecken, nur um von einem
     /// Renderordner zum naechsten zu kommen.
     /// </summary>
-    private void Toggle() => OpenViewer();
-
-    private void OpenViewer()
-    {
-        var target = ExplorerSelectionProvider.Resolve();
-        if (target is null || !target.HasAnything)
-        {
-            // Kein Explorer im Vordergrund: dann ist der Hotkey schlicht ein
-            // Schliessbefehl fuer die offene Vorschau.
-            if (_viewer is not null) { _viewer.BeginClose(); return; }
-
-            Notify(Localization.Strings.T("S_NoExplorer"));
-            return;
-        }
-
-        string? seed = target.FilePath;
-        if (seed is null || !_decoders.IsSupported(Path.GetExtension(seed)))
-        {
-            // Nichts oder etwas Unlesbares selektiert: erstes darstellbare Bild im Ordner.
-            seed = target.FolderPath is not null
-                ? SequenceScanner.FindFirstImage(target.FolderPath, _decoders)
-                : null;
-        }
-
-        if (seed is null)
-        {
-            if (_viewer is not null) { _viewer.BeginClose(); return; }
-
-            Notify(Localization.Strings.T("S_NoImageInFolder"));
-            return;
-        }
-
-        var sequence = SequenceScanner.Scan(seed, _decoders);
-        if (sequence is null || sequence.Count == 0)
-        {
-            if (_viewer is not null) { _viewer.BeginClose(); return; }
-
-            Notify(Localization.Strings.T("S_SequenceUnreadable"));
-            return;
-        }
-
-        ShowSequence(sequence, seed, target.WindowHandle, allowToggleClose: true);
-    }
+    private void Toggle() => _viewerOpening.Toggle();
 
     /// <summary>
     /// Oeffnet die Vorschau fuer eine bestimmte Datei, ohne den Explorer zu befragen.
     /// Wird von der Befehlszeile benutzt: FrameFlip.exe --preview "C:\pfad\render_0001.png"
     /// </summary>
-    public void OpenFile(string path)
+    public void OpenFile(string path) => _viewerOpening.OpenFile(path);
+
+    private void OpenNewViewer(ViewerOpenRequest request)
     {
-        if (!File.Exists(path) || !_decoders.IsSupported(Path.GetExtension(path)))
-        {
-            Notify(Localization.Strings.T("S_FileUnsupported"));
-            return;
-        }
-
-        var sequence = SequenceScanner.Scan(path, _decoders);
-        if (sequence is null || sequence.Count == 0)
-        {
-            Notify(Localization.Strings.T("S_SequenceUnreadable"));
-            return;
-        }
-
-        // Vom Kommandozeilenaufruf aus wird nie geschlossen: wer eine Datei uebergibt,
-        // will sie sehen, auch wenn sie zufaellig schon offen ist.
-        ShowSequence(sequence, path, IntPtr.Zero, allowToggleClose: false);
-    }
-
-    private void ShowSequence(ImageSequence sequence, string seed, IntPtr explorerWindow,
-                              bool allowToggleClose)
-    {
-        int start = Math.Max(0, sequence.IndexOfPath(seed));
-
-        // Fenster in Mediengroesse: dafuer wird nur der Header der Datei gelesen.
-        if (!_decoders.TryProbeSize(sequence.Frames[start].Path, out int sourceWidth, out int sourceHeight))
-        {
-            if (_viewer is null) Notify(Localization.Strings.T("S_ImageUnreadable"));
-            return;
-        }
-
-        // Ein offenes Fenster bekommt den neuen Inhalt, statt dass ein zweites
-        // aufgeht. Zeigt der Explorer auf dieselbe Sequenz, wirkt der Hotkey wie
-        // erwartet als Umschalter und schliesst.
-        if (_viewer is { } open)
-        {
-            if (allowToggleClose && open.ShowsSameSequence(sequence)) open.BeginClose();
-            else if (open.ShowsSameSequence(sequence)) open.Activate();
-            else open.TryLoadSequence(sequence, start, sourceWidth, sourceHeight);
-            return;
-        }
+        var (sequence, seed, start, explorerWindow, sourceWidth, sourceHeight) = request;
 
         EnsureLoadMonitor();
         int maxWorkers = _settings.AdaptiveResources && _loadMonitor is not null ? _loadMonitor.MaxDecoderThreads : 1;

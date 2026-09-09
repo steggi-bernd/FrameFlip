@@ -3,7 +3,7 @@
 Dieser Fahrplan hält die Reihenfolge und den erreichten Stand der Strukturarbeit
 fest. Jeder Schnitt baut auf einem getesteten Sicherheits- und Funktionsstand auf.
 
-## Stand am 8. September 2026
+## Stand am 9. September 2026
 
 - Der gemeinsame Ausgangspunkt ist mit `v2-secure-baseline` markiert; die
   v2-Konformitätstests und der Relay-Reconnect-Fix sind integriert.
@@ -36,7 +36,7 @@ fest. Jeder Schnitt baut auf einem getesteten Sicherheits- und Funktionsstand au
   prüft dabei die aktuelle Ansicht. Tests sichern Dateifreigabe, erneutes Laden,
   gemeinsame Cache-Nutzung, parallele Zugriffe und verspätete Rückgaben ab.
   Kacheln, Navigationseingaben und WPF-Darstellung bleiben in `ProjectsPage`.
-- `AppWindowController` übernimmt die Lebenszyklen von Hauptfenster,
+- `AppWindowController` ist mit PR #15 integriert und übernimmt die Lebenszyklen von Hauptfenster,
   Einstellungen und Kopplungsdialog aus `AppHost`: einmaliges Erzeugen,
   Wiederverwenden, Owner-Zuordnung und Freigabe nach `Closed`. Der Host stellt
   die Fenster mit aktuellen Einstellungen und Callbacks bereit. Er entscheidet
@@ -44,7 +44,15 @@ fest. Jeder Schnitt baut auf einem getesteten Sicherheits- und Funktionsstand au
   `Show` und sein Ende nach dem Freigeben der Referenz. Charakterisierungs- und
   Controller-Tests sichern minimierte Fenster, Owner-Schließung, abgebrochene
   Schließvorgänge und den Fokusverlust-Schutz des ursprünglichen Viewers ab.
-  Viewer-Öffnung und Sequenzwechsel bleiben als nächster eigener Schnitt offen.
+- `ViewerOpenController` übernimmt die Öffnungsentscheidungen aus `AppHost`:
+  Explorer-Auswahl und Ordner-Fallback, explizites Dateiöffnen, Headerprüfung,
+  Hotkey-Schließen, Aktivieren derselben Sequenz und Laden einer anderen Sequenz
+  im vorhandenen Fenster. Austauschbare Quellen und ein internes Viewer-Ziel
+  ermöglichen Tests ohne persönliche Dateien oder echte Explorer-Auswahl.
+  `AppHost` erzeugt weiterhin den Viewer und verbindet ihn mit Einstellungen,
+  Render-/Lastmonitor und Verlauf. Tests am echten WPF-Viewer haben außerdem
+  eine ungültige Dekodier-Untergrenze bei Bildern unter 16 Pixeln aufgedeckt;
+  sie ist für Breite und Höhe korrigiert und bis 1 × 1 Pixel abgesichert.
 
 ## Ausgangspunkt und Sperre
 
@@ -111,7 +119,7 @@ sofort koppeln, ohne zusätzliche Schritte.
 
 ## Nächster Startpunkt
 
-Nach Hauptfenster und Dialogen folgen Viewer-Öffnung und Sequenzwechsel aus
-`AppHost`. Zuerst werden Hotkey-Umschalten, explizites Dateiöffnen und die
-Wiederverwendung des Viewers charakterisiert. Danach folgen Tray-, Remote- und
+Nach Fenster- und Viewer-Öffnungssteuerung folgt der Tray-Lebenszyklus aus
+`AppHost`: Menüaktionen, Sprachwechsel, Benachrichtigungen und Freigabe beim
+Beenden werden zuerst charakterisiert. Danach folgen Remote- und
 Load-Monitor-Zuständigkeiten. Erst anschließend beginnt der Android-Umbau.

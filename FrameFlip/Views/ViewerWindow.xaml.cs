@@ -15,6 +15,7 @@ using FrameFlip.Decoding;
 using FrameFlip.Diagnostics;
 using FrameFlip.Imaging;
 using FrameFlip.Interop;
+using FrameFlip.Lifecycle;
 using FrameFlip.Playback;
 using FrameFlip.Localization;
 using FrameFlip.Sequencing;
@@ -25,7 +26,7 @@ using Size = System.Windows.Size;
 
 namespace FrameFlip.Views;
 
-public partial class ViewerWindow : Window
+public partial class ViewerWindow : Window, IViewerOpenTarget
 {
     private const int FallbackLookback = 8;
     private const double ZoomStep = 1.2;      // wie QuickLook: spuerbare, gleichmaessige Schritte
@@ -553,11 +554,13 @@ public partial class ViewerWindow : Window
         _redecodeTimer.Start();
     }
 
+    // Auch Bilder unter 16 Pixeln sind gueltig; die Untergrenze darf nie
+    // groesser als die native Bildgroesse werden.
     private int RequiredDecodeWidth()
-        => Math.Clamp((int)Math.Ceiling(_sourceWidth * _view.Zoom * _draftScale), 16, _sourceWidth);
+        => Math.Clamp((int)Math.Ceiling(_sourceWidth * _view.Zoom * _draftScale), Math.Min(16, _sourceWidth), _sourceWidth);
 
     private int RequiredDecodeHeight()
-        => Math.Clamp((int)Math.Ceiling(_sourceHeight * _view.Zoom * _draftScale), 16, _sourceHeight);
+        => Math.Clamp((int)Math.Ceiling(_sourceHeight * _view.Zoom * _draftScale), Math.Min(16, _sourceHeight), _sourceHeight);
 
     // ------------------------------------------------------------ Pufferstufe
 
