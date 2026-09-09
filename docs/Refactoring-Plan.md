@@ -62,7 +62,7 @@ fest. Jeder Schnitt baut auf einem getesteten Sicherheits- und Funktionsstand au
   Tests mit echten, unsichtbaren WinForms-Komponenten sichern Menüaktionen,
   beide Sprachen, Tooltip-Grenzen, abgewiesene Meldungen, wiederholtes Beenden,
   unabhängige Instanzen und die Freigabe durch den Host ab.
-- `AppRemoteController` übernimmt Aufbau, Austausch und Beenden der optionalen
+- `AppRemoteController` ist mit PR #18 integriert und übernimmt Aufbau, Austausch und Beenden der optionalen
   Remote-Verbindung sowie den Vergleich verbindungsrelevanter Einstellungen.
   Der Host liefert Bridge-Verfügbarkeit und Verbindungsfabrik; Einstellungen
   und Lastwerte werden weiterhin live gelesen. Ein interner Adapter hält die
@@ -74,6 +74,19 @@ fest. Jeder Schnitt baut auf einem getesteten Sicherheits- und Funktionsstand au
   Einstellungswechsel, Zustandsweitergabe, ausstehende Freigaben, Startfehler
   und wiederholtes Beenden ab. Ein Integrationstest prüft dabei die Freigabe
   des echten Lastmonitors ohne Netzwerk oder persönliche Konfigurationsdateien.
+- `AppLoadController` übernimmt Bedarf, Wiederverwendung und Freigabe der
+  Lastmessung sowie Render-Modus, Messwertzustellung und Prozesspriorität.
+  Interne Adapter erhalten die öffentlichen Monitor- und Viewer-Schnittstellen.
+  Der erste Viewer zählt schon vor seiner Konstruktion als Verbraucher und
+  erhält das passende Decoderlimit. Ein fehlgeschlagener Fensteraufbau gibt
+  diese Reservierung wieder frei. Alte Monitor-Sitzungen dürfen weder bereits
+  eingereihte noch verspätet gemeldete Messwerte an die UI liefern.
+  Der Render-Modus bleibt auch ohne Monitor erhalten; unveränderte
+  Fortschrittsmeldungen setzen den Messtimer nicht wiederholt zurück.
+  Tests sichern alle Kombinationen von Verbrauchern und adaptiver Regelung,
+  Wiederverwendung, Startfehler, Beenden, Render-Ereignisse und die Zustellung
+  über den echten WPF-Dispatcher ab. Die Mess- und Ressourcenalgorithmen in
+  `SystemLoadMonitor` bleiben unverändert.
 
 ## Ausgangspunkt und Sperre
 
@@ -140,8 +153,8 @@ sofort koppeln, ohne zusätzliche Schritte.
 
 ## Nächster Startpunkt
 
-Nach Fenster-, Viewer-Öffnungs-, Tray- und Remote-Steuerung folgt die
-Lastmonitor-Zuständigkeit aus `AppHost`. Zuerst werden Bedarf durch Viewer,
-Hauptfenster und Remote-Verbindung, Messtakt während des Renderns sowie die
-Weitergabe von Lastwerten und Prozesspriorität charakterisiert. Erst
-anschließend beginnt der Android-Umbau.
+Die geplanten Desktop-Schnitte für Fenster, Viewer-Öffnung, Tray, Remote und
+Lastmessung sind umgesetzt. Als Nächstes wird der Android-`RemoteHub` untersucht
+und sein Verbindungs-Lebenszyklus vor der Auslagerung charakterisiert.
+`RemoteHub` bleibt die Fassade; Compose-Screens und das Kopplungsprotokoll
+werden beim ersten Android-Schritt nicht gleichzeitig umgebaut.

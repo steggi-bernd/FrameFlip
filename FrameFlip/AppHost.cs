@@ -1,8 +1,6 @@
-using System.Diagnostics;
 using System.IO;
 using FrameFlip.Configuration;
 using FrameFlip.Decoding;
-using FrameFlip.Diagnostics;
 using FrameFlip.Interop;
 using FrameFlip.Lifecycle;
 using FrameFlip.Sequencing;
@@ -25,6 +23,7 @@ public sealed class AppHost : IDisposable
     private AppTrayController? _tray;
     private ViewerWindow? _viewer;
     private readonly ViewerOpenController _viewerOpening;
+    private readonly Func<ViewerOpenRequest, int, ViewerWindow> _createViewer;
 
     /// <summary>Nimmt Meldungen des Blender-Addons entgegen. Null, wenn abgeschaltet.</summary>
     private Bridge.RenderMonitor? _renderMonitor;
@@ -32,7 +31,7 @@ public sealed class AppHost : IDisposable
     /// <summary>Besitzt die optionale Verbindung zum Handy.</summary>
     private readonly AppRemoteController _remote;
     private readonly AppWindowController _windows;
-    private SystemLoadMonitor? _loadMonitor;
+    private readonly AppLoadController _load;
     private bool _disposed;
 
     public AppHost() : this(null, null, null) { }
@@ -40,16 +39,19 @@ public sealed class AppHost : IDisposable
     /// <summary>Fenstertests brauchen weder persoenliche Einstellungen noch eine Kopplung anzulegen.</summary>
     internal AppHost(Func<Window>? createMain, Func<Window>? createSettings, Func<Window>? createPairing)
     {
+        _createViewer = CreateViewer;
+        _load = new AppLoadController(() => _settings,
+            AppLoadSources.Default(() => _viewer is { } viewer ? new AppViewerLoadTarget(viewer) : null));
         // Die Verbindung liest Einstellungen und Lastwerte weiter live aus dem Host.
         _remote = new AppRemoteController(() => _settings, new AppRemoteSources(
             () => _renderMonitor is not null,
             invite => new AppRemoteLink(new Remote.RemoteLink(invite, _renderMonitor!,
-                () => _loadMonitor?.LastSnapshot, () => _settings))), EnsureLoadMonitor);
+                () => _load.LastSnapshot, () => _settings))), EnsureLoadMonitor);
         _viewerOpening = new ViewerOpenController(new ViewerOpenSources(_decoders), () => _viewer, OpenNewViewer, Notify);
         _windows = new AppWindowController(
             () =>
             {
-                LivePage.Load = () => _loadMonitor?.LastSnapshot;
+                LivePage.Load = () => _load.LastSnapshot;
                 return createMain?.Invoke() ?? new MainWindow(_renderMonitor, () => _remote.State,
                     ShowSettings, OpenFile, ShowPairing, _settings, settings => SettingsStore.Save(settings));
             },
@@ -67,6 +69,12 @@ public sealed class AppHost : IDisposable
     internal AppHost(AppRemoteSources sources, Action remoteChanged) : this(null, null, null)
     {
         _remote = new AppRemoteController(() => _settings, sources, remoteChanged);
+    }
+
+    internal AppHost(AppLoadSources sources, Func<ViewerOpenRequest, int, ViewerWindow>? createViewer = null) : this(null, null, null)
+    {
+        _load = new AppLoadController(() => _settings, sources);
+        _createViewer = createViewer ?? CreateViewer;
     }
 
     public void Start()
@@ -99,8 +107,8 @@ public sealed class AppHost : IDisposable
 
             // Waehrend eines Renders wird dichter gemessen: Der normale Takt reicht
             // fuer die Lastregelung, aber nicht fuer eine Verlaufskurve.
-            _renderMonitor.Changed += () =>
-                _loadMonitor?.SetRenderMode(_renderMonitor?.HasRunningJob == true);
+            _renderMonitor.Changed += OnRenderChanged;
+            OnRenderChanged();
         }
 
         StartRemote();
@@ -134,34 +142,43 @@ public sealed class AppHost : IDisposable
 
     private void OpenNewViewer(ViewerOpenRequest request)
     {
-        var (sequence, seed, start, explorerWindow, sourceWidth, sourceHeight) = request;
-
-        EnsureLoadMonitor();
-        int maxWorkers = _settings.AdaptiveResources && _loadMonitor is not null ? _loadMonitor.MaxDecoderThreads : 1;
-
-        var bounds = WindowBoundsFor(explorerWindow, sourceWidth, sourceHeight);
-        var viewer = new ViewerWindow(sequence, start, _settings, Persist, _decoders,
-                                      bounds, sourceWidth, sourceHeight, maxWorkers);
-
-        // Der Monitor gehoert dem Tray, nicht dem Fenster: Ein Render kann laufen,
-        // waehrend gar keine Vorschau offen ist, und soll dann trotzdem mitgezaehlt
-        // werden. Das Fenster haengt sich nur an.
-        if (_renderMonitor is not null) viewer.AttachRenderMonitor(_renderMonitor);
-
-        // Der Viewer soll die Einstellungen oeffnen koennen, ohne den Dialog selbst
-        // zu bauen - Pruefen und Sichern gehoeren hierher.
-        viewer.SettingsRequested = ShowSettings;
-        viewer.Closed += (_, _) =>
+        int maxWorkers = PrepareViewerLoad();
+        ViewerWindow? viewer = null;
+        try
         {
-            _viewer = null;
+            viewer = _createViewer(request, maxWorkers);
+            // Der Render-Monitor gehoert dem Host; das Fenster haengt sich nur an.
+            if (_renderMonitor is not null) viewer.AttachRenderMonitor(_renderMonitor);
+            viewer.SettingsRequested = ShowSettings;
+            viewer.Closed += (_, _) =>
+            {
+                if (ReferenceEquals(_viewer, viewer)) _viewer = null;
+                EnsureLoadMonitor();
+            };
+
+            _viewer = viewer;
+            viewer.Show();
+
+            Remember(request.Sequence, request.Seed, request.SourceWidth, request.SourceHeight);
+        }
+        catch
+        {
+            if (ReferenceEquals(_viewer, viewer)) _viewer = null;
+            viewer?.Close();
+            throw;
+        }
+        finally
+        {
+            // Die Reservierung vor der Konstruktion darf bei einem Fehler keinen
+            // Lastmonitor ohne Verbraucher zuruecklassen.
             EnsureLoadMonitor();
-        };
-
-        _viewer = viewer;
-        viewer.Show();
-
-        Remember(sequence, seed, sourceWidth, sourceHeight);
+        }
     }
+
+    private ViewerWindow CreateViewer(ViewerOpenRequest request, int maxWorkers)
+        => new(request.Sequence, request.StartIndex, _settings, Persist, _decoders,
+            WindowBoundsFor(request.ExplorerWindow, request.SourceWidth, request.SourceHeight),
+            request.SourceWidth, request.SourceHeight, maxWorkers);
 
     /// <summary>
     /// Fenstergroesse und -position auf dem Monitor des ausloesenden Explorer-Fensters.
@@ -174,17 +191,6 @@ public sealed class AppHost : IDisposable
         return WindowPlacement.Compute(work, scale, sourceWidth, sourceHeight);
     }
 
-    // ------------------------------------------------------------ Lasterkennung
-
-    /// <summary>
-    /// Die Lastmessung laufen lassen, solange jemand sie braucht.
-    ///
-    /// Sie haengt nicht mehr allein am Vorschaufenster. Das war richtig, solange sie
-    /// nur die Decoder-Threads regelte - jetzt speist sie auch die Werte, die ans
-    /// Handy gehen, und die sollen gerade dann kommen, wenn keine Vorschau offen
-    /// ist. Ohne diese Unterscheidung blieb der Live-Bildschirm leer, sobald man das
-    /// Fenster schloss.
-    /// </summary>
     /// <summary>
     /// Die Sequenz in die Liste der zuletzt geoeffneten aufnehmen.
     ///
@@ -210,73 +216,19 @@ public sealed class AppHost : IDisposable
         Task.Run(() => Configuration.RecentSequences.Remember(entry));
     }
 
+    // ------------------------------------------------------------ Lasterkennung
+
     private void EnsureLoadMonitor()
-    {
-        bool wanted = _viewer is not null || _remote.HasConnection || _windows.Main is not null;
+        => _load.Ensure(_viewer is not null, _windows.Main is not null, _remote.HasConnection);
 
-        if (wanted) StartLoadMonitor();
-        else StopLoadMonitor();
+    private int PrepareViewerLoad()
+    {
+        // Der neue Viewer muss schon vor seiner Konstruktion als Verbraucher zaehlen.
+        _load.Ensure(true, _windows.Main is not null, _remote.HasConnection);
+        return _load.ViewerDecoderThreads;
     }
 
-    private void StartLoadMonitor()
-    {
-        // Schon am Laufen - ein Neustart wuerde nur die Messreihe abschneiden.
-        if (_loadMonitor is not null) return;
-
-        StopLoadMonitor();
-
-        // Die Messung selbst ist billig und wird auch fuer die Fernsteuerung
-        // gebraucht; geregelt wird nur, wenn es eingeschaltet ist.
-        if (!_settings.AdaptiveResources && !_remote.HasConnection) return;
-
-        var monitor = new SystemLoadMonitor(_settings.MaxDecoderThreads,
-                                            TimeSpan.FromSeconds(_settings.LoadIntervalSeconds));
-        monitor.Updated += OnLoadUpdated;
-        _loadMonitor = monitor;
-        monitor.Start();
-    }
-
-    private void StopLoadMonitor()
-    {
-        var monitor = _loadMonitor;
-        _loadMonitor = null;
-
-        if (monitor is not null)
-        {
-            monitor.Updated -= OnLoadUpdated;
-            monitor.Dispose();
-        }
-
-        // Ohne offene Vorschau wieder zurueckhaltend werden.
-        ApplyProcessPriority(ProcessPriorityClass.BelowNormal);
-    }
-
-    private void OnLoadUpdated(LoadSnapshot snapshot, ResourceProfile profile)
-    {
-        var viewer = _viewer;
-        if (viewer is null) return;
-
-        viewer.Dispatcher.BeginInvoke(new Action(() =>
-        {
-            var current = _viewer;
-            if (current is null) return;
-            ApplyProcessPriority(profile.ProcessPriority);
-            current.ApplyLoad(snapshot, profile);
-        }));
-    }
-
-    private static void ApplyProcessPriority(ProcessPriorityClass priority)
-    {
-        try
-        {
-            using var process = Process.GetCurrentProcess();
-            if (process.PriorityClass != priority) process.PriorityClass = priority;
-        }
-        catch (Exception)
-        {
-            // Ohne ausreichende Rechte bleibt es bei der aktuellen Stufe.
-        }
-    }
+    private void OnRenderChanged() => _load.SetRenderMode(_renderMonitor?.HasRunningJob == true);
 
     private void Persist(AppSettings settings) => SettingsStore.Save(settings);
 
@@ -350,11 +302,15 @@ public sealed class AppHost : IDisposable
         if (_disposed) return;
         _disposed = true;
 
-        StopLoadMonitor();
+        _load.Dispose();
 
         _remote.Dispose();
 
-        _renderMonitor?.Dispose();
+        if (_renderMonitor is not null)
+        {
+            _renderMonitor.Changed -= OnRenderChanged;
+            _renderMonitor.Dispose();
+        }
         _renderMonitor = null;
 
         _hotkeys.Pressed -= Toggle;

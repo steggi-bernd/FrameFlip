@@ -197,13 +197,13 @@ public static class RemoteLifecycleInvariants
     private static void LoadMonitorAfterFailedRestart(AppSettings settings)
     {
         using var host = new Harness(settings, useLoadMonitor: true);
-        var loadField = typeof(AppHost).GetField("_loadMonitor", Hidden)!;
+        var load = (AppLoadController)typeof(AppHost).GetField("_load", Hidden)!.GetValue(host.Host)!;
         host.Restart();
-        Check.That(loadField.GetValue(host.Host) is not null,
+        Check.That(load.IsRunning,
                    "Host startet bei Remote-Verbindung auch ohne adaptive Regelung die Lastmessung");
         host.Settings.RelayHost = "https://invalid.example/";
         host.Restart();
-        Check.That(loadField.GetValue(host.Host) is null,
+        Check.That(!load.IsRunning,
                    "fehlgeschlagener Wechsel stoppt die echte Lastmessung, wenn kein anderer Verbraucher offen ist");
     }
 

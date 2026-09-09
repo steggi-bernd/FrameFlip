@@ -52,6 +52,7 @@ static int RunAll()
     ViewerOpeningInvariants.Run();
     TrayInvariants.Run();
     RemoteLifecycleInvariants.Run();
+    LoadLifecycleInvariants.Run();
     ResourceInvariants.Run();
     VaultInvariants.Run();
     BrowseInvariants.Run();
