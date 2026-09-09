@@ -46,7 +46,7 @@ public static class AppHostWindowInvariants
             host.ShowMain();
             Check.That(mains == 1 && main.WindowState == WindowState.Normal,
                        "erneutes Oeffnen stellt dasselbe minimierte Hauptfenster wieder her");
-            Check.That(Field<object?>(host, "_loadMonitor") is null, "isolierte Tests starten ohne adaptive Ressourcen keinen Lastmonitor");
+            Check.That(!Field<AppLoadController>(host, "_load").IsRunning, "isolierte Tests starten ohne adaptive Ressourcen keinen Lastmonitor");
             Call(host, "ShowPairing");
             var owned = Field<Window>(host, "_pairingWindow");
             Check.That(pairings == 2 && ReferenceEquals(owned.Owner, main)
