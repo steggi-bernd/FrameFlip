@@ -65,7 +65,7 @@ public static class WatchState
         }
 
         // Nur eine Kennung, kein Pfad: Aendert sie sich, holt die Seite das Bild neu.
-        state["frameId"] = FrameId(newestFrame);
+        state["frameId"] = FrameIdOf(newestFrame);
 
         return JsonSerializer.Serialize(state);
     }
@@ -77,7 +77,7 @@ public static class WatchState
     /// braucht der Browser nicht zu wissen. Der Name wird dabei nicht mitgeschickt,
     /// nur seine Quersumme.
     /// </summary>
-    private static string FrameId(string? path)
+    public static string FrameIdOf(string? path)
     {
         if (string.IsNullOrWhiteSpace(path)) return string.Empty;
 

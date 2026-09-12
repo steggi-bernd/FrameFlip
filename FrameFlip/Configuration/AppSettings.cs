@@ -173,16 +173,27 @@ public sealed class AppSettings
     public int BridgePort { get; set; } = 47823;
 
     /// <summary>
-    /// Die Seite zum Zusehen im eigenen Netz.
+    /// Die Seite zum Zusehen im Browser, ueber den Relay.
     ///
-    /// Aus, solange niemand sie einschaltet. Ein offener Port, den man nicht bestellt
-    /// hat, ist genau die Art Ueberraschung, die ein Programm nicht bereiten soll -
-    /// und die Vorschau selbst braucht ihn nicht.
+    /// Aus, solange niemand sie einschaltet. Eine Verbindung nach draussen, die man
+    /// nicht bestellt hat, ist genau die Art Ueberraschung, die ein Programm nicht
+    /// bereiten soll - und die Vorschau selbst braucht sie nicht.
+    ///
+    /// Der Weg fuehrt bewusst ueber denselben Relay wie die Kopplung ans Handy und
+    /// nicht ueber einen eigenen Server im Heimnetz. Ein eigener Server brauchte eine
+    /// Oeffnung in der Firewall, also einen Weg von aussen nach innen. So baut
+    /// FrameFlip die Verbindung selbst auf, nach draussen, wie ein Browser auch -
+    /// es gibt keinen Eingang, der offen stehen koennte.
     /// </summary>
     public bool WatchEnabled { get; set; }
 
-    /// <summary>Port der Zusehen-Seite.</summary>
-    public int WatchPort { get; set; } = 47824;
+    /// <summary>
+    /// Zuschauer-Geheimnis und Kennwort, mit DPAPI geschuetzt.
+    ///
+    /// Beides zusammen in einem Feld, siehe <see cref="Remote.WatchStore"/>. Leer
+    /// heisst: Es gibt noch keinen Link; beim Einschalten entsteht einer.
+    /// </summary>
+    public string WatchSecret { get; set; } = string.Empty;
 
     /// <summary>
     /// Renderfortschritt an ein gekoppeltes Handy weiterreichen.

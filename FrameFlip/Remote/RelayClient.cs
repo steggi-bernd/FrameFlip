@@ -55,7 +55,7 @@ public sealed class RelayClient : IAsyncDisposable
     private static readonly TimeSpan FirstRetry = TimeSpan.FromSeconds(2);
     private static readonly TimeSpan MaxRetry = TimeSpan.FromMinutes(2);
 
-    private readonly PairingInvite _invite;
+    private readonly RelayRoom _room;
     private readonly CancellationTokenSource _stopping = new();
     private readonly Channel<byte[]> _outgoing;
     private readonly Func<IRelaySocket> _socketFactory;
@@ -68,7 +68,12 @@ public sealed class RelayClient : IAsyncDisposable
     private RelayState _state = RelayState.Off;
 
     public RelayClient(PairingInvite invite)
-        : this(invite, static () => new ClientRelaySocket(), static (delay, token) => Task.Delay(delay, token))
+        : this(RelayRoom.ForPairing(invite))
+    {
+    }
+
+    public RelayClient(RelayRoom room)
+        : this(room, static () => new ClientRelaySocket(), static (delay, token) => Task.Delay(delay, token))
     {
     }
 
@@ -80,8 +85,16 @@ public sealed class RelayClient : IAsyncDisposable
         PairingInvite invite,
         Func<IRelaySocket> socketFactory,
         Func<TimeSpan, CancellationToken, Task> delay)
+        : this(RelayRoom.ForPairing(invite), socketFactory, delay)
     {
-        _invite = invite ?? throw new ArgumentNullException(nameof(invite));
+    }
+
+    internal RelayClient(
+        RelayRoom room,
+        Func<IRelaySocket> socketFactory,
+        Func<TimeSpan, CancellationToken, Task> delay)
+    {
+        _room = room ?? throw new ArgumentNullException(nameof(room));
         _socketFactory = socketFactory ?? throw new ArgumentNullException(nameof(socketFactory));
         _delay = delay ?? throw new ArgumentNullException(nameof(delay));
 
@@ -98,6 +111,15 @@ public sealed class RelayClient : IAsyncDisposable
 
     /// <summary>Eine entschluesselte Nachricht vom Handy.</summary>
     public event Action<byte[]>? PayloadReceived;
+
+    /// <summary>
+    /// Jemand war im Raum, konnte den Schluessel aber nicht nachweisen.
+    ///
+    /// Im Kopplungsraum ist das ein Kuriosum. Im Zuschauerraum ist es die einzige
+    /// Spur, die ein falsch eingetippter Zahlencode hinterlaesst - und damit das,
+    /// woran sich Fehlversuche zaehlen lassen.
+    /// </summary>
+    public event Action? PeerRejected;
 
     public RelayState State => _state;
 
@@ -184,7 +206,7 @@ public sealed class RelayClient : IAsyncDisposable
         SetState(RelayState.Connecting);
 
         using var socket = _socketFactory();
-        await socket.ConnectAsync(new Uri(_invite.SocketUrl(RelayRole.Host)), token);
+        await socket.ConnectAsync(new Uri(_room.SocketUrl), token);
 
         SetState(RelayState.Waiting);
 
@@ -244,9 +266,9 @@ public sealed class RelayClient : IAsyncDisposable
                     if (!SecureChannel.TryReadHello(data, out byte[]? theirSalt)) continue;
 
                     peer.TheirSalt = theirSalt!;
-                    peer.Channel = SecureChannel.Establish(_invite.Key, RelayRole.Host, peer.OurSalt, peer.TheirSalt);
+                    peer.Channel = SecureChannel.Establish(_room.Channel, RelayRole.Host, peer.OurSalt, peer.TheirSalt);
 
-                    byte[] proof = _invite.Key.Confirmation(RelayRole.Host, peer.OurSalt, peer.TheirSalt);
+                    byte[] proof = _room.Channel.Confirmation(RelayRole.Host, peer.OurSalt, peer.TheirSalt);
                     try
                     {
                         await SendFrameAsync(socket, sends, peer.Channel.Seal(proof), WebSocketMessageType.Binary, connection.Token);
@@ -263,15 +285,25 @@ public sealed class RelayClient : IAsyncDisposable
                 {
                     if (peer.TheirSalt is not null &&
                         peer.Channel.TryOpen(data, out byte[]? proof) &&
-                        _invite.Key.IsConfirmation(proof!, RelayRole.Client, peer.OurSalt, peer.TheirSalt))
+                        _room.Channel.IsConfirmation(proof!, RelayRole.Client, peer.OurSalt, peer.TheirSalt))
                     {
                         peer.Confirmed = true;
                         SetState(RelayState.Paired);
                         peer.Pump = PumpAsync(socket, sends, peer, connection);
                     }
+                    else
+                    {
+                        try { PeerRejected?.Invoke(); }
+                        catch (Exception) { /* ein Zaehler darf die Leitung nicht reissen */ }
+                    }
 
                     continue;
                 }
+
+                // In einem Raum, in dem nicht zugehoert wird, endet die Nachricht
+                // hier - ungeoeffnet. Sie zu entschluesseln und danach wegzuwerfen
+                // waere derselbe Aufwand mit einer Tuer darin.
+                if (!_room.Listens) continue;
 
                 if (peer.Channel.TryOpen(data, out byte[]? payload))
                 {

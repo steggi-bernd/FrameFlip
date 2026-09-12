@@ -688,7 +688,27 @@
                                            TextAlignment="Center" FontSize="10.5" LineHeight="16"
                                            Foreground="{StaticResource DesktopMuted}" />
 
-                                <WrapPanel x:Name="WatchActions" Margin="0,12,0,0"
+                                <!-- Das Kennwort steht sichtbar, nicht hinter Punkten: Es ist
+                                     dazu da, weitergesagt zu werden. Wer es verbirgt, zwingt
+                                     nur dazu, es woanders aufzuschreiben. -->
+                                <StackPanel x:Name="WatchPassRow" Margin="0,16,0,0" Visibility="Collapsed">
+                                    <TextBlock views:Track.Text="{DynamicResource D_WatchPass}"
+                                               Style="{StaticResource DashLabel}" FontSize="8.5"
+                                               HorizontalAlignment="Center" />
+
+                                    <TextBox x:Name="WatchPass" Margin="0,8,0,0" Width="170"
+                                             HorizontalAlignment="Center" MaxLength="32"
+                                             Style="{StaticResource DashRateBox}"
+                                             HorizontalContentAlignment="Center"
+                                             KeyDown="OnWatchPassKey" LostFocus="OnWatchPassDone" />
+
+                                    <TextBlock x:Name="WatchPassHint" Margin="0,8,0,0"
+                                               TextWrapping="Wrap" TextAlignment="Center"
+                                               FontSize="9.5" LineHeight="14"
+                                               Foreground="{StaticResource DesktopMuted}" />
+                                </StackPanel>
+
+                                <WrapPanel x:Name="WatchActions" Margin="0,16,0,0"
                                            HorizontalAlignment="Center" />
                             </StackPanel>
                         </Border>

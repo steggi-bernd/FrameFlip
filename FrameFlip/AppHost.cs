@@ -27,7 +27,7 @@ public sealed class AppHost : IDisposable
 
     /// <summary>Nimmt Meldungen des Blender-Addons entgegen. Null, wenn abgeschaltet.</summary>
     private Bridge.RenderMonitor? _renderMonitor;
-    private Web.WatchServer? _watch;
+    private Web.WatchService? _watch;
 
     /// <summary>Besitzt die optionale Verbindung zum Handy.</summary>
     private readonly AppRemoteController _remote;
@@ -55,7 +55,7 @@ public sealed class AppHost : IDisposable
                 LivePage.Load = () => _load.LastSnapshot;
                 return createMain?.Invoke() ?? new MainWindow(_renderMonitor, () => _remote.State,
                     ShowSettings, OpenFile, ShowPairing, _settings, settings => SettingsStore.Save(settings),
-                    ApplySettings, () => _settings, () => WatchAddress);
+                    ApplySettings, () => _settings, () => _watch, RenewWatchLink, SetWatchCode);
             },
             createSettings ?? (() => new SettingsWindow(_settings, ApplySettings, () => _remote.State)),
             createPairing ?? (() => new PairingWindow(_settings, ApplySettings, () => _remote.State)),
@@ -134,26 +134,82 @@ public sealed class AppHost : IDisposable
     {
         if (!_settings.WatchEnabled) return;
 
+        // Ohne brauchbaren Relay-Namen gaebe es nur eine Adresse, die niemanden
+        // erreicht. Das faellt spaeter auf und ist dann schwer zu deuten.
+        if (!Remote.PairingInvite.IsUsableHost(_settings.RelayHost))
+        {
+            Notify(Localization.Strings.T("S_WatchNoRelay"));
+            return;
+        }
+
+        var key = WatchKeyForSettings();
+
         var newest = new Web.NewestFrame(() => _renderMonitor?.Job,
                                          Decoding.FrameDecoderRegistry.CreateDefault());
 
-        _watch = new Web.WatchServer(
-            () => _renderMonitor?.Job,
-            () => _load.LastSnapshot,
-            newest.Path);
+        _watch = new Web.WatchService(key, _settings.RelayHost, _renderMonitor,
+                                      () => _load.LastSnapshot, newest);
 
-        if (_watch.Start(_settings.WatchPort)) return;
-
-        // Port belegt: Dann gibt es die Seite nicht, und der Benutzer erfaehrt es -
-        // stillschweigend nichts zu tun waere hier die schlechtere Auskunft.
-        _watch.Dispose();
-        _watch = null;
-
-        Notify(Localization.Strings.T("S_WatchPortTaken", _settings.WatchPort));
+        _watch.Start();
     }
 
-    /// <summary>Die Adresse der Seite - oder null, wenn sie nicht laeuft.</summary>
-    public string? WatchAddress => _watch?.Address;
+    /// <summary>
+    /// Holt das gespeicherte Zuschauer-Geheimnis - oder legt beim ersten Mal eines an.
+    ///
+    /// Angelegt wird nur, wenn keines da ist. Ein neues bei jedem Start waere bequem
+    /// zu schreiben und in der Sache falsch: Der Link soll gelten, bis jemand ihn
+    /// ausdruecklich erneuert, sonst ist ein Lesezeichen auf dem Handy nach jedem
+    /// Neustart wertlos.
+    /// </summary>
+    private Remote.WatchKey WatchKeyForSettings()
+    {
+        if (Remote.WatchStore.TryUnprotect(_settings.WatchSecret, out var stored) && stored is not null)
+            return stored;
+
+        var fresh = Remote.WatchKey.Create(null);
+
+        _settings.WatchSecret = Remote.WatchStore.Protect(fresh);
+        SettingsStore.Save(_settings);
+
+        return fresh;
+    }
+
+    /// <summary>
+    /// Erzeugt einen neuen Link und macht damit jeden alten unwirksam.
+    ///
+    /// Der Widerruf ist vollstaendig, weil er an der Wurzel ansetzt: Mit einem neuen
+    /// Geheimnis liegen auch alle Raeume woanders. Wer den alten Link oeffnet, landet
+    /// in Raeumen, in denen schlicht niemand sitzt. Das eingestellte Kennwort bleibt -
+    /// es zu verwerfen, waere eine zweite Ueberraschung fuer einen Handgriff, der nur
+    /// eine bewirken soll.
+    /// </summary>
+    public void RenewWatchLink()
+    {
+        string? code = Remote.WatchStore.TryUnprotect(_settings.WatchSecret, out var old) && old is not null
+            ? old.Code
+            : null;
+
+        _settings.WatchSecret = Remote.WatchStore.Protect(Remote.WatchKey.Create(code));
+        SettingsStore.Save(_settings);
+
+        ApplyWatch();
+    }
+
+    /// <summary>Setzt das Kennwort fuer die hinteren Plaetze. Leer heisst: nur die freien.</summary>
+    public void SetWatchCode(string? code)
+    {
+        if (!Remote.WatchKey.IsUsableCode(code)) return;
+
+        var key = WatchKeyForSettings().WithCode(string.IsNullOrWhiteSpace(code) ? null : code.Trim());
+
+        _settings.WatchSecret = Remote.WatchStore.Protect(key);
+        SettingsStore.Save(_settings);
+
+        ApplyWatch();
+    }
+
+    /// <summary>Der Dienst hinter der Zuschauerseite - oder null, wenn er nicht laeuft.</summary>
+    public Web.WatchService? Watch => _watch;
 
     /// <summary>
     /// Ein- und ausschalten, ohne das Programm neu zu starten.
@@ -163,8 +219,12 @@ public sealed class AppHost : IDisposable
     /// </summary>
     public void ApplyWatch()
     {
-        _watch?.Dispose();
+        var closing = _watch;
         _watch = null;
+
+        // Nicht abwarten: Das Schliessen einer Verbindung kann an einem haengenden
+        // Socket Sekunden dauern, und die Oberflaeche steht sonst so lange.
+        if (closing is not null) _ = closing.DisposeAsync().AsTask();
 
         StartWatch();
     }
@@ -372,7 +432,8 @@ public sealed class AppHost : IDisposable
         // haben. Ein Neuaufbau bei jedem Speichern wuerde das Zeichen in der Adresse
         // erneuern, und die offene Seite auf dem Handy waere ohne Grund tot.
         if (previousSettings.WatchEnabled != _settings.WatchEnabled
-            || previousSettings.WatchPort != _settings.WatchPort)
+            || previousSettings.WatchSecret != _settings.WatchSecret
+            || previousSettings.RelayHost != _settings.RelayHost)
         {
             ApplyWatch();
         }
@@ -397,8 +458,17 @@ public sealed class AppHost : IDisposable
 
         _load.Dispose();
 
-        _watch?.Dispose();
+        // Beim Beenden warten wir kurz: Die Verbindungen sollen sauber enden,
+        // damit im Raum kein Platz als belegt zurueckbleibt, bis der Leuchtturm die
+        // Leiche selbst bemerkt.
+        var watch = _watch;
         _watch = null;
+
+        if (watch is not null)
+        {
+            try { watch.DisposeAsync().AsTask().Wait(TimeSpan.FromSeconds(2)); }
+            catch (Exception) { /* beim Beenden ist ein haengender Socket kein Anlass */ }
+        }
 
         _remote.Dispose();
 

@@ -32,6 +32,7 @@ static int RunAll()
     LocalizationInvariants.Run();
     RemoteInvariants.Run();
     RelayClientInvariants.Run();
+    WatchInvariants.Run();
     MachineInvariants.Run();
     RemoteCommandRouterInvariants.Run();
     RemotePreviewFollowInvariants.Run();

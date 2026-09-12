@@ -1,0 +1,769 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex, nofollow">
+<meta name="referrer" content="no-referrer">
+<!--
+  Streng, obwohl die Seite ohnehin nichts nachlaedt.
+
+  Der Nutzen liegt nicht im Normalfall, sondern im Fehlerfall: Sollte hier je etwas
+  stehen, das nicht hierhergehoert, kann es weder Daten wegschicken noch etwas
+  nachladen. 'unsafe-inline' ist noetig, weil Stil und Code im Dokument stehen - das
+  ist Absicht, denn eine Datei ohne Beiwerk laesst sich pruefen, indem man sie liest.
+-->
+<meta http-equiv="Content-Security-Policy"
+      content="default-src 'none'; img-src 'self' blob: data:; style-src 'unsafe-inline'; script-src 'unsafe-inline'; connect-src 'self'; base-uri 'none'; form-action 'none'">
+<title>FrameFlip</title>
+<style>
+  :root {
+    --bg: #07070d;      --panel: #0b0b14;   --stage: #05050a;
+    --surface: #11111b; --line: #1e1e2b;    --ink: #f4f4f8;
+    --muted: #9b9bb0;   --faint: #6b6b80;   --accent: #a855f7;
+    --blue: #60a5fa;    --cyan: #22d3ee;    --warn: #f472b6;
+    --mono: ui-monospace, "Cascadia Mono", "SF Mono", Menlo, Consolas, monospace;
+    --sans: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  }
+
+  * { box-sizing: border-box; }
+
+  html, body {
+    margin: 0; height: 100%;
+    background: var(--bg); color: var(--ink);
+    font-family: var(--sans);
+    -webkit-text-size-adjust: 100%;
+  }
+
+  body {
+    display: flex; flex-direction: column;
+    padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
+  }
+
+  /* ------------------------------------------------------------- Kopfzeile */
+  header {
+    display: flex; align-items: center; gap: 10px;
+    padding: 14px 18px; border-bottom: 1px solid var(--line);
+    background: var(--panel); flex: none;
+  }
+
+  .mark { font-weight: 650; letter-spacing: .04em; font-size: 14px; }
+
+  .dot {
+    width: 8px; height: 8px; border-radius: 50%;
+    background: var(--faint); flex: none;
+    transition: background .3s;
+  }
+  .dot.live  { background: var(--accent); box-shadow: 0 0 10px var(--accent); }
+  .dot.idle  { background: var(--blue); }
+  .dot.gone  { background: var(--warn); }
+
+  .standing {
+    font-size: 11px; color: var(--muted);
+    margin-left: auto; text-align: right;
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* ------------------------------------------------------------- Rumpf */
+  main {
+    flex: 1; min-height: 0;
+    display: grid; gap: 1px;
+    background: var(--line);
+    grid-template-rows: auto 1fr;
+  }
+
+  /* Quer und am Schreibtisch nebeneinander, hoch untereinander. Die Schwelle
+     liegt am Seitenverhaeltnis, nicht an der Breite: Ein Handy im Querformat ist
+     schmal und hat trotzdem Platz fuer zwei Spalten. */
+  @media (min-aspect-ratio: 1/1) {
+    main { grid-template-rows: 1fr; grid-template-columns: 1fr minmax(240px, 300px); }
+  }
+
+  .stage {
+    background: var(--stage);
+    display: flex; align-items: center; justify-content: center;
+    min-height: 0; padding: 10px; overflow: hidden;
+  }
+
+  .stage img {
+    max-width: 100%; max-height: 100%;
+    display: block; object-fit: contain;
+    border-radius: 4px;
+  }
+
+  .stage .empty {
+    color: var(--faint); font-size: 12px;
+    text-align: center; padding: 24px; line-height: 1.7;
+  }
+
+  .side {
+    background: var(--panel);
+    overflow-y: auto; -webkit-overflow-scrolling: touch;
+    padding: 16px 18px;
+  }
+
+  /* ------------------------------------------------------------- Zahlen */
+  .bar {
+    height: 4px; border-radius: 2px; background: var(--surface);
+    overflow: hidden; margin-bottom: 16px;
+  }
+  .bar span {
+    display: block; height: 100%; width: 0;
+    background: linear-gradient(90deg, var(--accent), var(--cyan));
+    transition: width .4s ease;
+  }
+
+  .grid {
+    display: grid; gap: 14px 16px;
+    grid-template-columns: repeat(auto-fit, minmax(96px, 1fr));
+  }
+
+  .cell label {
+    display: block; font-size: 8.5px; letter-spacing: .12em;
+    text-transform: uppercase; color: var(--faint); margin-bottom: 4px;
+  }
+  .cell output {
+    font-family: var(--mono); font-size: 15px;
+    font-variant-numeric: tabular-nums; color: var(--ink);
+  }
+  .cell output.small { font-size: 12px; }
+  .cell output em { font-style: normal; color: var(--faint); font-size: 11px; }
+
+  .rule {
+    grid-column: 1 / -1; height: 1px;
+    background: var(--line); margin: 2px 0;
+  }
+
+  .scene {
+    font-size: 12px; color: var(--muted);
+    margin-bottom: 14px; word-break: break-word;
+  }
+
+  /* ------------------------------------------------------------- Kennwort */
+  .ask {
+    position: fixed; inset: 0; z-index: 10;
+    background: rgba(7, 7, 13, .94);
+    display: none; align-items: center; justify-content: center; padding: 24px;
+  }
+  .ask.on { display: flex; }
+
+  .ask form {
+    background: var(--panel); border: 1px solid var(--line);
+    border-radius: 14px; padding: 24px; width: 100%; max-width: 320px;
+    text-align: center;
+  }
+  .ask h2 { margin: 0 0 8px; font-size: 14px; font-weight: 600; }
+  .ask p  { margin: 0 0 18px; font-size: 11.5px; color: var(--muted); line-height: 1.6; }
+
+  .ask input {
+    width: 100%; padding: 11px 12px; text-align: center;
+    font-family: var(--mono); font-size: 16px; letter-spacing: .1em;
+    color: var(--ink); background: var(--surface);
+    border: 1px solid var(--line); border-radius: 9px;
+  }
+  .ask input:focus { outline: none; border-color: var(--accent); }
+
+  .ask button {
+    width: 100%; margin-top: 12px; padding: 11px;
+    font-size: 12px; font-weight: 600; letter-spacing: .04em;
+    color: #0b0b14; background: var(--accent);
+    border: 0; border-radius: 9px; cursor: pointer;
+  }
+  .ask .wrong { color: var(--warn); font-size: 11px; margin: 12px 0 0; min-height: 14px; }
+
+  footer {
+    flex: none; padding: 9px 18px; font-size: 9.5px;
+    color: var(--faint); text-align: center;
+    border-top: 1px solid var(--line); background: var(--panel);
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <span class="dot" id="dot"></span>
+  <span class="mark">FrameFlip</span>
+  <span class="standing" id="standing">verbinde …</span>
+</header>
+
+<main>
+  <div class="stage" id="stage">
+    <div class="empty" id="empty">Noch kein Bild.</div>
+  </div>
+
+  <div class="side">
+    <div class="scene" id="scene"></div>
+    <div class="bar"><span id="barFill"></span></div>
+
+    <div class="grid">
+      <div class="cell"><label>Fortschritt</label><output id="percent">–</output></div>
+      <div class="cell"><label>Bild</label><output id="frame">–</output></div>
+      <div class="cell"><label>Geschrieben</label><output id="written">–</output></div>
+
+      <div class="rule"></div>
+
+      <div class="cell"><label>Gelaufen</label><output id="elapsed" class="small">–</output></div>
+      <div class="cell"><label>Verbleibend</label><output id="remaining" class="small">–</output></div>
+      <div class="cell"><label>Je Bild</label><output id="spf" class="small">–</output></div>
+
+      <div class="rule"></div>
+
+      <div class="cell"><label>Samples</label><output id="sample" class="small">–</output></div>
+      <div class="cell"><label>Speicher</label><output id="memory" class="small">–</output></div>
+      <div class="cell"><label>Auflösung</label><output id="size" class="small">–</output></div>
+
+      <div class="rule"></div>
+
+      <div class="cell"><label>CPU</label><output id="cpu" class="small">–</output></div>
+      <div class="cell"><label>GPU</label><output id="gpu" class="small">–</output></div>
+      <div class="cell"><label>RAM frei</label><output id="ram" class="small">–</output></div>
+    </div>
+  </div>
+</main>
+
+<footer id="foot">Nur Ansicht · Ende zu Ende verschlüsselt</footer>
+
+<div class="ask" id="ask">
+  <form id="askForm" autocomplete="off">
+    <h2>Kennwort</h2>
+    <p>Die ersten beiden Plätze sind belegt. Für einen weiteren braucht es das Kennwort, das am PC steht.</p>
+    <input id="askInput" type="password" inputmode="text" autocomplete="off"
+           autocapitalize="off" spellcheck="false" aria-label="Kennwort">
+    <button type="submit">Zusehen</button>
+    <p class="wrong" id="askWrong"></p>
+  </form>
+</div>
+
+<script>
+"use strict";
+
+/* ===========================================================================
+   Das Protokoll steht in PROTOCOL.md des Relays. Diese Datei ist die zweite
+   Umsetzung davon - die erste ist FrameFlip selbst. Jede Abweichung hier ist ein
+   Bruch der Schnittstelle, kein Detail.
+
+   Was der Server dabei erfaehrt: eine Raumkennung. Sonst nichts. Das Geheimnis
+   steht hinter der Raute der Adresse, und diesen Teil schickt ein Browser
+   grundsaetzlich nicht mit - nicht im Aufruf, nicht im Referrer, nirgends.
+   =========================================================================== */
+
+const SEATS       = 6;                        // muss zu WatchKey.Seats passen
+const FREE_SEATS  = 2;                        // ... und zu WatchKey.FreeSeats
+const ROOM_INFO   = "frameflip/v1/watchroom";
+const SEAT_INFO   = "frameflip/v1/watchseat";
+const HOST_INFO   = "frameflip/v1/host";
+const CLIENT_INFO = "frameflip/v1/client";
+const CONFIRM_INFO = "frameflip/v2/confirm";
+
+const VERSION = 2;
+const SALT_BYTES = 16, TAG_BYTES = 16, COUNTER_BYTES = 8, NONCE_BYTES = 12;
+const OVERHEAD = COUNTER_BYTES + TAG_BYTES;
+
+const KIND_JSON = 0x01, KIND_PREVIEW = 0x02;
+
+const enc = new TextEncoder();
+
+/* ------------------------------------------------------------------ Kleinkram */
+
+function fromBase64Url(text) {
+  let s = String(text).replace(/-/g, "+").replace(/_/g, "/");
+  while (s.length % 4) s += "=";
+
+  const raw = atob(s);
+  const out = new Uint8Array(raw.length);
+  for (let i = 0; i < raw.length; i++) out[i] = raw.charCodeAt(i);
+  return out;
+}
+
+const toHex = bytes => Array.from(bytes, b => b.toString(16).padStart(2, "0")).join("");
+
+async function hkdf(secret, info, salt, bytes) {
+  const key = await crypto.subtle.importKey("raw", secret, "HKDF", false, ["deriveBits"]);
+  const bits = await crypto.subtle.deriveBits(
+    { name: "HKDF", hash: "SHA-256", salt: salt, info: enc.encode(info) }, key, bytes * 8);
+
+  return new Uint8Array(bits);
+}
+
+/* Der Nachweis, dass die Gegenseite denselben Schluessel hat. Bindet beide Salze
+   und die Rolle, damit ein Platzhalter im Raum nicht als echtes Geraet durchgeht. */
+async function confirmation(seatKey, senderIsHost, hostSalt, clientSalt) {
+  const info = enc.encode(CONFIRM_INFO);
+  const transcript = new Uint8Array(info.length + 1 + SALT_BYTES * 2);
+
+  transcript.set(info, 0);
+  transcript[info.length] = senderIsHost ? 1 : 2;
+  transcript.set(hostSalt, info.length + 1);
+  transcript.set(clientSalt, info.length + 1 + SALT_BYTES);
+
+  const key = await crypto.subtle.importKey(
+    "raw", seatKey, { name: "HMAC", hash: "SHA-256" }, false, ["sign"]);
+
+  return new Uint8Array(await crypto.subtle.sign("HMAC", key, transcript));
+}
+
+function sameBytes(a, b) {
+  if (a.length !== b.length) return false;
+
+  // Ohne fruehen Ausstieg. Hier haengt zwar nichts Geheimes an der Laufzeit, aber
+  // ein Vergleich von Pruefsummen, der bei der ersten Abweichung aufhoert, ist eine
+  // Angewohnheit, die man sich an der falschen Stelle teuer bezahlt.
+  let diff = 0;
+  for (let i = 0; i < a.length; i++) diff |= a[i] ^ b[i];
+  return diff === 0;
+}
+
+/* ------------------------------------------------------- Der verschluesselte Kanal */
+
+class Channel {
+  constructor(sendKey, receiveKey) {
+    this.sendKey = sendKey;
+    this.receiveKey = receiveKey;
+    this.next = 0n;
+    this.lastSeen = 0n;
+    this.sawAny = false;
+  }
+
+  static async establish(seatKey, hostSalt, clientSalt) {
+    const salt = new Uint8Array(SALT_BYTES * 2);
+    salt.set(hostSalt, 0);
+    salt.set(clientSalt, SALT_BYTES);
+
+    // Wir sind der Client: Wir senden mit dem Client-Schluessel und lesen den des Hosts.
+    const mine  = await hkdf(seatKey, CLIENT_INFO, salt, 32);
+    const yours = await hkdf(seatKey, HOST_INFO, salt, 32);
+
+    const usable = raw => crypto.subtle.importKey(
+      "raw", raw, { name: "AES-GCM" }, false, ["encrypt", "decrypt"]);
+
+    return new Channel(await usable(mine), await usable(yours));
+  }
+
+  async seal(payload) {
+    const frame = new Uint8Array(OVERHEAD + payload.length);
+    new DataView(frame.buffer).setBigUint64(0, this.next++, false);
+
+    const nonce = new Uint8Array(NONCE_BYTES);
+    nonce.set(frame.subarray(0, COUNTER_BYTES), NONCE_BYTES - COUNTER_BYTES);
+
+    const sealed = new Uint8Array(await crypto.subtle.encrypt(
+      { name: "AES-GCM", iv: nonce, additionalData: frame.subarray(0, COUNTER_BYTES), tagLength: 128 },
+      this.sendKey, payload));
+
+    // WebCrypto haengt die Pruefsumme hinten an, auf der Leitung steht sie vorn.
+    frame.set(sealed.subarray(sealed.length - TAG_BYTES), COUNTER_BYTES);
+    frame.set(sealed.subarray(0, sealed.length - TAG_BYTES), OVERHEAD);
+
+    return frame;
+  }
+
+  async open(frame) {
+    if (frame.length < OVERHEAD) return null;
+
+    const counter = new DataView(frame.buffer, frame.byteOffset, frame.byteLength).getBigUint64(0, false);
+    if (this.sawAny && counter <= this.lastSeen) return null;
+
+    const nonce = new Uint8Array(NONCE_BYTES);
+    nonce.set(frame.subarray(0, COUNTER_BYTES), NONCE_BYTES - COUNTER_BYTES);
+
+    const body = new Uint8Array(frame.length - OVERHEAD + TAG_BYTES);
+    body.set(frame.subarray(OVERHEAD), 0);
+    body.set(frame.subarray(COUNTER_BYTES, OVERHEAD), frame.length - OVERHEAD);
+
+    let plain;
+    try {
+      plain = await crypto.subtle.decrypt(
+        { name: "AES-GCM", iv: nonce, additionalData: frame.subarray(0, COUNTER_BYTES), tagLength: 128 },
+        this.receiveKey, body);
+    } catch (e) {
+      return null;   // falscher Schluessel oder verfaelscht - beides derselbe Fall
+    }
+
+    // Erst jetzt weiterzaehlen. Andernfalls koennte ein Fremder mit einer erfundenen
+    // hohen Zahl die echte Gegenseite fuer den Rest der Sitzung aussperren.
+    this.lastSeen = counter;
+    this.sawAny = true;
+
+    return new Uint8Array(plain);
+  }
+}
+
+/* --------------------------------------------------------------- Das Geheimnis */
+
+/* Aus der Adresse holen und sofort daraus entfernen.
+
+   Der Sinn ist handfest: Danach steht in der Adresszeile nur noch der Pfad. Ein
+   Screenshot vom Handy verraet nichts, der Verlauf behaelt nichts, und wer kurz
+   ueber die Schulter sieht, sieht nichts. Im sessionStorage ueberlebt es das
+   Neuladen und stirbt mit dem Tab. */
+function secretFromAddress() {
+  const raw = location.hash.replace(/^#/, "").trim();
+
+  if (raw) {
+    try { sessionStorage.setItem("k", raw); } catch (e) { /* privates Fenster */ }
+    history.replaceState(null, "", location.pathname);
+    return raw;
+  }
+
+  try { return sessionStorage.getItem("k") || ""; } catch (e) { return ""; }
+}
+
+function rememberedCode() {
+  try { return sessionStorage.getItem("c") || ""; } catch (e) { return ""; }
+}
+
+function rememberCode(code) {
+  try { code ? sessionStorage.setItem("c", code) : sessionStorage.removeItem("c"); }
+  catch (e) { /* ohne Gedaechtnis fragt die Seite eben wieder */ }
+}
+
+/* ------------------------------------------------------------------- Anzeige */
+
+const el = id => document.getElementById(id);
+const dot = el("dot"), standing = el("standing"), stage = el("stage"), empty = el("empty");
+
+let picture = null;
+let pictureUrl = null;
+
+function say(text, mood) {
+  standing.textContent = text;
+  dot.className = "dot" + (mood ? " " + mood : "");
+}
+
+function clock(seconds) {
+  if (seconds === undefined || seconds === null) return "–";
+
+  const s = Math.max(0, Math.round(seconds));
+  const h = Math.floor(s / 3600), m = Math.floor((s % 3600) / 60), r = s % 60;
+
+  return h > 0
+    ? h + ":" + String(m).padStart(2, "0") + ":" + String(r).padStart(2, "0")
+    : m + ":" + String(r).padStart(2, "0");
+}
+
+const put = (id, text) => { el(id).textContent = text; };
+
+function show(state) {
+  const has = name => state[name] !== undefined && state[name] !== null;
+
+  put("percent", has("percent") ? state.percent.toFixed(1) + " %" : "–");
+  el("barFill").style.width = (has("percent") ? Math.min(100, state.percent) : 0) + "%";
+
+  put("frame", has("frame")
+    ? state.frame + (has("last") ? " / " + state.last : "")
+    : "–");
+
+  put("written", has("written") ? String(state.written) : "–");
+  put("elapsed", clock(state.elapsed));
+  put("remaining", state.rendering && has("remaining") ? clock(state.remaining) : "–");
+  put("spf", has("secondsPerFrame") ? state.secondsPerFrame.toFixed(2) + " s" : "–");
+
+  put("sample", has("sample")
+    ? state.sample + (has("sampleTotal") ? " / " + state.sampleTotal : "")
+    : "–");
+
+  put("memory", has("memoryMb") ? Math.round(state.memoryMb) + " MB" : "–");
+  put("size", has("width") && has("height") ? state.width + " × " + state.height : "–");
+  put("cpu", has("cpu") ? state.cpu.toFixed(0) + " %" : "–");
+  put("gpu", has("gpu") ? state.gpu.toFixed(0) + " %" : "–");
+
+  put("ram", has("freeMb")
+    ? (state.freeMb / 1024).toFixed(1) + (has("totalMb") ? " / " + (state.totalMb / 1024).toFixed(0) : "") + " GB"
+    : "–");
+
+  el("scene").textContent = state.scene
+    ? (state.rendering ? "rendert " : "") + state.scene
+    : "";
+
+  say(state.rendering ? (state.activity || "rendert") : "bereit",
+      state.rendering ? "live" : "idle");
+}
+
+function showPicture(jpeg) {
+  const next = URL.createObjectURL(new Blob([jpeg], { type: "image/jpeg" }));
+
+  if (!picture) {
+    picture = document.createElement("img");
+    picture.alt = "";
+    stage.appendChild(picture);
+  }
+
+  picture.src = next;
+  empty.style.display = "none";
+
+  // Die alte Adresse erst freigeben, wenn die neue steht - sonst blitzt es weiss auf.
+  const old = pictureUrl;
+  pictureUrl = next;
+  if (old) setTimeout(() => URL.revokeObjectURL(old), 1000);
+}
+
+/* ------------------------------------------------------------------ Verbindung */
+
+const Result = { Paired: "paired", Taken: "taken", Alone: "alone", Broken: "broken", Wrong: "wrong" };
+
+/* Ein Versuch auf einem Platz. Das Versprechen loest sich auf, sobald feststeht,
+   woran man ist - und bleibt offen, solange die Verbindung traegt. */
+function trySeat(room, seatKey) {
+  return new Promise(resolve => {
+    let socket;
+
+    try {
+      // Dasselbe Schema wie die Seite selbst. Steht sie auf https - und im Betrieb
+      // tut sie das -, ist es wss. Auf dem eigenen Rechner zum Pruefen ist es ws.
+      const scheme = location.protocol === "https:" ? "wss://" : "ws://";
+
+      socket = new WebSocket(scheme + location.host + "/r/" + room + "?role=client");
+    } catch (e) {
+      resolve(Result.Broken);
+      return;
+    }
+
+    socket.binaryType = "arraybuffer";
+
+    let channel = null, mySalt = null, theirSalt = null, confirmed = false;
+    let settled = false;
+
+    const done = outcome => {
+      if (settled) return;
+      settled = true;
+      resolve(outcome);
+    };
+
+    socket.onerror = () => done(Result.Broken);
+
+    socket.onclose = () => {
+      // Wurde der Kanal nie fertig, war es kein Platz fuer uns. Stand er schon,
+      // ist es ein Abbruch, und der aeussere Lauf versucht es erneut.
+      done(confirmed ? Result.Broken : Result.Wrong);
+      if (confirmed) say("Verbindung verloren", "gone");
+    };
+
+    /* Nachrichten NACHEINANDER, nicht durcheinander.
+
+       onmessage darf async sein - aber dann ruft der Browser es erneut auf, sobald
+       der laufende Aufruf auf das erste await trifft. Und genau das passiert hier:
+       Begruessung und Schluesselnachweis kommen dicht hintereinander, der Aufbau des
+       Kanals braucht vier await. Trifft der Nachweis in dieses Fenster, gibt es den
+       Kanal noch nicht; er faellt durch die Pruefung auf eine Begruessung, wird
+       verworfen, und die Verbindung haengt fuer immer - ohne Fehler, ohne Meldung.
+
+       Es hing an Millisekunden, ob es gutging. Eine Warteschlange nimmt das Glueck
+       aus der Sache. */
+    let pending = Promise.resolve();
+
+    socket.onmessage = event => {
+      pending = pending.then(() => handle(event)).catch(() => { /* eine kaputte Nachricht beendet nicht die Leitung */ });
+    };
+
+    async function handle(event) {
+      // Text gehoert dem Leuchtturm, Binaer der Gegenseite. Der Rahmentyp
+      // entscheidet, nie der Inhalt.
+      if (typeof event.data === "string") {
+        let control;
+        try { control = JSON.parse(event.data); } catch (e) { return; }
+
+        if (control.t === "error") {
+          // "role already taken" heisst: hier sitzt schon jemand. Alles andere ist
+          // eine Abweisung, die ein anderer Platz auch nicht heilt.
+          done(/taken/i.test(control.why || "") ? Result.Taken : Result.Broken);
+          socket.close();
+          return;
+        }
+
+        if (control.t === "waiting") {
+          // Wir sind drin, aber FrameFlip nicht. Auf einem der freien Plaetze heisst
+          // das: Das Programm laeuft nicht. Auf einem hinteren: Es ist kein Kennwort
+          // gesetzt, also gibt es diesen Platz gar nicht.
+          done(Result.Alone);
+          socket.close();
+          return;
+        }
+
+        if (control.t === "peer" && control.up) {
+          mySalt = crypto.getRandomValues(new Uint8Array(SALT_BYTES));
+
+          const hello = new Uint8Array(1 + SALT_BYTES);
+          hello[0] = VERSION;
+          hello.set(mySalt, 1);
+
+          socket.send(hello);
+          return;
+        }
+
+        if (control.t === "peer" && !control.up) {
+          say("FrameFlip ist weg", "gone");
+          channel = null;
+          confirmed = false;
+        }
+
+        return;
+      }
+
+      const data = new Uint8Array(event.data);
+
+      /* --- 1. Die Begruessung der Gegenseite: offen, Fassung und Salz --- */
+      if (!channel) {
+        if (data.length !== 1 + SALT_BYTES || data[0] !== VERSION) return;
+
+        theirSalt = data.subarray(1);
+        channel = await Channel.establish(seatKey, theirSalt, mySalt);
+
+        socket.send(await channel.seal(await confirmation(seatKey, false, theirSalt, mySalt)));
+        return;
+      }
+
+      /* --- 2. Ihr Schluesselnachweis. Stimmt er nicht, ist es der falsche Schluessel --- */
+      if (!confirmed) {
+        const proof = await channel.open(data);
+        const expected = await confirmation(seatKey, true, theirSalt, mySalt);
+
+        if (!proof || !sameBytes(proof, expected)) {
+          channel = null;
+          done(Result.Wrong);
+          socket.close();
+          return;
+        }
+
+        confirmed = true;
+        done(Result.Paired);
+        say("verbunden", "idle");
+        return;
+      }
+
+      /* --- 3. Von hier an nur noch Nutzlast --- */
+      const payload = await channel.open(data);
+      if (!payload || payload.length < 1) return;
+
+      const kind = payload[0];
+
+      if (kind === KIND_JSON) {
+        try { show(JSON.parse(new TextDecoder().decode(payload.subarray(1)))); }
+        catch (e) { /* eine unleserliche Meldung ist kein Grund aufzuhoeren */ }
+        return;
+      }
+
+      if (kind === KIND_PREVIEW && payload.length > 5) {
+        showPicture(payload.subarray(5));   // 1 Byte Art, 4 Byte Bildnummer
+      }
+    }
+  });
+}
+
+/* --------------------------------------------------------------- Platz suchen */
+
+const ask = el("ask"), askForm = el("askForm"), askInput = el("askInput"), askWrong = el("askWrong");
+
+function askForCode(message) {
+  return new Promise(resolve => {
+    askWrong.textContent = message || "";
+    askInput.value = "";
+    ask.classList.add("on");
+    setTimeout(() => askInput.focus(), 50);
+
+    askForm.onsubmit = event => {
+      event.preventDefault();
+
+      const typed = askInput.value.trim();
+      if (!typed) return;
+
+      ask.classList.remove("on");
+      resolve(typed);
+    };
+  });
+}
+
+async function run() {
+  const text = secretFromAddress();
+
+  if (!text) {
+    say("Link unvollständig", "gone");
+    empty.textContent = "Dieser Link enthält kein Geheimnis. Am PC einen neuen erzeugen und ganz kopieren.";
+    return;
+  }
+
+  let secret;
+  try {
+    secret = fromBase64Url(text);
+    if (secret.length !== 32) throw new Error("Länge");
+  } catch (e) {
+    say("Link unbrauchbar", "gone");
+    empty.textContent = "Mit diesem Link lässt sich nichts anfangen.";
+    return;
+  }
+
+  const rooms = [];
+  for (let seat = 0; seat < SEATS; seat++) {
+    rooms.push(toHex(await hkdf(secret, ROOM_INFO, new Uint8Array([seat]), 16)));
+  }
+
+  const freeKey = await hkdf(secret, SEAT_INFO, new Uint8Array(0), 32);
+
+  let code = rememberedCode();
+  let codeKey = code ? await hkdf(secret, SEAT_INFO, enc.encode(code), 32) : null;
+  let wait = 2000;
+
+  for (;;) {
+    let landed = false;
+
+    for (let seat = 0; seat < SEATS; seat++) {
+      const protectedSeat = seat >= FREE_SEATS;
+
+      if (protectedSeat && !codeKey) break;
+
+      say(seat === 0 ? "verbinde …" : "suche freien Platz …");
+
+      const outcome = await trySeat(rooms[seat], protectedSeat ? codeKey : freeKey);
+
+      if (outcome === Result.Paired) { landed = true; wait = 2000; break; }
+      if (outcome === Result.Taken) continue;
+
+      if (outcome === Result.Alone) {
+        if (!protectedSeat) {
+          say("FrameFlip ist nicht erreichbar", "gone");
+          empty.textContent = "FrameFlip läuft gerade nicht, oder das Zusehen ist dort abgeschaltet.";
+          landed = true;   // Warten statt weitersuchen - die anderen Plaetze sind auch leer.
+          break;
+        }
+
+        // Ein hinterer Platz ohne FrameFlip heisst: Es ist kein Kennwort gesetzt.
+        say("kein Platz frei", "gone");
+        empty.textContent = "Es sehen schon zwei zu. Mehr lässt sich nur zulassen, wenn am PC ein Kennwort gesetzt wird.";
+        landed = true;
+        break;
+      }
+
+      if (outcome === Result.Wrong && protectedSeat) {
+        rememberCode("");
+        code = await askForCode("Das war nicht das richtige Kennwort.");
+        rememberCode(code);
+        codeKey = await hkdf(secret, SEAT_INFO, enc.encode(code), 32);
+        seat = FREE_SEATS - 1;   // die geschuetzten Plaetze noch einmal durchgehen
+        continue;
+      }
+
+      if (outcome === Result.Wrong) {
+        say("Link gilt nicht mehr", "gone");
+        empty.textContent = "Dieser Link wurde erneuert. Am PC steht der aktuelle.";
+        landed = true;
+        break;
+      }
+    }
+
+    // Alle freien Plaetze belegt und noch kein Kennwort: dann eben danach fragen.
+    if (!landed && !codeKey) {
+      code = await askForCode("");
+      rememberCode(code);
+      codeKey = await hkdf(secret, SEAT_INFO, enc.encode(code), 32);
+      continue;
+    }
+
+    say("neuer Versuch …", "gone");
+    await new Promise(done => setTimeout(done, wait));
+    wait = Math.min(wait * 2, 30000);
+  }
+}
+
+run();
+</script>
+</body>
+</html>
