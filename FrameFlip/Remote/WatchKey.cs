@@ -154,7 +154,8 @@ public sealed class WatchKey
     /// Zugriffsprotokoll, in keinem Referrer und in keinem Zwischenspeicher eines
     /// Vermittlers. Der Leuchtturm liefert die Seite aus, ohne je zu erfahren, wofuer.
     /// </summary>
-    public string Link(string relay) => $"https://{relay}/w/#{Text}";
+    public string Link(string relay)
+        => $"{(RelayRoom.IsLoopback(relay) ? "http" : "https")}://{relay}/w/#{Text}";
 
     private byte[] Derive(string info, int length, ReadOnlySpan<byte> salt)
     {

@@ -698,7 +698,7 @@
 
                                     <TextBox x:Name="WatchPass" Margin="0,8,0,0" Width="170"
                                              HorizontalAlignment="Center" MaxLength="32"
-                                             Style="{StaticResource DashRateBox}"
+                                             Style="{StaticResource DashTextBox}"
                                              HorizontalContentAlignment="Center"
                                              KeyDown="OnWatchPassKey" LostFocus="OnWatchPassDone" />
 

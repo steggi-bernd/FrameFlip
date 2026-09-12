@@ -129,6 +129,15 @@ public static class WatchInvariants
         Check.That(RelayRoom.ForPairing(new PairingInvite(pairing, "relay.example.org")).Listens,
             "im Kopplungsraum wird dagegen zugehoert - dort kommen Befehle an");
 
+        Check.That(watch.Link("relay.example.org").StartsWith("https://", StringComparison.Ordinal),
+            "der Link ist verschluesselt");
+
+        Check.That(watch.Link("127.0.0.1:8080").StartsWith("http://", StringComparison.Ordinal),
+            "und folgt derselben Regel wie die Leitung - gegen den eigenen Rechner ohne");
+
+        Check.That(watch.Link("relay.example.org").Contains("/w/#", StringComparison.Ordinal),
+            "das Geheimnis steht hinter der Raute, wo kein Browser es mitschickt");
+
         Check.Group("Zusehen - was als Kennwort taugt");
 
         Check.That(WatchKey.IsUsableCode(null) && WatchKey.IsUsableCode(""),

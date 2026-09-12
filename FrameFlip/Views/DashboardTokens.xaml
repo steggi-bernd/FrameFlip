@@ -223,6 +223,50 @@
         </Setter>
     </Style>
 
+    <!--
+        Ein Eingabefeld im Ton der Tafel.
+
+        Es gibt bereits DashRateBox, und das sieht genauso aus - aber das ist ein Stil
+        fuer ComboBox. Ihn einer TextBox zu geben, ist kein Schoenheitsfehler: WPF
+        weist eine Vorlage mit falschem Zieltyp beim Laden zurueck, und mit ihr das
+        ganze Fenster. Der Bau meldet nichts davon; es faellt erst beim Start auf.
+    -->
+    <Style x:Key="DashTextBox" TargetType="TextBox">
+        <Setter Property="Height" Value="34" />
+        <Setter Property="Foreground" Value="{StaticResource DesktopInk}" />
+        <Setter Property="Background" Value="{StaticResource DesktopSurface}" />
+        <Setter Property="BorderBrush" Value="{StaticResource DesktopLine}" />
+        <Setter Property="BorderThickness" Value="1" />
+        <Setter Property="FontFamily" Value="{StaticResource MonoFont}" />
+        <Setter Property="FontSize" Value="11" />
+        <Setter Property="Padding" Value="10,0" />
+        <Setter Property="VerticalContentAlignment" Value="Center" />
+        <Setter Property="CaretBrush" Value="{StaticResource DesktopAccent}" />
+        <Setter Property="SelectionBrush" Value="{StaticResource DashAccentSoft}" />
+        <Setter Property="FocusVisualStyle" Value="{StaticResource DashFocus}" />
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="TextBox">
+                    <Border x:Name="Shell" CornerRadius="8"
+                            Background="{TemplateBinding Background}"
+                            BorderBrush="{TemplateBinding BorderBrush}"
+                            BorderThickness="{TemplateBinding BorderThickness}">
+                        <ScrollViewer x:Name="PART_ContentHost" Margin="{TemplateBinding Padding}"
+                                      VerticalAlignment="Center" />
+                    </Border>
+
+                    <ControlTemplate.Triggers>
+                        <Trigger Property="IsKeyboardFocusWithin" Value="True">
+                            <Setter TargetName="Shell" Property="BorderBrush"
+                                    Value="{StaticResource DashAccentEdge}" />
+                        </Trigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+
     <!-- ================================================================ Fokus
 
          WPF zeichnet von Haus aus ein gepunktetes Rechteck, das in diesem Entwurf

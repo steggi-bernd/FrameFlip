@@ -68,10 +68,20 @@ public sealed class RelayRoom
     /// Fuer die Kopplung ans Handy gilt das bewusst NICHT: Dort steht die Adresse in
     /// einem QR-Code, und ein QR-Code kommt von aussen.
     /// </summary>
-    private static string Scheme(string relay)
+    private static string Scheme(string relay) => IsLoopback(relay) ? "ws" : "wss";
+
+    /// <summary>
+    /// Zeigt die Adresse auf diesen Rechner?
+    ///
+    /// Steht hier und nicht an jeder Stelle neu, die es wissen will: Dieselbe Regel
+    /// zweimal aufzuschreiben heisst, dass eine der beiden Fassungen irgendwann
+    /// zurueckbleibt - und ausgerechnet bei der Frage "verschluesselt oder nicht"
+    /// waere das die falsche Stelle zum Auseinanderlaufen.
+    /// </summary>
+    internal static bool IsLoopback(string relay)
     {
         string host = relay.Split(':')[0];
 
-        return host is "localhost" or "127.0.0.1" or "::1" ? "ws" : "wss";
+        return host is "localhost" or "127.0.0.1" or "::1";
     }
 }
