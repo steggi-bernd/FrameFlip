@@ -129,6 +129,17 @@ auftauchen würden:
   Schema muss ausdrücklich genannt werden; die enge Fassung mit dem genauen
   Wirtsnamen setzt Caddy als Kopfzeile dazu.
 
+* **Die Seite fraß sich selbst alle Plätze weg.** Nach dem Verbinden verließ die
+  Platzsuche zwar ihre Schleife, die äußere Schleife lief aber weiter, wartete kurz
+  und suchte erneut ab Platz 0 — fand dort ihre *eigene* offene Verbindung als
+  besetzt vor, nahm den nächsten, und hatte nach ein paar Runden alle sechs Plätze
+  selbst belegt. Danach kam kein Zuschauer mehr herein. `trySeat` liefert deshalb ein
+  zweites Versprechen mit, das erst fällt, wenn die Verbindung endet; erst dann wird
+  wieder gesucht. Ein aufgegebener Versuch schließt seine Verbindung außerdem sofort,
+  und beim Verlassen der Seite (`pagehide`) gehen alle zu — auf einem Handy wandert
+  ein Reiter ständig in den Hintergrund, und ein Platz, den niemand mehr benutzt,
+  aber auch niemand freigibt, ist aus Sicht des Relays besetzt.
+
 * Ein gescheiterter Verbindungsaufbau darf nicht wie ein belegter Platz aussehen.
   Er tat es: Der Ausgang fiel durch alle Prüfungen bis zur Kennwortfrage, und man
   tippte ein Kennwort ein, das nichts besser machen konnte. `Result.Blocked` ist

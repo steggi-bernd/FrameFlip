@@ -520,24 +520,49 @@ const Result = {
   Wrong: "wrong"       // falscher Schluessel - Kennwort oder alter Link
 };
 
-/* Ein Versuch auf einem Platz. Das Versprechen loest sich auf, sobald feststeht,
-   woran man ist - und bleibt offen, solange die Verbindung traegt. */
+/* Jede offene Verbindung dieser Seite.
+
+   Sie werden mitgezaehlt, damit beim Verlassen der Seite wirklich alle zugehen.
+   Ein Platz, den niemand mehr benutzt, aber auch niemand freigibt, ist aus Sicht
+   des Leuchtturms besetzt - und der naechste Zuschauer steht davor. Auf einem Handy
+   ist das der Normalfall und nicht die Ausnahme: Der Reiter wandert in den
+   Hintergrund, die Verbindung bleibt und beantwortet brav jeden Ping. */
+const live = new Set();
+
+function drop(socket) {
+  live.delete(socket);
+  try { socket.close(); } catch (e) { /* war schon zu */ }
+}
+
+addEventListener("pagehide", () => {
+  for (const socket of Array.from(live)) drop(socket);
+});
+
+/* Ein Versuch auf einem Platz.
+
+   Aufgeloest wird mit ZWEI Dingen: dem Ausgang - und einem Versprechen, das erst
+   faellt, wenn die Verbindung endet. Das zweite ist nicht Beiwerk. Ohne es weiss
+   der aeussere Lauf nicht, wann er wieder anfangen soll; er suchte nach kurzer Pause
+   munter weiter, waehrend er laengst verbunden war, faende seinen eigenen Platz als
+   besetzt vor, naehme den naechsten - und haette nach ein paar Runden alle sechs
+   Plaetze selbst belegt. Genau das ist passiert. */
 function trySeat(room, seatKey) {
   return new Promise(resolve => {
+    // Dasselbe Schema wie die Seite selbst. Steht sie auf https - und im Betrieb
+    // tut sie das -, ist es wss. Auf dem eigenen Rechner zum Pruefen ist es ws.
+    const scheme = location.protocol === "https:" ? "wss://" : "ws://";
+
     let socket;
 
     try {
-      // Dasselbe Schema wie die Seite selbst. Steht sie auf https - und im Betrieb
-      // tut sie das -, ist es wss. Auf dem eigenen Rechner zum Pruefen ist es ws.
-      const scheme = location.protocol === "https:" ? "wss://" : "ws://";
-
       socket = new WebSocket(scheme + location.host + "/r/" + room + "?role=client");
     } catch (e) {
-      resolve(Result.Broken);
+      resolve({ outcome: Result.Blocked, closed: Promise.resolve() });
       return;
     }
 
     socket.binaryType = "arraybuffer";
+    live.add(socket);
 
     let channel = null, mySalt = null, theirSalt = null, confirmed = false;
     let settled = false;
@@ -547,30 +572,24 @@ function trySeat(room, seatKey) {
     // er darf niemals nach einem Kennwort fragen lassen.
     let opened = false;
 
-    socket.onopen = () => { opened = true; };
+    let ended;
+    const closed = new Promise(fall => { ended = fall; });
 
     const done = outcome => {
       if (settled) return;
       settled = true;
-      resolve(outcome);
+
+      // Alles ausser dem Platz, den wir behalten wollen, wird SOFORT freigegeben.
+      // Ein aufgegebener Versuch, dessen Verbindung offen bleibt, belegt einen Platz
+      // fuer niemanden.
+      if (outcome !== Result.Paired) drop(socket);
+
+      resolve({ outcome, closed });
     };
+
+    socket.onopen = () => { opened = true; };
 
     socket.onerror = () => done(opened ? Result.Broken : Result.Blocked);
-
-    socket.onclose = () => {
-      // Hinten anstellen, nicht vordraengeln: Der Leuchtturm schickt seine
-      // Abweisung als Text und schliesst unmittelbar danach. Wer hier sofort
-      // entscheidet, kommt der noch wartenden Meldung zuvor und macht aus
-      // "Platz belegt" ein "Schluessel falsch".
-      pending = pending.then(() => {
-        if (!opened) { done(Result.Blocked); return; }
-
-        // Wurde der Kanal nie fertig, war es kein Platz fuer uns. Stand er schon,
-        // ist es ein Abbruch, und der aeussere Lauf versucht es erneut.
-        done(confirmed ? Result.Broken : Result.Wrong);
-        if (confirmed) say("Verbindung verloren", "gone");
-      });
-    };
 
     /* Nachrichten NACHEINANDER, nicht durcheinander.
 
@@ -579,14 +598,29 @@ function trySeat(room, seatKey) {
        Begruessung und Schluesselnachweis kommen dicht hintereinander, der Aufbau des
        Kanals braucht vier await. Trifft der Nachweis in dieses Fenster, gibt es den
        Kanal noch nicht; er faellt durch die Pruefung auf eine Begruessung, wird
-       verworfen, und die Verbindung haengt fuer immer - ohne Fehler, ohne Meldung.
-
-       Es hing an Millisekunden, ob es gutging. Eine Warteschlange nimmt das Glueck
-       aus der Sache. */
+       verworfen, und die Verbindung haengt fuer immer - ohne Fehler, ohne Meldung. */
     let pending = Promise.resolve();
 
     socket.onmessage = event => {
       pending = pending.then(() => handle(event)).catch(() => { /* eine kaputte Nachricht beendet nicht die Leitung */ });
+    };
+
+    socket.onclose = () => {
+      live.delete(socket);
+
+      // Hinten anstellen, nicht vordraengeln: Der Leuchtturm schickt seine
+      // Abweisung als Text und schliesst unmittelbar danach. Wer hier sofort
+      // entscheidet, kommt der noch wartenden Meldung zuvor und macht aus
+      // "Platz belegt" ein "Schluessel falsch".
+      pending = pending.then(() => {
+        if (!opened) done(Result.Blocked);
+        else {
+          done(confirmed ? Result.Broken : Result.Wrong);
+          if (confirmed) say("Verbindung verloren", "gone");
+        }
+
+        ended();
+      });
     };
 
     async function handle(event) {
@@ -599,8 +633,7 @@ function trySeat(room, seatKey) {
         if (control.t === "error") {
           // "role already taken" heisst: hier sitzt schon jemand. Alles andere ist
           // eine Abweisung, die ein anderer Platz auch nicht heilt.
-          done(/taken/i.test(control.why || "") ? Result.Taken : Result.Broken);
-          socket.close();
+          done(/taken|full/i.test(control.why || "") ? Result.Taken : Result.Broken);
           return;
         }
 
@@ -609,7 +642,6 @@ function trySeat(room, seatKey) {
           // das: Das Programm laeuft nicht. Auf einem hinteren: Es ist kein Kennwort
           // gesetzt, also gibt es diesen Platz gar nicht.
           done(Result.Alone);
-          socket.close();
           return;
         }
 
@@ -654,7 +686,6 @@ function trySeat(room, seatKey) {
         if (!proof || !sameBytes(proof, expected)) {
           channel = null;
           done(Result.Wrong);
-          socket.close();
           return;
         }
 
@@ -739,12 +770,11 @@ async function run() {
   for (;;) {
     let landed = false;
 
-    // Wieviele der freien Plaetze wirklich besetzt waren. NUR das rechtfertigt die
-    // Frage nach dem Kennwort. Frueher fiel jeder andere Ausgang stillschweigend
-    // bis dorthin durch - ein Browser, der die Verbindung gar nicht zulaesst,
-    // sah damit aus wie ein volles Haus, und man tippte ein Kennwort ein, das
-    // nichts besser machen konnte.
-    let besetzt = 0;
+    // Wieviele Plaetze besetzt waren - getrennt nach frei und kennwortgeschuetzt.
+    // Nur volle FREIE Plaetze rechtfertigen die Frage nach dem Kennwort. Frueher
+    // fiel jeder andere Ausgang stillschweigend bis dorthin durch, und ein Browser,
+    // der die Verbindung gar nicht zulaesst, sah damit aus wie ein volles Haus.
+    let besetztFrei = 0, besetztGesamt = 0, versucht = 0;
 
     for (let seat = 0; seat < SEATS; seat++) {
       const protectedSeat = seat >= FREE_SEATS;
@@ -753,11 +783,29 @@ async function run() {
 
       say(seat === 0 ? "verbinde …" : "suche freien Platz …");
 
-      const outcome = await trySeat(rooms[seat], protectedSeat ? codeKey : freeKey);
+      versucht++;
 
-      if (outcome === Result.Paired) { landed = true; wait = 2000; break; }
+      const { outcome, closed } = await trySeat(rooms[seat], protectedSeat ? codeKey : freeKey);
 
-      if (outcome === Result.Taken) { if (!protectedSeat) besetzt++; continue; }
+      if (outcome === Result.Paired) {
+        landed = true;
+        wait = 2000;
+
+        // HIER BLEIBEN, bis die Leitung endet.
+        //
+        // Ohne dieses Warten lief der aeussere Lauf sofort weiter, suchte nach
+        // kurzer Pause erneut ab Platz 0, fand seinen eigenen Platz besetzt, nahm
+        // den naechsten - und hatte nach ein paar Runden alle sechs Plaetze selbst
+        // belegt. Fuer jeden anderen war dann kein Platz mehr frei.
+        await closed;
+        break;
+      }
+
+      if (outcome === Result.Taken) {
+        besetztGesamt++;
+        if (!protectedSeat) besetztFrei++;
+        continue;
+      }
 
       if (outcome === Result.Blocked) {
         say("Verbindung nicht möglich", "gone");
@@ -805,13 +853,22 @@ async function run() {
       break;
     }
 
-    // Nach dem Kennwort wird NUR gefragt, wenn beide freien Plaetze tatsaechlich
-    // besetzt waren. Alles andere ist ein Fehler und keine volle Reihe.
-    if (!landed && !codeKey && besetzt >= FREE_SEATS) {
-      code = await askForCode("");
-      rememberCode(code);
-      codeKey = await hkdf(secret, SEAT_INFO, enc.encode(code), 32);
-      continue;
+    if (!landed) {
+      // Alle freien Plaetze besetzt und noch kein Kennwort: dann eben danach fragen.
+      if (!codeKey && besetztFrei >= FREE_SEATS) {
+        code = await askForCode("");
+        rememberCode(code);
+        codeKey = await hkdf(secret, SEAT_INFO, enc.encode(code), 32);
+        continue;
+      }
+
+      // Wirklich alles voll. Das laut sagen, statt still weiterzusuchen - sonst
+      // steht man vor einer Seite, die ohne Grund nichts anzeigt.
+      if (besetztGesamt >= versucht && versucht > 0) {
+        say("kein Platz frei", "gone");
+        empty.textContent = "Alle " + versucht + " Plätze sind gerade belegt. "
+                          + "Sobald einer frei wird, geht es hier von selbst weiter.";
+      }
     }
 
     say("neuer Versuch …", "gone");

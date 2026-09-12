@@ -1,11 +1,15 @@
 // Prüfstand für die Zuschauerseite.
 //
-// Es wird NICHTS nachgebaut. Krypto und Verbindungsablauf werden aus watch.html
-// herausgeschnitten und ausgeführt - ein Nachbau prüfte am Ende sich selbst und
-// könnte denselben Fehler enthalten wie die Seite, ohne dass es auffiele.
+// Es wird NICHTS nachgebaut. Krypto, Verbindungsablauf UND die Platzsuche werden aus
+// watch.html herausgeschnitten und ausgeführt - ein Nachbau prüfte am Ende sich
+// selbst und könnte denselben Fehler enthalten wie die Seite, ohne dass es auffiele.
 //
-// Ersetzt werden nur die drei Stellen, die einen Bildschirm brauchen: say, show und
-// showPicture. Sie merken sich hier, was ankam.
+// Dass auch run() mitläuft, ist nicht Gründlichkeit um ihrer selbst willen. Eine
+// frühere Fassung prüfte nur trySeat einzeln und war grün, während die Seite im
+// Betrieb nach dem Verbinden munter weitersuchte, ihren eigenen Platz als besetzt
+// vorfand, den nächsten nahm - und nach ein paar Runden alle sechs Plätze selbst
+// belegt hatte. Kein Zuschauer kam mehr herein, auch kein Handy. Ein Fehler im
+// Zusammenspiel ist nicht zu sehen, wenn man nur die Teile prüft.
 
 import fs from "node:fs";
 
@@ -19,30 +23,35 @@ function slice(from, to, what) {
   return html.slice(a, b);
 }
 
-const core = slice("const SEATS",
-                   "/* --------------------------------------------------------------- Das Geheimnis */",
-                   "Der Krypto-Teil");
+const core   = slice("const SEATS", "/* --------------------------------------------------------------- Das Geheimnis */", "Der Krypto-Teil");
+const flow   = slice("const Result = {", "/* --------------------------------------------------------------- Platz suchen */", "Der Verbindungsablauf");
+const search = slice("const ask = el(", "run();", "Die Platzsuche");
 
-const flow = slice("const Result = {",
-                   "/* --------------------------------------------------------------- Platz suchen */",
-                   "Der Verbindungsablauf");
+// Was die Seite anzeigen würde - hier wird es nur gezählt.
+const seen = { states: 0, previews: 0, lastState: null, jpegBytes: 0, said: [], hinweis: "" };
+const beimVerlassen = [];
 
-// Was zuletzt ankam - die Seite würde es anzeigen, hier wird es geprüft.
-const seen = { states: 0, previews: 0, lastState: null, jpegBytes: 0, said: [] };
-const sockets = [];
+const fakeEl = () => ({
+  textContent: "", value: "", className: "", style: {},
+  classList: { add() { }, remove() { }, contains: () => false },
+  focus() { }, set onsubmit(_) { }
+});
 
-class Watched extends WebSocket {
-  constructor(url) { super(url); sockets.push(this); }
-}
-
-const page = new Function("location", "say", "show", "showPicture", "WebSocket",
-  core + "\n" + flow + "\n" +
-  "return { trySeat, Result, hkdf, toHex, fromBase64Url, ROOM_INFO, SEAT_INFO, SEATS, FREE_SEATS };")(
+const page = new Function("location", "say", "show", "showPicture", "WebSocket", "el", "empty",
+  "secretFromAddress", "rememberedCode", "rememberCode", "addEventListener",
+  core + "\n" + flow + "\n" + search + "\n" +
+  "return { trySeat, Result, run, hkdf, toHex, fromBase64Url, ROOM_INFO, SEAT_INFO, SEATS, FREE_SEATS };")(
     { host: RELAY, protocol: "http:" },
-    (text, mood) => seen.said.push(text),
+    text => { seen.said.push(text); },
     state => { seen.states++; seen.lastState = state; },
     jpeg => { seen.previews++; seen.jpegBytes = jpeg.length; },
-    Watched);
+    WebSocket,
+    fakeEl,
+    new Proxy({}, { set(o, k, v) { if (k === "textContent") seen.hinweis = v; return true; }, get: () => "" }),
+    () => SECRET,
+    () => "",
+    () => { },
+    (art, fn) => { if (art === "pagehide") beimVerlassen.push(fn); });
 
 const enc = new TextEncoder();
 const secret = page.fromBase64Url(SECRET);
@@ -60,88 +69,106 @@ const roomFor = async seat =>
 const seatKey = async code =>
   await page.hkdf(secret, page.SEAT_INFO, code ? enc.encode(code) : new Uint8Array(0), 32);
 
-function closeAll() {
-  for (const socket of sockets) { try { socket.close(); } catch { } }
-  sockets.length = 0;
-}
-
-// trySeat löst auf, sobald feststeht, woran man ist - und lässt die Verbindung dann
-// offen. Genau so soll es sein; für die Prüfung wird danach noch etwas gelauscht.
-async function visit(seat, key, listen = 0) {
-  const before = { states: seen.states, previews: seen.previews };
-  const outcome = await page.trySeat(await roomFor(seat), key);
-
-  if (listen > 0 && outcome === page.Result.Paired) {
-    await new Promise(done => setTimeout(done, listen));
-  }
-
-  return {
-    outcome,
-    states: seen.states - before.states,
-    previews: seen.previews - before.previews
-  };
-}
-
 const wait = ms => new Promise(done => setTimeout(done, ms));
 
-// -------------------------------------------------------------------- Ablauf
+// Anklopfen, ohne einen Platz zu belegen: sobald die Antwort da ist, wieder gehen.
+function belegt(room) {
+  return new Promise(resolve => {
+    const s = new WebSocket(`ws://${RELAY}/r/${room}?role=client`);
+    let fertig = false;
+    const raus = v => { if (fertig) return; fertig = true; resolve(v); try { s.close(); } catch { } };
 
-console.log("\nEin Zuschauer auf dem ersten freien Platz");
-console.log("----------------------------------------");
+    s.onerror = () => raus(null);
+    s.onclose = () => raus(null);
+    s.onmessage = e => {
+      if (typeof e.data !== "string") return;
+      const c = JSON.parse(e.data);
+      if (c.t === "error") raus(true);
+      if (c.t === "waiting" || (c.t === "peer" && c.up)) raus(false);
+    };
+    setTimeout(() => raus(null), 6000);
+  });
+}
+
+async function wieVieleBelegt() {
+  let n = 0;
+  for (let seat = 0; seat < page.SEATS; seat++) {
+    if (await belegt(await roomFor(seat))) n++;
+    await wait(150);
+  }
+  return n;
+}
+
+function alleGehen() {
+  for (const fn of beimVerlassen) fn();
+}
+
+// ------------------------------------------------------------ 1. Die Einzelteile
+
+console.log("\nEin zweiter auf einen besetzten Platz");
+console.log("------------------------------------");
 
 const free = await seatKey(null);
-const first = await visit(0, free, 2500);
+const erster = await page.trySeat(await roomFor(0), free);
+check(erster.outcome === page.Result.Paired, `der erste kommt herein (${erster.outcome})`);
 
-check(first.outcome === page.Result.Paired, `der Handschlag geht auf (${first.outcome})`);
-check(first.states > 0, `Zahlen kommen an (${first.states})`);
-check(first.previews > 0, `ein Bild kommt an (${first.previews})`);
-check(seen.jpegBytes > 100, `und es ist ein JPEG (${seen.jpegBytes} Bytes)`);
-check(seen.lastState?.scene === "pruefstand", "der Inhalt ist lesbar");
-check(seen.lastState?.width === 1920, "und vollständig");
-check(seen.lastState?.percent > 0, "die Zahlen sind Zahlen, kein Text");
+const zweiter = await page.trySeat(await roomFor(0), free);
+check(zweiter.outcome === page.Result.Taken, `der zweite wird abgewiesen (${zweiter.outcome})`);
 
-console.log("\nEin zweiter auf denselben Platz");
-console.log("------------------------------");
+check(await belegt(await roomFor(1)) === false,
+  "und der abgewiesene Versuch hat keinen anderen Platz blockiert");
 
-const second = await visit(0, free);
+console.log("\nDer Platz hinter dem Kennwort");
+console.log("-----------------------------");
 
-check(second.outcome === page.Result.Taken, `wird abgewiesen, nicht durchgelassen (${second.outcome})`);
+const richtig = await page.trySeat(await roomFor(2), await seatKey(CODE));
+check(richtig.outcome === page.Result.Paired, `mit richtigem Kennwort auf (${richtig.outcome})`);
 
-closeAll();
-await wait(800);
+const falsch = await page.trySeat(await roomFor(3), await seatKey("falsch999"));
+check(falsch.outcome === page.Result.Wrong, `mit falschem zu (${falsch.outcome})`);
 
-console.log("\nEin dritter - der Platz hinter dem Kennwort");
-console.log("------------------------------------------");
+const ohne = await page.trySeat(await roomFor(4), free);
+check(ohne.outcome === page.Result.Wrong, `und mit dem Link allein zu (${ohne.outcome})`);
 
-const third = await visit(2, await seatKey(CODE), 1800);
+check(await belegt(await roomFor(3)) === false && await belegt(await roomFor(4)) === false,
+  "auch gescheiterte Versuche geben ihren Platz sofort zurück");
 
-check(third.outcome === page.Result.Paired, `mit richtigem Kennwort geht er auf (${third.outcome})`);
-check(third.states > 0, `und die Zahlen kommen an (${third.states})`);
+console.log("\nBeim Verlassen der Seite werden die Plätze frei");
+console.log("----------------------------------------------");
 
-closeAll();
-await wait(800);
+check(beimVerlassen.length > 0, "die Seite meldet sich fürs Verlassen an");
 
-console.log("\nDerselbe Platz mit falschem Kennwort");
-console.log("-----------------------------------");
+alleGehen();
+await wait(1500);
 
-const wrong = await visit(2, await seatKey("falsch999"), 1200);
+const nachAbschied = await wieVieleBelegt();
+check(nachAbschied === 0, `danach ist kein Platz mehr belegt (${nachAbschied})`);
 
-check(wrong.outcome === page.Result.Wrong, `der Schlüsselnachweis scheitert (${wrong.outcome})`);
-check(wrong.states === 0, "es kommen keine Zahlen an");
-check(wrong.previews === 0, "und kein Bild");
+// ------------------------------------------------------------ 2. Die ganze Seite
+//
+// Der wichtigste Abschnitt. run() läuft hier wie im Browser - für immer - und darf
+// dabei genau einen Platz belegen, nicht mehr.
 
-closeAll();
-await wait(800);
+console.log("\nEine ganze Seite belegt genau einen Platz");
+console.log("----------------------------------------");
 
-console.log("\nDas Geheimnis allein reicht für die hinteren Plätze nicht");
-console.log("--------------------------------------------------------");
+page.run();
+await wait(6000);
 
-const bare = await visit(2, free, 1200);
+check(seen.states > 0, `sie verbindet sich und bekommt Zahlen (${seen.states})`);
+check(seen.previews > 0, `und ein Bild (${seen.previews})`);
 
-check(bare.outcome === page.Result.Wrong, `auch mit gültigem Link bleibt zu (${bare.outcome})`);
-check(bare.states === 0, "und es kommt nichts durch");
+const nachSechs = await wieVieleBelegt();
+check(nachSechs === 1, `nach sechs Sekunden ist genau ein Platz belegt (${nachSechs})`);
 
-closeAll();
+const bisher = seen.states;
+await wait(9000);
+
+const nachFuenfzehn = await wieVieleBelegt();
+check(nachFuenfzehn === 1, `nach fünfzehn immer noch genau einer (${nachFuenfzehn})`);
+check(seen.states > bisher, `und es kommen weiter Zahlen (${seen.states})`);
+
+alleGehen();
 
 console.log(failures === 0
   ? "\nAlle Zusicherungen erfüllt.\n"
