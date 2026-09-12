@@ -99,13 +99,15 @@
     min-height: 0; overflow: hidden; touch-action: none;
   }
 
+  /* KEIN transform-origin hier.
+     Es stand einmal auf "0 0", waehrend die Rechnung von der Mitte ausging - das
+     Bild wuchs dadurch aus der oberen linken Ecke heraus, egal wo der Zeiger war.
+     Die Voreinstellung ist die Mitte, und genau damit rechnet die Ansicht. */
   .stage img {
     max-width: 100%; max-height: 100%;
-    display: block; transform-origin: 0 0;
-    image-rendering: auto; user-select: none; -webkit-user-drag: none;
+    display: block; cursor: zoom-in;
+    user-select: none; -webkit-user-drag: none;
   }
-  .stage img.grabbing { cursor: grabbing; }
-  .stage img.grab { cursor: grab; }
 
   .stage .empty {
     color: var(--faint); font-size: 12px;
@@ -225,6 +227,55 @@
   }
   .note button:hover { color: var(--muted); }
 
+  /* --------------------------------------------------- Isolierte Vorschau */
+  .viewer {
+    position: fixed; inset: 0; z-index: 20;
+    background: #04040a; display: none;
+  }
+  .viewer.on { display: block; }
+
+  .vstage {
+    position: absolute; inset: 0;
+    display: flex; align-items: center; justify-content: center;
+    overflow: hidden; touch-action: none;
+  }
+
+  .vstage img {
+    max-width: 94%; max-height: 84%;
+    display: block; user-select: none; -webkit-user-drag: none;
+  }
+  .vstage img.grab { cursor: grab; }
+  .vstage img.grabbing { cursor: grabbing; }
+
+  .vtools {
+    position: absolute; left: 50%; transform: translateX(-50%);
+    bottom: calc(18px + env(safe-area-inset-bottom));
+    display: flex; align-items: center; gap: 2px; padding: 4px;
+    background: rgba(11, 11, 20, .9); border: 1px solid var(--line);
+    border-radius: 12px; backdrop-filter: blur(8px);
+  }
+  .vtools button {
+    min-width: 34px; height: 32px; padding: 0 9px;
+    background: transparent; border: 0; border-radius: 9px;
+    color: var(--muted); font-family: var(--mono); font-size: 14px;
+    cursor: pointer; line-height: 1;
+  }
+  .vtools button:hover { background: var(--surface); color: var(--ink); }
+  .vtools .level {
+    min-width: 50px; text-align: center; color: var(--faint);
+    font-size: 10.5px; font-family: var(--mono); cursor: default;
+  }
+  .vtools .sep { width: 1px; height: 19px; background: var(--line); margin: 0 3px; }
+
+  .vclose {
+    position: absolute; right: 12px;
+    top: calc(12px + env(safe-area-inset-top));
+    width: 38px; height: 38px; border-radius: 50%;
+    background: rgba(11, 11, 20, .9); border: 1px solid var(--line);
+    color: var(--muted); font-size: 15px; cursor: pointer; line-height: 1;
+  }
+  .vclose:hover { color: var(--ink); background: var(--surface); }
+
   /* ------------------------------------------------------------- Kennwort */
   .ask {
     position: fixed; inset: 0; z-index: 10;
@@ -273,11 +324,8 @@
     <div class="empty" id="empty">Noch kein Bild.</div>
 
     <div class="tools" id="tools">
-      <button id="zoomOut" title="Kleiner" aria-label="Kleiner">−</button>
-      <span class="level" id="level">100 %</span>
-      <button id="zoomIn" title="Größer" aria-label="Größer">+</button>
+      <button id="open" title="Groß ansehen" aria-label="Groß ansehen">⤢ Vergrößern</button>
       <span class="sep"></span>
-      <button id="zoomReset" title="Einpassen" aria-label="Einpassen">⤢</button>
       <button id="save" title="Bild sichern" aria-label="Bild sichern">↓</button>
     </div>
   </div>
@@ -323,6 +371,26 @@
     </div>
   </div>
 </main>
+
+<!-- Die isolierte Vorschau. Eigene Flaeche, eigene Ansicht - damit das Bild nicht
+     mit der Seite um den Platz streiten muss. -->
+<div class="viewer" id="viewer" aria-hidden="true">
+  <div class="vstage" id="vstage"></div>
+
+  <div class="vtools">
+    <button id="vOut" title="Kleiner" aria-label="Kleiner">−</button>
+    <span class="level" id="vLevel">100 %</span>
+    <button id="vIn" title="Größer" aria-label="Größer">+</button>
+    <span class="sep"></span>
+    <button id="vLeft" title="Nach links drehen" aria-label="Nach links drehen">⟲</button>
+    <button id="vRight" title="Nach rechts drehen" aria-label="Nach rechts drehen">⟳</button>
+    <span class="sep"></span>
+    <button id="vFit" title="Einpassen" aria-label="Einpassen">⤢</button>
+    <button id="vSave" title="Bild sichern" aria-label="Bild sichern">↓</button>
+  </div>
+
+  <button class="vclose" id="vClose" title="Schließen" aria-label="Schließen">✕</button>
+</div>
 
 <div class="ask" id="ask">
   <form id="askForm" autocomplete="off">
@@ -538,9 +606,11 @@ const rememberCode = code => keep(KEY_CODE, code);
 
 const el = id => document.getElementById(id);
 const dot = el("dot"), standing = el("standing"), stage = el("stage"), empty = el("empty");
-const tools = el("tools"), level = el("level");
+const tools = el("tools");
 
-let picture = null;      // das <img>, sobald es eines gibt
+const clamp = (v, lo, hi) => Math.min(hi, Math.max(lo, v));
+
+let picture = null;      // das <img> auf der Buehne
 let pictureUrl = null;   // seine derzeitige blob-Adresse
 let lastJpeg = null;     // die Bytes, fuer das Sichern
 let lastState = null;
@@ -613,13 +683,18 @@ function showPicture(jpeg) {
   if (!picture) {
     picture = document.createElement("img");
     picture.alt = "";
-    picture.addEventListener("dblclick", () => setZoom(scale > 1 ? 1 : 2));
+    picture.addEventListener("click", openViewer);
     stage.appendChild(picture);
   }
 
   picture.src = next;
   empty.style.display = "none";
   tools.classList.add("on");
+
+  // Ist die Vorschau offen, bekommt sie das neue Bild auch - aber OHNE Zoom und
+  // Drehung zurueckzusetzen. Wer sich gerade eine Ecke ansieht, will beim naechsten
+  // Frame dieselbe Ecke sehen und nicht wieder von vorn anfangen.
+  if (vImg && viewer.classList.contains("on")) vImg.src = next;
 
   // Die alte Adresse erst freigeben, wenn die neue steht - sonst blitzt es weiss auf.
   const old = pictureUrl;
@@ -633,7 +708,10 @@ function showPicture(jpeg) {
    Abfrage noch, was eine fruehere Verbindung geliefert hat - und ein Kennwort, das
    man umgehen kann, indem man dahinterschaut, ist keines. */
 function blank() {
+  closeViewer();
+
   if (picture) { picture.remove(); picture = null; }
+  if (vImg) { vImg.remove(); vImg = null; }
   if (pictureUrl) { URL.revokeObjectURL(pictureUrl); pictureUrl = null; }
 
   lastJpeg = null;
@@ -642,8 +720,6 @@ function blank() {
   tools.classList.remove("on");
   empty.style.display = "";
   empty.textContent = "Noch kein Bild.";
-
-  setZoom(1);
 
   el("chip").className = "chip";
   el("chip").textContent = "wartet";
@@ -657,102 +733,194 @@ function blank() {
   }
 }
 
-/* ---------------------------------------------------------- Näher heransehen */
+/* ------------------------------------------------------- Die isolierte Vorschau
 
-/* Die Verschiebung rechnet gegen die MITTE der Bühne, nicht gegen den Kasten des
-   Bildes: Der Kasten wandert ja mit der Verschiebung, und wer gegen ihn rechnet,
-   jagt seinem eigenen Ergebnis hinterher. */
-let scale = 1, tx = 0, ty = 0;
+   Eine eigene Flaeche fuer das Bild allein: naeher heransehen, drehen, schieben.
+   Auf der Buehne waere das falsch aufgehoben - dort teilt sich das Bild den Platz
+   mit den Zahlen, und jede Verschiebung waere sofort am Rand.
 
-const clamp = (v, lo, hi) => Math.min(hi, Math.max(lo, v));
+   Gerechnet wird durchweg gegen die MITTE der Flaeche. Das ist kein Geschmack: Der
+   Kasten des Bildes wandert mit der Verschiebung mit, und wer gegen ihn rechnet,
+   jagt seinem eigenen Ergebnis hinterher. Aus demselben Grund steht im Stil KEIN
+   transform-origin - die Voreinstellung ist die Mitte, und nur damit trifft der
+   Zoom die Stelle, auf die der Zeiger zeigt. */
 
-function apply() {
-  if (!picture) return;
+const viewer = el("viewer"), vstage = el("vstage"), vLevel = el("vLevel");
 
-  limit();
+let vImg = null;
+let vScale = 1, vTx = 0, vTy = 0, vRot = 0;
 
-  picture.style.transform = `translate(${tx}px, ${ty}px) scale(${scale})`;
-  picture.className = scale > 1 ? "grab" : "";
-  level.textContent = Math.round(scale * 100) + " %";
+/* Der kleinste sinnvolle Maßstab: so, dass das Bild ganz hineinpasst.
+
+   Nach einer Vierteldrehung tauschen Breite und Höhe - ein liegendes Bild braucht
+   hochkant deutlich weniger Maßstab, um noch ganz zu sein. Ohne diese Rechnung
+   ragte es nach dem Drehen einfach über den Rand hinaus. */
+function vPassend() {
+  if (!vImg || !vImg.clientWidth) return 1;
+
+  const fläche = vstage.getBoundingClientRect();
+  const quer = vRot % 180 !== 0;
+
+  const breite = quer ? vImg.clientHeight : vImg.clientWidth;
+  const höhe = quer ? vImg.clientWidth : vImg.clientHeight;
+
+  return Math.min(1, Math.min(fläche.width * 0.94 / breite, fläche.height * 0.84 / höhe));
 }
 
-/* Nicht weiter schieben, als Bild da ist. Sonst zieht man es aus dem Bild heraus
-   und sieht schwarz, ohne zu wissen, wohin man geraten ist. */
-function limit() {
-  if (!picture) return;
+/* Nicht weiter schieben, als Bild da ist - sonst zieht man es aus der Fläche
+   heraus und sieht schwarz, ohne zu wissen, wohin man geraten ist. */
+function vGrenzen() {
+  if (!vImg) return;
 
-  const bühne = stage.getBoundingClientRect();
-  const breite = picture.clientWidth * scale;
-  const höhe = picture.clientHeight * scale;
+  const fläche = vstage.getBoundingClientRect();
+  const quer = vRot % 180 !== 0;
 
-  const x = Math.max(0, (breite - bühne.width) / 2);
-  const y = Math.max(0, (höhe - bühne.height) / 2);
+  const breite = (quer ? vImg.clientHeight : vImg.clientWidth) * vScale;
+  const höhe = (quer ? vImg.clientWidth : vImg.clientHeight) * vScale;
 
-  tx = clamp(tx, -x, x);
-  ty = clamp(ty, -y, y);
+  const x = Math.max(0, (breite - fläche.width) / 2);
+  const y = Math.max(0, (höhe - fläche.height) / 2);
+
+  vTx = clamp(vTx, -x, x);
+  vTy = clamp(vTy, -y, y);
 }
 
-function setZoom(next, cx, cy) {
-  next = clamp(next, 1, 8);
+function vAnwenden() {
+  if (!vImg) return;
+
+  vGrenzen();
+
+  // Die Reihenfolge zählt: Erst wird skaliert, dann gedreht, dann verschoben.
+  // Dadurch bleibt die Verschiebung in Bildschirmrichtung, auch wenn das Bild
+  // hochkant steht - sonst zöge ein Zug nach rechts es nach unten.
+  vImg.style.transform = `translate(${vTx}px, ${vTy}px) rotate(${vRot}deg) scale(${vScale})`;
+  vImg.className = vScale > vPassend() * 1.01 ? "grab" : "";
+
+  vLevel.textContent = Math.round(vScale * 100) + " %";
+}
+
+/* Zoomen dorthin, wo der Zeiger ist.
+
+   Der Punkt unter dem Zeiger soll unter dem Zeiger bleiben. Mit p als Abstand des
+   Zeigers von der Mitte und k als Änderung des Maßstabs ist die neue Verschiebung
+   t' = p - k * (p - t). Ohne diese Zeile wächst das Bild um die Mitte herum, und
+   die Stelle, die man sich ansehen wollte, wandert aus dem Bild. */
+function vZoom(ziel, cx, cy) {
+  if (!vImg) return;
+
+  const klein = vPassend();
+  const next = clamp(ziel, klein, klein * 12);
+  const k = next / vScale;
 
   if (cx === undefined) {
-    // Ohne Zielpunkt um die Mitte herum.
-    const faktor = next / scale;
-    tx *= faktor;
-    ty *= faktor;
+    vTx *= k;
+    vTy *= k;
   } else {
-    const bühne = stage.getBoundingClientRect();
-    const px = cx - (bühne.left + bühne.width / 2);
-    const py = cy - (bühne.top + bühne.height / 2);
-    const faktor = next / scale;
+    const fläche = vstage.getBoundingClientRect();
+    const px = cx - (fläche.left + fläche.width / 2);
+    const py = cy - (fläche.top + fläche.height / 2);
 
-    tx = px - faktor * (px - tx);
-    ty = py - faktor * (py - ty);
+    vTx = px - k * (px - vTx);
+    vTy = py - k * (py - vTy);
   }
 
-  scale = next;
-
-  if (scale === 1) { tx = 0; ty = 0; }
-
-  apply();
+  vScale = next;
+  vAnwenden();
 }
 
-el("zoomIn").onclick = () => setZoom(scale * 1.5);
-el("zoomOut").onclick = () => setZoom(scale / 1.5);
-el("zoomReset").onclick = () => setZoom(1);
+function vEinpassen() {
+  vScale = vPassend();
+  vTx = 0;
+  vTy = 0;
+  vAnwenden();
+}
 
-stage.addEventListener("wheel", event => {
-  if (!picture) return;
+function vDrehen(schritt) {
+  vRot = (vRot + schritt + 360) % 360;
+  vEinpassen();
+}
+
+function openViewer() {
+  if (!pictureUrl) return;
+
+  if (!vImg) {
+    vImg = document.createElement("img");
+    vImg.alt = "";
+    vImg.addEventListener("dblclick", event => {
+      const klein = vPassend();
+      vZoom(vScale > klein * 1.01 ? klein : klein * 2.5, event.clientX, event.clientY);
+    });
+    vstage.appendChild(vImg);
+  }
+
+  vImg.src = pictureUrl;
+  vRot = 0;
+
+  viewer.classList.add("on");
+  viewer.setAttribute("aria-hidden", "false");
+
+  // Erst wenn das Bild seine Maße kennt, lässt es sich einpassen.
+  if (vImg.complete && vImg.clientWidth) vEinpassen();
+  else vImg.onload = () => vEinpassen();
+}
+
+function closeViewer() {
+  viewer.classList.remove("on");
+  viewer.setAttribute("aria-hidden", "true");
+}
+
+el("open").onclick = openViewer;
+el("vClose").onclick = closeViewer;
+el("vIn").onclick = () => vZoom(vScale * 1.5);
+el("vOut").onclick = () => vZoom(vScale / 1.5);
+el("vFit").onclick = vEinpassen;
+el("vLeft").onclick = () => vDrehen(-90);
+el("vRight").onclick = () => vDrehen(90);
+
+// Ein Klick neben das Bild schließt - auf das Bild selbst nicht.
+vstage.addEventListener("click", event => { if (event.target === vstage) closeViewer(); });
+
+addEventListener("keydown", event => {
+  if (!viewer.classList.contains("on")) return;
+
+  if (event.key === "Escape") closeViewer();
+  else if (event.key === "+" || event.key === "=") vZoom(vScale * 1.5);
+  else if (event.key === "-") vZoom(vScale / 1.5);
+  else if (event.key === "0") vEinpassen();
+});
+
+vstage.addEventListener("wheel", event => {
+  if (!vImg) return;
 
   event.preventDefault();
-  setZoom(scale * (event.deltaY < 0 ? 1.18 : 1 / 1.18), event.clientX, event.clientY);
+  vZoom(vScale * (event.deltaY < 0 ? 1.18 : 1 / 1.18), event.clientX, event.clientY);
 }, { passive: false });
 
-/* Ziehen und Zusammenkneifen über Zeiger-Ereignisse - dieselbe Behandlung für
-   Maus und Finger, statt zweier Wege, die auseinanderlaufen. */
+/* Ziehen und Zusammenkneifen über Zeiger-Ereignisse - dieselbe Behandlung für Maus
+   und Finger, statt zweier Wege, die auseinanderlaufen. */
 const zeiger = new Map();
 let greifpunkt = null, kneifAbstand = 0, kneifStart = 1;
 
-stage.addEventListener("pointerdown", event => {
-  if (!picture) return;
+vstage.addEventListener("pointerdown", event => {
+  if (!vImg) return;
 
   zeiger.set(event.pointerId, { x: event.clientX, y: event.clientY });
-  stage.setPointerCapture(event.pointerId);
+  vstage.setPointerCapture(event.pointerId);
 
-  if (zeiger.size === 1 && scale > 1) {
-    greifpunkt = { x: event.clientX - tx, y: event.clientY - ty };
-    picture.className = "grabbing";
+  if (zeiger.size === 1) {
+    greifpunkt = { x: event.clientX - vTx, y: event.clientY - vTy };
+    vImg.className = "grabbing";
   }
 
   if (zeiger.size === 2) {
     const [a, b] = Array.from(zeiger.values());
     kneifAbstand = Math.hypot(a.x - b.x, a.y - b.y);
-    kneifStart = scale;
+    kneifStart = vScale;
     greifpunkt = null;
   }
 });
 
-stage.addEventListener("pointermove", event => {
+vstage.addEventListener("pointermove", event => {
   if (!zeiger.has(event.pointerId)) return;
 
   zeiger.set(event.pointerId, { x: event.clientX, y: event.clientY });
@@ -762,16 +930,16 @@ stage.addEventListener("pointermove", event => {
     const jetzt = Math.hypot(a.x - b.x, a.y - b.y);
 
     if (kneifAbstand > 0) {
-      setZoom(kneifStart * (jetzt / kneifAbstand), (a.x + b.x) / 2, (a.y + b.y) / 2);
+      vZoom(kneifStart * (jetzt / kneifAbstand), (a.x + b.x) / 2, (a.y + b.y) / 2);
     }
 
     return;
   }
 
   if (greifpunkt) {
-    tx = event.clientX - greifpunkt.x;
-    ty = event.clientY - greifpunkt.y;
-    apply();
+    vTx = event.clientX - greifpunkt.x;
+    vTy = event.clientY - greifpunkt.y;
+    vAnwenden();
   }
 });
 
@@ -779,17 +947,21 @@ function loslassen(event) {
   zeiger.delete(event.pointerId);
 
   if (zeiger.size < 2) kneifAbstand = 0;
-  if (zeiger.size === 0) { greifpunkt = null; if (picture) picture.className = scale > 1 ? "grab" : ""; }
+
+  if (zeiger.size === 0) {
+    greifpunkt = null;
+    if (vImg) vAnwenden();
+  }
 }
 
-stage.addEventListener("pointerup", loslassen);
-stage.addEventListener("pointercancel", loslassen);
+vstage.addEventListener("pointerup", loslassen);
+vstage.addEventListener("pointercancel", loslassen);
 
-addEventListener("resize", () => apply());
+addEventListener("resize", () => { if (viewer.classList.contains("on")) vAnwenden(); });
 
 /* ------------------------------------------------------------------- Sichern */
 
-el("save").onclick = () => {
+function sichern() {
   if (!lastJpeg) return;
 
   const nummer = lastState && lastState.frame !== undefined && lastState.frame !== null
@@ -806,7 +978,10 @@ el("save").onclick = () => {
   a.remove();
 
   setTimeout(() => URL.revokeObjectURL(url), 2000);
-};
+}
+
+el("save").onclick = sichern;
+el("vSave").onclick = sichern;
 
 el("forget").onclick = () => {
   keep(KEY_SECRET, "");

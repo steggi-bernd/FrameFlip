@@ -96,6 +96,28 @@ Dann neu laden:
 cd ~/caddy && docker compose up -d --force-recreate
 ```
 
+## Das Bild ansehen
+
+Ein Klick auf das Bild öffnet eine **eigene Fläche** dafür: näher heransehen (Rad,
+Zusammenkneifen, Doppeltippen), drehen, schieben, sichern. Esc schließt, ein Klick
+neben das Bild auch.
+
+Auf der Bühne selbst wird bewusst **nicht** gezoomt. Dort teilt sich das Bild den
+Platz mit den Zahlen; jede Verschiebung wäre sofort am Rand, und ein Zug zum
+Verschieben ließe sich nicht von einem Klick zum Öffnen unterscheiden.
+
+Zwei Dinge, die dabei leicht schiefgehen:
+
+* Im Stil darf **kein** `transform-origin` stehen. Es stand einmal auf `0 0`,
+  während die Rechnung von der Mitte ausging — das Bild wuchs dadurch aus der oberen
+  linken Ecke heraus, ganz gleich wo der Zeiger war.
+
+* Gerechnet wird gegen die **Mitte der Fläche**, nie gegen den Kasten des Bildes.
+  Der wandert ja mit der Verschiebung mit; wer gegen ihn rechnet, jagt seinem
+  eigenen Ergebnis hinterher. Der Punkt unter dem Zeiger bleibt unter dem Zeiger,
+  solange in dieser Richtung überhaupt etwas zu verschieben ist — passt das Bild
+  quer noch ganz hinein, wird dort auf die Mitte geklemmt, und das ist richtig so.
+
 ## Als Programm ablegen
 
 `manifest.webmanifest` und `sw.js` machen die Seite installierbar — am Handy über
