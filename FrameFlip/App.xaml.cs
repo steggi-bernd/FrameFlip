@@ -105,6 +105,18 @@ public partial class App : Application
         // gross, und ihr einziger Zweck war eine Abkuerzung, die nicht genommen wurde.
         Task.Run(FrameFlip.Playback.PreparedVideo.CleanOld);
 
+        // "--show" oeffnet das Fenster gleich beim Start.
+        //
+        // FrameFlip lebt im Ablagebereich: Es startet still und wartet auf die
+        // Tastenkombination. Das ist richtig fuer den taeglichen Gebrauch und
+        // unpraktisch in jedem anderen Fall - beim Vergleichen zweier Staende, beim
+        // Vorfuehren, nach einer frischen Installation. Wer es einmal sehen will,
+        // soll es nicht erst im Ablagebereich suchen muessen.
+        if (e.Args.Contains("--show", StringComparer.OrdinalIgnoreCase))
+        {
+            Dispatcher.BeginInvoke(new Action(() => _host?.ShowMain()));
+        }
+
         // "--preview <datei>" oeffnet die Vorschau direkt, ohne Umweg ueber den Explorer.
         for (int i = 0; i < e.Args.Length - 1; i++)
         {
