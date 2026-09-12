@@ -118,6 +118,27 @@ public static class RecentSequences
     }
 
     /// <summary>Einen Eintrag entfernen - etwa, weil der Ordner nicht mehr da ist.</summary>
+    /// <summary>
+    /// Die ganze Merkliste vergessen.
+    ///
+    /// Geloescht wird dabei nichts ausser dem Merkzettel: Die Ordner und ihre Bilder
+    /// bleiben, wo sie sind. Das ist der Grund, warum hier nicht nachgefragt wird.
+    /// </summary>
+    public static void Clear()
+    {
+        lock (Gate)
+        {
+            try
+            {
+                if (File.Exists(FilePath)) File.Delete(FilePath);
+            }
+            catch (Exception)
+            {
+                // Eine Merkliste ist Bequemlichkeit. Nichts daran darf etwas anhalten.
+            }
+        }
+    }
+
     public static void Forget(string folder)
     {
         lock (Gate)

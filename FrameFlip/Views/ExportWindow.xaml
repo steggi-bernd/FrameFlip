@@ -22,13 +22,15 @@
             <RowDefinition Height="Auto" />   <!-- 3 Bereich -->
             <RowDefinition Height="Auto" />   <!-- 4 Bildrate -->
             <RowDefinition Height="Auto" />   <!-- 5 Aufloesung -->
-            <RowDefinition Height="Auto" />   <!-- 6 Luecken -->
-            <RowDefinition Height="Auto" />   <!-- 7 Korrektur -->
-            <RowDefinition Height="Auto" />   <!-- 8 Ziel -->
-            <RowDefinition Height="Auto" />   <!-- 9 Zusammenfassung -->
-            <RowDefinition Height="Auto" />   <!-- 10 Fortschritt -->
-            <RowDefinition Height="Auto" />   <!-- 11 Status -->
-            <RowDefinition Height="Auto" />   <!-- 12 Knoepfe -->
+            <RowDefinition Height="Auto" />   <!-- 6 Qualitaet -->
+            <RowDefinition Height="Auto" />   <!-- 7 Tempo -->
+            <RowDefinition Height="Auto" />   <!-- 8 Luecken -->
+            <RowDefinition Height="Auto" />   <!-- 9 Korrektur -->
+            <RowDefinition Height="Auto" />   <!-- 10 Ziel -->
+            <RowDefinition Height="Auto" />   <!-- 11 Zusammenfassung -->
+            <RowDefinition Height="Auto" />   <!-- 12 Fortschritt -->
+            <RowDefinition Height="Auto" />   <!-- 13 Status -->
+            <RowDefinition Height="Auto" />   <!-- 14 Knoepfe -->
         </Grid.RowDefinitions>
 
         <TextBlock Grid.Row="0" Grid.Column="0" Text="ffmpeg" Style="{StaticResource DialogLabel}" />
@@ -76,9 +78,25 @@
                        Foreground="{StaticResource MutedBrush}" FontSize="11" />
         </StackPanel>
 
-        <TextBlock x:Name="GapLabel" Grid.Row="6" Grid.Column="0" Text="Lücken"
+        <TextBlock Grid.Row="6" Grid.Column="0" Text="Qualität" Style="{StaticResource DialogLabel}" />
+        <StackPanel Grid.Row="6" Grid.Column="1" Margin="0,0,0,12">
+            <ComboBox x:Name="QualityBox" Style="{StaticResource OverlayCombo}"
+                      HorizontalAlignment="Left" Width="180" SelectionChanged="OnQualityChanged" />
+            <TextBlock x:Name="QualityHint" Margin="0,4,0,0"
+                       Foreground="{StaticResource MutedBrush}" FontSize="11" TextWrapping="Wrap" />
+        </StackPanel>
+
+        <TextBlock Grid.Row="7" Grid.Column="0" Text="Encoder" Style="{StaticResource DialogLabel}" />
+        <StackPanel Grid.Row="7" Grid.Column="1" Margin="0,0,0,12">
+            <ComboBox x:Name="SpeedBox" Style="{StaticResource OverlayCombo}"
+                      HorizontalAlignment="Left" Width="180" SelectionChanged="OnSpeedChanged" />
+            <TextBlock x:Name="SpeedHint" Margin="0,4,0,0"
+                       Foreground="{StaticResource MutedBrush}" FontSize="11" TextWrapping="Wrap" />
+        </StackPanel>
+
+        <TextBlock x:Name="GapLabel" Grid.Row="8" Grid.Column="0" Text="Lücken"
                    Style="{StaticResource DialogLabel}" Visibility="Collapsed" />
-        <StackPanel x:Name="GapPanel" Grid.Row="6" Grid.Column="1" Margin="0,0,0,12"
+        <StackPanel x:Name="GapPanel" Grid.Row="8" Grid.Column="1" Margin="0,0,0,12"
                     Visibility="Collapsed">
             <RadioButton x:Name="HoldRadio" Style="{StaticResource DialogRadio}"
                          Content="Letzten Frame halten" IsChecked="True" Checked="OnGapChanged"
@@ -90,9 +108,9 @@
                        Foreground="{StaticResource GapBrush}" FontSize="11" TextWrapping="Wrap" />
         </StackPanel>
 
-        <TextBlock x:Name="AdjustLabel" Grid.Row="7" Grid.Column="0" Text="Bildkorrektur"
+        <TextBlock x:Name="AdjustLabel" Grid.Row="9" Grid.Column="0" Text="Bildkorrektur"
                    Style="{StaticResource DialogLabel}" Visibility="Collapsed" />
-        <StackPanel x:Name="AdjustPanel" Grid.Row="7" Grid.Column="1" Margin="0,0,0,12"
+        <StackPanel x:Name="AdjustPanel" Grid.Row="9" Grid.Column="1" Margin="0,0,0,12"
                     Visibility="Collapsed">
             <CheckBox x:Name="ApplyAdjustBox" Style="{StaticResource DialogCheckBox}"
                       Content="Korrektur aus der Vorschau ins Video einrechnen"
@@ -101,8 +119,8 @@
                        Foreground="{StaticResource MutedBrush}" />
         </StackPanel>
 
-        <TextBlock Grid.Row="8" Grid.Column="0" Text="Zieldatei" Style="{StaticResource DialogLabel}" />
-        <Grid Grid.Row="8" Grid.Column="1" Margin="0,0,0,12">
+        <TextBlock Grid.Row="10" Grid.Column="0" Text="Zieldatei" Style="{StaticResource DialogLabel}" />
+        <Grid Grid.Row="10" Grid.Column="1" Margin="0,0,0,12">
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="*" />
                 <ColumnDefinition Width="Auto" />
@@ -113,18 +131,46 @@
                     Content="Wählen …" Click="OnBrowseOutput" />
         </Grid>
 
-        <TextBlock x:Name="SummaryText" Grid.Row="9" Grid.Column="1" Margin="0,0,0,12"
-                   Foreground="{StaticResource MutedBrush}" FontSize="11" TextWrapping="Wrap" />
+        <StackPanel Grid.Row="11" Grid.Column="1" Margin="0,0,0,12">
+            <TextBlock x:Name="SummaryText"
+                       Foreground="{StaticResource MutedBrush}" FontSize="11" TextWrapping="Wrap" />
 
-        <ProgressBar x:Name="Progress" Grid.Row="10" Grid.ColumnSpan="2" Height="6"
-                     Margin="0,0,0,8" Minimum="0" Maximum="1" Visibility="Collapsed"
-                     Background="{StaticResource TrackBrush}" Foreground="{StaticResource AccentBrush}"
-                     BorderThickness="0" />
+            <!-- Getrennt von der Zusammenfassung, weil es etwas anderes ist: Oben
+                 steht, was herauskommt, hier steht eine Vermutung darueber. Das
+                 "ca." ist kein Zierrat - eine CRF-Kodierung richtet sich nach dem
+                 Bildinhalt, und dieselbe Einstellung ergibt bei ruhigem Material ein
+                 Drittel der Datei einer Szene voller Rauch. -->
+            <TextBlock x:Name="EstimateText" Margin="0,6,0,0"
+                       Foreground="{StaticResource ForegroundBrush}" FontSize="11.5"
+                       TextWrapping="Wrap" />
 
-        <TextBlock x:Name="StatusText" Grid.Row="11" Grid.ColumnSpan="2" Margin="0,0,0,12"
+            <!-- Nur sichtbar, wenn im Hintergrund genau dieser Fall schon kodiert
+                 wurde. Dann ist der Export ein Kopiervorgang, und das soll man
+                 vorher wissen und nicht erst hinterher merken. -->
+            <TextBlock x:Name="PreparedHint" Margin="0,6,0,0" Visibility="Collapsed"
+                       Text="{DynamicResource D_ExportReady}"
+                       Foreground="{StaticResource AccentBrush}" FontSize="11" TextWrapping="Wrap" />
+        </StackPanel>
+
+        <StackPanel x:Name="ProgressPanel" Grid.Row="12" Grid.ColumnSpan="2" Margin="0,4,0,10"
+                    Visibility="Collapsed">
+            <ProgressBar x:Name="Progress" Height="8" Minimum="0" Maximum="1"
+                         Background="{StaticResource TrackBrush}"
+                         Foreground="{StaticResource AccentBrush}" BorderThickness="0" />
+
+            <Grid Margin="0,7,0,0">
+                <TextBlock x:Name="ProgressLeft" Foreground="{StaticResource MutedBrush}"
+                           FontFamily="Consolas" FontSize="11" />
+                <TextBlock x:Name="ProgressRight" HorizontalAlignment="Right"
+                           Foreground="{StaticResource ForegroundBrush}"
+                           FontFamily="Consolas" FontSize="11" />
+            </Grid>
+        </StackPanel>
+
+        <TextBlock x:Name="StatusText" Grid.Row="13" Grid.ColumnSpan="2" Margin="0,0,0,12"
                    Foreground="{StaticResource AccentBrush}" FontSize="11" TextWrapping="Wrap" />
 
-        <StackPanel Grid.Row="12" Grid.ColumnSpan="2" Orientation="Horizontal"
+        <StackPanel Grid.Row="14" Grid.ColumnSpan="2" Orientation="Horizontal"
                     HorizontalAlignment="Right">
             <Button x:Name="CopyCommandButton" Style="{StaticResource LinkButton}"
                     Content="Befehl kopieren" Margin="0,0,12,0" Click="OnCopyCommand"

@@ -1,0 +1,256 @@
+<UserControl x:Class="FrameFlip.Views.SettingsEditor" xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" xmlns:views="clr-namespace:FrameFlip.Views" TextOptions.TextFormattingMode="Display">
+
+    <!-- Texte ueber DynamicResource, nicht StaticResource: Nur so wechselt der
+         Dialog die Sprache im laufenden Betrieb, ohne neu geoeffnet zu werden. -->
+
+    <UserControl.Resources>
+        <!-- Jede Seite ist ein zweispaltiges Raster mit denselben Massen. Ohne das
+             sprangen die Beschriftungen beim Reiterwechsel hin und her. -->
+        <GridLength x:Key="LabelWidth">160</GridLength>
+    </UserControl.Resources>
+
+    <Grid Margin="0">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="*" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+        </Grid.RowDefinitions>
+
+        <TabControl x:Name="Tabs" Grid.Row="0" Style="{StaticResource DialogTabs}" Background="Transparent">
+
+            <TabItem Style="{StaticResource DialogTab}" Header="{DynamicResource S_TabGeneral}"><ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" Padding="0,8,12,18"><Grid>
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="{StaticResource LabelWidth}" />
+                        <ColumnDefinition Width="*" />
+                    </Grid.ColumnDefinitions>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                    </Grid.RowDefinitions>
+
+                    <TextBlock Grid.Row="0" Grid.Column="0" Text="{DynamicResource S_Hotkey}"
+                               Style="{StaticResource DialogLabel}" />
+                    <TextBox x:Name="HotkeyBox" Grid.Row="0" Grid.Column="1" Style="{StaticResource DialogTextBox}"
+                             IsReadOnly="True" Cursor="Hand"
+                             ToolTip="{DynamicResource S_HotkeyHint}" />
+
+                    <TextBlock Grid.Row="1" Grid.Column="1" Margin="0,4,0,12"
+                               Foreground="{StaticResource MutedBrush}" FontSize="11" TextWrapping="Wrap"
+                               Text="{DynamicResource S_HotkeyNote}" />
+
+                    <TextBlock Grid.Row="2" Grid.Column="0" Text="{DynamicResource S_Language}"
+                               Style="{StaticResource DialogLabel}" />
+                    <ComboBox x:Name="LanguageBox" Grid.Row="2" Grid.Column="1" Style="{StaticResource OverlayCombo}"
+                              HorizontalAlignment="Left" Width="140"
+                              SelectionChanged="OnLanguageChanged" />
+                </Grid>
+            </Grid></ScrollViewer></TabItem>
+
+            <TabItem Style="{StaticResource DialogTab}" Header="{DynamicResource S_TabPlayback}"><ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" Padding="0,8,12,18"><Grid>
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="{StaticResource LabelWidth}" />
+                        <ColumnDefinition Width="*" />
+                    </Grid.ColumnDefinitions>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                    </Grid.RowDefinitions>
+
+                    <TextBlock Grid.Row="0" Grid.Column="0" Text="{DynamicResource S_FrameRate}"
+                               Style="{StaticResource DialogLabel}" />
+                    <ComboBox x:Name="FpsBox" Grid.Row="0" Grid.Column="1" Style="{StaticResource OverlayCombo}"
+                              HorizontalAlignment="Left" Width="140" Margin="0,0,0,12" />
+
+                    <TextBlock Grid.Row="1" Grid.Column="0" Text="{DynamicResource S_Playback}"
+                               Style="{StaticResource DialogLabel}" />
+                    <StackPanel Grid.Row="1" Grid.Column="1">
+                        <CheckBox x:Name="LoopBox" Style="{StaticResource DialogCheckBox}"
+                                  Content="{DynamicResource S_LoopSeamless}" />
+                        <CheckBox x:Name="LockToDisplayBox" Style="{StaticResource DialogCheckBox}"
+                                  Margin="0,6,0,0"
+                                  Content="{DynamicResource S_LockToDisplay}"
+                                  ToolTip="{DynamicResource S_LockToDisplayHint}" />
+                        <CheckBox x:Name="CloseOnFocusLossBox" Style="{StaticResource DialogCheckBox}"
+                                  Margin="0,6,0,0"
+                                  Content="{DynamicResource S_CloseOnFocusLoss}"
+                                  ToolTip="{DynamicResource S_CloseOnFocusLossHint}" />
+                    </StackPanel>
+                </Grid>
+            </Grid></ScrollViewer></TabItem>
+
+            <TabItem Style="{StaticResource DialogTab}" Header="{DynamicResource S_TabPerformance}"><ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" Padding="0,8,12,18"><Grid>
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="{StaticResource LabelWidth}" />
+                        <ColumnDefinition Width="*" />
+                    </Grid.ColumnDefinitions>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                    </Grid.RowDefinitions>
+
+                    <TextBlock Grid.Row="0" Grid.Column="0" Text="{DynamicResource S_MemoryBudget}"
+                               Style="{StaticResource DialogLabel}" />
+                    <TextBox x:Name="BudgetBox" Grid.Row="0" Grid.Column="1" Style="{StaticResource DialogTextBox}"
+                             HorizontalAlignment="Left" Width="140" Margin="0,0,0,12" />
+
+                    <TextBlock Grid.Row="1" Grid.Column="0" Text="{DynamicResource S_PrefetchAhead}"
+                               Style="{StaticResource DialogLabel}" />
+                    <TextBox x:Name="AheadBox" Grid.Row="1" Grid.Column="1" Style="{StaticResource DialogTextBox}"
+                             HorizontalAlignment="Left" Width="140" Margin="0,0,0,12" />
+
+                    <TextBlock Grid.Row="2" Grid.Column="0" Text="{DynamicResource S_PrefetchBehind}"
+                               Style="{StaticResource DialogLabel}" />
+                    <TextBox x:Name="BehindBox" Grid.Row="2" Grid.Column="1" Style="{StaticResource DialogTextBox}"
+                             HorizontalAlignment="Left" Width="140" Margin="0,0,0,4" />
+
+                    <Separator Grid.Row="4" Grid.ColumnSpan="2" Margin="0,8,0,14"
+                               Background="{StaticResource PanelBorder}" />
+
+                    <TextBlock Grid.Row="4" Grid.Column="0" Text="{DynamicResource S_AdaptiveLoad}"
+                               Style="{StaticResource DialogLabel}" />
+                    <CheckBox x:Name="AdaptiveBox" Grid.Row="4" Grid.Column="1" Style="{StaticResource DialogCheckBox}"
+                              Content="{DynamicResource S_AdaptiveLoadHint}" Margin="0,0,0,12" />
+
+                    <TextBlock Grid.Row="5" Grid.Column="0" Text="{DynamicResource S_LoadInterval}"
+                               Style="{StaticResource DialogLabel}" />
+                    <TextBox x:Name="IntervalBox" Grid.Row="5" Grid.Column="1" Style="{StaticResource DialogTextBox}"
+                             HorizontalAlignment="Left" Width="140" Margin="0,0,0,12" />
+
+                    <TextBlock Grid.Row="6" Grid.Column="0" Text="{DynamicResource S_MaxThreads}"
+                               Style="{StaticResource DialogLabel}" />
+                    <StackPanel Grid.Row="6" Grid.Column="1">
+                        <TextBox x:Name="ThreadsBox" Style="{StaticResource DialogTextBox}"
+                                 HorizontalAlignment="Left" Width="140" />
+                        <TextBlock x:Name="ThreadsHint" Margin="0,4,0,0" TextWrapping="Wrap"
+                                   Foreground="{StaticResource MutedBrush}" FontSize="11" />
+                    </StackPanel>
+                </Grid>
+            </Grid></ScrollViewer></TabItem>
+
+            <TabItem Style="{StaticResource DialogTab}" Header="{DynamicResource S_TabRemote}"><ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" Padding="0,8,12,18"><Grid>
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="{StaticResource LabelWidth}" />
+                        <ColumnDefinition Width="*" />
+                    </Grid.ColumnDefinitions>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                    </Grid.RowDefinitions>
+
+                    <TextBlock Grid.Row="0" Grid.Column="0" Text="{DynamicResource S_RelayHost}"
+                               Style="{StaticResource DialogLabel}" VerticalAlignment="Top" Margin="0,6,12,0" />
+                    <StackPanel Grid.Row="0" Grid.Column="1">
+                        <TextBox x:Name="RelayBox" Style="{StaticResource DialogTextBox}"
+                                 TextChanged="OnRelayChanged" />
+                        <TextBlock Margin="0,4,0,0" TextWrapping="Wrap"
+                                   Foreground="{StaticResource MutedBrush}" FontSize="11"
+                                   Text="{DynamicResource S_RelayHostHint}" />
+                    </StackPanel>
+
+                    <CheckBox x:Name="RemoteBox" Grid.Row="1" Grid.Column="1" Margin="0,14,0,0"
+                              Style="{StaticResource DialogCheckBox}"
+                              Content="{DynamicResource S_RemoteEnable}" />
+
+                    <TextBlock Grid.Row="2" Grid.Column="1" Margin="0,6,0,0" TextWrapping="Wrap"
+                               Foreground="{StaticResource MutedBrush}" FontSize="11"
+                               Text="{DynamicResource S_RemoteHint}" />
+
+                    <!-- Der Dateizugriff steht bewusst hier und nicht bei den Projekten:
+                         Er gehört zur Fernsteuerung, hängt an ihr, und wer ihn sucht,
+                         sucht ihn dort, wo er das Handy eingerichtet hat. -->
+                    <StackPanel Grid.Row="3" Grid.Column="1" Margin="0,14,0,0">
+                        <CheckBox x:Name="LibraryBox" Style="{StaticResource DialogCheckBox}"
+                                  Content="{DynamicResource S_LibraryEnable}" />
+
+                        <TextBlock Margin="0,6,0,0" TextWrapping="Wrap"
+                                   Foreground="{StaticResource MutedBrush}" FontSize="11"
+                                   Text="{DynamicResource S_LibraryHint}" />
+                    </StackPanel>
+
+                    <Separator Grid.Row="4" Grid.ColumnSpan="2" Margin="0,16,0,14"
+                               Background="{StaticResource PanelBorder}" />
+
+                    <TextBlock Grid.Row="5" Grid.Column="0" Text="{DynamicResource S_Pairing}"
+                               Style="{StaticResource DialogLabel}" VerticalAlignment="Top" Margin="0,6,12,0" />
+
+                    <StackPanel Grid.Row="5" Grid.Column="1">
+                        <Border Background="{StaticResource DesktopSurface}" CornerRadius="{StaticResource SurfaceCorner}"
+                                Width="252" Height="252" HorizontalAlignment="Left">
+                            <views:QrCodeView x:Name="PairingCode" LightModules="True" />
+                        </Border>
+
+                        <TextBlock x:Name="RemoteState" Margin="0,10,0,0"
+                                   Foreground="{StaticResource AccentBrush}" FontSize="11"
+                                   FontFamily="Consolas" />
+
+                        <TextBlock x:Name="RoomText" Margin="0,6,0,0"
+                                   Foreground="{StaticResource FaintBrush}" FontSize="10"
+                                   FontFamily="Consolas" />
+
+                        <TextBlock x:Name="PairingHint" Margin="0,6,0,0" TextWrapping="Wrap"
+                                   Foreground="{StaticResource MutedBrush}" FontSize="11"
+                                   Text="{DynamicResource S_ScanHint}" />
+
+                        <CheckBox x:Name="ClassicQr" Content="{DynamicResource D_ClassicQr}" Style="{StaticResource DialogCheckBox}" Margin="0,12,0,0" Checked="OnQrStyle" Unchecked="OnQrStyle" /><WrapPanel Margin="0,12,0,0">
+                            <Button x:Name="CopyLinkButton" Style="{StaticResource DesktopButton}"
+                                    Content="{DynamicResource S_CopyLink}" MinWidth="120"
+                                    Click="OnCopyLinkClicked" />
+                            <Button x:Name="NewKeyButton" Style="{StaticResource DesktopButton}"
+                                    Content="{DynamicResource S_NewKey}" MinWidth="120" Margin="8,0,0,0"
+                                    ToolTip="{DynamicResource S_NewKeyHint}"
+                                    Click="OnNewKeyClicked" />
+                        </WrapPanel>
+                    </StackPanel>
+                </Grid>
+            </Grid></ScrollViewer></TabItem>
+        <TabItem Style="{StaticResource DialogTab}" Header="{DynamicResource D_Permissions}">
+ <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" Padding="0,8,12,18"><StackPanel>
+ <TextBlock Text="{DynamicResource D_PermissionsIntro}" TextWrapping="Wrap" Foreground="{StaticResource DesktopMuted}" Margin="0,0,0,22" />
+ <CheckBox x:Name="BridgeBox" Content="{DynamicResource D_BlenderBridge}" Style="{StaticResource DialogCheckBox}" Margin="0,0,0,20" />
+ <TextBlock Text="{DynamicResource S_BlenderLabel}" Style="{StaticResource DesktopLabel}" Margin="0,0,0,8" />
+ <DockPanel><Button DockPanel.Dock="Right" Content="…" Style="{StaticResource DesktopButton}" Click="OnBrowseBlender" Margin="8,0,0,0" /><TextBox x:Name="BlenderPathBox" Style="{StaticResource DialogTextBox}" /></DockPanel>
+ <CheckBox x:Name="RenderBox" Content="{DynamicResource S_RenderEnable}" Style="{StaticResource DialogCheckBox}" Margin="0,14,0,8" />
+ <TextBlock Text="{DynamicResource S_RenderHint}" TextWrapping="Wrap" Foreground="{StaticResource DesktopMuted}" FontSize="11" />
+ <Separator Margin="0,22" Background="{StaticResource DesktopLine}" />
+ <TextBlock Text="{DynamicResource S_ExchangeFolder}" Style="{StaticResource DesktopLabel}" Margin="0,0,0,8" />
+ <DockPanel><Button DockPanel.Dock="Right" Content="…" Style="{StaticResource DesktopButton}" Click="OnBrowseFolder" Margin="8,0,0,0" /><TextBox x:Name="FolderBox" Style="{StaticResource DialogTextBox}" /></DockPanel>
+ <CheckBox x:Name="FileAccessBox" Content="{DynamicResource D_FileRead}" Style="{StaticResource DialogCheckBox}" Margin="0,14,0,12" />
+ <CheckBox x:Name="PushBox" Content="{DynamicResource S_PushEnable}" Style="{StaticResource DialogCheckBox}" />
+ <TextBlock Text="{DynamicResource S_PushHint}" TextWrapping="Wrap" Foreground="{StaticResource DesktopMuted}" FontSize="11" Margin="0,8,0,0" />
+ </StackPanel></ScrollViewer>
+ </TabItem>
+ <TabItem x:Name="AppearanceTab" Style="{StaticResource DialogTab}" Header="{DynamicResource D_Appearance}"><ContentControl x:Name="AppearanceHost" /></TabItem>
+ </TabControl>
+
+        <TextBlock x:Name="StatusText" Grid.Row="1" Margin="0,14,0,0"
+                   Foreground="{StaticResource AccentBrush}" FontSize="11" TextWrapping="Wrap"
+                   Visibility="Collapsed" />
+
+        <StackPanel Grid.Row="2" Orientation="Horizontal"
+                    HorizontalAlignment="Right" Margin="0,20,0,0">
+            <Button x:Name="RevealButton" Style="{StaticResource DesktopButton}"
+                    Content="{DynamicResource S_ShowConfig}"
+                    MinWidth="140" Margin="0,0,8,0" Click="OnRevealClicked" />
+            <Button x:Name="CancelButton" Style="{StaticResource DesktopButton}"
+                    Content="{DynamicResource D_Discard}"
+                    Margin="0,0,8,0"  Click="OnCancelClicked" />
+            <Button x:Name="SaveButton" Style="{StaticResource DesktopButton}"
+                    Content="{DynamicResource D_Apply}"
+                     Click="OnSaveClicked" />
+        </StackPanel>
+    </Grid>
+</UserControl>

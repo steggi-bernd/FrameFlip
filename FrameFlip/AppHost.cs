@@ -53,7 +53,7 @@ public sealed class AppHost : IDisposable
             {
                 LivePage.Load = () => _load.LastSnapshot;
                 return createMain?.Invoke() ?? new MainWindow(_renderMonitor, () => _remote.State,
-                    ShowSettings, OpenFile, ShowPairing, _settings, settings => SettingsStore.Save(settings));
+                    ShowSettings, OpenFile, ShowPairing, _settings, settings => SettingsStore.Save(settings), ApplySettings, () => _settings);
             },
             createSettings ?? (() => new SettingsWindow(_settings, ApplySettings, () => _remote.State)),
             createPairing ?? (() => new PairingWindow(_settings, ApplySettings, () => _remote.State)),
@@ -243,10 +243,16 @@ public sealed class AppHost : IDisposable
     public void ShowMain() => _windows.ShowMain();
 
     /// <summary>Der Kopplungscode als eigenes Fenster, ueber dem Hauptfenster.</summary>
-    private void ShowPairing() => _windows.ShowPairing();
+    private void ShowPairing()
+    {
+        if (_windows.Main is MainWindow main) { main.ShowSettingsPage(true); main.Activate(); }
+        else _windows.ShowPairing();
+    }
 
     private void ShowSettings()
     {
+        if (_windows.Main is MainWindow main && _viewer is null)
+        { main.ShowSettingsPage(); main.Activate(); return; }
         // Der Callback gehoert zu diesem Viewer, auch wenn inzwischen ein
         // anderer geoeffnet wurde. Der Controller besitzt keine Viewer-Sitzung.
         var viewer = _viewer;

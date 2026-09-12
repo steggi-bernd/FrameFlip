@@ -47,6 +47,52 @@ public sealed class AppSettings
     public int MemoryBudgetMb { get; set; } = 1024;
 
     /// <summary>
+    /// Ob Abspielen die Folge erst vollstaendig in den Speicher liest.
+    ///
+    /// Voreingestellt an: Eine Folge von der Platte abzuspielen ruckelt genau dann am
+    /// staerksten, wenn nebenan ein Render laeuft - also in dem Fall, fuer den es
+    /// FrameFlip gibt.
+    /// </summary>
+    public bool Prebuffer { get; set; } = true;
+
+    /// <summary>
+    /// Ob beim Vorausladen nebenher schon ein Video entsteht.
+    ///
+    /// Die Bilder werden dabei ohnehin alle gelesen; sie im selben Zug an ffmpeg zu
+    /// reichen kostet wenig zusaetzlich und erspart beim spaeteren Export das ganze
+    /// Kodieren. Die fertige Datei liegt im Temp-Ordner und wird nur dann an ihren
+    /// Platz gebracht, wenn wirklich exportiert wird - wer nie exportiert, hat nur
+    /// eine Datei im Temp-Ordner, die beim naechsten Start aufgeraeumt wird.
+    /// </summary>
+    public bool PrepareVideo { get; set; }
+
+    /// <summary>Zuletzt gewaehlte Qualitaetsstufe im Exportdialog.</summary>
+    public string ExportQuality { get; set; } = "Hoch";
+
+    /// <summary>Zuletzt gewaehltes Encoder-Tempo im Exportdialog.</summary>
+    public string ExportSpeed { get; set; } = "Ausgewogen";
+
+    /// <summary>
+    /// Was diese Maschine beim letzten Export geschafft hat, in Megabildpunkten je
+    /// Sekunde.
+    ///
+    /// Damit wird die Dauerschaetzung mit jedem Export besser. Eine feste Zahl im
+    /// Code koennte das nicht: Zwischen einem Notebook und einer Renderkiste liegt
+    /// leicht der Faktor zehn.
+    /// </summary>
+    public double ExportThroughput { get; set; }
+
+    /// <summary>
+    /// Wie sich die geschaetzte Groesse beim letzten Export zur tatsaechlichen
+    /// verhalten hat. 0 heisst: noch nie gemessen.
+    ///
+    /// Damit lernt die Schaetzung das Material kennen. Wer immer dieselbe Art Szene
+    /// rendert - und das tun die meisten - bekommt nach zwei Exporten eine Zahl, die
+    /// stimmt.
+    /// </summary>
+    public double ExportSizeFactor { get; set; }
+
+    /// <summary>
     /// Dekodiergroesse als Stufe: 0 = voll, 1 = halb, 2 = viertel. Verlaengert den
     /// Puffervorlauf um das Vier- bzw. Sechzehnfache.
     /// </summary>

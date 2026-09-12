@@ -101,7 +101,13 @@ public sealed class RenderMonitor : IDisposable
                     // eigenen Thread, weil hier eine Datei geschrieben wird und der
                     // Zustand des Renders darauf nicht warten soll.
                     if (message.File is { Length: > 0 } blend)
-                        Task.Run(() => Projects.ProjectLibrary.Note(blend));
+                    {
+                        string output = message.Output ?? string.Empty;
+                        int width = message.Width;
+                        int height = message.Height;
+
+                        Task.Run(() => Projects.ProjectLibrary.Note(blend, output, null, width, height));
+                    }
 
                     break;
 
@@ -118,6 +124,21 @@ public sealed class RenderMonitor : IDisposable
                     {
                         write.FrameWritten(message.Frame, message.Path);
                         changed = true;
+
+                        // Der erste geschriebene Frame ist der Einstieg in die
+                        // Sequenz - nur der wird vermerkt. Bei jedem weiteren waere
+                        // es dieselbe Erkenntnis zum Preis eines Dateischreibvorgangs
+                        // je Bild, und bei einem langen Render sind das Tausende.
+                        if (write.FramesWritten == 1
+                            && write.BlendFile is { Length: > 0 } rendered
+                            && message.Path is { Length: > 0 } first)
+                        {
+                            string folder = write.OutputDirectory;
+                            int w = write.Width;
+                            int h = write.Height;
+
+                            Task.Run(() => Projects.ProjectLibrary.Note(rendered, folder, first, w, h));
+                        }
                     }
                     break;
 

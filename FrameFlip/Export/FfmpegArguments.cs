@@ -39,7 +39,7 @@ public static class FfmpegArguments
         var filter = BuildVideoFilter(request);
         if (filter is not null) { args.Add("-vf"); args.Add(filter); }
 
-        args.AddRange(request.Preset.VideoArguments);
+        args.AddRange(WithChoices(request));
 
         AddCommonOutput(args, request);
         args.Add(request.OutputPath);
@@ -160,6 +160,36 @@ public static class FfmpegArguments
         }
 
         return "scale=trunc(iw/2)*2:trunc(ih/2)*2";
+    }
+
+    /// <summary>
+    /// Die Argumente des Formats, mit Qualitaet und Tempo des Auftrags darin.
+    ///
+    /// Ersetzt wird, was schon dasteht - nicht angehaengt. Ein zweites "-crf" hinter
+    /// dem ersten waere zwar gueltig und wuerde sogar gewinnen, aber der Aufruf, den
+    /// der Knopf "Befehl kopieren" ausgibt, saehe aus wie ein Versehen.
+    /// </summary>
+    private static IReadOnlyList<string> WithChoices(ExportRequest request)
+    {
+        var args = request.Preset.VideoArguments.ToList();
+
+        Replace(args, "-crf", request.Crf?.ToString(CultureInfo.InvariantCulture));
+        Replace(args, "-preset", request.Speed);
+
+        return args;
+    }
+
+    private static void Replace(List<string> args, string flag, string? value)
+    {
+        if (value is not { Length: > 0 }) return;
+
+        int at = args.IndexOf(flag);
+
+        // Steht die Angabe nicht im Format, gehoert sie auch nicht hinein: ProRes
+        // kennt kein -crf, und ein aufgezwungenes waere schlicht ein Fehler.
+        if (at < 0 || at + 1 >= args.Count) return;
+
+        args[at + 1] = value;
     }
 
     private static string Combine(string? first, string second)

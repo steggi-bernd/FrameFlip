@@ -272,6 +272,8 @@ public partial class ProjectsPage : UserControl
 
     private void ShowOverviewContents(ProjectOverviewScan scan)
     {
+        ShowWatchedFolders();
+
         if (scan.Projects.Count == 0)
         {
             Note.Text = T("S_ProjectsEmpty");
@@ -295,7 +297,11 @@ public partial class ProjectsPage : UserControl
 
         if (recent.Count > 0)
         {
-            Body.Children.Add(Section(T("S_RecentlyOpened")));
+            Body.Children.Add(Section(T("S_RecentlyOpened"), T("D_ClearRecent"), () =>
+            {
+                RecentSequences.Clear();
+                Reload();
+            }));
 
             var tiles = Wrap();
 
@@ -303,6 +309,112 @@ public partial class ProjectsPage : UserControl
 
             Body.Children.Add(tiles);
         }
+    }
+
+    /// <summary>
+    /// Die Ordner, die FrameFlip durchsucht - mit einem Weg wieder hinaus.
+    ///
+    /// Ohne diese Liste war das Eintragen eine Einbahnstrasse: Ein Ordner, den
+    /// jemand versehentlich hinzugefuegt hatte, blieb fuer immer drin, und weder die
+    /// Oberflaeche noch die Projektkacheln sagten, welche Ordner ueberhaupt gemeint
+    /// sind. Die Liste steht ganz oben, weil sie erklaert, woher alles darunter
+    /// kommt.
+    /// </summary>
+    private void ShowWatchedFolders()
+    {
+        var folders = ProjectLibrary.Load().Folders;
+        if (folders.Count == 0) return;
+
+        var section = Section(T("D_WatchedFolders"));
+
+        foreach (string folder in folders) section.Children.Add(WatchedFolderRow(folder));
+
+        Body.Children.Add(section);
+    }
+
+    private Border WatchedFolderRow(string folder)
+    {
+        bool exists = Directory.Exists(folder);
+
+        var row = new Grid { Margin = new Thickness(10, 7, 7, 7) };
+        row.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+        row.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+
+        var texts = new StackPanel { VerticalAlignment = VerticalAlignment.Center };
+
+        texts.Children.Add(new TextBlock
+        {
+            Text = Path.GetFileName(folder.TrimEnd(Path.DirectorySeparatorChar)),
+            FontFamily = (FontFamily)FindResource("HeadFont"),
+            FontWeight = FontWeights.Bold,
+            FontSize = 12,
+            Foreground = (Brush)FindResource(exists ? "ForegroundBrush" : "FaintBrush"),
+        });
+
+        texts.Children.Add(new TextBlock
+        {
+            Text = exists ? folder : folder + "  \u00b7  " + T("D_FolderGone"),
+            Margin = new Thickness(0, 2, 0, 0),
+            FontSize = 10.5,
+            TextTrimming = TextTrimming.CharacterEllipsis,
+            Foreground = (Brush)FindResource("FaintBrush"),
+        });
+
+        Grid.SetColumn(texts, 0);
+        row.Children.Add(texts);
+
+        var remove = RemoveButton(() =>
+        {
+            ProjectLibrary.RemoveFolder(folder);
+            Reload();
+        });
+
+        Grid.SetColumn(remove, 1);
+        row.Children.Add(remove);
+
+        return new Border
+        {
+            Margin = new Thickness(0, 0, 0, 6),
+            CornerRadius = new CornerRadius(9),
+            Background = (Brush)FindResource("AppSurface"),
+            BorderBrush = (Brush)FindResource("PanelBorder"),
+            BorderThickness = new Thickness(1),
+            Child = row,
+        };
+    }
+
+    /// <summary>Das Kreuz am Zeilenende. Entfernt den Eintrag, nicht den Ordner.</summary>
+    private Border RemoveButton(Action click)
+    {
+        var glyph = new System.Windows.Shapes.Path
+        {
+            Data = Geometry.Parse("M0,0 L9,9 M9,0 L0,9"),
+            StrokeThickness = 1.4,
+            Stroke = (Brush)FindResource("MutedBrush"),
+            HorizontalAlignment = HorizontalAlignment.Center,
+            VerticalAlignment = VerticalAlignment.Center,
+        };
+
+        var button = new Border
+        {
+            Width = 28,
+            Height = 28,
+            CornerRadius = new CornerRadius(8),
+            VerticalAlignment = VerticalAlignment.Center,
+            Background = (Brush)FindResource("AppSurface"),
+            BorderBrush = (Brush)FindResource("PanelBorder"),
+            BorderThickness = new Thickness(1),
+            Cursor = Cursors.Hand,
+            // Der Ordner bleibt, wo er ist - nur FrameFlip sieht nicht mehr hin.
+            ToolTip = T("D_RemoveFolder"),
+            Child = glyph,
+        };
+
+        button.MouseLeftButtonUp += (_, _) => click();
+        button.MouseEnter += (_, _) => glyph.Stroke = (Brush)FindResource("ForegroundBrush");
+        button.MouseLeave += (_, _) => glyph.Stroke = (Brush)FindResource("MutedBrush");
+
+        return button;
     }
 
     private void Inside()
@@ -568,34 +680,41 @@ public partial class ProjectsPage : UserControl
         layers.Children.Add(picture);
         layers.Children.Add(band);
 
-        var card = new Border
-        {
-            Width = width,
-            Height = height,
-            Margin = new Thickness(0, 0, 12, 12),
-            CornerRadius = new CornerRadius(14),
-            Background = (Brush)FindResource("AppSurface"),
-            BorderBrush = (Brush)FindResource("PanelBorder"),
-            BorderThickness = new Thickness(1),
-            Cursor = click is null ? Cursors.Arrow : Cursors.Hand,
-            Child = layers,
-        };
-
-        if (click is not null)
-        {
-            card.MouseLeftButtonUp += (_, _) =>
+        // Eine Kachel ohne Wirkung bleibt ein Rahmen - sie soll keinen Fokus fangen
+        // und sich bei keiner Sprachausgabe als Schalter ausgeben.
+        Border card = click is null
+            ? new Border()
+            : new ClickCard(detail.Length > 0 ? title + ", " + detail : title, click)
             {
-                if (_dragging) return;
-
-                click();
+                Suppress = () => _dragging,
             };
 
-            card.MouseEnter += (_, _) => card.BorderBrush = (Brush)FindResource("AccentBrush");
-            card.MouseLeave += (_, _) => card.BorderBrush = (Brush)FindResource("PanelBorder");
+        card.Width = width;
+        card.Height = height;
+        card.Margin = new Thickness(0, 0, 12, 12);
+        card.CornerRadius = new CornerRadius(14);
+        card.Background = (Brush)FindResource("AppSurface");
+        card.BorderBrush = (Brush)FindResource("PanelBorder");
+        card.BorderThickness = new Thickness(1);
+        card.Child = layers;
+
+        if (card is ClickCard active)
+        {
+            active.MouseLeftButtonUp += (_, _) => active.Activate();
+
+            // Der Rand zeigt beides an, Zeigen wie Tastaturfokus - sonst waere beim
+            // Durchtabben nicht zu sehen, wo man gerade steht.
+            active.MouseEnter += (_, _) => Mark(active, true);
+            active.MouseLeave += (_, _) => Mark(active, active.IsKeyboardFocused);
+            active.GotKeyboardFocus += (_, _) => Mark(active, true);
+            active.LostKeyboardFocus += (_, _) => Mark(active, active.IsMouseOver);
         }
 
         return card;
     }
+
+    private void Mark(Border card, bool lit)
+        => card.BorderBrush = (Brush)FindResource(lit ? "AccentBrush" : "PanelBorder");
 
     /// <summary>
     /// Der Stapel der .blend-Dateien, zu einer Zeile zusammengelegt.
@@ -882,35 +1001,81 @@ public partial class ProjectsPage : UserControl
 
     private void PickFolder()
     {
-        using var dialog = new WinForms.FolderBrowserDialog
+        // Der WPF-Ordnerdialog statt des alten Baumdialogs aus WinForms: Er kennt
+        // Mehrfachauswahl, und wer drei Projektordner hat, will sie in einem Zug
+        // eintragen statt dreimal denselben Dialog zu sehen.
+        var dialog = new Microsoft.Win32.OpenFolderDialog
         {
-            Description = T("S_PickProjectFolder"),
-            UseDescriptionForTitle = true,
-            ShowNewFolderButton = false,
+            Title = T("S_PickProjectFolder"),
+            Multiselect = true,
         };
 
-        if (dialog.ShowDialog() != WinForms.DialogResult.OK) return;
+        if (dialog.ShowDialog(Window.GetWindow(this)) != true) return;
 
-        ProjectLibrary.AddFolder(dialog.SelectedPath);
+        foreach (string path in dialog.FolderNames) ProjectLibrary.AddFolder(path);
+
         Reload();
     }
 
     // ---------------------------------------------------------------- Kleinteile
 
-    private StackPanel Section(string title)
+    private StackPanel Section(string title) => Section(title, null, null);
+
+    /// <summary>
+    /// Eine Abschnittsueberschrift, wahlweise mit einem Knopf am rechten Rand.
+    ///
+    /// Der Knopf gehoert zur Ueberschrift und nicht zwischen die Kacheln: Er betrifft
+    /// den ganzen Abschnitt, nicht einen Eintrag darin.
+    /// </summary>
+    private StackPanel Section(string title, string? action, Action? click)
     {
         var text = new TextBlock
         {
             Text = title,
-            Margin = new Thickness(2, 6, 0, 10),
+            VerticalAlignment = VerticalAlignment.Center,
             FontFamily = (FontFamily)FindResource("HeadFont"),
             FontWeight = FontWeights.Bold,
             FontSize = 10,
             Foreground = (Brush)FindResource("MutedBrush"),
         };
 
+        var head = new Grid { Margin = new Thickness(2, 6, 2, 10) };
+        head.Children.Add(text);
+
+        if (action is not null && click is not null)
+        {
+            var label = new TextBlock
+            {
+                Text = action,
+                FontFamily = (FontFamily)FindResource("HeadFont"),
+                FontWeight = FontWeights.Bold,
+                FontSize = 9,
+                Foreground = (Brush)FindResource("MutedBrush"),
+            };
+
+            var button = new ClickCard(action, click)
+            {
+                HorizontalAlignment = HorizontalAlignment.Right,
+                VerticalAlignment = VerticalAlignment.Center,
+                Padding = new Thickness(10, 4, 10, 4),
+                CornerRadius = new CornerRadius(8),
+                Background = (Brush)FindResource("AppSurface"),
+                BorderBrush = (Brush)FindResource("PanelBorder"),
+                BorderThickness = new Thickness(1),
+                Child = label,
+            };
+
+            button.MouseLeftButtonUp += (_, _) => button.Activate();
+            button.MouseEnter += (_, _) => label.Foreground = (Brush)FindResource("ForegroundBrush");
+            button.MouseLeave += (_, _) => label.Foreground = (Brush)FindResource("MutedBrush");
+            button.GotKeyboardFocus += (_, _) => label.Foreground = (Brush)FindResource("ForegroundBrush");
+            button.LostKeyboardFocus += (_, _) => label.Foreground = (Brush)FindResource("MutedBrush");
+
+            head.Children.Add(button);
+        }
+
         var holder = new StackPanel();
-        holder.Children.Add(text);
+        holder.Children.Add(head);
 
         return holder;
     }

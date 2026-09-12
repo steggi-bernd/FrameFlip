@@ -308,4 +308,175 @@
     <sys:String x:Key="S_NoFolderSet">no folder chosen</sys:String>
     <sys:String x:Key="S_ChooseFolder">Choose …</sys:String>
 
+    <sys:String x:Key="D_Minimize">Minimize</sys:String>
+    <sys:String x:Key="D_Maximize">Maximize / restore</sys:String>
+    <sys:String x:Key="D_Restore">Restore</sys:String>
+    <sys:String x:Key="D_Close">Close window</sys:String>
+    <sys:String x:Key="D_Workspace">WORKSPACE</sys:String>
+    <sys:String x:Key="D_ManageDevices">Connect device →</sys:String>
+    <sys:String x:Key="D_ResizeNav">Drag: navigation width · Double-click: reset</sys:String>
+    <sys:String x:Key="D_Smaller">Smaller · Ctrl −</sys:String>
+    <sys:String x:Key="D_Larger">Larger · Ctrl +</sys:String>
+    <sys:String x:Key="D_ResetScale">Reset scale · Ctrl 0</sys:String>
+    <sys:String x:Key="D_Layout">Layout</sys:String>
+    <sys:String x:Key="D_LayoutHint">Drag the divider to resize · Ctrl + / − to scale</sys:String>
+    <sys:String x:Key="D_Overview">Overview</sys:String>
+    <sys:String x:Key="D_Projects">Projects</sys:String>
+    <sys:String x:Key="D_Settings">Settings</sys:String>
+    <sys:String x:Key="D_Studio">Your render workspace.</sys:String>
+    <sys:String x:Key="D_StudioIntro">Review sequences. Keep an eye on your render.</sys:String>
+    <sys:String x:Key="D_Swap">⇄  Swap panels</sys:String>
+    <sys:String x:Key="D_RenderSession">RENDER SESSION</sys:String>
+    <sys:String x:Key="D_Ready">Ready for the next frame.</sys:String>
+    <sys:String x:Key="D_ReadyHint">Open an image sequence or start a render in Blender. With the FrameFlip bridge active, progress appears here automatically.</sys:String>
+    <sys:String x:Key="D_OpenSequence">Open sequence</sys:String>
+    <sys:String x:Key="D_BrowseProjects">Browse projects</sys:String>
+    <sys:String x:Key="D_QuickPreview">One shortcut. The entire sequence.</sys:String>
+    <sys:String x:Key="D_HotkeyHint">Select a frame in Explorer and press {0}.</sys:String>
+    <sys:String x:Key="D_System">SYSTEM MONITOR</sys:String>
+    <sys:String x:Key="D_UnknownMetric">— means no reading is available for this metric.</sys:String>
+    <sys:String x:Key="D_ResizePanels">Drag: resize panels · Double-click: reset</sys:String>
+    <sys:String x:Key="D_GpuLoad">GPU LOAD</sys:String>
+    <sys:String x:Key="D_Vram">VRAM</sys:String>
+    <sys:String x:Key="D_GpuTemp">TEMPERATURE</sys:String>
+    <sys:String x:Key="D_Cpu">CPU</sys:String>
+    <sys:String x:Key="D_Ram">RAM</sys:String>
+    <sys:String x:Key="D_Cycles">CYCLES MEMORY</sys:String>
+    <sys:String x:Key="D_Remaining">REMAINING</sys:String>
+    <sys:String x:Key="D_Still">STILL FRAME</sys:String>
+    <sys:String x:Key="D_Elapsed">{0} elapsed</sys:String>
+    <sys:String x:Key="D_SettingsIntro">Everything in one place. Playback, devices, and your personal workspace.</sys:String>
+    <sys:String x:Key="D_Discard">Discard changes</sys:String>
+    <sys:String x:Key="D_Apply">Apply</sys:String>
+    <sys:String x:Key="D_ClassicQr">Classic QR code (dark on light)</sys:String>
+    <sys:String x:Key="D_Permissions">Blender &amp; files</sys:String>
+    <sys:String x:Key="D_PermissionsIntro">Choose how Blender connects and what your paired device can do on this PC.</sys:String>
+    <sys:String x:Key="D_BlenderBridge">Enable FrameFlip bridge for render status</sys:String>
+    <sys:String x:Key="D_FileRead">Allow reading files in the exchange folder</sys:String>
+    <sys:String x:Key="D_Appearance">Workspace</sys:String>
+    <sys:String x:Key="D_AppearanceIntro">These adjustments apply and save immediately. Panels automatically stack when space is limited.</sys:String>
+    <sys:String x:Key="D_UiScale">Interface scale</sys:String>
+    <sys:String x:Key="D_TileSize">System tile size</sys:String>
+    <sys:String x:Key="D_MonitorShare">System panel width</sys:String>
+    <sys:String x:Key="D_NavigationWidth">Navigation width</sys:String>
+    <sys:String x:Key="D_MonitorFirst">Show system monitor first</sys:String>
+    <sys:String x:Key="D_ReduceMotion">Reduce motion</sys:String>
+    <sys:String x:Key="D_ResetLayout">Restore default layout</sys:String>
+    <sys:String x:Key="D_SaveToPair">Enable remote control and apply to display the pairing code.</sys:String>
+    <sys:String x:Key="D_BlenderRequired">Enable remote control and select an existing blender.exe.</sys:String>
+    <sys:String x:Key="D_FolderRequired">Enable remote control and select an existing exchange folder.</sys:String>
+    <sys:String x:Key="D_ReadRequired">Reading access must also be enabled to receive files.</sys:String>
+    <sys:String x:Key="D_Saved">Settings applied.</sys:String>
+    <sys:String x:Key="D_Preview">UI PREVIEW</sys:String>
+    <sys:String x:Key="D_PreviewHint">UI preview · Background services are paused in this copy.</sys:String>
+
+    <!-- Dashboard: title bar, tabs -->
+    <sys:String x:Key="D_NavDashboard">Overview</sys:String>
+    <sys:String x:Key="D_NavProjects">Projects</sys:String>
+    <sys:String x:Key="D_NavSettings">Settings</sys:String>
+    <sys:String x:Key="D_Idle">idle</sys:String>
+    <sys:String x:Key="D_Rendering">rendering</sys:String>
+
+    <!-- Dashboard: sequence column -->
+    <sys:String x:Key="D_Sequences">SEQUENCES</sys:String>
+    <sys:String x:Key="D_Open">OPEN</sys:String>
+    <sys:String x:Key="D_ShowQr">SHOW QR</sys:String>
+    <sys:String x:Key="D_TagGaps">GAPS</sys:String>
+    <sys:String x:Key="D_Today">today</sys:String>
+    <sys:String x:Key="D_Yesterday">yesterday</sys:String>
+
+    <!-- Dashboard: stage and transport -->
+    <sys:String x:Key="D_StageEmpty">No frame loaded.</sys:String>
+    <sys:String x:Key="D_Newest">NEWEST</sys:String>
+    <sys:String x:Key="D_Fit">FIT</sys:String>
+    <sys:String x:Key="D_Play">PLAY</sys:String>
+    <sys:String x:Key="D_Pause">PAUSE</sys:String>
+    <sys:String x:Key="D_Loop">LOOP</sys:String>
+    <sys:String x:Key="D_SetIn">SET IN</sys:String>
+    <sys:String x:Key="D_SetOut">SET OUT</sys:String>
+    <sys:String x:Key="D_JumpIn">Jump to in point</sys:String>
+    <sys:String x:Key="D_JumpOut">Jump to out point</sys:String>
+    <sys:String x:Key="D_StepBack">Previous frame</sys:String>
+    <sys:String x:Key="D_StepForward">Next frame</sys:String>
+    <sys:String x:Key="D_InOut">IN {0} · OUT {1} · {2} frames</sys:String>
+
+    <!-- Dashboard: right column -->
+    <sys:String x:Key="D_Metrics">METRICS</sys:String>
+    <sys:String x:Key="D_Log">LOG</sys:String>
+    <sys:String x:Key="D_Gaps">GAPS</sys:String>
+    <sys:String x:Key="D_FrameOf">{0} / {1}</sys:String>
+    <sys:String x:Key="D_SampleOf">{0} / {1}</sys:String>
+    <sys:String x:Key="D_SecPerFrame">SEC / FRAME</sys:String>
+    <sys:String x:Key="D_Written">WRITTEN</sys:String>
+    <sys:String x:Key="D_Slowest">SLOWEST</sys:String>
+    <sys:String x:Key="D_Remote">REMOTE</sys:String>
+    <sys:String x:Key="D_PairDevice">PAIR DEVICE</sys:String>
+    <sys:String x:Key="D_OpenFolder">OPEN FOLDER</sys:String>
+    <sys:String x:Key="D_ExportVideo">EXPORT VIDEO</sys:String>
+    <sys:String x:Key="D_NoActivity">No activity.</sys:String>
+    <sys:String x:Key="D_LogStarted">FrameFlip started.</sys:String>
+    <sys:String x:Key="D_LogOpened">Opened {0} · {1} frames.</sys:String>
+    <sys:String x:Key="D_LogSaved">Wrote {0}.</sys:String>
+    <sys:String x:Key="D_GapsIntro">{0} · {1} frames missing.</sys:String>
+    <sys:String x:Key="D_GapsNone">No sequence opened.</sys:String>
+    <sys:String x:Key="D_GapsClean">No gaps.</sys:String>
+    <sys:String x:Key="D_GapsList">Missing: {0}</sys:String>
+    <sys:String x:Key="D_Pending">PENDING</sys:String>
+    <sys:String x:Key="D_Missing">MISSING</sys:String>
+
+    <!-- Dashboard: status bar -->
+    <sys:String x:Key="D_NMissing">{0} missing</sys:String>
+    <sys:String x:Key="D_Overlay">Overlay</sys:String>
+    <sys:String x:Key="D_RelayConnected">Device connected</sys:String>
+    <sys:String x:Key="D_RelayWaiting">waiting for device</sys:String>
+    <sys:String x:Key="D_RelayOff">Remote off</sys:String>
+
+
+    <!-- Dashboard: sequence column as render list -->
+    <sys:String x:Key="D_NoRenders">No render recorded yet. As soon as you render in Blender with the FrameFlip bridge active, the file appears here. OPEN loads an image sequence by hand.</sys:String>
+    <sys:String x:Key="D_NoOutput">no render recorded</sys:String>
+    <sys:String x:Key="D_OpenHint">Open an image sequence by hand</sys:String>
+    <sys:String x:Key="D_ImageFilter">Image sequence</sys:String>
+    <sys:String x:Key="D_StageNoFrames">No readable image in the output folder.</sys:String>
+    <sys:String x:Key="D_StageNoOutput">No output folder known for this file yet. It is recorded on the next render through the bridge.</sys:String>
+
+    <!-- Projects: watched folders -->
+    <sys:String x:Key="D_WatchedFolders">WATCHED FOLDERS</sys:String>
+    <sys:String x:Key="D_RemoveFolder">Stop watching this folder</sys:String>
+    <sys:String x:Key="D_FolderGone">not found</sys:String>
+
+
+    <!-- Dashboard: frame rate, follow, pairing -->
+    <sys:String x:Key="D_Rate">Frame rate</sys:String>
+    <sys:String x:Key="D_RateHint">Playback frame rate – pick from the list or type any value (1 to 240).</sys:String>
+    <sys:String x:Key="D_FollowHint">Stay on the newest frame while rendering continues</sys:String>
+    <sys:String x:Key="D_PairTitle">PAIR DEVICE</sys:String>
+    <sys:String x:Key="D_PairOff">Remote control is off. Turning it on creates a pairing key and shows the code.</sys:String>
+    <sys:String x:Key="D_PairEnable">Turn on</sys:String>
+    <sys:String x:Key="D_PairFailed">The key could not be stored.</sys:String>
+    <sys:String x:Key="D_LogPairing">Remote control turned on.</sys:String>
+
+    <sys:String x:Key="D_ClearRecent">CLEAR LIST</sys:String>
+    <sys:String x:Key="D_Preloading">PRELOADING</sys:String>
+    <sys:String x:Key="D_PaceFast">FAST</sys:String>
+    <sys:String x:Key="D_PaceMedium">MEDIUM</sys:String>
+    <sys:String x:Key="D_PaceSlow">SLOW</sys:String>
+    <sys:String x:Key="D_PaceRendering">A render is running – FrameFlip loads gently so Blender keeps its cores.</sys:String>
+    <sys:String x:Key="D_PaceBusy">The machine is busy – loading with a single core.</sys:String>
+    <sys:String x:Key="D_LogPreload">Preload started ({0} frames).</sys:String>
+    <sys:String x:Key="D_LogPreloadDone">{0} frames in memory.</sys:String>
+    <sys:String x:Key="D_LogPreloadPart">Only {0} of {1} frames fit the budget.</sys:String>
+    <sys:String x:Key="D_LogPreloadStop">Preload cancelled.</sys:String>
+    <sys:String x:Key="D_Prebuffer">PRELOAD</sys:String>
+    <sys:String x:Key="D_PrebufferHint">Read the whole sequence into memory before playing – then it runs without stutter.</sys:String>
+    <sys:String x:Key="D_PrepareVideo">PREPARE VIDEO</sys:String>
+    <sys:String x:Key="D_PrepareVideoHint">While the sequence plays, encode a video alongside. It stays in the temp folder and is only saved when you export – the export is then just a copy.</sys:String>
+    <sys:String x:Key="D_LogPrepare">Preparing video in the background.</sys:String>
+    <sys:String x:Key="D_LogPrepareReady">A prepared video was already there.</sys:String>
+    <sys:String x:Key="D_LogPrepareDone">Video prepared.</sys:String>
+    <sys:String x:Key="D_LogPrepareFailed">Preparation failed: {0}</sys:String>
+    <sys:String x:Key="D_ExportReady">Already prepared – the export only copies.</sys:String>
+    <sys:String x:Key="D_PaceNarrow">Read at {0} instead of {1} pixels wide so the whole sequence fits in memory.</sys:String>
+    <sys:String x:Key="S_PreviewHintMany">Arrow keys to page · Enter or Space combines · Esc closes</sys:String>
+    <sys:String x:Key="S_PreviewHintOne">A single image – combining needs several in the same folder.</sys:String>
 </ResourceDictionary>

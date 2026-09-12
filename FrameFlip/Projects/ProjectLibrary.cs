@@ -11,6 +11,33 @@ public sealed class KnownBlend
 
     /// <summary>Wann sie zuletzt aufgefallen ist - beim Rendern oder beim Oeffnen.</summary>
     public DateTime SeenUtc { get; set; } = DateTime.UtcNow;
+
+    /// <summary>
+    /// Wohin ihr letzter Render geschrieben hat - leer, solange keiner beobachtet
+    /// wurde.
+    ///
+    /// Ohne das hier weiss FrameFlip zwar, DASS eine Datei gerendert hat, aber nicht,
+    /// wo das Ergebnis liegt. Die Bruecke meldet beides im selben Atemzug; es nicht
+    /// zu behalten hiesse, den Benutzer hinterher danach suchen zu lassen.
+    /// </summary>
+    public string Output { get; set; } = string.Empty;
+
+    /// <summary>
+    /// Ein Frame aus diesem Render - der Einstieg fuer den Sequenzleser.
+    ///
+    /// Der Ordner allein reicht meist, aber nicht immer: Liegen zwei Sequenzen
+    /// nebeneinander, entscheidet erst die Beispieldatei, welche gemeint ist.
+    /// </summary>
+    public string Seed { get; set; } = string.Empty;
+
+    /// <summary>Bildbreite des Renders, 0 solange unbekannt.</summary>
+    public int Width { get; set; }
+
+    /// <summary>Bildhoehe des Renders, 0 solange unbekannt.</summary>
+    public int Height { get; set; }
+
+    /// <summary>Ob das Ergebnis noch dort liegt, wo es gemeldet wurde.</summary>
+    public bool HasOutput => Output.Length > 0 && System.IO.Directory.Exists(Output);
 }
 
 /// <summary>Was FrameFlip ueber die Projekte auf diesem Rechner weiss.</summary>
@@ -158,19 +185,39 @@ public static class ProjectLibrary
     /// seine .blend-Datei ueber die Bruecke, und ab dann steht das Projekt da - auch
     /// wenn es in keinem eingetragenen Ordner liegt.
     /// </summary>
-    public static void Note(string? blendFile)
+    public static void Note(string? blendFile, string? output = null, string? seed = null,
+                            int width = 0, int height = 0)
     {
         if (string.IsNullOrWhiteSpace(blendFile) || !BlendProjects.IsBlendFile(blendFile)) return;
 
         var data = Load();
 
+        var previous = data.Files.FirstOrDefault(
+            f => string.Equals(f.Path, blendFile, StringComparison.OrdinalIgnoreCase));
+
         data.Files.RemoveAll(f => string.Equals(f.Path, blendFile, StringComparison.OrdinalIgnoreCase));
-        data.Files.Insert(0, new KnownBlend { Path = blendFile, SeenUtc = DateTime.UtcNow });
+
+        // Was diesmal nicht mitkommt, bleibt stehen. Die Bruecke meldet den
+        // Ausgabeordner beim Start und die Beispieldatei erst beim ersten Frame -
+        // und ein Vermerk von Hand kennt beides nicht. Jede dieser Meldungen darf
+        // ergaenzen, keine darf loeschen.
+        data.Files.Insert(0, new KnownBlend
+        {
+            Path = blendFile,
+            SeenUtc = DateTime.UtcNow,
+            Output = Pick(output, previous?.Output),
+            Seed = Pick(seed, previous?.Seed),
+            Width = width > 0 ? width : previous?.Width ?? 0,
+            Height = height > 0 ? height : previous?.Height ?? 0,
+        });
 
         if (data.Files.Count > FileLimit) data.Files.RemoveRange(FileLimit, data.Files.Count - FileLimit);
 
         Save(data);
     }
+
+    private static string Pick(string? fresh, string? kept)
+        => string.IsNullOrWhiteSpace(fresh) ? kept ?? string.Empty : fresh.Trim();
 
     /// <summary>Eine Datei von Hand einem Projekt zuordnen. Ein leerer Name hebt die Zuordnung auf.</summary>
     public static void Assign(string path, string? projectName)

@@ -6,6 +6,8 @@
         <ResourceDictionary>
             <ResourceDictionary.MergedDictionaries>
                 <ResourceDictionary Source="Views/Theme.xaml" />
+                <ResourceDictionary Source="Views/DesktopTheme.xaml" />
+                <ResourceDictionary Source="Views/DashboardTokens.xaml" />
                 <ResourceDictionary Source="Localization/Strings.de.xaml" />
             </ResourceDictionary.MergedDictionaries>
         </ResourceDictionary>

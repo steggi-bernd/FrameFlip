@@ -18,7 +18,7 @@
                    FontSize="10.5" Foreground="{StaticResource AccentBrush}" />
 
         <Border Margin="0,18,0,0" Width="220" Height="220" HorizontalAlignment="Center"
-                CornerRadius="{StaticResource SurfaceCorner}" Background="White">
+                CornerRadius="{StaticResource SurfaceCorner}" Background="{StaticResource DesktopSurface}">
             <views:QrCodeView x:Name="Code" />
         </Border>
 
