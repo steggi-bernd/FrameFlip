@@ -277,6 +277,37 @@ public partial class MainWindow : Window
     private const double MaxScale = 1.25;
 
     /// <summary>
+    /// Aus dem Groessenverhaeltnis eine Stufe machen - nicht jede Zwischenzahl.
+    ///
+    /// Ein stufenloser Faktor klingt geschmeidiger, kostet aber Schaerfe: Jeder
+    /// krumme Wert zieht Schrift und Linien zwischen die Bildpunkte. Auf einem
+    /// Full-HD-Schirm ergab das Verhaeltnis 1,2 - die Oberflaeche wurde also
+    /// vergroessert, obwohl ohnehin Platz war, und sah dafuer grob aus.
+    ///
+    /// Darum: In einem breiten Band um 1,0 wird gar nicht skaliert. Erst wenn das
+    /// Fenster wirklich deutlich groesser ist als der Entwurf, kommt eine Stufe
+    /// hinzu. Nach unten wird weiter fein abgestuft - dort geht es nicht um
+    /// Geschmack, sondern darum, dass die drei Spalten hineinpassen.
+    ///
+    /// Die Bildschirmdichte ist hier schon heraus: Die gemessene Breite zaehlt in
+    /// geraeteunabhaengigen Punkten, und um die Dichte kuemmert sich Windows selbst.
+    /// </summary>
+    private static double ElasticFor(double ratio)
+    {
+        if (double.IsNaN(ratio) || ratio <= 0) return 1.0;
+
+        // Deutlich groesser als der Entwurf: eine Stufe hoeher, und dabei bleibt es.
+        if (ratio >= 1.35) return MaxScale;
+
+        // Das Band, in das Full HD und WQHD fallen. Hier bleibt alles unangetastet.
+        if (ratio >= 0.98) return 1.0;
+
+        // Enger als der Entwurf: in Zwanzigstelschritten verkleinern, damit die
+        // Spalten nicht aus dem Fenster laufen.
+        return Math.Clamp(Math.Round(ratio * 20) / 20, MinScale, 1.0);
+    }
+
+    /// <summary>
     /// Die Oberflaeche mit dem Fenster mitwachsen lassen.
     ///
     /// Die Spalten teilen sich den Platz bereits nach Anteilen, aber Schrift,
@@ -303,7 +334,7 @@ public partial class MainWindow : Window
         double elastic = 1;
 
         if (width > 0 && height > 0 && !double.IsNaN(width) && !double.IsNaN(height))
-            elastic = Math.Clamp(Math.Min(width / ReferenceWidth, height / ReferenceHeight), MinScale, MaxScale);
+            elastic = ElasticFor(Math.Min(width / ReferenceWidth, height / ReferenceHeight));
 
         double scale = _layout.Scale * elastic;
 
@@ -312,6 +343,19 @@ public partial class MainWindow : Window
         if (Math.Abs(UiScale.ScaleX - scale) < 0.001) return;
 
         UiScale.ScaleX = UiScale.ScaleY = scale;
+
+        // Schrift und Skalierung vertragen sich nur in eine Richtung.
+        //
+        // "Display" rastet die Buchstaben aufs Pixelraster - bei kleiner Schrift die
+        // schaerfste Darstellung, die WPF kann. Gerastet wird aber VOR der
+        // Transformation, und was danach um einen krummen Faktor vergroessert wird,
+        // ist genau das, was auf einem Full-HD-Schirm grob aussah. "Ideal" rechnet
+        // mit den Umrissen und traegt jede Skalierung sauber.
+        //
+        // Also: unskaliert rasten, skaliert rechnen.
+        bool crisp = Math.Abs(scale - 1.0) < 0.001;
+
+        TextOptions.SetTextFormattingMode(this, crisp ? TextFormattingMode.Display : TextFormattingMode.Ideal);
 
         // Die Titelzeile ist 44 Punkte hoch - im skalierten Inhalt. Die Ziehflaeche
         // des Fensterrahmens zaehlt dagegen in unskalierten Punkten. Ohne diese
