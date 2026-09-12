@@ -321,17 +321,44 @@ public sealed class AppHost : IDisposable
         if (!HotKeyDefinition.TryParse(settings.Hotkey, out var definition))
             return Localization.Strings.T("S_HotkeyInvalid");
 
-        if (definition != _hotkeys.Current)
+        // Nur anfassen, wenn die Kombination selbst geaendert wurde.
+        //
+        // Verglichen wurde hier frueher mit der GERADE REGISTRIERTEN - und die kann
+        // von der eingestellten abweichen, naemlich dann, wenn das Registrieren beim
+        // Start fehlgeschlagen ist, weil ein anderes Programm die Kombination haelt.
+        // Dann schlug jeder Versuch fehl, IRGENDEINE Einstellung zu speichern, mit
+        // der Meldung, die Kombination sei belegt. Ein Schalter fuer eine Seite im
+        // Netz hat mit der Tastenkombination aber nichts zu tun, und ein Fehlschlag
+        // an einer Stelle darf nicht alles andere blockieren.
+        //
+        // Wer die Kombination wirklich aendert, bekommt die Meldung weiterhin - dort
+        // gehoert sie hin.
+        if (!string.Equals(settings.Hotkey, _settings.Hotkey, StringComparison.OrdinalIgnoreCase))
         {
             var previous = _hotkeys.Current;
+
             if (!_hotkeys.Register(definition))
             {
                 _hotkeys.Register(previous);
                 return Localization.Strings.T("S_HotkeyBusy");
             }
         }
+        else if (definition != _hotkeys.Current)
+        {
+            // Unveraendert, aber noch nicht aktiv: Ein stiller zweiter Versuch. Klappt
+            // er nicht, bleibt es dabei - gemeldet wurde es beim Start.
+            _hotkeys.Register(definition);
+        }
 
-        var previousSettings = _settings;
+        // Eine Kopie des bisherigen Standes, bevor der neue uebernommen wird.
+        //
+        // Ohne das Kopieren geht der Vergleich weiter unten schief, sobald ein
+        // Aufrufer das Objekt aendert, das er von getSettings() bekommen hat - dann
+        // ist "vorher" dieselbe Instanz wie "nachher", und keine Aenderung faellt
+        // mehr auf. Genau daran startete die Seite im Netz nicht: Der Schalter stand
+        // auf an, gespeichert war es auch, nur der Server erfuhr nie davon.
+        var previousSettings = _settings.Clone();
+
         _settings = settings;
         Localization.Strings.Apply(Localization.Strings.Parse(_settings.Language));
         SettingsStore.Save(_settings);

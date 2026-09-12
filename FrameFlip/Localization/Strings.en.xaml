@@ -488,4 +488,5 @@
     <sys:String x:Key="D_Off">OFF</sys:String>
     <sys:String x:Key="D_LogWatchOn">Watch page turned on.</sys:String>
     <sys:String x:Key="D_LogWatchOff">Watch page turned off.</sys:String>
+    <sys:String x:Key="D_WatchNoPort">Port {0} could not be opened – probably taken. Pick another one in the settings.</sys:String>
 </ResourceDictionary>

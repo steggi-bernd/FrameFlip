@@ -2294,7 +2294,11 @@ public partial class MainWindow : Window
     {
         if (!_ready || sender is not ToggleButton toggle) return;
 
-        var settings = _getSettings();
+        // Eine KOPIE aendern, nicht den Bestand: _getSettings() liefert dasselbe
+        // Objekt, das der Wirt haelt. Wer es an Ort und Stelle umschreibt, nimmt ihm
+        // die Moeglichkeit, die Aenderung zu bemerken - er vergleicht dann den neuen
+        // Stand mit sich selbst.
+        var settings = _getSettings().Clone();
 
         settings.WatchEnabled = toggle.IsChecked == true;
 
@@ -2332,7 +2336,14 @@ public partial class MainWindow : Window
             WatchCode.Text = null;
             WatchAddress.Text = string.Empty;
 
-            WatchHint.Text = on ? Strings.T("D_WatchNoNet") : Strings.T("D_WatchOff");
+            // Zwei ganz verschiedene Faelle, und sie brauchen verschiedene Saetze:
+            // kein Netz - oder ein Netz, aber der Port liess sich nicht oeffnen.
+            WatchHint.Text = !on
+                ? Strings.T("D_WatchOff")
+                : Web.WatchServer.LocalAddress() is null
+                    ? Strings.T("D_WatchNoNet")
+                    : Strings.T("D_WatchNoPort", _getSettings().WatchPort);
+
             return;
         }
 

@@ -488,4 +488,5 @@
     <sys:String x:Key="D_Off">AUS</sys:String>
     <sys:String x:Key="D_LogWatchOn">Seite zum Zusehen eingeschaltet.</sys:String>
     <sys:String x:Key="D_LogWatchOff">Seite zum Zusehen ausgeschaltet.</sys:String>
+    <sys:String x:Key="D_WatchNoPort">Port {0} ließ sich nicht öffnen – vermutlich belegt. In den Einstellungen einen anderen wählen.</sys:String>
 </ResourceDictionary>
