@@ -479,4 +479,13 @@
     <sys:String x:Key="D_PaceNarrow">Read at {0} instead of {1} pixels wide so the whole sequence fits in memory.</sys:String>
     <sys:String x:Key="S_PreviewHintMany">Arrow keys to page · Enter or Space combines · Esc closes</sys:String>
     <sys:String x:Key="S_PreviewHintOne">A single image – combining needs several in the same folder.</sys:String>
+    <sys:String x:Key="S_WatchPortTaken">Port {0} is taken – the watch page is not running.</sys:String>
+    <sys:String x:Key="D_Watch">WATCH ON THE NETWORK</sys:String>
+    <sys:String x:Key="D_WatchOff">Off. When on, a page on your own network shows progress and the newest frame – read only, nothing else.</sys:String>
+    <sys:String x:Key="D_WatchOn">Open in a browser, phone included. Works on your own network only, and only while FrameFlip runs.</sys:String>
+    <sys:String x:Key="D_WatchNoNet">No network address found – is the machine online?</sys:String>
+    <sys:String x:Key="D_On">ON</sys:String>
+    <sys:String x:Key="D_Off">OFF</sys:String>
+    <sys:String x:Key="D_LogWatchOn">Watch page turned on.</sys:String>
+    <sys:String x:Key="D_LogWatchOff">Watch page turned off.</sys:String>
 </ResourceDictionary>

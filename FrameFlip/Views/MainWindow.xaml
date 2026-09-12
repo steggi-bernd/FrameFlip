@@ -650,6 +650,48 @@
                                    Foreground="{StaticResource DesktopMuted}" />
 
                         <WrapPanel x:Name="PairActions" Margin="0,16,0,0" HorizontalAlignment="Center" />
+
+                        <!-- ==================================== Zusehen im Netz
+
+                             Der Kopplungscode darueber gehoert der App; das hier ist
+                             der Weg fuer alles andere - ein Browser, ein zweiter
+                             Bildschirm, jemand im selben Netz. Die Seite kann
+                             ausschliesslich lesen. -->
+                        <Border Margin="0,20,0,0" Padding="0,18,0,0"
+                                BorderBrush="{StaticResource DesktopLine}" BorderThickness="0,1,0,0">
+                            <StackPanel>
+                                <Grid>
+                                    <TextBlock views:Track.Text="{DynamicResource D_Watch}"
+                                               Style="{StaticResource DashLabel}" FontSize="9"
+                                               VerticalAlignment="Center" />
+
+                                    <ToggleButton x:Name="WatchToggle" HorizontalAlignment="Right"
+                                                  Style="{StaticResource DashChipSmall}"
+                                                  Checked="OnWatchToggled" Unchecked="OnWatchToggled">
+                                        <TextBlock x:Name="WatchToggleText" FontSize="8.5" />
+                                    </ToggleButton>
+                                </Grid>
+
+                                <Border x:Name="WatchCodeFrame" Margin="0,14,0,0" CornerRadius="10"
+                                        Padding="12" Width="170" Height="170"
+                                        HorizontalAlignment="Center" Visibility="Collapsed"
+                                        Background="{StaticResource DesktopSurface}">
+                                    <views:QrCodeView x:Name="WatchCode" LightModules="True" />
+                                </Border>
+
+                                <TextBlock x:Name="WatchAddress" Margin="0,12,0,0"
+                                           HorizontalAlignment="Center" TextAlignment="Center"
+                                           TextWrapping="Wrap" Style="{StaticResource DashMono}"
+                                           FontSize="11" Foreground="{StaticResource DesktopInk}" />
+
+                                <TextBlock x:Name="WatchHint" Margin="0,8,0,0" TextWrapping="Wrap"
+                                           TextAlignment="Center" FontSize="10.5" LineHeight="16"
+                                           Foreground="{StaticResource DesktopMuted}" />
+
+                                <WrapPanel x:Name="WatchActions" Margin="0,12,0,0"
+                                           HorizontalAlignment="Center" />
+                            </StackPanel>
+                        </Border>
                     </StackPanel>
                 </Border>
             </Grid>

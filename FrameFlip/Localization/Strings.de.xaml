@@ -479,4 +479,13 @@
     <sys:String x:Key="D_PaceNarrow">In {0} statt {1} Punkten Breite gelesen, damit die ganze Folge in den Speicher passt.</sys:String>
     <sys:String x:Key="S_PreviewHintMany">Mit den Pfeiltasten blättern · Eingabe oder Leertaste fügt zusammen · Esc schließt</sys:String>
     <sys:String x:Key="S_PreviewHintOne">Ein einzelnes Bild – zum Zusammenfügen braucht es mehrere im selben Ordner.</sys:String>
+    <sys:String x:Key="S_WatchPortTaken">Port {0} ist belegt – die Seite zum Zusehen läuft nicht.</sys:String>
+    <sys:String x:Key="D_Watch">IM NETZ ZUSEHEN</sys:String>
+    <sys:String x:Key="D_WatchOff">Aus. Eingeschaltet zeigt eine Seite im eigenen Netz den Fortschritt und das neueste Bild – nur lesen, sonst nichts.</sys:String>
+    <sys:String x:Key="D_WatchOn">Im Browser öffnen, auch am Handy. Gilt nur im eigenen Netz und nur, solange FrameFlip läuft.</sys:String>
+    <sys:String x:Key="D_WatchNoNet">Keine Netzwerkadresse gefunden – hängt der Rechner am Netz?</sys:String>
+    <sys:String x:Key="D_On">AN</sys:String>
+    <sys:String x:Key="D_Off">AUS</sys:String>
+    <sys:String x:Key="D_LogWatchOn">Seite zum Zusehen eingeschaltet.</sys:String>
+    <sys:String x:Key="D_LogWatchOff">Seite zum Zusehen ausgeschaltet.</sys:String>
 </ResourceDictionary>

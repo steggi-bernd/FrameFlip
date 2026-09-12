@@ -27,6 +27,7 @@ public sealed class AppHost : IDisposable
 
     /// <summary>Nimmt Meldungen des Blender-Addons entgegen. Null, wenn abgeschaltet.</summary>
     private Bridge.RenderMonitor? _renderMonitor;
+    private Web.WatchServer? _watch;
 
     /// <summary>Besitzt die optionale Verbindung zum Handy.</summary>
     private readonly AppRemoteController _remote;
@@ -53,7 +54,8 @@ public sealed class AppHost : IDisposable
             {
                 LivePage.Load = () => _load.LastSnapshot;
                 return createMain?.Invoke() ?? new MainWindow(_renderMonitor, () => _remote.State,
-                    ShowSettings, OpenFile, ShowPairing, _settings, settings => SettingsStore.Save(settings), ApplySettings, () => _settings);
+                    ShowSettings, OpenFile, ShowPairing, _settings, settings => SettingsStore.Save(settings),
+                    ApplySettings, () => _settings, () => WatchAddress);
             },
             createSettings ?? (() => new SettingsWindow(_settings, ApplySettings, () => _remote.State)),
             createPairing ?? (() => new PairingWindow(_settings, ApplySettings, () => _remote.State)),
@@ -112,10 +114,59 @@ public sealed class AppHost : IDisposable
         }
 
         StartRemote();
+        StartWatch();
 
         // Startballast (JIT, XAML-Parser, Icon-Erzeugung) wieder abgeben. Die App
         // steht danach nur noch am Hotkey und soll im Leerlauf nichts festhalten.
         Task.Delay(3000).ContinueWith(_ => MemoryTrimmer.TrimNow(), TaskScheduler.Default);
+    }
+
+    // ------------------------------------------------------------ Zusehen im Netz
+
+    /// <summary>
+    /// Die Seite zum Zusehen starten, falls eingeschaltet.
+    ///
+    /// Sie bekommt drei Lesezugriffe und sonst nichts: den Renderzustand, die
+    /// Systemlast und den Pfad des zuletzt geschriebenen Bildes. Der Pfad bleibt im
+    /// Programm - nach draussen geht nur das fertig verkleinerte JPEG.
+    /// </summary>
+    private void StartWatch()
+    {
+        if (!_settings.WatchEnabled) return;
+
+        var newest = new Web.NewestFrame(() => _renderMonitor?.Job,
+                                         Decoding.FrameDecoderRegistry.CreateDefault());
+
+        _watch = new Web.WatchServer(
+            () => _renderMonitor?.Job,
+            () => _load.LastSnapshot,
+            newest.Path);
+
+        if (_watch.Start(_settings.WatchPort)) return;
+
+        // Port belegt: Dann gibt es die Seite nicht, und der Benutzer erfaehrt es -
+        // stillschweigend nichts zu tun waere hier die schlechtere Auskunft.
+        _watch.Dispose();
+        _watch = null;
+
+        Notify(Localization.Strings.T("S_WatchPortTaken", _settings.WatchPort));
+    }
+
+    /// <summary>Die Adresse der Seite - oder null, wenn sie nicht laeuft.</summary>
+    public string? WatchAddress => _watch?.Address;
+
+    /// <summary>
+    /// Ein- und ausschalten, ohne das Programm neu zu starten.
+    ///
+    /// Beim Einschalten entsteht ein neues Zeichen in der Adresse. Wer die alte noch
+    /// offen hat, sieht ab dann nichts mehr - und das ist der Sinn eines Schalters.
+    /// </summary>
+    public void ApplyWatch()
+    {
+        _watch?.Dispose();
+        _watch = null;
+
+        StartWatch();
     }
 
     // ------------------------------------------------------------ Tray
@@ -290,6 +341,15 @@ public sealed class AppHost : IDisposable
         // Einstellungsdialog eine stehende Verbindung ab.
         _remote.SettingsChanged(previousSettings);
 
+        // Dasselbe fuer die Seite im Netz: Nur wenn sich Schalter oder Port geaendert
+        // haben. Ein Neuaufbau bei jedem Speichern wuerde das Zeichen in der Adresse
+        // erneuern, und die offene Seite auf dem Handy waere ohne Grund tot.
+        if (previousSettings.WatchEnabled != _settings.WatchEnabled
+            || previousSettings.WatchPort != _settings.WatchPort)
+        {
+            ApplyWatch();
+        }
+
         // Puffer- und Budgetwerte greifen beim naechsten Oeffnen des Viewers.
         return null;
     }
@@ -309,6 +369,9 @@ public sealed class AppHost : IDisposable
         _disposed = true;
 
         _load.Dispose();
+
+        _watch?.Dispose();
+        _watch = null;
 
         _remote.Dispose();
 

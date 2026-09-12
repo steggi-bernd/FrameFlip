@@ -173,6 +173,18 @@ public sealed class AppSettings
     public int BridgePort { get; set; } = 47823;
 
     /// <summary>
+    /// Die Seite zum Zusehen im eigenen Netz.
+    ///
+    /// Aus, solange niemand sie einschaltet. Ein offener Port, den man nicht bestellt
+    /// hat, ist genau die Art Ueberraschung, die ein Programm nicht bereiten soll -
+    /// und die Vorschau selbst braucht ihn nicht.
+    /// </summary>
+    public bool WatchEnabled { get; set; }
+
+    /// <summary>Port der Zusehen-Seite.</summary>
+    public int WatchPort { get; set; } = 47824;
+
+    /// <summary>
     /// Renderfortschritt an ein gekoppeltes Handy weiterreichen.
     ///
     /// Bleibt aus, solange kein Relay eingetragen und kein Handy gekoppelt ist.

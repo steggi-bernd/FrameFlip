@@ -61,6 +61,9 @@ public partial class MainWindow : Window
     private readonly Action<AppSettings>? _persist;
     private readonly DesktopLayout _layout;
 
+    /// <summary>Woher die Adresse der Zusehen-Seite kommt. Leer, wenn sie nicht laeuft.</summary>
+    private readonly Func<string?> _watchAddress;
+
     private readonly FrameDecoderRegistry _decoders = FrameDecoderRegistry.CreateDefault();
 
     private readonly DispatcherTimer _ticker;
@@ -156,8 +159,10 @@ public partial class MainWindow : Window
     public MainWindow(RenderMonitor? monitor, Func<RelayState?> remoteState, Action showSettings,
         Action<string> openSequence, Action showPairing, AppSettings? settings = null,
         Action<AppSettings>? persist = null, Func<AppSettings, string?>? applySettings = null,
-        Func<AppSettings>? getSettings = null)
+        Func<AppSettings>? getSettings = null, Func<string?>? watchAddress = null)
     {
+        _watchAddress = watchAddress ?? (() => null);
+
         _monitor = monitor;
         _remoteState = remoteState;
         _openSequence = openSequence;
@@ -2271,9 +2276,75 @@ public partial class MainWindow : Window
     {
         PairHost.Visibility = Visibility.Visible;
         RefreshPairing();
+        RefreshWatch();
     }
 
     private void OnPairClose(object sender, RoutedEventArgs e) => PairHost.Visibility = Visibility.Collapsed;
+
+    // ================================================================ Zusehen im Netz
+
+    /// <summary>
+    /// Der Schalter fuer die Seite im eigenen Netz.
+    ///
+    /// Einschalten oeffnet einen Port und legt ein neues Zeichen fuer die Adresse an;
+    /// Ausschalten macht beides wieder zu. Dass die alte Adresse danach nicht mehr
+    /// gilt, ist kein Nebeneffekt, sondern der Zweck.
+    /// </summary>
+    private void OnWatchToggled(object sender, RoutedEventArgs e)
+    {
+        if (!_ready || sender is not ToggleButton toggle) return;
+
+        var settings = _getSettings();
+
+        settings.WatchEnabled = toggle.IsChecked == true;
+
+        if (_apply(settings) is { } error)
+        {
+            PairHint.Text = error;
+            return;
+        }
+
+        Note(Strings.T(settings.WatchEnabled ? "D_LogWatchOn" : "D_LogWatchOff"));
+
+        // Erst nachdem der Host den Server auf- oder abgebaut hat, steht die Adresse
+        // fest. Deshalb eine Runde spaeter nachsehen.
+        Dispatcher.BeginInvoke(new Action(RefreshWatch), DispatcherPriority.Background);
+    }
+
+    private void RefreshWatch()
+    {
+        if (WatchToggle is null) return;
+
+        var settings = _getSettings();
+        bool on = settings.WatchEnabled;
+
+        WatchToggle.IsChecked = on;
+        Track.SetAmount(WatchToggleText, 1);
+        Track.SetText(WatchToggleText, Strings.T(on ? "D_On" : "D_Off"));
+
+        WatchActions.Children.Clear();
+
+        string? address = _watchAddress();
+
+        if (!on || address is null)
+        {
+            WatchCodeFrame.Visibility = Visibility.Collapsed;
+            WatchCode.Text = null;
+            WatchAddress.Text = string.Empty;
+
+            WatchHint.Text = on ? Strings.T("D_WatchNoNet") : Strings.T("D_WatchOff");
+            return;
+        }
+
+        WatchCodeFrame.Visibility = Visibility.Visible;
+        WatchCode.LightModules = _layout.LightQr;
+        WatchCode.Text = address;
+
+        WatchAddress.Text = address;
+        WatchHint.Text = Strings.T("D_WatchOn");
+
+        WatchActions.Children.Add(PairAction("S_CopyLink", primary: false, () => CopyInvite(address)));
+    }
 
     /// <summary>Ein Klick neben die Tafel schliesst sie - auf die Tafel selbst nicht.</summary>
     private void OnPairBackdrop(object sender, MouseButtonEventArgs e)
