@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="de">
+<html lang="en">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
@@ -27,6 +27,7 @@
 <link rel="apple-touch-icon" href="icon-192.png">
 <meta name="theme-color" content="#07070d">
 <meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="FrameFlip">
 
@@ -38,6 +39,20 @@
     --blue: #60a5fa;    --cyan: #22d3ee;    --warn: #f472b6;
     --mono: ui-monospace, "Cascadia Mono", "SF Mono", Menlo, Consolas, monospace;
     --sans: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+
+    /* Elastisch statt fest.
+
+       Jede Groesse waechst mit der Flaeche, aber innerhalb von Grenzen: clamp()
+       nennt kleinsten Wert, gewuenschten und groessten. Auf einem schmalen Handy
+       wird nichts unleserlich klein, auf einem grossen Schirm nichts laecherlich
+       verloren - und dazwischen gibt es keinen Sprung, an dem es kippt. */
+    --pad: clamp(12px, 2.2vw, 22px);
+    --gap: clamp(10px, 1.6vw, 18px);
+    --t-label: clamp(8px, .95vw, 9.5px);
+    --t-small: clamp(9.5px, 1.05vw, 11.5px);
+    --t-body: clamp(11px, 1.25vw, 13.5px);
+    --t-mark: clamp(13px, 1.5vw, 16px);
+    --t-huge: clamp(28px, 4.4vw, 46px);
   }
 
   * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
@@ -57,11 +72,12 @@
   /* ------------------------------------------------------------- Kopfzeile */
   header {
     display: flex; align-items: center; gap: 10px;
-    padding: 13px 18px; border-bottom: 1px solid var(--line);
+    padding: clamp(10px, 1.4vw, 16px) var(--pad);
+    border-bottom: 1px solid var(--line);
     background: var(--panel); flex: none;
   }
 
-  .mark { font-weight: 650; letter-spacing: .04em; font-size: 14px; }
+  .mark { font-weight: 650; letter-spacing: .04em; font-size: var(--t-mark); }
 
   .dot {
     width: 8px; height: 8px; border-radius: 50%;
@@ -73,23 +89,38 @@
   .dot.gone { background: var(--warn); }
 
   .standing {
-    font-size: 11px; color: var(--muted);
+    font-size: var(--t-small); color: var(--muted);
     margin-left: auto; text-align: right;
   }
+
+  .install {
+    flex: none; padding: 6px 11px; border-radius: 999px;
+    background: color-mix(in srgb, var(--accent) 16%, transparent);
+    border: 1px solid color-mix(in srgb, var(--accent) 45%, transparent);
+    color: var(--accent); font-size: var(--t-label); font-weight: 600;
+    letter-spacing: .08em; text-transform: uppercase;
+    cursor: pointer; display: none; white-space: nowrap;
+  }
+  .install.on { display: block; }
+  .install:hover { background: color-mix(in srgb, var(--accent) 26%, transparent); }
 
   /* ------------------------------------------------------------- Rumpf */
   main {
     flex: 1; min-height: 0;
     display: grid; gap: 1px;
     background: var(--line);
-    grid-template-rows: auto 1fr;
+    grid-template-rows: minmax(38vh, auto) 1fr;
   }
 
   /* Quer und am Schreibtisch nebeneinander, hoch untereinander. Die Schwelle
      liegt am Seitenverhaeltnis, nicht an der Breite: Ein Handy im Querformat ist
-     schmal und hat trotzdem Platz fuer zwei Spalten. */
+     schmal und hat trotzdem Platz fuer zwei Spalten. Die Seitenspalte waechst mit
+     dem Schirm, statt bei einer festen Breite stehenzubleiben. */
   @media (min-aspect-ratio: 1/1) {
-    main { grid-template-rows: 1fr; grid-template-columns: 1fr minmax(250px, 320px); }
+    main {
+      grid-template-rows: 1fr;
+      grid-template-columns: 1fr clamp(240px, 26vw, 380px);
+    }
   }
 
   /* ------------------------------------------------------------- Bühne */
@@ -103,53 +134,54 @@
      Es stand einmal auf "0 0", waehrend die Rechnung von der Mitte ausging - das
      Bild wuchs dadurch aus der oberen linken Ecke heraus, egal wo der Zeiger war.
      Die Voreinstellung ist die Mitte, und genau damit rechnet die Ansicht. */
-  .stage img {
+  .stage img, .vstage img {
     max-width: 100%; max-height: 100%;
     display: block; cursor: zoom-in;
     user-select: none; -webkit-user-drag: none;
   }
+  .stage img.grab, .vstage img.grab { cursor: grab; }
+  .stage img.grabbing, .vstage img.grabbing { cursor: grabbing; }
 
   .stage .empty {
-    color: var(--faint); font-size: 12px;
-    text-align: center; padding: 24px; line-height: 1.7; max-width: 30em;
+    color: var(--faint); font-size: var(--t-small);
+    text-align: center; padding: 24px; line-height: 1.7; max-width: 32em;
   }
 
   /* Werkzeuge auf der Bühne - erscheinen nur, wenn es ein Bild gibt. */
   .tools {
-    position: absolute; left: 50%; bottom: 12px; transform: translateX(-50%);
+    position: absolute; left: 50%; bottom: 10px; transform: translateX(-50%);
     display: none; align-items: center; gap: 2px; padding: 4px;
     background: rgba(11, 11, 20, .86); border: 1px solid var(--line);
     border-radius: 11px; backdrop-filter: blur(8px);
   }
   .tools.on { display: flex; }
 
-  .tools button {
+  .tools button, .vtools button {
     min-width: 32px; height: 30px; padding: 0 8px;
     background: transparent; border: 0; border-radius: 8px;
     color: var(--muted); font-family: var(--mono); font-size: 13px;
     cursor: pointer; line-height: 1;
   }
-  .tools button:hover { background: var(--surface); color: var(--ink); }
-  .tools button:active { background: var(--line); }
-  .tools .level {
-    min-width: 46px; text-align: center; color: var(--faint);
+  .tools button:hover, .vtools button:hover { background: var(--surface); color: var(--ink); }
+  .tools .level, .vtools .level {
+    min-width: 48px; text-align: center; color: var(--faint);
     font-size: 10.5px; font-family: var(--mono); cursor: default;
   }
-  .tools .sep { width: 1px; height: 18px; background: var(--line); margin: 0 3px; }
+  .tools .sep, .vtools .sep { width: 1px; height: 18px; background: var(--line); margin: 0 3px; }
 
   /* ------------------------------------------------------------- Seite */
   .side {
     background: var(--panel);
     overflow-y: auto; -webkit-overflow-scrolling: touch;
-    padding: 16px 18px 14px;
+    padding: var(--pad);
   }
 
   /* ---------------------------------------------------- Zustand & Fortschritt */
-  .state { display: flex; align-items: center; gap: 8px; margin-bottom: 12px; }
+  .state { display: flex; align-items: center; gap: 8px; margin-bottom: var(--gap); }
 
   .chip {
-    font-size: 8.5px; letter-spacing: .14em; text-transform: uppercase;
-    padding: 4px 8px; border-radius: 999px; font-weight: 600;
+    font-size: var(--t-label); letter-spacing: .14em; text-transform: uppercase;
+    padding: 4px 9px; border-radius: 999px; font-weight: 600;
     color: var(--faint); background: var(--surface); border: 1px solid var(--line);
     white-space: nowrap;
   }
@@ -160,29 +192,26 @@
   .chip.idle { color: var(--blue); border-color: color-mix(in srgb, var(--blue) 40%, transparent); }
 
   .scene {
-    font-size: 11.5px; color: var(--muted);
+    font-size: var(--t-small); color: var(--muted);
     overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
   }
 
   .headline { display: flex; align-items: baseline; gap: 10px; margin-bottom: 10px; }
 
   .headline .pct {
-    font-family: var(--mono); font-size: 34px; line-height: 1;
+    font-family: var(--mono); font-size: var(--t-huge); line-height: 1;
     font-variant-numeric: tabular-nums; letter-spacing: -.02em;
   }
-  .headline .pct small { font-size: 15px; color: var(--faint); margin-left: 2px; }
+  .headline .pct small { font-size: .42em; color: var(--faint); margin-left: 2px; }
 
   .headline .frames {
     margin-left: auto; text-align: right;
-    font-family: var(--mono); font-size: 13px; color: var(--muted);
+    font-family: var(--mono); font-size: var(--t-body); color: var(--muted);
     font-variant-numeric: tabular-nums;
   }
   .headline .frames b { color: var(--ink); font-weight: 500; }
 
-  .bar {
-    height: 6px; border-radius: 3px; background: var(--surface);
-    overflow: hidden; position: relative;
-  }
+  .bar { height: 6px; border-radius: 3px; background: var(--surface); overflow: hidden; position: relative; }
   .bar i {
     position: absolute; inset: 0 auto 0 0; display: block;
     background: linear-gradient(90deg, var(--accent), var(--cyan));
@@ -191,47 +220,58 @@
 
   .times {
     display: flex; justify-content: space-between;
-    margin: 7px 0 16px; font-size: 10px; color: var(--faint);
+    margin: 7px 0 var(--gap); font-size: var(--t-label); color: var(--faint);
     font-family: var(--mono); font-variant-numeric: tabular-nums;
   }
   .times b { color: var(--muted); font-weight: 400; }
 
   /* ------------------------------------------------------------- Zahlen */
   .grid {
-    display: grid; gap: 13px 16px;
-    grid-template-columns: repeat(auto-fit, minmax(88px, 1fr));
+    display: grid; gap: var(--gap) clamp(10px, 1.6vw, 20px);
+    grid-template-columns: repeat(auto-fit, minmax(clamp(78px, 8vw, 104px), 1fr));
   }
 
   .cell label {
-    display: block; font-size: 8.5px; letter-spacing: .12em;
+    display: block; font-size: var(--t-label); letter-spacing: .12em;
     text-transform: uppercase; color: var(--faint); margin-bottom: 3px;
   }
   .cell output {
-    font-family: var(--mono); font-size: 13px;
+    font-family: var(--mono); font-size: var(--t-body);
     font-variant-numeric: tabular-nums; color: var(--ink);
   }
 
   .rule { grid-column: 1 / -1; height: 1px; background: var(--line); margin: 1px 0; }
 
+  /* -------------------------------------------------------- Bild sichern */
+  .save {
+    width: 100%; margin-top: calc(var(--gap) + 4px);
+    padding: clamp(10px, 1.3vw, 14px); border-radius: 10px;
+    background: var(--surface); border: 1px solid var(--line);
+    color: var(--ink); font-family: inherit; font-size: var(--t-small);
+    font-weight: 600; letter-spacing: .03em; cursor: pointer;
+    display: none; align-items: center; justify-content: center; gap: 8px;
+  }
+  .save.on { display: flex; }
+  .save:hover { border-color: color-mix(in srgb, var(--accent) 55%, transparent); color: var(--accent); }
+  .save b { font-family: var(--mono); font-weight: 400; color: var(--faint); }
+
   /* Die Fussnote gehoert unter die Zahlen, nicht in einen eigenen Balken quer
      ueber die Seite: Sie ist eine Randbemerkung, kein Bedienelement. */
   .note {
-    margin-top: 18px; padding-top: 12px; border-top: 1px solid var(--line);
-    font-size: 9.5px; line-height: 1.6; color: var(--faint);
+    margin-top: var(--gap); padding-top: 12px; border-top: 1px solid var(--line);
+    font-size: var(--t-label); line-height: 1.7; color: var(--faint);
     display: flex; justify-content: space-between; align-items: center; gap: 10px;
+    flex-wrap: wrap;
   }
   .note button {
     background: transparent; border: 0; padding: 0;
-    color: var(--faint); font-size: 9.5px; text-decoration: underline;
+    color: var(--faint); font-size: var(--t-label); text-decoration: underline;
     cursor: pointer; font-family: inherit; white-space: nowrap;
   }
   .note button:hover { color: var(--muted); }
 
   /* --------------------------------------------------- Isolierte Vorschau */
-  .viewer {
-    position: fixed; inset: 0; z-index: 20;
-    background: #04040a; display: none;
-  }
+  .viewer { position: fixed; inset: 0; z-index: 20; background: #04040a; display: none; }
   .viewer.on { display: block; }
 
   .vstage {
@@ -239,13 +279,7 @@
     display: flex; align-items: center; justify-content: center;
     overflow: hidden; touch-action: none;
   }
-
-  .vstage img {
-    max-width: 94%; max-height: 84%;
-    display: block; user-select: none; -webkit-user-drag: none;
-  }
-  .vstage img.grab { cursor: grab; }
-  .vstage img.grabbing { cursor: grabbing; }
+  .vstage img { max-width: 94%; max-height: 84%; }
 
   .vtools {
     position: absolute; left: 50%; transform: translateX(-50%);
@@ -254,18 +288,6 @@
     background: rgba(11, 11, 20, .9); border: 1px solid var(--line);
     border-radius: 12px; backdrop-filter: blur(8px);
   }
-  .vtools button {
-    min-width: 34px; height: 32px; padding: 0 9px;
-    background: transparent; border: 0; border-radius: 9px;
-    color: var(--muted); font-family: var(--mono); font-size: 14px;
-    cursor: pointer; line-height: 1;
-  }
-  .vtools button:hover { background: var(--surface); color: var(--ink); }
-  .vtools .level {
-    min-width: 50px; text-align: center; color: var(--faint);
-    font-size: 10.5px; font-family: var(--mono); cursor: default;
-  }
-  .vtools .sep { width: 1px; height: 19px; background: var(--line); margin: 0 3px; }
 
   .vclose {
     position: absolute; right: 12px;
@@ -278,7 +300,7 @@
 
   /* ------------------------------------------------------------- Kennwort */
   .ask {
-    position: fixed; inset: 0; z-index: 10;
+    position: fixed; inset: 0; z-index: 30;
     /* Deckend, nicht durchscheinend: Wer nach einem Kennwort gefragt wird, soll
        nichts sehen, was er ohne Kennwort nicht sehen duerfte. */
     background: var(--bg);
@@ -288,11 +310,11 @@
 
   .ask form {
     background: var(--panel); border: 1px solid var(--line);
-    border-radius: 14px; padding: 24px; width: 100%; max-width: 320px;
-    text-align: center;
+    border-radius: 14px; padding: clamp(20px, 3vw, 30px);
+    width: 100%; max-width: 340px; text-align: center;
   }
-  .ask h2 { margin: 0 0 8px; font-size: 14px; font-weight: 600; }
-  .ask p  { margin: 0 0 18px; font-size: 11.5px; color: var(--muted); line-height: 1.6; }
+  .ask h2 { margin: 0 0 8px; font-size: var(--t-mark); font-weight: 600; }
+  .ask p  { margin: 0 0 18px; font-size: var(--t-small); color: var(--muted); line-height: 1.6; }
 
   .ask input {
     width: 100%; padding: 11px 12px; text-align: center;
@@ -304,11 +326,11 @@
 
   .ask button[type=submit] {
     width: 100%; margin-top: 12px; padding: 11px;
-    font-size: 12px; font-weight: 600; letter-spacing: .04em;
+    font-size: var(--t-small); font-weight: 600; letter-spacing: .04em;
     color: #0b0b14; background: var(--accent);
     border: 0; border-radius: 9px; cursor: pointer;
   }
-  .ask .wrong { color: var(--warn); font-size: 11px; margin: 12px 0 0; min-height: 14px; }
+  .ask .wrong { color: var(--warn); font-size: var(--t-small); margin: 12px 0 0; min-height: 14px; }
 </style>
 </head>
 <body>
@@ -316,23 +338,26 @@
 <header>
   <span class="dot" id="dot"></span>
   <span class="mark">FrameFlip</span>
-  <span class="standing" id="standing">verbinde …</span>
+  <button class="install" id="install">Install</button>
+  <span class="standing" id="standing">connecting …</span>
 </header>
 
 <main>
   <div class="stage" id="stage">
-    <div class="empty" id="empty">Noch kein Bild.</div>
+    <div class="empty" id="empty">No frame yet.</div>
 
     <div class="tools" id="tools">
-      <button id="open" title="Groß ansehen" aria-label="Groß ansehen">⤢ Vergrößern</button>
+      <button id="zoomOut" title="Zoom out" aria-label="Zoom out">−</button>
+      <span class="level" id="level">100 %</span>
+      <button id="zoomIn" title="Zoom in" aria-label="Zoom in">+</button>
       <span class="sep"></span>
-      <button id="save" title="Bild sichern" aria-label="Bild sichern">↓</button>
+      <button id="zoomFit" title="Fit" aria-label="Fit">⤢</button>
     </div>
   </div>
 
   <div class="side">
     <div class="state">
-      <span class="chip" id="chip">wartet</span>
+      <span class="chip" id="chip">waiting</span>
       <span class="scene" id="scene"></span>
     </div>
 
@@ -344,20 +369,20 @@
     <div class="bar"><i id="barFill"></i></div>
 
     <div class="times">
-      <span>gelaufen <b id="elapsed">–</b></span>
-      <span>verbleibend <b id="remaining">–</b></span>
+      <span>elapsed <b id="elapsed">–</b></span>
+      <span>remaining <b id="remaining">–</b></span>
     </div>
 
     <div class="grid">
-      <div class="cell"><label>Je Bild</label><output id="spf">–</output></div>
-      <div class="cell"><label>Geschrieben</label><output id="written">–</output></div>
+      <div class="cell"><label>Per frame</label><output id="spf">–</output></div>
+      <div class="cell"><label>Written</label><output id="written">–</output></div>
       <div class="cell"><label>Samples</label><output id="sample">–</output></div>
 
       <div class="rule"></div>
 
-      <div class="cell"><label>Auflösung</label><output id="size">–</output></div>
-      <div class="cell"><label>Speicher</label><output id="memory">–</output></div>
-      <div class="cell"><label>RAM frei</label><output id="ram">–</output></div>
+      <div class="cell"><label>Resolution</label><output id="size">–</output></div>
+      <div class="cell"><label>Memory</label><output id="memory">–</output></div>
+      <div class="cell"><label>RAM free</label><output id="ram">–</output></div>
 
       <div class="rule"></div>
 
@@ -365,9 +390,11 @@
       <div class="cell"><label>GPU</label><output id="gpu">–</output></div>
     </div>
 
+    <button class="save" id="save">↓ Save this frame <b id="saveName"></b></button>
+
     <div class="note">
-      <span>Nur Ansicht · Ende zu Ende verschlüsselt</span>
-      <button id="forget" title="Zugang von diesem Gerät entfernen">Zugang entfernen</button>
+      <span>View only · End-to-end encrypted</span>
+      <button id="forget" title="Remove this device's access">Forget access</button>
     </div>
   </div>
 </main>
@@ -378,27 +405,27 @@
   <div class="vstage" id="vstage"></div>
 
   <div class="vtools">
-    <button id="vOut" title="Kleiner" aria-label="Kleiner">−</button>
+    <button id="vOut" title="Zoom out" aria-label="Zoom out">−</button>
     <span class="level" id="vLevel">100 %</span>
-    <button id="vIn" title="Größer" aria-label="Größer">+</button>
+    <button id="vIn" title="Zoom in" aria-label="Zoom in">+</button>
     <span class="sep"></span>
-    <button id="vLeft" title="Nach links drehen" aria-label="Nach links drehen">⟲</button>
-    <button id="vRight" title="Nach rechts drehen" aria-label="Nach rechts drehen">⟳</button>
+    <button id="vLeft" title="Rotate left" aria-label="Rotate left">⟲</button>
+    <button id="vRight" title="Rotate right" aria-label="Rotate right">⟳</button>
     <span class="sep"></span>
-    <button id="vFit" title="Einpassen" aria-label="Einpassen">⤢</button>
-    <button id="vSave" title="Bild sichern" aria-label="Bild sichern">↓</button>
+    <button id="vFit" title="Fit" aria-label="Fit">⤢</button>
+    <button id="vSave" title="Save frame" aria-label="Save frame">↓</button>
   </div>
 
-  <button class="vclose" id="vClose" title="Schließen" aria-label="Schließen">✕</button>
+  <button class="vclose" id="vClose" title="Close" aria-label="Close">✕</button>
 </div>
 
 <div class="ask" id="ask">
   <form id="askForm" autocomplete="off">
-    <h2>Kennwort</h2>
-    <p>Die freien Plätze sind belegt. Für einen weiteren braucht es das Kennwort, das am PC steht.</p>
+    <h2>Password</h2>
+    <p>The open seats are taken. To watch as well, enter the password shown on the PC.</p>
     <input id="askInput" type="password" inputmode="text" autocomplete="off"
-           autocapitalize="off" spellcheck="false" aria-label="Kennwort">
-    <button type="submit">Zusehen</button>
+           autocapitalize="off" spellcheck="false" aria-label="Password">
+    <button type="submit">Watch</button>
     <p class="wrong" id="askWrong"></p>
   </form>
 </div>
@@ -568,7 +595,7 @@ class Channel {
    Abgelegt wird im localStorage, nicht nur fuer die Sitzung. Das ist noetig, damit
    die Seite sich installieren laesst: Ein installiertes Programm startet unter
    seiner eigenen Adresse, ohne Raute - ohne bleibende Ablage waere es bei jedem
-   Start leer. Wer das nicht will, hat unten "Zugang entfernen". */
+   Start leer. Wer das nicht will, hat unten "Forget access". */
 const KEY_SECRET = "frameflip.watch.key";
 const KEY_CODE = "frameflip.watch.code";
 
@@ -606,12 +633,11 @@ const rememberCode = code => keep(KEY_CODE, code);
 
 const el = id => document.getElementById(id);
 const dot = el("dot"), standing = el("standing"), stage = el("stage"), empty = el("empty");
-const tools = el("tools");
+const tools = el("tools"), viewer = el("viewer"), vstage = el("vstage");
 
 const clamp = (v, lo, hi) => Math.min(hi, Math.max(lo, v));
 
-let picture = null;      // das <img> auf der Buehne
-let pictureUrl = null;   // seine derzeitige blob-Adresse
+let pictureUrl = null;   // die derzeitige blob-Adresse des Bildes
 let lastJpeg = null;     // die Bytes, fuer das Sichern
 let lastState = null;
 
@@ -637,10 +663,10 @@ function show(state) {
   lastState = state;
 
   const has = name => state[name] !== undefined && state[name] !== null;
-  const läuft = state.rendering === true;
+  const busy = state.rendering === true;
 
-  el("chip").className = "chip " + (läuft ? "live" : "idle");
-  el("chip").textContent = läuft ? (state.activity || "rendert") : "bereit";
+  el("chip").className = "chip " + (busy ? "live" : "idle");
+  el("chip").textContent = busy ? (state.activity || "rendering") : "ready";
 
   el("scene").textContent = state.scene || "";
 
@@ -655,7 +681,7 @@ function show(state) {
     : "–";
 
   put("elapsed", clock(state.elapsed));
-  put("remaining", läuft && has("remaining") ? clock(state.remaining) : "–");
+  put("remaining", busy && has("remaining") ? clock(state.remaining) : "–");
   put("spf", has("secondsPerFrame") ? state.secondsPerFrame.toFixed(2) + " s" : "–");
   put("written", has("written") ? String(state.written) : "–");
 
@@ -672,29 +698,248 @@ function show(state) {
     ? (state.freeMb / 1024).toFixed(1) + (has("totalMb") ? " / " + (state.totalMb / 1024).toFixed(0) : "") + " GB"
     : "–");
 
-  say(läuft ? (state.activity || "rendert") : "bereit", läuft ? "live" : "idle");
+  put("saveName", dateiname());
+
+  say(busy ? (state.activity || "rendering") : "ready", busy ? "live" : "idle");
 }
+
+/* ----------------------------------------------------------------- Ansichten
+
+   EINE Ansicht, zweimal eingehaengt: auf der Buehne und in der isolierten
+   Vorschau. Zwei Umsetzungen desselben Gedankens waeren zwei Orte, an denen
+   dieselbe Rechnung schiefgehen kann - und die Rechnung ist hier der ganze Punkt.
+
+   Gerechnet wird durchweg gegen die MITTE der Flaeche, nie gegen den Kasten des
+   Bildes. Der wandert ja mit der Verschiebung mit; wer gegen ihn rechnet, jagt
+   seinem eigenen Ergebnis hinterher. Aus demselben Grund steht im Stil KEIN
+   transform-origin - die Voreinstellung ist die Mitte. */
+function macheAnsicht(flaeche, anzeige, { drehbar = false, beiKlick = null } = {}) {
+  let bild = null;
+  let maß = 1, tx = 0, ty = 0, dreh = 0;
+
+  /* Wie weit sich das Bild schieben laesst.
+
+     Der Betrag der Differenz, nicht nur der Ueberstand. Das ist der Unterschied,
+     an dem es haengt: Ist das Bild kleiner als die Flaeche, war es frueher starr
+     in der Mitte festgenagelt - und der Punkt unter dem Zeiger konnte gar nicht
+     dort bleiben. Es zog erst zur Mitte und dann langsam zum Zeiger, genau wie es
+     sich angefuehlt hat. Jetzt darf es sich auch im freien Raum bewegen, solange
+     es die Flaeche nicht verlaesst. */
+  function grenzen() {
+    if (!bild) return;
+
+    const f = flaeche.getBoundingClientRect();
+    const quer = dreh % 180 !== 0;
+
+    const breite = (quer ? bild.clientHeight : bild.clientWidth) * maß;
+    const höhe = (quer ? bild.clientWidth : bild.clientHeight) * maß;
+
+    /* Der Betrag allein ergibt ein V: Ist das Bild viel kleiner oder viel groesser
+       als die Flaeche, gibt es reichlich Raum - aber genau dort, wo beide ungefaehr
+       gleich gross sind, geht er gegen null. Und das ist der Zoomschritt, in dem
+       der Punkt unter dem Zeiger am weitesten wegrutscht: Er braucht dort umso mehr
+       Verschiebung, je weiter er von der Mitte weg liegt.
+
+       Ein Viertel der Flaeche als Untergrenze fuellt diese Senke. Mehr als ein
+       Viertel kann das Bild dadurch nie aus der Mitte wandern - es bleibt immer weit
+       ueberwiegend zu sehen, und der Zeiger trifft trotzdem. */
+    const x = Math.max(Math.abs(breite - f.width) / 2, f.width * 0.25);
+    const y = Math.max(Math.abs(höhe - f.height) / 2, f.height * 0.25);
+
+    tx = clamp(tx, -x, x);
+    ty = clamp(ty, -y, y);
+  }
+
+  function anwenden() {
+    if (!bild) return;
+
+    grenzen();
+
+    // Die Reihenfolge zaehlt: erst skalieren, dann drehen, dann verschieben.
+    // Dadurch bleibt die Verschiebung in Bildschirmrichtung, auch wenn das Bild
+    // hochkant steht - sonst zoege ein Zug nach rechts es nach unten.
+    bild.style.transform = `translate(${tx}px, ${ty}px) rotate(${dreh}deg) scale(${maß})`;
+    bild.className = maß > passend() * 1.01 ? "grab" : "";
+
+    if (anzeige) anzeige.textContent = Math.round(maß * 100) + " %";
+  }
+
+  /* Der kleinste sinnvolle Maßstab: so, dass das Bild ganz hineinpasst.
+
+     Nach einer Vierteldrehung tauschen Breite und Höhe - ein liegendes Bild
+     braucht hochkant deutlich weniger Maßstab, um noch ganz zu sein. */
+  function passend() {
+    if (!bild || !bild.clientWidth) return 1;
+    if (dreh % 180 === 0) return 1;   // ungedreht passt es durch das Layout schon
+
+    const f = flaeche.getBoundingClientRect();
+
+    return Math.min(1, Math.min(f.width / bild.clientHeight, f.height / bild.clientWidth));
+  }
+
+  /* Zoomen dorthin, wo der Zeiger ist.
+
+     Der Punkt unter dem Zeiger soll unter dem Zeiger BLEIBEN - vom ersten Schritt
+     an, nicht erst, wenn genug Ueberstand da ist. Mit p als Abstand des Zeigers
+     von der Mitte und k als Aenderung des Maßstabs ist die neue Verschiebung
+     t' = p - k * (p - t). */
+  function zoom(ziel, cx, cy) {
+    if (!bild) return;
+
+    const klein = passend();
+    const next = clamp(ziel, klein, klein * 12);
+    const k = next / maß;
+
+    if (cx === undefined) {
+      tx *= k;
+      ty *= k;
+    } else {
+      const f = flaeche.getBoundingClientRect();
+      const px = cx - (f.left + f.width / 2);
+      const py = cy - (f.top + f.height / 2);
+
+      tx = px - k * (px - tx);
+      ty = py - k * (py - ty);
+    }
+
+    maß = next;
+    anwenden();
+  }
+
+  function einpassen() {
+    maß = passend();
+    tx = 0;
+    ty = 0;
+    anwenden();
+  }
+
+  function drehen(schritt) {
+    if (!drehbar) return;
+
+    dreh = (dreh + schritt + 360) % 360;
+    einpassen();
+  }
+
+  function setzeBild(url, behalten) {
+    if (!bild) {
+      bild = document.createElement("img");
+      bild.alt = "";
+      bild.addEventListener("dblclick", event => {
+        const klein = passend();
+        zoom(maß > klein * 1.01 ? klein : klein * 2.5, event.clientX, event.clientY);
+      });
+      flaeche.appendChild(bild);
+    }
+
+    bild.src = url;
+
+    // Beim Bildwechsel wird Zoom und Drehung NICHT zurueckgesetzt: Wer sich gerade
+    // eine Ecke ansieht, will beim naechsten Frame dieselbe Ecke sehen.
+    if (!behalten) {
+      dreh = 0;
+      if (bild.complete && bild.clientWidth) einpassen();
+      else bild.onload = einpassen;
+    }
+  }
+
+  function weg() {
+    if (bild) { bild.remove(); bild = null; }
+    maß = 1; tx = 0; ty = 0; dreh = 0;
+    if (anzeige) anzeige.textContent = "100 %";
+  }
+
+  // ---------------------------------------------------------- Rad und Finger
+
+  flaeche.addEventListener("wheel", event => {
+    if (!bild) return;
+
+    event.preventDefault();
+    zoom(maß * (event.deltaY < 0 ? 1.18 : 1 / 1.18), event.clientX, event.clientY);
+  }, { passive: false });
+
+  const zeiger = new Map();
+  let greifpunkt = null, kneifAbstand = 0, kneifStart = 1, gezogen = 0;
+
+  flaeche.addEventListener("pointerdown", event => {
+    if (!bild) return;
+
+    zeiger.set(event.pointerId, { x: event.clientX, y: event.clientY });
+    flaeche.setPointerCapture(event.pointerId);
+
+    if (zeiger.size === 1) {
+      greifpunkt = { x: event.clientX - tx, y: event.clientY - ty };
+      gezogen = 0;
+      bild.className = "grabbing";
+    }
+
+    if (zeiger.size === 2) {
+      const [a, b] = Array.from(zeiger.values());
+      kneifAbstand = Math.hypot(a.x - b.x, a.y - b.y);
+      kneifStart = maß;
+      greifpunkt = null;
+    }
+  });
+
+  flaeche.addEventListener("pointermove", event => {
+    if (!zeiger.has(event.pointerId)) return;
+
+    const vorher = zeiger.get(event.pointerId);
+    zeiger.set(event.pointerId, { x: event.clientX, y: event.clientY });
+
+    if (zeiger.size === 2) {
+      const [a, b] = Array.from(zeiger.values());
+      const jetzt = Math.hypot(a.x - b.x, a.y - b.y);
+
+      if (kneifAbstand > 0) zoom(kneifStart * (jetzt / kneifAbstand), (a.x + b.x) / 2, (a.y + b.y) / 2);
+
+      return;
+    }
+
+    if (greifpunkt) {
+      gezogen += Math.hypot(event.clientX - vorher.x, event.clientY - vorher.y);
+      tx = event.clientX - greifpunkt.x;
+      ty = event.clientY - greifpunkt.y;
+      anwenden();
+    }
+  });
+
+  function loslassen(event) {
+    const war = zeiger.size;
+    zeiger.delete(event.pointerId);
+
+    if (zeiger.size < 2) kneifAbstand = 0;
+
+    if (zeiger.size === 0) {
+      greifpunkt = null;
+      if (bild) anwenden();
+
+      // Ein Zug ist kein Klick. Nur wer das Bild nicht bewegt hat, wollte es
+      // oeffnen - sonst kaeme die Vorschau nach jedem Verschieben hoch.
+      if (war === 1 && gezogen < 5 && beiKlick) beiKlick();
+    }
+  }
+
+  flaeche.addEventListener("pointerup", loslassen);
+  flaeche.addEventListener("pointercancel", loslassen);
+
+  return { setzeBild, weg, zoom, einpassen, drehen, anwenden, maß: () => maß };
+}
+
+const bühne = macheAnsicht(stage, el("level"), { beiKlick: openViewer });
+const groß = macheAnsicht(vstage, el("vLevel"), { drehbar: true });
 
 function showPicture(jpeg) {
   lastJpeg = jpeg;
 
   const next = URL.createObjectURL(new Blob([jpeg], { type: "image/jpeg" }));
 
-  if (!picture) {
-    picture = document.createElement("img");
-    picture.alt = "";
-    picture.addEventListener("click", openViewer);
-    stage.appendChild(picture);
-  }
-
-  picture.src = next;
+  bühne.setzeBild(next, true);
   empty.style.display = "none";
   tools.classList.add("on");
+  el("save").classList.add("on");
+  put("saveName", dateiname());
 
-  // Ist die Vorschau offen, bekommt sie das neue Bild auch - aber OHNE Zoom und
-  // Drehung zurueckzusetzen. Wer sich gerade eine Ecke ansieht, will beim naechsten
-  // Frame dieselbe Ecke sehen und nicht wieder von vorn anfangen.
-  if (vImg && viewer.classList.contains("on")) vImg.src = next;
+  if (viewer.classList.contains("on")) groß.setzeBild(next, true);
 
   // Die alte Adresse erst freigeben, wenn die neue steht - sonst blitzt es weiss auf.
   const old = pictureUrl;
@@ -710,19 +955,21 @@ function showPicture(jpeg) {
 function blank() {
   closeViewer();
 
-  if (picture) { picture.remove(); picture = null; }
-  if (vImg) { vImg.remove(); vImg = null; }
+  bühne.weg();
+  groß.weg();
+
   if (pictureUrl) { URL.revokeObjectURL(pictureUrl); pictureUrl = null; }
 
   lastJpeg = null;
   lastState = null;
 
   tools.classList.remove("on");
+  el("save").classList.remove("on");
   empty.style.display = "";
-  empty.textContent = "Noch kein Bild.";
+  empty.textContent = "No frame yet.";
 
   el("chip").className = "chip";
-  el("chip").textContent = "wartet";
+  el("chip").textContent = "waiting";
   el("scene").textContent = "";
   el("percent").innerHTML = "–<small>%</small>";
   el("frames").textContent = "–";
@@ -733,135 +980,15 @@ function blank() {
   }
 }
 
-/* ------------------------------------------------------- Die isolierte Vorschau
-
-   Eine eigene Flaeche fuer das Bild allein: naeher heransehen, drehen, schieben.
-   Auf der Buehne waere das falsch aufgehoben - dort teilt sich das Bild den Platz
-   mit den Zahlen, und jede Verschiebung waere sofort am Rand.
-
-   Gerechnet wird durchweg gegen die MITTE der Flaeche. Das ist kein Geschmack: Der
-   Kasten des Bildes wandert mit der Verschiebung mit, und wer gegen ihn rechnet,
-   jagt seinem eigenen Ergebnis hinterher. Aus demselben Grund steht im Stil KEIN
-   transform-origin - die Voreinstellung ist die Mitte, und nur damit trifft der
-   Zoom die Stelle, auf die der Zeiger zeigt. */
-
-const viewer = el("viewer"), vstage = el("vstage"), vLevel = el("vLevel");
-
-let vImg = null;
-let vScale = 1, vTx = 0, vTy = 0, vRot = 0;
-
-/* Der kleinste sinnvolle Maßstab: so, dass das Bild ganz hineinpasst.
-
-   Nach einer Vierteldrehung tauschen Breite und Höhe - ein liegendes Bild braucht
-   hochkant deutlich weniger Maßstab, um noch ganz zu sein. Ohne diese Rechnung
-   ragte es nach dem Drehen einfach über den Rand hinaus. */
-function vPassend() {
-  if (!vImg || !vImg.clientWidth) return 1;
-
-  const fläche = vstage.getBoundingClientRect();
-  const quer = vRot % 180 !== 0;
-
-  const breite = quer ? vImg.clientHeight : vImg.clientWidth;
-  const höhe = quer ? vImg.clientWidth : vImg.clientHeight;
-
-  return Math.min(1, Math.min(fläche.width * 0.94 / breite, fläche.height * 0.84 / höhe));
-}
-
-/* Nicht weiter schieben, als Bild da ist - sonst zieht man es aus der Fläche
-   heraus und sieht schwarz, ohne zu wissen, wohin man geraten ist. */
-function vGrenzen() {
-  if (!vImg) return;
-
-  const fläche = vstage.getBoundingClientRect();
-  const quer = vRot % 180 !== 0;
-
-  const breite = (quer ? vImg.clientHeight : vImg.clientWidth) * vScale;
-  const höhe = (quer ? vImg.clientWidth : vImg.clientHeight) * vScale;
-
-  const x = Math.max(0, (breite - fläche.width) / 2);
-  const y = Math.max(0, (höhe - fläche.height) / 2);
-
-  vTx = clamp(vTx, -x, x);
-  vTy = clamp(vTy, -y, y);
-}
-
-function vAnwenden() {
-  if (!vImg) return;
-
-  vGrenzen();
-
-  // Die Reihenfolge zählt: Erst wird skaliert, dann gedreht, dann verschoben.
-  // Dadurch bleibt die Verschiebung in Bildschirmrichtung, auch wenn das Bild
-  // hochkant steht - sonst zöge ein Zug nach rechts es nach unten.
-  vImg.style.transform = `translate(${vTx}px, ${vTy}px) rotate(${vRot}deg) scale(${vScale})`;
-  vImg.className = vScale > vPassend() * 1.01 ? "grab" : "";
-
-  vLevel.textContent = Math.round(vScale * 100) + " %";
-}
-
-/* Zoomen dorthin, wo der Zeiger ist.
-
-   Der Punkt unter dem Zeiger soll unter dem Zeiger bleiben. Mit p als Abstand des
-   Zeigers von der Mitte und k als Änderung des Maßstabs ist die neue Verschiebung
-   t' = p - k * (p - t). Ohne diese Zeile wächst das Bild um die Mitte herum, und
-   die Stelle, die man sich ansehen wollte, wandert aus dem Bild. */
-function vZoom(ziel, cx, cy) {
-  if (!vImg) return;
-
-  const klein = vPassend();
-  const next = clamp(ziel, klein, klein * 12);
-  const k = next / vScale;
-
-  if (cx === undefined) {
-    vTx *= k;
-    vTy *= k;
-  } else {
-    const fläche = vstage.getBoundingClientRect();
-    const px = cx - (fläche.left + fläche.width / 2);
-    const py = cy - (fläche.top + fläche.height / 2);
-
-    vTx = px - k * (px - vTx);
-    vTy = py - k * (py - vTy);
-  }
-
-  vScale = next;
-  vAnwenden();
-}
-
-function vEinpassen() {
-  vScale = vPassend();
-  vTx = 0;
-  vTy = 0;
-  vAnwenden();
-}
-
-function vDrehen(schritt) {
-  vRot = (vRot + schritt + 360) % 360;
-  vEinpassen();
-}
+/* ------------------------------------------------------- Die isolierte Vorschau */
 
 function openViewer() {
   if (!pictureUrl) return;
 
-  if (!vImg) {
-    vImg = document.createElement("img");
-    vImg.alt = "";
-    vImg.addEventListener("dblclick", event => {
-      const klein = vPassend();
-      vZoom(vScale > klein * 1.01 ? klein : klein * 2.5, event.clientX, event.clientY);
-    });
-    vstage.appendChild(vImg);
-  }
-
-  vImg.src = pictureUrl;
-  vRot = 0;
-
   viewer.classList.add("on");
   viewer.setAttribute("aria-hidden", "false");
 
-  // Erst wenn das Bild seine Maße kennt, lässt es sich einpassen.
-  if (vImg.complete && vImg.clientWidth) vEinpassen();
-  else vImg.onload = () => vEinpassen();
+  groß.setzeBild(pictureUrl, false);
 }
 
 function closeViewer() {
@@ -869,13 +996,16 @@ function closeViewer() {
   viewer.setAttribute("aria-hidden", "true");
 }
 
-el("open").onclick = openViewer;
+el("zoomIn").onclick = () => bühne.zoom(bühne.maß() * 1.5);
+el("zoomOut").onclick = () => bühne.zoom(bühne.maß() / 1.5);
+el("zoomFit").onclick = () => bühne.einpassen();
+
 el("vClose").onclick = closeViewer;
-el("vIn").onclick = () => vZoom(vScale * 1.5);
-el("vOut").onclick = () => vZoom(vScale / 1.5);
-el("vFit").onclick = vEinpassen;
-el("vLeft").onclick = () => vDrehen(-90);
-el("vRight").onclick = () => vDrehen(90);
+el("vIn").onclick = () => groß.zoom(groß.maß() * 1.5);
+el("vOut").onclick = () => groß.zoom(groß.maß() / 1.5);
+el("vFit").onclick = () => groß.einpassen();
+el("vLeft").onclick = () => groß.drehen(-90);
+el("vRight").onclick = () => groß.drehen(90);
 
 // Ein Klick neben das Bild schließt - auf das Bild selbst nicht.
 vstage.addEventListener("click", event => { if (event.target === vstage) closeViewer(); });
@@ -884,95 +1014,31 @@ addEventListener("keydown", event => {
   if (!viewer.classList.contains("on")) return;
 
   if (event.key === "Escape") closeViewer();
-  else if (event.key === "+" || event.key === "=") vZoom(vScale * 1.5);
-  else if (event.key === "-") vZoom(vScale / 1.5);
-  else if (event.key === "0") vEinpassen();
+  else if (event.key === "+" || event.key === "=") groß.zoom(groß.maß() * 1.5);
+  else if (event.key === "-") groß.zoom(groß.maß() / 1.5);
+  else if (event.key === "0") groß.einpassen();
 });
 
-vstage.addEventListener("wheel", event => {
-  if (!vImg) return;
-
-  event.preventDefault();
-  vZoom(vScale * (event.deltaY < 0 ? 1.18 : 1 / 1.18), event.clientX, event.clientY);
-}, { passive: false });
-
-/* Ziehen und Zusammenkneifen über Zeiger-Ereignisse - dieselbe Behandlung für Maus
-   und Finger, statt zweier Wege, die auseinanderlaufen. */
-const zeiger = new Map();
-let greifpunkt = null, kneifAbstand = 0, kneifStart = 1;
-
-vstage.addEventListener("pointerdown", event => {
-  if (!vImg) return;
-
-  zeiger.set(event.pointerId, { x: event.clientX, y: event.clientY });
-  vstage.setPointerCapture(event.pointerId);
-
-  if (zeiger.size === 1) {
-    greifpunkt = { x: event.clientX - vTx, y: event.clientY - vTy };
-    vImg.className = "grabbing";
-  }
-
-  if (zeiger.size === 2) {
-    const [a, b] = Array.from(zeiger.values());
-    kneifAbstand = Math.hypot(a.x - b.x, a.y - b.y);
-    kneifStart = vScale;
-    greifpunkt = null;
-  }
-});
-
-vstage.addEventListener("pointermove", event => {
-  if (!zeiger.has(event.pointerId)) return;
-
-  zeiger.set(event.pointerId, { x: event.clientX, y: event.clientY });
-
-  if (zeiger.size === 2) {
-    const [a, b] = Array.from(zeiger.values());
-    const jetzt = Math.hypot(a.x - b.x, a.y - b.y);
-
-    if (kneifAbstand > 0) {
-      vZoom(kneifStart * (jetzt / kneifAbstand), (a.x + b.x) / 2, (a.y + b.y) / 2);
-    }
-
-    return;
-  }
-
-  if (greifpunkt) {
-    vTx = event.clientX - greifpunkt.x;
-    vTy = event.clientY - greifpunkt.y;
-    vAnwenden();
-  }
-});
-
-function loslassen(event) {
-  zeiger.delete(event.pointerId);
-
-  if (zeiger.size < 2) kneifAbstand = 0;
-
-  if (zeiger.size === 0) {
-    greifpunkt = null;
-    if (vImg) vAnwenden();
-  }
-}
-
-vstage.addEventListener("pointerup", loslassen);
-vstage.addEventListener("pointercancel", loslassen);
-
-addEventListener("resize", () => { if (viewer.classList.contains("on")) vAnwenden(); });
+addEventListener("resize", () => { bühne.anwenden(); groß.anwenden(); });
 
 /* ------------------------------------------------------------------- Sichern */
 
-function sichern() {
-  if (!lastJpeg) return;
-
+function dateiname() {
   const nummer = lastState && lastState.frame !== undefined && lastState.frame !== null
     ? String(lastState.frame).padStart(4, "0")
-    : "aktuell";
+    : "current";
+
+  return `frameflip_${nummer}.jpg`;
+}
+
+function sichern() {
+  if (!lastJpeg) return;
 
   const url = URL.createObjectURL(new Blob([lastJpeg], { type: "image/jpeg" }));
   const a = document.createElement("a");
 
   a.href = url;
-  a.download = `frameflip_${nummer}.jpg`;
+  a.download = dateiname();
   document.body.appendChild(a);
   a.click();
   a.remove();
@@ -988,6 +1054,34 @@ el("forget").onclick = () => {
   keep(KEY_CODE, "");
   location.reload();
 };
+
+/* ---------------------------------------------------------------- Ablegen
+
+   Der Knopf erscheint nur, wenn der Browser das Ablegen auch anbietet. Ihn immer
+   zu zeigen und dann nichts zu tun, waere die schlechtere Auskunft.
+
+   Auf einem iPhone gibt es dieses Ereignis nicht - dort fuehrt der Weg ueber
+   "Teilen" und "Zum Home-Bildschirm". Das steht dann als Hinweis in der Fusszeile,
+   statt einen Knopf anzubieten, der nichts bewirkt. */
+let ablegen = null;
+
+addEventListener("beforeinstallprompt", event => {
+  event.preventDefault();
+  ablegen = event;
+  el("install").classList.add("on");
+});
+
+el("install").onclick = async () => {
+  if (!ablegen) return;
+
+  ablegen.prompt();
+  await ablegen.userChoice;
+
+  ablegen = null;
+  el("install").classList.remove("on");
+};
+
+addEventListener("appinstalled", () => el("install").classList.remove("on"));
 
 const Result = {
   Paired: "paired",    // drin, Kanal steht
@@ -1094,7 +1188,7 @@ function trySeat(room, seatKey) {
         if (!opened) done(Result.Blocked);
         else {
           done(confirmed ? Result.Broken : Result.Wrong);
-          if (confirmed) say("Verbindung verloren", "gone");
+          if (confirmed) say("connection lost", "gone");
         }
 
         ended();
@@ -1135,7 +1229,7 @@ function trySeat(room, seatKey) {
         }
 
         if (control.t === "peer" && !control.up) {
-          say("FrameFlip ist weg", "gone");
+          say("FrameFlip is gone", "gone");
           channel = null;
           confirmed = false;
         }
@@ -1169,7 +1263,7 @@ function trySeat(room, seatKey) {
 
         confirmed = true;
         done(Result.Paired);
-        say("verbunden", "idle");
+        say("connected", "idle");
         return;
       }
 
@@ -1223,8 +1317,8 @@ async function run() {
   const text = secretFromAddress();
 
   if (!text) {
-    say("Link unvollständig", "gone");
-    empty.textContent = "Dieser Link enthält kein Geheimnis. Am PC einen neuen erzeugen und ganz kopieren.";
+    say("link incomplete", "gone");
+    empty.textContent = "This link carries no secret. Create a new one on the PC and copy all of it.";
     return;
   }
 
@@ -1233,8 +1327,8 @@ async function run() {
     secret = fromBase64Url(text);
     if (secret.length !== 32) throw new Error("Länge");
   } catch (e) {
-    say("Link unbrauchbar", "gone");
-    empty.textContent = "Mit diesem Link lässt sich nichts anfangen.";
+    say("link unusable", "gone");
+    empty.textContent = "There is nothing to do with this link.";
     return;
   }
 
@@ -1263,7 +1357,7 @@ async function run() {
 
       if (protectedSeat && !codeKey) break;
 
-      say(seat === 0 ? "verbinde …" : "suche freien Platz …");
+      say(seat === 0 ? "connecting …" : "looking for a free seat …");
 
       versucht++;
 
@@ -1290,22 +1384,22 @@ async function run() {
       }
 
       if (outcome === Result.Blocked) {
-        say("Verbindung nicht möglich", "gone");
-        empty.textContent = "Der Browser lässt die Verbindung zum Leuchtturm nicht zu, "
-                          + "oder er ist gerade nicht erreichbar. Es wird weiter versucht.";
+        say("cannot connect", "gone");
+        empty.textContent = "The browser will not allow the connection to the relay, "
+                          + "or the relay is unreachable right now. Still trying.";
         landed = true;
         break;
       }
 
       if (outcome === Result.Alone) {
         if (!protectedSeat) {
-          say("FrameFlip ist nicht erreichbar", "gone");
-          empty.textContent = "FrameFlip läuft gerade nicht, oder das Zusehen ist dort abgeschaltet.";
+          say("FrameFlip is unreachable", "gone");
+          empty.textContent = "FrameFlip is not running, or watching is switched off there.";
         } else {
           // Ein hinterer Platz ohne FrameFlip heisst: Es ist kein Kennwort gesetzt.
-          say("kein Platz frei", "gone");
-          empty.textContent = "Es sehen schon zwei zu. Mehr lässt sich nur zulassen, "
-                            + "wenn am PC ein Kennwort gesetzt wird.";
+          say("no seat free", "gone");
+          empty.textContent = "Two people are already watching. More is only possible "
+                            + "once a password is set on the PC.";
         }
 
         landed = true;   // Warten statt weitersuchen - die anderen Plaetze sind auch leer.
@@ -1314,7 +1408,7 @@ async function run() {
 
       if (outcome === Result.Wrong && protectedSeat) {
         rememberCode("");
-        code = await askForCode("Das war nicht das richtige Kennwort.");
+        code = await askForCode("That was not the right password.");
         rememberCode(code);
         codeKey = await hkdf(secret, SEAT_INFO, enc.encode(code), 32);
         seat = FREE_SEATS - 1;   // die geschuetzten Plaetze noch einmal durchgehen
@@ -1322,15 +1416,15 @@ async function run() {
       }
 
       if (outcome === Result.Wrong) {
-        say("Link gilt nicht mehr", "gone");
-        empty.textContent = "Dieser Link wurde erneuert. Am PC steht der aktuelle.";
+        say("link no longer valid", "gone");
+        empty.textContent = "This link has been renewed. The current one is shown on the PC.";
         landed = true;
         break;
       }
 
       // Bleibt Result.Broken: Die Verbindung stand und riss ab. Nicht den naechsten
       // Platz belegen - abwarten und denselben noch einmal versuchen.
-      say("Verbindung verloren", "gone");
+      say("connection lost", "gone");
       landed = true;
       break;
     }
@@ -1347,13 +1441,13 @@ async function run() {
       // Wirklich alles voll. Das laut sagen, statt still weiterzusuchen - sonst
       // steht man vor einer Seite, die ohne Grund nichts anzeigt.
       if (besetztGesamt >= versucht && versucht > 0) {
-        say("kein Platz frei", "gone");
-        empty.textContent = "Alle " + versucht + " Plätze sind gerade belegt. "
-                          + "Sobald einer frei wird, geht es hier von selbst weiter.";
+        say("no seat free", "gone");
+        empty.textContent = "All " + versucht + " seats are taken right now. "
+                          + "This page continues on its own as soon as one frees up.";
       }
     }
 
-    say("neuer Versuch …", "gone");
+    say("retrying …", "gone");
     await new Promise(done => setTimeout(done, wait));
     wait = Math.min(wait * 2, 30000);
   }
@@ -1365,14 +1459,34 @@ run();
 
    Der Dienstarbeiter ist nicht dafuer da, Daten vorzuhalten - es gibt hier nichts
    vorzuhalten, was laenger als ein paar Sekunden gilt. Er haelt die Huelle bereit,
-   damit sich die Seite als Programm ablegen laesst und beim Start sofort etwas da
-   ist. Alles Lebendige kommt weiterhin ueber die verschluesselte Leitung.
+   damit sich die Seite als Programm ablegen laesst. Alles Lebendige kommt
+   weiterhin ueber die verschluesselte Leitung.
 
-   Schlaegt die Anmeldung fehl - altes Handy, abgeschaltet, privates Fenster -,
-   laeuft die Seite unveraendert weiter. Sie laesst sich dann nur nicht ablegen. */
-if ("serviceWorker" in navigator) {
+   Scheitert die Anmeldung, steht der Grund in der Fusszeile. Das ist nicht
+   Zierde: Ohne diese Zeile bleibt "das Installieren wird nicht angeboten" eine
+   Beobachtung ohne Ursache, und auf einem Handy laesst sich keine Entwicklerkonsole
+   oeffnen, um nachzusehen. */
+const appnote = document.createElement("span");
+appnote.style.cssText = "flex-basis:100%;color:var(--faint)";
+document.querySelector(".note").appendChild(appnote);
+
+function vermerk(text) { appnote.textContent = text; }
+
+// Auf einem iPhone gibt es kein beforeinstallprompt - dort fuehrt der Weg ueber
+// "Teilen" und "Zum Home-Bildschirm". Ein Knopf, der nichts bewirkt, waere eine
+// Enttaeuschung; der Hinweis ist die ehrlichere Auskunft.
+const apfel = /iPad|iPhone|iPod/.test(navigator.userAgent)
+  || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
+
+if (apfel && !navigator.standalone) vermerk("To install: Share → Add to Home Screen");
+
+if (!("serviceWorker" in navigator)) {
+  if (!apfel) vermerk("App install unavailable: this browser has no service workers.");
+} else {
   addEventListener("load", () => {
-    navigator.serviceWorker.register("sw.js").catch(() => { /* dann eben ohne */ });
+    navigator.serviceWorker.register("sw.js")
+      .then(() => { if (!apfel) vermerk(""); })
+      .catch(error => vermerk("App install unavailable: " + (error && error.message ? error.message : error)));
   });
 }
 </script>

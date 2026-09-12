@@ -106,7 +106,7 @@ Auf der Bühne selbst wird bewusst **nicht** gezoomt. Dort teilt sich das Bild d
 Platz mit den Zahlen; jede Verschiebung wäre sofort am Rand, und ein Zug zum
 Verschieben ließe sich nicht von einem Klick zum Öffnen unterscheiden.
 
-Zwei Dinge, die dabei leicht schiefgehen:
+Drei Dinge, die dabei leicht schiefgehen — alle drei sind passiert:
 
 * Im Stil darf **kein** `transform-origin` stehen. Es stand einmal auf `0 0`,
   während die Rechnung von der Mitte ausging — das Bild wuchs dadurch aus der oberen
@@ -114,9 +114,17 @@ Zwei Dinge, die dabei leicht schiefgehen:
 
 * Gerechnet wird gegen die **Mitte der Fläche**, nie gegen den Kasten des Bildes.
   Der wandert ja mit der Verschiebung mit; wer gegen ihn rechnet, jagt seinem
-  eigenen Ergebnis hinterher. Der Punkt unter dem Zeiger bleibt unter dem Zeiger,
-  solange in dieser Richtung überhaupt etwas zu verschieben ist — passt das Bild
-  quer noch ganz hinein, wird dort auf die Mitte geklemmt, und das ist richtig so.
+  eigenen Ergebnis hinterher.
+
+* Die Begrenzung der Verschiebung braucht eine **Untergrenze**. Nur den Überstand
+  zuzulassen ergibt ein V: viel Raum, wenn das Bild deutlich kleiner oder deutlich
+  größer als die Fläche ist — und fast keinen genau dort, wo beide gleich groß sind.
+  Das ist aber der Zoomschritt, in dem der Punkt unter dem Zeiger am weitesten
+  wegrutschen will. Ein Viertel der Fläche als Untergrenze füllt die Senke; weiter
+  als ein Viertel kann das Bild dadurch nie aus der Mitte wandern.
+
+Nachgemessen: null Punkte Abweichung über vierzehn Zoomschritte, in zwei
+verschiedenen Ecken, auf beiden Flächen.
 
 ## Als Programm ablegen
 
