@@ -13,8 +13,20 @@
   nachladen. 'unsafe-inline' ist noetig, weil Stil und Code im Dokument stehen - das
   ist Absicht, denn eine Datei ohne Beiwerk laesst sich pruefen, indem man sie liest.
 -->
+<!--
+  connect-src nennt das Schema AUSDRUECKLICH, nicht nur 'self'.
+
+  WebKit - also jedes Safari und alles auf einem iPhone - rechnet 'self' bei
+  WebSockets nicht auf wss:// an. Die Seite laedt dann ganz normal, und die
+  Verbindung zum Leuchtturm wird stumm verworfen: Bild und Zahlen bleiben leer,
+  ohne dass irgendwo etwas steht. Am Schreibtisch faellt es nicht auf, weil
+  Chromium und Firefox es grosszuegiger auslegen.
+
+  Die engere Fassung mit dem genauen Wirtsnamen setzt Caddy als Kopfzeile dazu;
+  beide Regeln gelten dann gleichzeitig, und es gilt die Schnittmenge.
+-->
 <meta http-equiv="Content-Security-Policy"
-      content="default-src 'none'; img-src 'self' blob: data:; style-src 'unsafe-inline'; script-src 'unsafe-inline'; connect-src 'self'; base-uri 'none'; form-action 'none'">
+      content="default-src 'none'; img-src 'self' blob: data:; style-src 'unsafe-inline'; script-src 'unsafe-inline'; connect-src 'self' wss: ws:; base-uri 'none'; form-action 'none'">
 <title>FrameFlip</title>
 <style>
   :root {
@@ -499,7 +511,14 @@ function showPicture(jpeg) {
 
 /* ------------------------------------------------------------------ Verbindung */
 
-const Result = { Paired: "paired", Taken: "taken", Alone: "alone", Broken: "broken", Wrong: "wrong" };
+const Result = {
+  Paired: "paired",    // drin, Kanal steht
+  Taken: "taken",      // hier sitzt schon jemand
+  Alone: "alone",      // Raum da, aber kein FrameFlip
+  Blocked: "blocked",  // die Verbindung kam gar nicht erst zustande
+  Broken: "broken",    // sie stand und ist abgerissen
+  Wrong: "wrong"       // falscher Schluessel - Kennwort oder alter Link
+};
 
 /* Ein Versuch auf einem Platz. Das Versprechen loest sich auf, sobald feststeht,
    woran man ist - und bleibt offen, solange die Verbindung traegt. */
@@ -523,19 +542,34 @@ function trySeat(room, seatKey) {
     let channel = null, mySalt = null, theirSalt = null, confirmed = false;
     let settled = false;
 
+    // Ob die Verbindung ueberhaupt zustande kam. Der Unterschied ist wichtig: Ein
+    // Aufbau, der nie gelingt, ist etwas ganz anderes als ein belegter Platz - und
+    // er darf niemals nach einem Kennwort fragen lassen.
+    let opened = false;
+
+    socket.onopen = () => { opened = true; };
+
     const done = outcome => {
       if (settled) return;
       settled = true;
       resolve(outcome);
     };
 
-    socket.onerror = () => done(Result.Broken);
+    socket.onerror = () => done(opened ? Result.Broken : Result.Blocked);
 
     socket.onclose = () => {
-      // Wurde der Kanal nie fertig, war es kein Platz fuer uns. Stand er schon,
-      // ist es ein Abbruch, und der aeussere Lauf versucht es erneut.
-      done(confirmed ? Result.Broken : Result.Wrong);
-      if (confirmed) say("Verbindung verloren", "gone");
+      // Hinten anstellen, nicht vordraengeln: Der Leuchtturm schickt seine
+      // Abweisung als Text und schliesst unmittelbar danach. Wer hier sofort
+      // entscheidet, kommt der noch wartenden Meldung zuvor und macht aus
+      // "Platz belegt" ein "Schluessel falsch".
+      pending = pending.then(() => {
+        if (!opened) { done(Result.Blocked); return; }
+
+        // Wurde der Kanal nie fertig, war es kein Platz fuer uns. Stand er schon,
+        // ist es ein Abbruch, und der aeussere Lauf versucht es erneut.
+        done(confirmed ? Result.Broken : Result.Wrong);
+        if (confirmed) say("Verbindung verloren", "gone");
+      });
     };
 
     /* Nachrichten NACHEINANDER, nicht durcheinander.
@@ -705,6 +739,13 @@ async function run() {
   for (;;) {
     let landed = false;
 
+    // Wieviele der freien Plaetze wirklich besetzt waren. NUR das rechtfertigt die
+    // Frage nach dem Kennwort. Frueher fiel jeder andere Ausgang stillschweigend
+    // bis dorthin durch - ein Browser, der die Verbindung gar nicht zulaesst,
+    // sah damit aus wie ein volles Haus, und man tippte ein Kennwort ein, das
+    // nichts besser machen konnte.
+    let besetzt = 0;
+
     for (let seat = 0; seat < SEATS; seat++) {
       const protectedSeat = seat >= FREE_SEATS;
 
@@ -715,20 +756,29 @@ async function run() {
       const outcome = await trySeat(rooms[seat], protectedSeat ? codeKey : freeKey);
 
       if (outcome === Result.Paired) { landed = true; wait = 2000; break; }
-      if (outcome === Result.Taken) continue;
+
+      if (outcome === Result.Taken) { if (!protectedSeat) besetzt++; continue; }
+
+      if (outcome === Result.Blocked) {
+        say("Verbindung nicht möglich", "gone");
+        empty.textContent = "Der Browser lässt die Verbindung zum Leuchtturm nicht zu, "
+                          + "oder er ist gerade nicht erreichbar. Es wird weiter versucht.";
+        landed = true;
+        break;
+      }
 
       if (outcome === Result.Alone) {
         if (!protectedSeat) {
           say("FrameFlip ist nicht erreichbar", "gone");
           empty.textContent = "FrameFlip läuft gerade nicht, oder das Zusehen ist dort abgeschaltet.";
-          landed = true;   // Warten statt weitersuchen - die anderen Plaetze sind auch leer.
-          break;
+        } else {
+          // Ein hinterer Platz ohne FrameFlip heisst: Es ist kein Kennwort gesetzt.
+          say("kein Platz frei", "gone");
+          empty.textContent = "Es sehen schon zwei zu. Mehr lässt sich nur zulassen, "
+                            + "wenn am PC ein Kennwort gesetzt wird.";
         }
 
-        // Ein hinterer Platz ohne FrameFlip heisst: Es ist kein Kennwort gesetzt.
-        say("kein Platz frei", "gone");
-        empty.textContent = "Es sehen schon zwei zu. Mehr lässt sich nur zulassen, wenn am PC ein Kennwort gesetzt wird.";
-        landed = true;
+        landed = true;   // Warten statt weitersuchen - die anderen Plaetze sind auch leer.
         break;
       }
 
@@ -747,10 +797,17 @@ async function run() {
         landed = true;
         break;
       }
+
+      // Bleibt Result.Broken: Die Verbindung stand und riss ab. Nicht den naechsten
+      // Platz belegen - abwarten und denselben noch einmal versuchen.
+      say("Verbindung verloren", "gone");
+      landed = true;
+      break;
     }
 
-    // Alle freien Plaetze belegt und noch kein Kennwort: dann eben danach fragen.
-    if (!landed && !codeKey) {
+    // Nach dem Kennwort wird NUR gefragt, wenn beide freien Plaetze tatsaechlich
+    // besetzt waren. Alles andere ist ein Fehler und keine volle Reihe.
+    if (!landed && !codeKey && besetzt >= FREE_SEATS) {
       code = await askForCode("");
       rememberCode(code);
       codeKey = await hkdf(secret, SEAT_INFO, enc.encode(code), 32);

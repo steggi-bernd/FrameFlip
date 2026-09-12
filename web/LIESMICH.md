@@ -122,3 +122,15 @@ auftauchen würden:
   jemand hereinkommt, ergießt sich der Stau auf ihn, und der Relay trennt ihn als
   „zu langsam", bevor er ein Bild gesehen hat. **Nichts senden, solange niemand
   zusieht** ist deshalb keine Sparsamkeit, sondern Bedingung.
+
+* `connect-src 'self'` genügt für WebSockets **nicht**. WebKit — also jedes Safari
+  und alles auf einem iPhone — rechnet `'self'` dort nicht auf `wss://` an. Die Seite
+  lädt dann ganz normal und bleibt stumm leer, ohne dass irgendwo etwas steht. Das
+  Schema muss ausdrücklich genannt werden; die enge Fassung mit dem genauen
+  Wirtsnamen setzt Caddy als Kopfzeile dazu.
+
+* Ein gescheiterter Verbindungsaufbau darf nicht wie ein belegter Platz aussehen.
+  Er tat es: Der Ausgang fiel durch alle Prüfungen bis zur Kennwortfrage, und man
+  tippte ein Kennwort ein, das nichts besser machen konnte. `Result.Blocked` ist
+  deshalb ein eigener Ausgang, und nach dem Kennwort wird nur gefragt, wenn beide
+  freien Plätze wirklich besetzt waren.
