@@ -134,6 +134,13 @@ Adresszeile. Sie startet dann unter ihrer eigenen Adresse, **ohne Raute**; das
 Geheimnis liegt deshalb im `localStorage` statt nur für die Sitzung. „Zugang
 entfernen" unten in der Seite löscht es wieder.
 
+**Die Inhaltsregel darf nicht auf dem Dienstarbeiter liegen.** Ein Dienstarbeiter
+erbt die Regel aus der Antwort seines *eigenen* Skripts. Lag dort
+`script-src 'unsafe-inline'` ohne `'self'`, verbot er damit sich selbst — die
+Anmeldung scheiterte mit „unknown error when fetching the script", und die Seite
+ließ sich nicht ablegen. Caddy setzt die Regel deshalb nur noch auf `/` und
+`/index.html`, und `'self'` steht mit dabei.
+
 Der Dienstarbeiter hält **nur die Hülle** bereit — Seite, Manifest, Zeichen. Er
 fasst nichts an, was durch die verschlüsselte Leitung kommt: Ein Bild aus einem
 Render soll auf dem Gerät nicht länger liegen, als es zu sehen ist.

@@ -1,7 +1,7 @@
 {
-  "name": "FrameFlip – Zusehen",
+  "name": "FrameFlip Watch",
   "short_name": "FrameFlip",
-  "description": "Renderfortschritt und das neueste Bild. Nur Ansicht, Ende zu Ende verschlüsselt.",
+  "description": "Render progress and the newest frame. View only, end-to-end encrypted.",
   "id": "/w/",
   "start_url": "./",
   "scope": "./",
