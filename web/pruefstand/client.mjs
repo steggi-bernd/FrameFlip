@@ -28,7 +28,7 @@ const flow   = slice("const Result = {", "/* -----------------------------------
 const search = slice("const ask = el(", "run();", "Die Platzsuche");
 
 // Was die Seite anzeigen würde - hier wird es nur gezählt.
-const seen = { states: 0, previews: 0, lastState: null, jpegBytes: 0, said: [], hinweis: "" };
+const seen = { states: 0, previews: 0, lastState: null, jpegBytes: 0, said: [], hinweis: "", geleert: 0 };
 const beimVerlassen = [];
 
 const fakeEl = () => ({
@@ -37,7 +37,7 @@ const fakeEl = () => ({
   focus() { }, set onsubmit(_) { }
 });
 
-const page = new Function("location", "say", "show", "showPicture", "WebSocket", "el", "empty",
+const page = new Function("location", "say", "show", "showPicture", "blank", "WebSocket", "el", "empty",
   "secretFromAddress", "rememberedCode", "rememberCode", "addEventListener",
   core + "\n" + flow + "\n" + search + "\n" +
   "return { trySeat, Result, run, hkdf, toHex, fromBase64Url, ROOM_INFO, SEAT_INFO, SEATS, FREE_SEATS };")(
@@ -45,6 +45,7 @@ const page = new Function("location", "say", "show", "showPicture", "WebSocket",
     text => { seen.said.push(text); },
     state => { seen.states++; seen.lastState = state; },
     jpeg => { seen.previews++; seen.jpegBytes = jpeg.length; },
+    () => { seen.geleert++; },
     WebSocket,
     fakeEl,
     new Proxy({}, { set(o, k, v) { if (k === "textContent") seen.hinweis = v; return true; }, get: () => "" }),

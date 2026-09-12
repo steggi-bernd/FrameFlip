@@ -2,17 +2,9 @@
 <html lang="de">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
 <meta name="robots" content="noindex, nofollow">
 <meta name="referrer" content="no-referrer">
-<!--
-  Streng, obwohl die Seite ohnehin nichts nachlaedt.
-
-  Der Nutzen liegt nicht im Normalfall, sondern im Fehlerfall: Sollte hier je etwas
-  stehen, das nicht hierhergehoert, kann es weder Daten wegschicken noch etwas
-  nachladen. 'unsafe-inline' ist noetig, weil Stil und Code im Dokument stehen - das
-  ist Absicht, denn eine Datei ohne Beiwerk laesst sich pruefen, indem man sie liest.
--->
 <!--
   connect-src nennt das Schema AUSDRUECKLICH, nicht nur 'self'.
 
@@ -26,8 +18,18 @@
   beide Regeln gelten dann gleichzeitig, und es gilt die Schnittmenge.
 -->
 <meta http-equiv="Content-Security-Policy"
-      content="default-src 'none'; img-src 'self' blob: data:; style-src 'unsafe-inline'; script-src 'unsafe-inline'; connect-src 'self' wss: ws:; base-uri 'none'; form-action 'none'">
+      content="default-src 'none'; img-src 'self' blob: data:; style-src 'unsafe-inline'; script-src 'unsafe-inline'; connect-src 'self' wss: ws:; manifest-src 'self'; worker-src 'self'; base-uri 'none'; form-action 'none'">
+
 <title>FrameFlip</title>
+
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icon-192.png" sizes="192x192">
+<link rel="apple-touch-icon" href="icon-192.png">
+<meta name="theme-color" content="#07070d">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="FrameFlip">
+
 <style>
   :root {
     --bg: #07070d;      --panel: #0b0b14;   --stage: #05050a;
@@ -38,10 +40,10 @@
     --sans: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
   }
 
-  * { box-sizing: border-box; }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
 
   html, body {
-    margin: 0; height: 100%;
+    margin: 0; height: 100%; overflow: hidden;
     background: var(--bg); color: var(--ink);
     font-family: var(--sans);
     -webkit-text-size-adjust: 100%;
@@ -55,7 +57,7 @@
   /* ------------------------------------------------------------- Kopfzeile */
   header {
     display: flex; align-items: center; gap: 10px;
-    padding: 14px 18px; border-bottom: 1px solid var(--line);
+    padding: 13px 18px; border-bottom: 1px solid var(--line);
     background: var(--panel); flex: none;
   }
 
@@ -64,16 +66,15 @@
   .dot {
     width: 8px; height: 8px; border-radius: 50%;
     background: var(--faint); flex: none;
-    transition: background .3s;
+    transition: background .3s, box-shadow .3s;
   }
-  .dot.live  { background: var(--accent); box-shadow: 0 0 10px var(--accent); }
-  .dot.idle  { background: var(--blue); }
-  .dot.gone  { background: var(--warn); }
+  .dot.live { background: var(--accent); box-shadow: 0 0 10px var(--accent); }
+  .dot.idle { background: var(--blue); }
+  .dot.gone { background: var(--warn); }
 
   .standing {
     font-size: 11px; color: var(--muted);
     margin-left: auto; text-align: right;
-    font-variant-numeric: tabular-nums;
   }
 
   /* ------------------------------------------------------------- Rumpf */
@@ -88,73 +89,148 @@
      liegt am Seitenverhaeltnis, nicht an der Breite: Ein Handy im Querformat ist
      schmal und hat trotzdem Platz fuer zwei Spalten. */
   @media (min-aspect-ratio: 1/1) {
-    main { grid-template-rows: 1fr; grid-template-columns: 1fr minmax(240px, 300px); }
+    main { grid-template-rows: 1fr; grid-template-columns: 1fr minmax(250px, 320px); }
   }
 
+  /* ------------------------------------------------------------- Bühne */
   .stage {
-    background: var(--stage);
+    position: relative; background: var(--stage);
     display: flex; align-items: center; justify-content: center;
-    min-height: 0; padding: 10px; overflow: hidden;
+    min-height: 0; overflow: hidden; touch-action: none;
   }
 
   .stage img {
     max-width: 100%; max-height: 100%;
-    display: block; object-fit: contain;
-    border-radius: 4px;
+    display: block; transform-origin: 0 0;
+    image-rendering: auto; user-select: none; -webkit-user-drag: none;
   }
+  .stage img.grabbing { cursor: grabbing; }
+  .stage img.grab { cursor: grab; }
 
   .stage .empty {
     color: var(--faint); font-size: 12px;
-    text-align: center; padding: 24px; line-height: 1.7;
+    text-align: center; padding: 24px; line-height: 1.7; max-width: 30em;
   }
 
+  /* Werkzeuge auf der Bühne - erscheinen nur, wenn es ein Bild gibt. */
+  .tools {
+    position: absolute; left: 50%; bottom: 12px; transform: translateX(-50%);
+    display: none; align-items: center; gap: 2px; padding: 4px;
+    background: rgba(11, 11, 20, .86); border: 1px solid var(--line);
+    border-radius: 11px; backdrop-filter: blur(8px);
+  }
+  .tools.on { display: flex; }
+
+  .tools button {
+    min-width: 32px; height: 30px; padding: 0 8px;
+    background: transparent; border: 0; border-radius: 8px;
+    color: var(--muted); font-family: var(--mono); font-size: 13px;
+    cursor: pointer; line-height: 1;
+  }
+  .tools button:hover { background: var(--surface); color: var(--ink); }
+  .tools button:active { background: var(--line); }
+  .tools .level {
+    min-width: 46px; text-align: center; color: var(--faint);
+    font-size: 10.5px; font-family: var(--mono); cursor: default;
+  }
+  .tools .sep { width: 1px; height: 18px; background: var(--line); margin: 0 3px; }
+
+  /* ------------------------------------------------------------- Seite */
   .side {
     background: var(--panel);
     overflow-y: auto; -webkit-overflow-scrolling: touch;
-    padding: 16px 18px;
+    padding: 16px 18px 14px;
   }
+
+  /* ---------------------------------------------------- Zustand & Fortschritt */
+  .state { display: flex; align-items: center; gap: 8px; margin-bottom: 12px; }
+
+  .chip {
+    font-size: 8.5px; letter-spacing: .14em; text-transform: uppercase;
+    padding: 4px 8px; border-radius: 999px; font-weight: 600;
+    color: var(--faint); background: var(--surface); border: 1px solid var(--line);
+    white-space: nowrap;
+  }
+  .chip.live {
+    color: var(--accent); border-color: color-mix(in srgb, var(--accent) 45%, transparent);
+    background: color-mix(in srgb, var(--accent) 14%, transparent);
+  }
+  .chip.idle { color: var(--blue); border-color: color-mix(in srgb, var(--blue) 40%, transparent); }
+
+  .scene {
+    font-size: 11.5px; color: var(--muted);
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  }
+
+  .headline { display: flex; align-items: baseline; gap: 10px; margin-bottom: 10px; }
+
+  .headline .pct {
+    font-family: var(--mono); font-size: 34px; line-height: 1;
+    font-variant-numeric: tabular-nums; letter-spacing: -.02em;
+  }
+  .headline .pct small { font-size: 15px; color: var(--faint); margin-left: 2px; }
+
+  .headline .frames {
+    margin-left: auto; text-align: right;
+    font-family: var(--mono); font-size: 13px; color: var(--muted);
+    font-variant-numeric: tabular-nums;
+  }
+  .headline .frames b { color: var(--ink); font-weight: 500; }
+
+  .bar {
+    height: 6px; border-radius: 3px; background: var(--surface);
+    overflow: hidden; position: relative;
+  }
+  .bar i {
+    position: absolute; inset: 0 auto 0 0; display: block;
+    background: linear-gradient(90deg, var(--accent), var(--cyan));
+    width: 0; transition: width .45s ease; border-radius: 3px;
+  }
+
+  .times {
+    display: flex; justify-content: space-between;
+    margin: 7px 0 16px; font-size: 10px; color: var(--faint);
+    font-family: var(--mono); font-variant-numeric: tabular-nums;
+  }
+  .times b { color: var(--muted); font-weight: 400; }
 
   /* ------------------------------------------------------------- Zahlen */
-  .bar {
-    height: 4px; border-radius: 2px; background: var(--surface);
-    overflow: hidden; margin-bottom: 16px;
-  }
-  .bar span {
-    display: block; height: 100%; width: 0;
-    background: linear-gradient(90deg, var(--accent), var(--cyan));
-    transition: width .4s ease;
-  }
-
   .grid {
-    display: grid; gap: 14px 16px;
-    grid-template-columns: repeat(auto-fit, minmax(96px, 1fr));
+    display: grid; gap: 13px 16px;
+    grid-template-columns: repeat(auto-fit, minmax(88px, 1fr));
   }
 
   .cell label {
     display: block; font-size: 8.5px; letter-spacing: .12em;
-    text-transform: uppercase; color: var(--faint); margin-bottom: 4px;
+    text-transform: uppercase; color: var(--faint); margin-bottom: 3px;
   }
   .cell output {
-    font-family: var(--mono); font-size: 15px;
+    font-family: var(--mono); font-size: 13px;
     font-variant-numeric: tabular-nums; color: var(--ink);
   }
-  .cell output.small { font-size: 12px; }
-  .cell output em { font-style: normal; color: var(--faint); font-size: 11px; }
 
-  .rule {
-    grid-column: 1 / -1; height: 1px;
-    background: var(--line); margin: 2px 0;
-  }
+  .rule { grid-column: 1 / -1; height: 1px; background: var(--line); margin: 1px 0; }
 
-  .scene {
-    font-size: 12px; color: var(--muted);
-    margin-bottom: 14px; word-break: break-word;
+  /* Die Fussnote gehoert unter die Zahlen, nicht in einen eigenen Balken quer
+     ueber die Seite: Sie ist eine Randbemerkung, kein Bedienelement. */
+  .note {
+    margin-top: 18px; padding-top: 12px; border-top: 1px solid var(--line);
+    font-size: 9.5px; line-height: 1.6; color: var(--faint);
+    display: flex; justify-content: space-between; align-items: center; gap: 10px;
   }
+  .note button {
+    background: transparent; border: 0; padding: 0;
+    color: var(--faint); font-size: 9.5px; text-decoration: underline;
+    cursor: pointer; font-family: inherit; white-space: nowrap;
+  }
+  .note button:hover { color: var(--muted); }
 
   /* ------------------------------------------------------------- Kennwort */
   .ask {
     position: fixed; inset: 0; z-index: 10;
-    background: rgba(7, 7, 13, .94);
+    /* Deckend, nicht durchscheinend: Wer nach einem Kennwort gefragt wird, soll
+       nichts sehen, was er ohne Kennwort nicht sehen duerfte. */
+    background: var(--bg);
     display: none; align-items: center; justify-content: center; padding: 24px;
   }
   .ask.on { display: flex; }
@@ -175,19 +251,13 @@
   }
   .ask input:focus { outline: none; border-color: var(--accent); }
 
-  .ask button {
+  .ask button[type=submit] {
     width: 100%; margin-top: 12px; padding: 11px;
     font-size: 12px; font-weight: 600; letter-spacing: .04em;
     color: #0b0b14; background: var(--accent);
     border: 0; border-radius: 9px; cursor: pointer;
   }
   .ask .wrong { color: var(--warn); font-size: 11px; margin: 12px 0 0; min-height: 14px; }
-
-  footer {
-    flex: none; padding: 9px 18px; font-size: 9.5px;
-    color: var(--faint); text-align: center;
-    border-top: 1px solid var(--line); background: var(--panel);
-  }
 </style>
 </head>
 <body>
@@ -201,44 +271,63 @@
 <main>
   <div class="stage" id="stage">
     <div class="empty" id="empty">Noch kein Bild.</div>
+
+    <div class="tools" id="tools">
+      <button id="zoomOut" title="Kleiner" aria-label="Kleiner">−</button>
+      <span class="level" id="level">100 %</span>
+      <button id="zoomIn" title="Größer" aria-label="Größer">+</button>
+      <span class="sep"></span>
+      <button id="zoomReset" title="Einpassen" aria-label="Einpassen">⤢</button>
+      <button id="save" title="Bild sichern" aria-label="Bild sichern">↓</button>
+    </div>
   </div>
 
   <div class="side">
-    <div class="scene" id="scene"></div>
-    <div class="bar"><span id="barFill"></span></div>
+    <div class="state">
+      <span class="chip" id="chip">wartet</span>
+      <span class="scene" id="scene"></span>
+    </div>
+
+    <div class="headline">
+      <span class="pct" id="percent">–<small>%</small></span>
+      <span class="frames" id="frames">–</span>
+    </div>
+
+    <div class="bar"><i id="barFill"></i></div>
+
+    <div class="times">
+      <span>gelaufen <b id="elapsed">–</b></span>
+      <span>verbleibend <b id="remaining">–</b></span>
+    </div>
 
     <div class="grid">
-      <div class="cell"><label>Fortschritt</label><output id="percent">–</output></div>
-      <div class="cell"><label>Bild</label><output id="frame">–</output></div>
+      <div class="cell"><label>Je Bild</label><output id="spf">–</output></div>
       <div class="cell"><label>Geschrieben</label><output id="written">–</output></div>
+      <div class="cell"><label>Samples</label><output id="sample">–</output></div>
 
       <div class="rule"></div>
 
-      <div class="cell"><label>Gelaufen</label><output id="elapsed" class="small">–</output></div>
-      <div class="cell"><label>Verbleibend</label><output id="remaining" class="small">–</output></div>
-      <div class="cell"><label>Je Bild</label><output id="spf" class="small">–</output></div>
+      <div class="cell"><label>Auflösung</label><output id="size">–</output></div>
+      <div class="cell"><label>Speicher</label><output id="memory">–</output></div>
+      <div class="cell"><label>RAM frei</label><output id="ram">–</output></div>
 
       <div class="rule"></div>
 
-      <div class="cell"><label>Samples</label><output id="sample" class="small">–</output></div>
-      <div class="cell"><label>Speicher</label><output id="memory" class="small">–</output></div>
-      <div class="cell"><label>Auflösung</label><output id="size" class="small">–</output></div>
+      <div class="cell"><label>CPU</label><output id="cpu">–</output></div>
+      <div class="cell"><label>GPU</label><output id="gpu">–</output></div>
+    </div>
 
-      <div class="rule"></div>
-
-      <div class="cell"><label>CPU</label><output id="cpu" class="small">–</output></div>
-      <div class="cell"><label>GPU</label><output id="gpu" class="small">–</output></div>
-      <div class="cell"><label>RAM frei</label><output id="ram" class="small">–</output></div>
+    <div class="note">
+      <span>Nur Ansicht · Ende zu Ende verschlüsselt</span>
+      <button id="forget" title="Zugang von diesem Gerät entfernen">Zugang entfernen</button>
     </div>
   </div>
 </main>
 
-<footer id="foot">Nur Ansicht · Ende zu Ende verschlüsselt</footer>
-
 <div class="ask" id="ask">
   <form id="askForm" autocomplete="off">
     <h2>Kennwort</h2>
-    <p>Die ersten beiden Plätze sind belegt. Für einen weiteren braucht es das Kennwort, das am PC steht.</p>
+    <p>Die freien Plätze sind belegt. Für einen weiteren braucht es das Kennwort, das am PC steht.</p>
     <input id="askInput" type="password" inputmode="text" autocomplete="off"
            autocapitalize="off" spellcheck="false" aria-label="Kennwort">
     <button type="submit">Zusehen</button>
@@ -406,36 +495,55 @@ class Channel {
 
    Der Sinn ist handfest: Danach steht in der Adresszeile nur noch der Pfad. Ein
    Screenshot vom Handy verraet nichts, der Verlauf behaelt nichts, und wer kurz
-   ueber die Schulter sieht, sieht nichts. Im sessionStorage ueberlebt es das
-   Neuladen und stirbt mit dem Tab. */
+   ueber die Schulter sieht, sieht nichts.
+
+   Abgelegt wird im localStorage, nicht nur fuer die Sitzung. Das ist noetig, damit
+   die Seite sich installieren laesst: Ein installiertes Programm startet unter
+   seiner eigenen Adresse, ohne Raute - ohne bleibende Ablage waere es bei jedem
+   Start leer. Wer das nicht will, hat unten "Zugang entfernen". */
+const KEY_SECRET = "frameflip.watch.key";
+const KEY_CODE = "frameflip.watch.code";
+
+function keep(name, value) {
+  try {
+    if (value) localStorage.setItem(name, value);
+    else localStorage.removeItem(name);
+  } catch (e) { /* privates Fenster: dann eben nur fuer diesen Besuch */ }
+}
+
+function kept(name) {
+  try { return localStorage.getItem(name) || ""; } catch (e) { return ""; }
+}
+
 function secretFromAddress() {
   const raw = location.hash.replace(/^#/, "").trim();
 
   if (raw) {
-    try { sessionStorage.setItem("k", raw); } catch (e) { /* privates Fenster */ }
+    keep(KEY_SECRET, raw);
+
+    // Ein neuer Link heisst auch: das alte Kennwort passt womoeglich nicht mehr.
+    keep(KEY_CODE, "");
+
     history.replaceState(null, "", location.pathname);
     return raw;
   }
 
-  try { return sessionStorage.getItem("k") || ""; } catch (e) { return ""; }
+  return kept(KEY_SECRET);
 }
 
-function rememberedCode() {
-  try { return sessionStorage.getItem("c") || ""; } catch (e) { return ""; }
-}
-
-function rememberCode(code) {
-  try { code ? sessionStorage.setItem("c", code) : sessionStorage.removeItem("c"); }
-  catch (e) { /* ohne Gedaechtnis fragt die Seite eben wieder */ }
-}
+const rememberedCode = () => kept(KEY_CODE);
+const rememberCode = code => keep(KEY_CODE, code);
 
 /* ------------------------------------------------------------------- Anzeige */
 
 const el = id => document.getElementById(id);
 const dot = el("dot"), standing = el("standing"), stage = el("stage"), empty = el("empty");
+const tools = el("tools"), level = el("level");
 
-let picture = null;
-let pictureUrl = null;
+let picture = null;      // das <img>, sobald es eines gibt
+let pictureUrl = null;   // seine derzeitige blob-Adresse
+let lastJpeg = null;     // die Bytes, fuer das Sichern
+let lastState = null;
 
 function say(text, mood) {
   standing.textContent = text;
@@ -456,26 +564,37 @@ function clock(seconds) {
 const put = (id, text) => { el(id).textContent = text; };
 
 function show(state) {
-  const has = name => state[name] !== undefined && state[name] !== null;
+  lastState = state;
 
-  put("percent", has("percent") ? state.percent.toFixed(1) + " %" : "–");
+  const has = name => state[name] !== undefined && state[name] !== null;
+  const läuft = state.rendering === true;
+
+  el("chip").className = "chip " + (läuft ? "live" : "idle");
+  el("chip").textContent = läuft ? (state.activity || "rendert") : "bereit";
+
+  el("scene").textContent = state.scene || "";
+
+  el("percent").innerHTML = has("percent")
+    ? state.percent.toFixed(1) + "<small>%</small>"
+    : "–<small>%</small>";
+
   el("barFill").style.width = (has("percent") ? Math.min(100, state.percent) : 0) + "%";
 
-  put("frame", has("frame")
-    ? state.frame + (has("last") ? " / " + state.last : "")
-    : "–");
+  el("frames").innerHTML = has("frame")
+    ? "<b>" + state.frame + "</b>" + (has("last") ? " / " + state.last : "")
+    : "–";
 
-  put("written", has("written") ? String(state.written) : "–");
   put("elapsed", clock(state.elapsed));
-  put("remaining", state.rendering && has("remaining") ? clock(state.remaining) : "–");
+  put("remaining", läuft && has("remaining") ? clock(state.remaining) : "–");
   put("spf", has("secondsPerFrame") ? state.secondsPerFrame.toFixed(2) + " s" : "–");
+  put("written", has("written") ? String(state.written) : "–");
 
   put("sample", has("sample")
     ? state.sample + (has("sampleTotal") ? " / " + state.sampleTotal : "")
     : "–");
 
-  put("memory", has("memoryMb") ? Math.round(state.memoryMb) + " MB" : "–");
   put("size", has("width") && has("height") ? state.width + " × " + state.height : "–");
+  put("memory", has("memoryMb") ? Math.round(state.memoryMb) + " MB" : "–");
   put("cpu", has("cpu") ? state.cpu.toFixed(0) + " %" : "–");
   put("gpu", has("gpu") ? state.gpu.toFixed(0) + " %" : "–");
 
@@ -483,25 +602,24 @@ function show(state) {
     ? (state.freeMb / 1024).toFixed(1) + (has("totalMb") ? " / " + (state.totalMb / 1024).toFixed(0) : "") + " GB"
     : "–");
 
-  el("scene").textContent = state.scene
-    ? (state.rendering ? "rendert " : "") + state.scene
-    : "";
-
-  say(state.rendering ? (state.activity || "rendert") : "bereit",
-      state.rendering ? "live" : "idle");
+  say(läuft ? (state.activity || "rendert") : "bereit", läuft ? "live" : "idle");
 }
 
 function showPicture(jpeg) {
+  lastJpeg = jpeg;
+
   const next = URL.createObjectURL(new Blob([jpeg], { type: "image/jpeg" }));
 
   if (!picture) {
     picture = document.createElement("img");
     picture.alt = "";
+    picture.addEventListener("dblclick", () => setZoom(scale > 1 ? 1 : 2));
     stage.appendChild(picture);
   }
 
   picture.src = next;
   empty.style.display = "none";
+  tools.classList.add("on");
 
   // Die alte Adresse erst freigeben, wenn die neue steht - sonst blitzt es weiss auf.
   const old = pictureUrl;
@@ -509,7 +627,192 @@ function showPicture(jpeg) {
   if (old) setTimeout(() => URL.revokeObjectURL(old), 1000);
 }
 
-/* ------------------------------------------------------------------ Verbindung */
+/* Alles vom Bildschirm nehmen.
+
+   Wird gerufen, bevor nach einem Kennwort gefragt wird. Ohne das staende hinter der
+   Abfrage noch, was eine fruehere Verbindung geliefert hat - und ein Kennwort, das
+   man umgehen kann, indem man dahinterschaut, ist keines. */
+function blank() {
+  if (picture) { picture.remove(); picture = null; }
+  if (pictureUrl) { URL.revokeObjectURL(pictureUrl); pictureUrl = null; }
+
+  lastJpeg = null;
+  lastState = null;
+
+  tools.classList.remove("on");
+  empty.style.display = "";
+  empty.textContent = "Noch kein Bild.";
+
+  setZoom(1);
+
+  el("chip").className = "chip";
+  el("chip").textContent = "wartet";
+  el("scene").textContent = "";
+  el("percent").innerHTML = "–<small>%</small>";
+  el("frames").textContent = "–";
+  el("barFill").style.width = "0%";
+
+  for (const id of ["elapsed", "remaining", "spf", "written", "sample", "size", "memory", "cpu", "gpu", "ram"]) {
+    put(id, "–");
+  }
+}
+
+/* ---------------------------------------------------------- Näher heransehen */
+
+/* Die Verschiebung rechnet gegen die MITTE der Bühne, nicht gegen den Kasten des
+   Bildes: Der Kasten wandert ja mit der Verschiebung, und wer gegen ihn rechnet,
+   jagt seinem eigenen Ergebnis hinterher. */
+let scale = 1, tx = 0, ty = 0;
+
+const clamp = (v, lo, hi) => Math.min(hi, Math.max(lo, v));
+
+function apply() {
+  if (!picture) return;
+
+  limit();
+
+  picture.style.transform = `translate(${tx}px, ${ty}px) scale(${scale})`;
+  picture.className = scale > 1 ? "grab" : "";
+  level.textContent = Math.round(scale * 100) + " %";
+}
+
+/* Nicht weiter schieben, als Bild da ist. Sonst zieht man es aus dem Bild heraus
+   und sieht schwarz, ohne zu wissen, wohin man geraten ist. */
+function limit() {
+  if (!picture) return;
+
+  const bühne = stage.getBoundingClientRect();
+  const breite = picture.clientWidth * scale;
+  const höhe = picture.clientHeight * scale;
+
+  const x = Math.max(0, (breite - bühne.width) / 2);
+  const y = Math.max(0, (höhe - bühne.height) / 2);
+
+  tx = clamp(tx, -x, x);
+  ty = clamp(ty, -y, y);
+}
+
+function setZoom(next, cx, cy) {
+  next = clamp(next, 1, 8);
+
+  if (cx === undefined) {
+    // Ohne Zielpunkt um die Mitte herum.
+    const faktor = next / scale;
+    tx *= faktor;
+    ty *= faktor;
+  } else {
+    const bühne = stage.getBoundingClientRect();
+    const px = cx - (bühne.left + bühne.width / 2);
+    const py = cy - (bühne.top + bühne.height / 2);
+    const faktor = next / scale;
+
+    tx = px - faktor * (px - tx);
+    ty = py - faktor * (py - ty);
+  }
+
+  scale = next;
+
+  if (scale === 1) { tx = 0; ty = 0; }
+
+  apply();
+}
+
+el("zoomIn").onclick = () => setZoom(scale * 1.5);
+el("zoomOut").onclick = () => setZoom(scale / 1.5);
+el("zoomReset").onclick = () => setZoom(1);
+
+stage.addEventListener("wheel", event => {
+  if (!picture) return;
+
+  event.preventDefault();
+  setZoom(scale * (event.deltaY < 0 ? 1.18 : 1 / 1.18), event.clientX, event.clientY);
+}, { passive: false });
+
+/* Ziehen und Zusammenkneifen über Zeiger-Ereignisse - dieselbe Behandlung für
+   Maus und Finger, statt zweier Wege, die auseinanderlaufen. */
+const zeiger = new Map();
+let greifpunkt = null, kneifAbstand = 0, kneifStart = 1;
+
+stage.addEventListener("pointerdown", event => {
+  if (!picture) return;
+
+  zeiger.set(event.pointerId, { x: event.clientX, y: event.clientY });
+  stage.setPointerCapture(event.pointerId);
+
+  if (zeiger.size === 1 && scale > 1) {
+    greifpunkt = { x: event.clientX - tx, y: event.clientY - ty };
+    picture.className = "grabbing";
+  }
+
+  if (zeiger.size === 2) {
+    const [a, b] = Array.from(zeiger.values());
+    kneifAbstand = Math.hypot(a.x - b.x, a.y - b.y);
+    kneifStart = scale;
+    greifpunkt = null;
+  }
+});
+
+stage.addEventListener("pointermove", event => {
+  if (!zeiger.has(event.pointerId)) return;
+
+  zeiger.set(event.pointerId, { x: event.clientX, y: event.clientY });
+
+  if (zeiger.size === 2) {
+    const [a, b] = Array.from(zeiger.values());
+    const jetzt = Math.hypot(a.x - b.x, a.y - b.y);
+
+    if (kneifAbstand > 0) {
+      setZoom(kneifStart * (jetzt / kneifAbstand), (a.x + b.x) / 2, (a.y + b.y) / 2);
+    }
+
+    return;
+  }
+
+  if (greifpunkt) {
+    tx = event.clientX - greifpunkt.x;
+    ty = event.clientY - greifpunkt.y;
+    apply();
+  }
+});
+
+function loslassen(event) {
+  zeiger.delete(event.pointerId);
+
+  if (zeiger.size < 2) kneifAbstand = 0;
+  if (zeiger.size === 0) { greifpunkt = null; if (picture) picture.className = scale > 1 ? "grab" : ""; }
+}
+
+stage.addEventListener("pointerup", loslassen);
+stage.addEventListener("pointercancel", loslassen);
+
+addEventListener("resize", () => apply());
+
+/* ------------------------------------------------------------------- Sichern */
+
+el("save").onclick = () => {
+  if (!lastJpeg) return;
+
+  const nummer = lastState && lastState.frame !== undefined && lastState.frame !== null
+    ? String(lastState.frame).padStart(4, "0")
+    : "aktuell";
+
+  const url = URL.createObjectURL(new Blob([lastJpeg], { type: "image/jpeg" }));
+  const a = document.createElement("a");
+
+  a.href = url;
+  a.download = `frameflip_${nummer}.jpg`;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+
+  setTimeout(() => URL.revokeObjectURL(url), 2000);
+};
+
+el("forget").onclick = () => {
+  keep(KEY_SECRET, "");
+  keep(KEY_CODE, "");
+  location.reload();
+};
 
 const Result = {
   Paired: "paired",    // drin, Kanal steht
@@ -720,6 +1023,10 @@ const ask = el("ask"), askForm = el("askForm"), askInput = el("askInput"), askWr
 
 function askForCode(message) {
   return new Promise(resolve => {
+    // Erst leeren, dann fragen - sonst steht hinter der Abfrage noch, was eine
+    // fruehere Verbindung geliefert hat.
+    blank();
+
     askWrong.textContent = message || "";
     askInput.value = "";
     ask.classList.add("on");
@@ -878,6 +1185,21 @@ async function run() {
 }
 
 run();
+
+/* ------------------------------------------------------------ Installierbar
+
+   Der Dienstarbeiter ist nicht dafuer da, Daten vorzuhalten - es gibt hier nichts
+   vorzuhalten, was laenger als ein paar Sekunden gilt. Er haelt die Huelle bereit,
+   damit sich die Seite als Programm ablegen laesst und beim Start sofort etwas da
+   ist. Alles Lebendige kommt weiterhin ueber die verschluesselte Leitung.
+
+   Schlaegt die Anmeldung fehl - altes Handy, abgeschaltet, privates Fenster -,
+   laeuft die Seite unveraendert weiter. Sie laesst sich dann nur nicht ablegen. */
+if ("serviceWorker" in navigator) {
+  addEventListener("load", () => {
+    navigator.serviceWorker.register("sw.js").catch(() => { /* dann eben ohne */ });
+  });
+}
 </script>
 </body>
 </html>

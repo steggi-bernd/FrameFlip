@@ -10,6 +10,7 @@
 import fs from "node:fs";
 import http from "node:http";
 import net from "node:net";
+import path from "node:path";
 
 const [, , PAGE, PORT = "8090", RELAY = "127.0.0.1:8080"] = process.argv;
 const [relayHost, relayPort] = RELAY.split(":");
@@ -22,18 +23,35 @@ const server = http.createServer((request, response) => {
   }
 
   if (request.url.startsWith("/w/")) {
-    // Frisch von der Platte lesen: Beim Anschauen wird oft nachgebessert, und ein
-    // Neustart für jede Änderung wäre die falsche Art von Sorgfalt.
-    const page = fs.readFileSync(PAGE);
+    // Genau wie Caddy: Was als Datei danebenliegt, wird ausgeliefert; alles andere
+    // ist die Seite selbst.
+    const name = request.url.slice(3).split("?")[0] || "index.html";
+    const ordner = path.dirname(PAGE);
+
+    const arten = {
+      ".html": "text/html; charset=utf-8",
+      ".js": "text/javascript; charset=utf-8",
+      ".webmanifest": "application/manifest+json; charset=utf-8",
+      ".png": "image/png"
+    };
+
+    // Nur Namen ohne Pfadanteil - ein Aufruf soll nicht aus dem Ordner herausführen.
+    const datei = /^[A-Za-z0-9._-]+$/.test(name) && name !== "index.html"
+      ? path.join(ordner, name)
+      : PAGE;
+
+    if (!fs.existsSync(datei)) { response.writeHead(404); response.end("Nichts hier.\n"); return; }
 
     response.writeHead(200, {
-      "Content-Type": "text/html; charset=utf-8",
+      "Content-Type": arten[path.extname(datei)] || "application/octet-stream",
       "Cache-Control": "no-store",
       "X-Content-Type-Options": "nosniff",
       "Referrer-Policy": "no-referrer"
     });
 
-    response.end(page);
+    // Frisch von der Platte lesen: Beim Anschauen wird oft nachgebessert, und ein
+    // Neustart für jede Änderung wäre die falsche Art von Sorgfalt.
+    response.end(fs.readFileSync(datei));
     return;
   }
 

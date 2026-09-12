@@ -1,6 +1,6 @@
 # Die Zuschauerseite
 
-`watch.html` ist die ganze Seite. Eine Datei, kein Beiwerk, nichts nachzuladen — sie
+`index.html` ist die ganze Seite. Eine Datei, kein Beiwerk, nichts nachzuladen — sie
 lässt sich prüfen, indem man sie liest.
 
 Sie zeigt **nur** Zahlen und das jeweils neueste Bild. Es gibt keinen Weg, von ihr aus
@@ -45,7 +45,7 @@ nicht. Zwei Handgriffe auf dem Leuchtturm:
 
 ```bash
 mkdir -p ~/caddy/watch
-# watch.html dorthin kopieren
+# index.html dorthin kopieren
 ```
 
 Und in `~/caddy/docker-compose.yml` bei `volumes` ergänzen:
@@ -61,15 +61,15 @@ bekommt einen zweiten Pfad davor:
 relay.steggi-matrix.work {
     redir /w /w/
 
-    handle /w/* {
+    handle_path /w/* {
         root * /srv/watch
-        rewrite * /watch.html
         file_server
 
         header {
-            Cache-Control       "no-store"
+            Cache-Control          "no-store"
             X-Content-Type-Options "nosniff"
-            Referrer-Policy     "no-referrer"
+            Referrer-Policy        "no-referrer"
+            Content-Security-Policy "default-src 'none'; img-src 'self' blob: data:; style-src 'unsafe-inline'; script-src 'unsafe-inline'; connect-src 'self' wss://relay.steggi-matrix.work; manifest-src 'self'; worker-src 'self'; base-uri 'none'; form-action 'none'"
         }
     }
 
@@ -80,14 +80,33 @@ relay.steggi-matrix.work {
 }
 ```
 
-Die Reihenfolge ist wichtig — `handle /w/*` muss **vor** dem allgemeinen `handle`
-stehen, sonst geht der Aufruf an den Relay, und der kennt den Pfad nicht.
+Zwei Dinge sind daran wichtig:
+
+* `handle_path` statt `handle` — es schneidet `/w` vom Pfad ab, sodass `/w/` die
+  `index.html` trifft und `/w/sw.js` wirklich den Dienstarbeiter. Mit einem
+  `rewrite * /index.html` käme stattdessen auf **jeden** Pfad die Seite zurück,
+  auch auf Manifest und Zeichen — und installieren ließe sie sich nicht.
+
+* Die Reihenfolge — der `/w/`-Block muss **vor** dem allgemeinen `handle` stehen,
+  sonst geht der Aufruf an den Relay, und der kennt den Pfad nicht.
 
 Dann neu laden:
 
 ```bash
 cd ~/caddy && docker compose up -d --force-recreate
 ```
+
+## Als Programm ablegen
+
+`manifest.webmanifest` und `sw.js` machen die Seite installierbar — am Handy über
+„Zum Startbildschirm", am Schreibtisch über das Installieren-Zeichen in der
+Adresszeile. Sie startet dann unter ihrer eigenen Adresse, **ohne Raute**; das
+Geheimnis liegt deshalb im `localStorage` statt nur für die Sitzung. „Zugang
+entfernen" unten in der Seite löscht es wieder.
+
+Der Dienstarbeiter hält **nur die Hülle** bereit — Seite, Manifest, Zeichen. Er
+fasst nichts an, was durch die verschlüsselte Leitung kommt: Ein Bild aus einem
+Render soll auf dem Gerät nicht länger liegen, als es zu sehen ist.
 
 ## Nachsehen, ob es steht
 
@@ -106,7 +125,7 @@ ausgeführt statt nachgebaut:
 
 ```bash
 go build -o relay.exe .        # im Ordner frameflip-relay
-node client.mjs watch.html 127.0.0.1:8080 <geheimnis> <kennwort>
+node client.mjs index.html 127.0.0.1:8080 <geheimnis> <kennwort>
 ```
 
 Zwei Dinge sind dabei schon aufgefallen und behoben, die in keiner Durchsicht
