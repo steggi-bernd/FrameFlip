@@ -1,0 +1,11 @@
+# Zeilenenden festnageln - hier haengt mehr daran als Ordnung.
+#
+# Die Inhaltsregel der Seite nennt die SHA-256 ihres Skript- und Stilblocks. Die
+# Summe gilt fuer den Text mit \n. Wandelt Git beim Auschecken in \r\n um, ist es
+# ein anderer Text, die Summe stimmt nicht mehr, der Browser weist das Skript ab -
+# und die Seite bleibt leer, ohne dass irgendwo ein Fehler stuende.
+#
+# Dasselbe gilt fuer die Teile in teile/: bauen.py rechnet ueber sie.
+* text eol=lf
+
+*.png binary
