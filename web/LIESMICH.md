@@ -30,10 +30,36 @@ Ableitung eingeht. FrameFlip sitzt in allen, ein Browser sucht sich einen freien
 | 0, 1 | der Link allein genügt |
 | 2 – 5 | zusätzlich das Kennwort, das am PC steht |
 
-**Am Relay ist dafür nichts zu ändern.** Er sieht sechs ganz gewöhnliche Räume und
-muss von Zuschauern nichts wissen. Jeder Zuschauer hat außerdem seinen eigenen Kanal
-mit eigenen Salzen — keiner kann lesen, was ein anderer bekommt, selbst wenn beide
+**Am Relay ist dafür nichts zu ändern.** Er sieht gewöhnliche Räume und muss von
+Zuschauern nichts wissen. Jeder Zuschauer hat außerdem seinen eigenen Kanal mit
+eigenen Salzen — keiner kann lesen, was ein anderer bekommt, selbst wenn beide
 denselben Link haben.
+
+### Plätze gehen bei Bedarf auf, nicht auf Vorrat
+
+Ein Raum gilt beim Relay als belegt, **sobald jemand darin sitzt** — auch wenn das
+nur FrameFlip selbst ist und nie ein Zuschauer kommt. Sechs Plätze dauerhaft offen zu
+halten hieße, sechs Räume für Leute freizuhalten, die nicht da sind. Der Relay fasst
+128 Räume insgesamt; bei sieben je Installation wären das achtzehn gleichzeitige
+Nutzer, bei dreien mehr als vierzig.
+
+Offen bleibt deshalb immer **einer mehr, als besetzt sind** — mindestens aber die
+freien:
+
+```
+  niemand sieht zu    frei frei zu zu zu zu          2 offen
+  einer sieht zu      besetzt frei zu zu zu zu       2 offen
+  zwei sehen zu       besetzt besetzt frei zu zu zu  3 offen
+```
+
+Der eine im Voraus ist keine Großzügigkeit, sondern Notwendigkeit: Der Relay bringt
+nur zusammen, was schon da ist. Ein Platz, der erst aufginge, wenn jemand danach
+fragt, käme immer zu spät — der Zuschauer fände einen leeren Raum vor und zöge weiter.
+
+Beim Schließen wird dagegen **gewartet** (30 Sekunden, im Prüfstand 3). Wer die Seite
+neu lädt oder kurz das Netz wechselt, ist in Sekunden zurück; ohne die Wartezeit
+entstünde genau das Verbindungsflattern, gegen das die Grenzen des Relays gedacht
+sind.
 
 ## Aufstellen
 

@@ -147,8 +147,11 @@ public sealed class AppHost : IDisposable
         var newest = new Web.NewestFrame(() => _renderMonitor?.Job,
                                          Decoding.FrameDecoderRegistry.CreateDefault());
 
+        // newest.Path statt des Objekts: Der Dienst braucht nur den Pfad, und die
+        // Entkopplung macht ihn pruefbar, ohne dass ein Pruefstand je die Merkliste
+        // des Benutzers anfassen muesste.
         _watch = new Web.WatchService(key, _settings.RelayHost, _renderMonitor,
-                                      () => _load.LastSnapshot, newest);
+                                      () => _load.LastSnapshot, newest.Path);
 
         _watch.Start();
     }

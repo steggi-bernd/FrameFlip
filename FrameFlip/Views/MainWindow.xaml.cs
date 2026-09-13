@@ -2401,7 +2401,10 @@ public partial class MainWindow : Window
             _ => Strings.T("D_WatchViewers", watchers)
         };
 
-        string seats = Strings.T("D_WatchSeats", Math.Max(0, watch.OpenSeats - watchers), watch.OpenSeats);
+        // MaxSeats, nicht OpenSeats: Offen ist immer nur einer mehr als besetzt, weil
+        // Raeume auf dem Leuchtturm knapp sind. Dem Benutzer davon zu erzaehlen waere
+        // verwirrend - fuer ihn zaehlt, wieviele ueberhaupt zusehen koennen.
+        string seats = Strings.T("D_WatchSeats", Math.Max(0, watch.MaxSeats - watchers), watch.MaxSeats);
 
         string standing = Strings.T("D_WatchOn") + Environment.NewLine + Environment.NewLine + who + " " + seats;
 

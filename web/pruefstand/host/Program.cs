@@ -1,125 +1,74 @@
-// Prüfstand: FrameFlip als Host in den Zuschauerräumen eines lokalen Leuchtturms.
+// Prüfstand: FrameFlips echter WatchService gegen einen Leuchtturm.
 //
-// Bewusst ohne NewestFrame und ohne ProjectLibrary - der Prüfstand soll keine
-// Bilder des Benutzers anfassen. Was hier hinausgeht, entsteht in dieser Datei.
+// Bewusst der Dienst selbst und kein Nachbau. Eine frühere Fassung schickte die
+// Nachrichten von Hand über RelayClient - und prüfte damit alles außer der Logik,
+// auf die es ankommt: wann Plätze aufgehen, wann sie wieder zugehen, und dass nie
+// an einen leeren Platz gesendet wird.
+//
+// Das Bild entsteht hier in der Datei. Der Prüfstand fasst nie die Medien des
+// Benutzers an - deshalb bekommt WatchService den Pfad als Funktion und nicht die
+// Merkliste des Projekts.
 
 using System.Globalization;
 using System.IO;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
 using FrameFlip.Remote;
+using FrameFlip.Web;
 
 string relay = args.Length > 0 ? args[0] : "127.0.0.1:8080";
 string code = args.Length > 1 ? args[1] : "geheim123";
 
 var key = WatchKey.Create(code);
 
+// Ein eigenes Bild, damit nichts vom Rechner des Benutzers das Haus verlässt.
+string bild = Path.Combine(Path.GetTempPath(), "frameflip-pruefbild.jpg");
+File.WriteAllBytes(bild, TestBild());
+
 Console.WriteLine("SECRET=" + key.Text);
 Console.WriteLine("CODE=" + code);
-Console.WriteLine("SEATS=" + key.OpenSeats);
+Console.WriteLine("MAXSEATS=" + key.OpenSeats);
+Console.WriteLine("JPEG=" + new FileInfo(bild).Length);
 
-for (int seat = 0; seat < key.OpenSeats; seat++)
-{
-    Console.WriteLine($"ROOM{seat}=" + key.RoomId(seat));
+// Drei Sekunden statt dreißig: Eine Prüfung, die eine halbe Minute darauf wartet,
+// dass ein Platz zugeht, wäre keine Prüfung, sondern eine Geduldsprobe.
+var dienst = new WatchService(key, relay, null, () => null, () => bild, TimeSpan.FromSeconds(3));
 
-    // Nicht der Schluessel selbst, nur ein Fingerabdruck - er genuegt zum Vergleich.
-    byte[] raw = System.Text.Encoding.UTF8.GetBytes(key.Channel(seat).Text);
-    Console.WriteLine($"FP{seat}=" + Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(raw))[..16].ToLowerInvariant());
-}
+dienst.Changed += () =>
+    Console.WriteLine(string.Create(CultureInfo.InvariantCulture,
+        $"STAND offen={dienst.OpenSeats} zusehend={dienst.Watchers} hoechstens={dienst.MaxSeats}"));
 
-var clients = new List<RelayClient>();
+dienst.Start();
 
-// Wer zusieht - und nur dorthin wird gesendet.
-//
-// Das ist keine Sparsamkeit, sondern Notwendigkeit: Der Ausgangspuffer haelt 64
-// Nachrichten. Wer an einen leeren Platz sendet, staut sie dort auf, und sobald
-// jemand hereinkommt, ergiesst sich der ganze Stau auf ihn. Die Warteschlange des
-// Leuchtturms fasst 32 - er trennt den Neuankoemmling als "zu langsam", bevor der
-// ein einziges Bild gesehen hat. WatchService haelt sich aus demselben Grund daran.
-var paired = new bool[key.OpenSeats];
-
-for (int seat = 0; seat < key.OpenSeats; seat++)
-{
-    var client = new RelayClient(RelayRoom.ForWatching(key, relay, seat));
-    int mine = seat;
-
-    client.StateChanged += state =>
-    {
-        paired[mine] = state == RelayState.Paired;
-        Console.WriteLine($"SEAT{mine}={state}");
-    };
-
-    // Darf nie feuern: Der Raum hört nicht zu. Feuert es doch, ist die Einbahnstraße
-    // keine - und der Prüfstand soll das laut sagen.
-    client.PayloadReceived += _ => Console.WriteLine($"LEAK{mine}=eingehende Nutzlast geöffnet!");
-
-    clients.Add(client);
-    client.Start();
-}
-
-byte[] jpeg = TestBild();
-Console.WriteLine("JPEG=" + jpeg.Length);
+Console.WriteLine("BEREIT");
 Console.Out.Flush();
 
-int tick = 0;
+await Task.Delay(Timeout.Infinite);
 
-while (true)
-{
-    tick++;
-
-    // Invariant, sonst schreibt eine deutsche Umgebung "5,0" - und das ist kein JSON.
-    string percent = (tick * 5.0).ToString("0.0", CultureInfo.InvariantCulture);
-
-    string json = $"{{\"rendering\":true,\"percent\":{percent},\"frame\":{100 + tick}," +
-                  "\"first\":100,\"last\":120,\"written\":" + tick + ",\"elapsed\":" + (tick * 3) +
-                  ",\"remaining\":42,\"secondsPerFrame\":3.25,\"width\":1920,\"height\":1080," +
-                  "\"scene\":\"pruefstand\",\"sample\":16,\"sampleTotal\":128,\"memoryMb\":2048," +
-                  "\"cpu\":73.5,\"gpu\":91.0,\"freeMb\":8192,\"totalMb\":32768," +
-                  "\"frameId\":\"t" + tick.ToString("x4") + "\"}";
-
-    for (int seat = 0; seat < clients.Count; seat++)
-    {
-        if (!paired[seat]) continue;
-
-        clients[seat].Send(Envelope.Json(json));
-        clients[seat].Send(Envelope.Preview(100 + tick, jpeg));
-    }
-
-    await Task.Delay(1000);
-}
-
-// Ein eigenes Bild, damit nichts vom Rechner des Benutzers das Haus verlässt.
+// Ein Bild in Renderformat - an einer Briefmarke ließe sich nichts nachmessen.
 static byte[] TestBild()
 {
-    try
-    {
-        const int w = 160, h = 90;
-        var pixels = new byte[w * h * 3];
+    const int w = 1280, h = 720;
+    var pixels = new byte[w * h * 3];
 
-        for (int y = 0; y < h; y++)
+    for (int y = 0; y < h; y++)
+    {
+        for (int x = 0; x < w; x++)
         {
-            for (int x = 0; x < w; x++)
-            {
-                int i = (y * w + x) * 3;
-                pixels[i] = (byte)(x * 255 / w);
-                pixels[i + 1] = (byte)(y * 255 / h);
-                pixels[i + 2] = 120;
-            }
+            int i = (y * w + x) * 3;
+            pixels[i] = (byte)(x * 255 / w);
+            pixels[i + 1] = (byte)(y * 255 / h);
+            pixels[i + 2] = 120;
         }
-
-        var source = BitmapSource.Create(w, h, 96, 96, PixelFormats.Rgb24, null, pixels, w * 3);
-
-        var encoder = new JpegBitmapEncoder { QualityLevel = 70 };
-        encoder.Frames.Add(BitmapFrame.Create(source));
-
-        using var buffer = new MemoryStream();
-        encoder.Save(buffer);
-
-        return buffer.ToArray();
     }
-    catch (Exception ex)
-    {
-        Console.WriteLine("JPEGFEHLER=" + ex.GetType().Name);
-        return new byte[512];
-    }
+
+    var source = BitmapSource.Create(w, h, 96, 96, PixelFormats.Rgb24, null, pixels, w * 3);
+
+    var encoder = new JpegBitmapEncoder { QualityLevel = 70 };
+    encoder.Frames.Add(BitmapFrame.Create(source));
+
+    using var buffer = new MemoryStream();
+    encoder.Save(buffer);
+
+    return buffer.ToArray();
 }
