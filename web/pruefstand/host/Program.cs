@@ -16,6 +16,15 @@ using System.Windows.Media.Imaging;
 using FrameFlip.Remote;
 using FrameFlip.Web;
 
+// Flutmodus: Schiebt so viel durch eine Verbindung, wie die Bremse zulässt, und
+// sagt, ob der Leuchtturm sie dabei getrennt hat. Das ist die eigentliche Frage -
+// eine Rechnung auf dem Papier beantwortet sie nicht.
+if (args.Length > 0 && args[0] == "--flut")
+{
+    await Fluten(args.Length > 1 ? args[1] : "127.0.0.1:8080");
+    return;
+}
+
 string relay = args.Length > 0 ? args[0] : "127.0.0.1:8080";
 string code = args.Length > 1 ? args[1] : "geheim123";
 
@@ -71,4 +80,62 @@ static byte[] TestBild()
     encoder.Save(buffer);
 
     return buffer.ToArray();
+}
+
+// ---------------------------------------------------------------------- Flutmodus
+
+static async Task Fluten(string relay)
+{
+    var key = WatchKey.Create(null);
+
+    Console.WriteLine("SECRET=" + key.Text);
+    Console.Out.Flush();
+
+    var client = new RelayClient(RelayRoom.ForWatching(key, relay, 0));
+
+    var verbunden = new TaskCompletionSource();
+    bool abgerissen = false;
+
+    client.StateChanged += state =>
+    {
+        Console.WriteLine("STATE=" + state);
+
+        if (state == RelayState.Paired) verbunden.TrySetResult();
+        else if (verbunden.Task.IsCompleted) abgerissen = true;
+    };
+
+    client.Start();
+
+    await verbunden.Task.WaitAsync(TimeSpan.FromSeconds(20));
+
+    /* In Runden, nicht alles auf einmal.
+     *
+     * Der Ausgangspuffer fasst 64 Nachrichten und wirft im Ueberlauf die aeltesten
+     * weg. Vierhundert Stuecke auf einen Schlag einzureihen wuerde also nur zeigen,
+     * dass ein Puffer ueberlaeuft - nicht, ob der Leuchtturm trennt. Vierzig je
+     * Runde passen hinein, drei Sekunden Pause reichen der Bremse, sie
+     * abzuarbeiten. Zusammen vierzig Megabyte, das Fuenffache des Vorrats den der
+     * Relay einraeumt. */
+    var stueck = new byte[Envelope.ChunkBytes];
+    var begonnen = DateTime.UtcNow;
+    int gesendet = 0;
+
+    for (int runde = 0; runde < 8 && !abgerissen; runde++)
+    {
+        for (int i = 0; i < 40 && !abgerissen; i++)
+        {
+            client.Send(Envelope.Chunk(1, gesendet, false, stueck));
+            gesendet++;
+        }
+
+        await Task.Delay(3000);
+    }
+
+    double dauer = (DateTime.UtcNow - begonnen).TotalSeconds;
+
+    Console.WriteLine($"GESENDET={gesendet * (long)Envelope.ChunkBytes / 1048576.0:0.0} MiB angereiht");
+    Console.WriteLine($"DAUER={dauer:0.0} s");
+    Console.WriteLine("ABGERISSEN=" + (abgerissen ? "JA" : "nein"));
+
+    await client.DisposeAsync();
 }

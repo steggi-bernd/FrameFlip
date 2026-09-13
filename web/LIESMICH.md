@@ -152,6 +152,30 @@ Drei Dinge, die dabei leicht schiefgehen — alle drei sind passiert:
 Nachgemessen: null Punkte Abweichung über vierzehn Zoomschritte, in zwei
 verschiedenen Ecken, auf beiden Flächen.
 
+## Die Bremse am Ausgang
+
+Der Relay begrenzt, was eine Verbindung ihm zumutet — Nachrichten und Bytes je
+Sekunde. Wer darüber liegt, wird nicht gebremst, sondern **getrennt**, ohne Vorwarnung
+und mitten im Satz.
+
+Gemessen am laufenden Stand: Eine Dateiübertragung — 128-KiB-Stücke, vier gleichzeitig
+unterwegs — fiel nach **10,5 MiB und 1,1 Sekunden**. Auf einer schnellen Leitung sind
+das zweistellige MiB je Sekunde, und keine Grenze, die als Schutz noch etwas bedeutet,
+lässt das durch.
+
+Die Bremse sitzt deshalb in `RelayClient.PumpAsync` und nicht im Dateiweg: Der Relay
+zählt die **Verbindung**, nicht das Feature. Vorschaubilder, Zustandsmeldungen,
+Dateistücke und alles Künftige teilen sich dieselbe Leitung und müssen sich dasselbe
+Budget teilen.
+
+Mit Bremse, gegen dieselben Grenzen gemessen: **40 MiB in 24 Sekunden, nicht
+getrennt.**
+
+Die Werte liegen bewusst unter denen des Relays — 48 statt 64 Nachrichten, 3 statt
+4 MiB je Sekunde. Sie sind kein Nachbau seiner Grenzen, sondern ein Abstand dazu: Der
+Relay darf streng bleiben, ohne dass ein Zittern in der Laufzeit gleich eine Trennung
+bedeutet.
+
 ## Als Programm ablegen
 
 `manifest.webmanifest` und `sw.js` machen die Seite installierbar — am Handy über

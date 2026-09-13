@@ -335,11 +335,23 @@ public sealed class RelayClient : IAsyncDisposable
 
         try
         {
+            // Je Sitzung ein eigenes Budget. Es beginnt voll: Nach einem
+            // Wiederverbinden soll das Nachholen der Zustandsmeldung nicht erst
+            // anstehen muessen.
+            var pace = new OutboundPace(DateTime.UtcNow);
+
             while (await _outgoing.Reader.WaitToReadAsync(token))
             {
                 while (_outgoing.Reader.TryRead(out byte[]? payload))
                 {
                     byte[] frame = channel.Seal(payload);
+
+                    // Gebremst wird VOR dem Senden und gemessen wird der fertige
+                    // Rahmen - genau das, was beim Relay ankommt und was er zaehlt.
+                    TimeSpan pause = pace.Reserve(frame.Length, DateTime.UtcNow);
+
+                    if (pause > TimeSpan.Zero) await _delay(pause, token);
+
                     await SendFrameAsync(socket, sends, frame, WebSocketMessageType.Binary, token);
                 }
             }
