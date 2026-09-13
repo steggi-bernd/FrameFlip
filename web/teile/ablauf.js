@@ -59,6 +59,21 @@ function trySeat(room, seatKey) {
     // er darf niemals nach einem Kennwort fragen lassen.
     let opened = false;
 
+    /* Wie lange der Platz gehalten wird, wenn FrameFlip aus dem Raum verschwindet.
+
+       Kurz sitzenbleiben lohnt sich: Wer neu laedt, kurz das Netz wechselt oder
+       FrameFlip neu startet, ist in Sekunden zurueck, und der Zuschauer ist ohne
+       Suchen wieder dabei.
+
+       Ewig sitzenbleiben lohnt sich nicht. Ein Raum gilt beim Leuchtturm als belegt,
+       solange irgendjemand darin sitzt - auch ein vergessener Reiter auf einem Handy,
+       dessen PC seit Tagen aus ist. Nach dieser Frist wird der Platz also
+       zurueckgegeben und ganz normal weitergesucht; kommt FrameFlip wieder, ist die
+       Seite binnen Sekunden zurueck. */
+    const HOLD_WITHOUT_HOST = 20000;
+
+    let waiting = null;
+
     let ended;
     const closed = new Promise(fall => { ended = fall; });
 
@@ -94,6 +109,8 @@ function trySeat(room, seatKey) {
 
     socket.onclose = () => {
       live.delete(socket);
+
+      if (waiting) { clearTimeout(waiting); waiting = null; }
 
       // Hinten anstellen, nicht vordraengeln: Der Leuchtturm schickt seine
       // Abweisung als Text und schliesst unmittelbar danach. Wer hier sofort
@@ -133,6 +150,9 @@ function trySeat(room, seatKey) {
         }
 
         if (control.t === "peer" && control.up) {
+          // Er ist zurueck - der Platz wird nicht mehr zurueckgegeben.
+          if (waiting) { clearTimeout(waiting); waiting = null; }
+
           mySalt = crypto.getRandomValues(new Uint8Array(SALT_BYTES));
 
           const hello = new Uint8Array(1 + SALT_BYTES);
@@ -147,6 +167,14 @@ function trySeat(room, seatKey) {
           say("FrameFlip is gone", "gone");
           channel = null;
           confirmed = false;
+
+          /* Den Platz nach einer Frist zurueckgeben.
+
+             Geschlossen wird, nicht aufgegeben: Das Schliessen loest "closed" aus,
+             der aeussere Lauf faengt von vorn an, findet den Raum leer und sagt
+             genau das - "FrameFlip is unreachable" - waehrend er weiter nachfragt.
+             Die Auskunft bleibt also stehen; nur der Raum ist wieder frei. */
+          if (!waiting) waiting = setTimeout(() => { waiting = null; drop(socket); }, HOLD_WITHOUT_HOST);
         }
 
         return;
