@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using System.Globalization;
 using System.IO;
 using System.Windows;
@@ -2302,6 +2303,15 @@ public partial class MainWindow : Window
     {
         if (!_ready || sender is not ToggleButton toggle) return;
 
+        // Einschalten heisst: eine Verbindung nach draussen. Vorher wird gefragt.
+        // Beim Ausschalten nicht - wer zumacht, braucht keine Zustimmung.
+        if (toggle.IsChecked == true && !_getSettings().TermsOk)
+        {
+            toggle.IsChecked = false;
+            AskTerms(() => { WatchToggle.IsChecked = true; });
+            return;
+        }
+
         // Eine KOPIE aendern, nicht den Bestand: _getSettings() liefert dasselbe
         // Objekt, das der Wirt haelt. Wer es an Ort und Stelle umschreibt, nimmt ihm
         // die Moeglichkeit, die Aenderung zu bemerken - er vergleicht dann den neuen
@@ -2476,6 +2486,100 @@ public partial class MainWindow : Window
         Note(Strings.T(typed.Length == 0 ? "D_WatchPassCleared" : "D_WatchPassSet"));
 
         Dispatcher.BeginInvoke(new Action(RefreshWatch), DispatcherPriority.Background);
+    }
+
+    /* ----------------------------------------------------------- Zustimmung
+
+       Vor der ersten Verbindung nach draussen wird gefragt - bei der Kopplung wie
+       beim Zusehen im Browser. Nicht als Formsache: Bis hierhin hat FrameFlip
+       ausschliesslich auf diesem Rechner gearbeitet, und dass es das nun verlaesst,
+       soll niemandem beilaeufig passieren.
+
+       Durchgesetzt wird der Riegel nicht hier, sondern in AppSettings.Normalize.
+       Diese Tafel holt die Zustimmung nur ein. */
+
+    private Action? _afterTerms;
+
+    /// <summary>
+    /// Zeigt die Tafel und fuehrt <paramref name="dann"/> aus, wenn zugestimmt wurde.
+    /// Liegt die Zustimmung schon vor, geht es ohne Umweg weiter.
+    /// </summary>
+    private void AskTerms(Action dann)
+    {
+        if (_getSettings().TermsOk) { dann(); return; }
+
+        _afterTerms = dann;
+
+        TermsAgree.IsChecked = false;
+        TermsGo.IsEnabled = false;
+        TermsHost.Visibility = Visibility.Visible;
+
+        // Den Tastaturschein auf die Tafel holen, damit Esc und Tab dort wirken.
+        TermsAgree.Focus();
+    }
+
+    private void OnTermsChecked(object sender, RoutedEventArgs e)
+    {
+        if (TermsGo is null) return;
+
+        TermsGo.IsEnabled = TermsAgree.IsChecked == true;
+    }
+
+    private void OnTermsLater(object sender, RoutedEventArgs e)
+    {
+        _afterTerms = null;
+        TermsHost.Visibility = Visibility.Collapsed;
+
+        Note(Strings.T("D_TermsDeclined"));
+    }
+
+    private void OnTermsAccept(object sender, RoutedEventArgs e)
+    {
+        if (TermsAgree.IsChecked != true) return;
+
+        var settings = _getSettings().Clone();
+        settings.TermsAccepted = AppSettings.TermsVersion;
+
+        if (_apply(settings) is { } error)
+        {
+            Note(error);
+            return;
+        }
+
+        TermsHost.Visibility = Visibility.Collapsed;
+        Note(Strings.T("D_TermsAccepted"));
+
+        var dann = _afterTerms;
+        _afterTerms = null;
+
+        // Eine Runde spaeter: Der Wirt hat den neuen Stand dann uebernommen, und
+        // was jetzt eingeschaltet wird, ueberlebt das naechste Normalize.
+        if (dann is not null) Dispatcher.BeginInvoke(dann, DispatcherPriority.Background);
+    }
+
+    /// <summary>
+    /// Oeffnet einen der Rechtstexte im Browser. Hyperlink.NavigateUri folgt von sich
+    /// aus nichts - das ist gut so, sonst liesse sich aus einer Zeichenkette in den
+    /// Einstellungen ein Programmstart machen.
+    /// </summary>
+    private void OnTermsLink(object sender, System.Windows.Navigation.RequestNavigateEventArgs e)
+    {
+        e.Handled = true;
+
+        string ziel = e.Uri?.ToString() ?? string.Empty;
+
+        // Nur https, und nur weil es hier fest im Markup steht. Ein Pfad oder ein
+        // anderes Schema hat in einem ShellExecute nichts verloren.
+        if (!ziel.StartsWith("https://", StringComparison.Ordinal)) return;
+
+        try
+        {
+            Process.Start(new ProcessStartInfo(ziel) { UseShellExecute = true });
+        }
+        catch (Exception)
+        {
+            // Kein Browser, keine Zuordnung - die Tafel bleibt trotzdem bedienbar.
+        }
     }
 
     /// <summary>Ein Klick neben die Tafel schliesst sie - auf die Tafel selbst nicht.</summary>

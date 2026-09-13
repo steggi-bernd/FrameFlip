@@ -15,7 +15,8 @@ public static class RemoteLifecycleInvariants
         var key = PairingKey.Create();
         var settings = new AppSettings
         {
-            RemoteEnabled = true, PairingSecret = PairingStore.Protect(key), RelayHost = "relay.example",
+            RemoteEnabled = true, TermsAccepted = AppSettings.TermsVersion,
+            PairingSecret = PairingStore.Protect(key), RelayHost = "relay.example",
             AdaptiveResources = false,
         };
         Check.Group("Remote-Lebenszyklus - Voraussetzungen und Zustandsweitergabe");
@@ -132,6 +133,7 @@ public static class RemoteLifecycleInvariants
         enabled.Settings.RemoteEnabled = false;
         enabled.Restart();
         var on = enabled.Settings.Clone();
+        on.TermsAccepted = AppSettings.TermsVersion;
         on.RemoteEnabled = true;
         enabled.Update(on);
         Check.That(enabled.Links.Count == 1 && enabled.Changes.SequenceEqual(new bool[] { false, true }),

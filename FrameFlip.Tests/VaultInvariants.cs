@@ -190,6 +190,7 @@ public static class VaultInvariants
             var settings = new AppSettings
             {
                 RemoteEnabled = true,
+                TermsAccepted = AppSettings.TermsVersion,
                 PairingSecret = "x",
                 FileAccessEnabled = true,
                 FilePushEnabled = true,
@@ -225,6 +226,7 @@ public static class VaultInvariants
             var render = new AppSettings
             {
                 RemoteEnabled = true,
+                TermsAccepted = AppSettings.TermsVersion,
                 PairingSecret = "x",
                 HeadlessRenderEnabled = true,
                 BlenderPath = @"  C:\Blenderlender.exe  ",

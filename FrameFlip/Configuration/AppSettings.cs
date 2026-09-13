@@ -205,6 +205,25 @@ public sealed class AppSettings
     public bool RemoteEnabled { get; set; }
 
     /// <summary>
+    /// Welcher Fassung der Nutzungsbedingungen zugestimmt wurde. 0 heisst: keiner.
+    ///
+    /// Eine Zahl und kein Ja/Nein, damit sich die Zustimmung erneuern laesst. Aendern
+    /// sich die Bedingungen wesentlich, wird <see cref="TermsVersion"/> hochgezaehlt -
+    /// und die alte Zustimmung traegt nicht mehr. Ein Haken, der einmal gesetzt fuer
+    /// immer gilt, waere eine Zustimmung zu etwas, das der Nutzer nie gesehen hat.
+    /// </summary>
+    public int TermsAccepted { get; set; }
+
+    /// <summary>
+    /// Die derzeit gueltige Fassung. Beim Aendern der Bedingungen hochzaehlen.
+    /// </summary>
+    public const int TermsVersion = 1;
+
+    /// <summary>Liegt eine Zustimmung zur aktuellen Fassung vor?</summary>
+    [JsonIgnore]
+    public bool TermsOk => TermsAccepted >= TermsVersion;
+
+    /// <summary>
     /// Wirtsname des Relays, ohne Schema und Pfad - die Verbindung wird immer als
     /// wss aufgebaut.
     ///
@@ -355,6 +374,22 @@ public sealed class AppSettings
         // Ein leeres Feld heisst "nimm den Standard", nicht "kein Relay". Wer keinen
         // will, schaltet die Fernsteuerung ab - das ist der eindeutige Weg.
         RelayHost = RelayHost?.Trim() is { Length: > 0 } host ? host : DefaultRelayHost;
+
+        /* Ohne Zustimmung geht NICHTS nach draussen.
+         *
+         * Der Riegel sitzt hier und nicht in der Oberflaeche. Die Oberflaeche ist ein
+         * Weg von vielen - es gibt den Einstellungsdialog, die Kopplungstafel, eine von
+         * Hand geaenderte config.json und jeden kuenftigen Weg, den noch niemand
+         * gebaut hat. Jeden einzeln zu sichern hiesse, einen davon zu vergessen.
+         *
+         * Normalize laeuft dagegen bei jedem Laden und bei jeder Uebernahme. Was hier
+         * abgeschaltet wird, bleibt abgeschaltet, ganz gleich wer es eingeschaltet hat.
+         * Die Oberflaeche holt die Zustimmung ein; durchgesetzt wird sie hier. */
+        if (TermsAccepted < TermsVersion)
+        {
+            RemoteEnabled = false;
+            WatchEnabled = false;
+        }
 
         // Eingeschaltet ohne Schluessel waere ein Zustand, den die Oberflaeche
         // anzeigt und der nichts tut. Lieber ehrlich aus.

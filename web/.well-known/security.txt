@@ -1,0 +1,12 @@
+# Wie man mir eine Lücke meldet. Das Format steht in RFC 9116.
+#
+# AUSFÜLLEN vor der Veröffentlichung: Contact und Expires. Ein abgelaufenes
+# Expires macht die Datei wertlos - sie will jährlich angefasst werden.
+
+Contact: mailto:<EINTRAGEN>
+Expires: <EINTRAGEN, z.B. 2027-09-13T00:00:00.000Z>
+Preferred-Languages: de, en
+Canonical: https://relay.steggi-matrix.work/.well-known/security.txt
+Policy: https://github.com/steggi-bernd/FrameFlip/blob/main/SECURITY.md
+
+# Der Relay ist MIT-lizenziert - zum Pruefen braucht niemand meinen Server.

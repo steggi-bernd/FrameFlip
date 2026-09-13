@@ -500,4 +500,16 @@
     <sys:String x:Key="D_Off">OFF</sys:String>
     <sys:String x:Key="D_LogWatchOn">Watch page turned on.</sys:String>
     <sys:String x:Key="D_LogWatchOff">Watch page turned off.</sys:String>
+    <sys:String x:Key="D_TermsTitle">BEFORE ANYTHING LEAVES THIS MACHINE</sys:String>
+    <sys:String x:Key="D_TermsBody">So far FrameFlip has worked on this computer alone. What you are about to switch on opens a connection through a server on the internet.  Everything sent across it is end-to-end encrypted – the server sees random bytes and stores nothing. It is offered free of charge with no promise of availability, and you use it at your own risk.</sys:String>
+    <sys:String x:Key="D_TermsUse">Terms of use</sys:String>
+    <sys:String x:Key="D_TermsPrivacy">Privacy</sys:String>
+    <sys:String x:Key="D_TermsImprint">Legal notice</sys:String>
+    <sys:String x:Key="D_TermsAgree">I have read the terms of use and the privacy notice, and I use the service at my own risk.</sys:String>
+    <sys:String x:Key="D_TermsOwnRelay">The server is an offer, not a requirement: you can enter a different one in the settings, and the source is open – run your own if you prefer.</sys:String>
+    <sys:String x:Key="D_TermsLater">Not now</sys:String>
+    <sys:String x:Key="D_TermsGo">Agree and switch on</sys:String>
+    <sys:String x:Key="D_TermsAccepted">Agreed – outbound connections are now allowed.</sys:String>
+    <sys:String x:Key="D_TermsDeclined">Not agreed – nothing leaves this machine.</sys:String>
+    <sys:String x:Key="S_TermsMissing">Without agreeing to the terms of use, FrameFlip makes no outbound connection.</sys:String>
 </ResourceDictionary>

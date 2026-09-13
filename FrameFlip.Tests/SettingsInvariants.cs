@@ -40,16 +40,68 @@ public static class SettingsInvariants
         Check.That(own.RelayHost == "relay.example.org:8443", "ein eigener Relay bleibt", own.RelayHost);
 
         // Ohne Schluessel bleibt die Fernsteuerung aus, egal was angehakt ist.
-        var keyless = new AppSettings { RemoteEnabled = true, PairingSecret = "" };
+        var keyless = new AppSettings
+        {
+            RemoteEnabled = true,
+            TermsAccepted = AppSettings.TermsVersion, PairingSecret = ""
+        };
         keyless.Normalize();
 
         Check.That(!keyless.RemoteEnabled, "ohne Schluessel bleibt es aus");
+
+        /* Der Riegel vor jeder Verbindung nach draussen.
+         *
+         * Er sitzt in Normalize und nicht in der Oberflaeche - deshalb wird er auch
+         * hier geprueft und nicht dort. Eine von Hand geaenderte config.json, ein
+         * alter Stand, ein kuenftiger Weg, den es noch nicht gibt: Sie alle laufen
+         * durch Normalize, und alle finden dieselbe verschlossene Tuer. */
+        Check.Group("Einstellungen - ohne Zustimmung geht nichts nach draussen");
+
+        var ohneZustimmung = new AppSettings
+        {
+            RemoteEnabled = true,
+            WatchEnabled = true,
+            PairingSecret = "nur-ein-platzhalter",
+            TermsAccepted = 0
+        };
+        ohneZustimmung.Normalize();
+
+        Check.That(!ohneZustimmung.RemoteEnabled, "die Kopplung bleibt aus");
+        Check.That(!ohneZustimmung.WatchEnabled, "die Zuschauerseite bleibt aus");
+
+        var veraltet = new AppSettings
+        {
+            RemoteEnabled = true,
+            WatchEnabled = true,
+            PairingSecret = "nur-ein-platzhalter",
+            TermsAccepted = AppSettings.TermsVersion - 1
+        };
+        veraltet.Normalize();
+
+        Check.That(!veraltet.RemoteEnabled && !veraltet.WatchEnabled,
+            "und eine Zustimmung zu einer aelteren Fassung traegt nicht");
+
+        var zugestimmt = new AppSettings
+        {
+            RemoteEnabled = true,
+            WatchEnabled = true,
+            PairingSecret = "nur-ein-platzhalter",
+            TermsAccepted = AppSettings.TermsVersion
+        };
+        zugestimmt.Normalize();
+
+        Check.That(zugestimmt.RemoteEnabled && zugestimmt.WatchEnabled,
+            "mit Zustimmung geht beides");
+
+        Check.That(!zugestimmt.FileAccessEnabled && !zugestimmt.LibraryAccessEnabled,
+            "der Dateizugriff bleibt davon unberuehrt aus - er will eigens eingeschaltet werden");
 
         Check.Group("Einstellungen - Weg auf die Platte und zurueck");
 
         var written = new AppSettings
         {
             RemoteEnabled = true,
+            TermsAccepted = AppSettings.TermsVersion,
             RelayHost = "relay.example.org",
             PairingSecret = "nur-ein-platzhalter",
             Hotkey = "Ctrl+Alt+F",

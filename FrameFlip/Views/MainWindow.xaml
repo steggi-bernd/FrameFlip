@@ -614,6 +614,74 @@
                  "QR ZEIGEN" auf die Einstellungsseite, wo je nach Zustand statt
                  eines Codes ein Satz stand, warum keiner da ist - eine Antwort auf
                  eine Frage, die niemand gestellt hatte. -->
+            <!-- Die Zustimmungstafel.
+
+                 Sie kommt VOR jeder Verbindung nach draussen - Kopplung wie
+                 Zuschauerseite. Kein Hintergrund zum Wegklicken: Wer sie schliesst,
+                 soll das ueber "Nicht jetzt" tun, damit klar ist, dass nichts
+                 eingeschaltet wurde. -->
+            <Grid x:Name="TermsHost" Background="#F205050A" Visibility="Collapsed">
+                <Border MaxWidth="420" VerticalAlignment="Center" HorizontalAlignment="Center"
+                        CornerRadius="14" Padding="26" Background="{StaticResource DesktopPanel}"
+                        BorderBrush="{StaticResource DesktopLine}" BorderThickness="1">
+                    <Border.Effect>
+                        <DropShadowEffect BlurRadius="40" ShadowDepth="10" Opacity="0.55" Color="#000000" />
+                    </Border.Effect>
+
+                    <StackPanel>
+                        <TextBlock views:Track.Text="{DynamicResource D_TermsTitle}"
+                                   Style="{StaticResource DashLabel}" />
+
+                        <TextBlock views:Track.Text="{DynamicResource D_TermsBody}"
+                                   Margin="0,16,0,0" TextWrapping="Wrap" FontSize="11.5"
+                                   LineHeight="19" Foreground="{StaticResource DesktopInk}" />
+
+                        <TextBlock Margin="0,14,0,0" TextWrapping="Wrap" FontSize="11"
+                                   LineHeight="18" Foreground="{StaticResource DesktopMuted}">
+                            <Hyperlink RequestNavigate="OnTermsLink"
+                                       AutomationProperties.Name="{DynamicResource D_TermsUse}"
+                                       NavigateUri="https://relay.steggi-matrix.work/recht/nutzungsbedingungen.html">
+                                <Run Text="{DynamicResource D_TermsUse}" />
+                            </Hyperlink>
+                            <Run Text="  ·  " />
+                            <Hyperlink RequestNavigate="OnTermsLink"
+                                       AutomationProperties.Name="{DynamicResource D_TermsPrivacy}"
+                                       NavigateUri="https://relay.steggi-matrix.work/recht/datenschutz.html">
+                                <Run Text="{DynamicResource D_TermsPrivacy}" />
+                            </Hyperlink>
+                            <Run Text="  ·  " />
+                            <Hyperlink RequestNavigate="OnTermsLink"
+                                       AutomationProperties.Name="{DynamicResource D_TermsImprint}"
+                                       NavigateUri="https://relay.steggi-matrix.work/recht/impressum.html">
+                                <Run Text="{DynamicResource D_TermsImprint}" />
+                            </Hyperlink>
+                        </TextBlock>
+
+                        <CheckBox x:Name="TermsAgree" Margin="0,20,0,0"
+                                  Style="{StaticResource DialogCheckBox}"
+                                  Checked="OnTermsChecked" Unchecked="OnTermsChecked">
+                            <TextBlock views:Track.Text="{DynamicResource D_TermsAgree}"
+                                       TextWrapping="Wrap" FontSize="11.5" LineHeight="18" />
+                        </CheckBox>
+
+                        <TextBlock views:Track.Text="{DynamicResource D_TermsOwnRelay}"
+                                   Margin="0,16,0,0" TextWrapping="Wrap" FontSize="10.5"
+                                   LineHeight="17" Foreground="{StaticResource DesktopFaint}" />
+
+                        <WrapPanel Margin="0,20,0,0" HorizontalAlignment="Right">
+                            <Button x:Name="TermsLater" Style="{StaticResource DashGhost}"
+                                    Margin="0,0,8,0" Click="OnTermsLater">
+                                <TextBlock views:Track.Text="{DynamicResource D_TermsLater}" />
+                            </Button>
+                            <Button x:Name="TermsGo" Style="{StaticResource DashPrimary}"
+                                    IsEnabled="False" Click="OnTermsAccept">
+                                <TextBlock views:Track.Text="{DynamicResource D_TermsGo}" />
+                            </Button>
+                        </WrapPanel>
+                    </StackPanel>
+                </Border>
+            </Grid>
+
             <Grid x:Name="PairHost" Background="#B305050A" Visibility="Collapsed"
                   MouseLeftButtonDown="OnPairBackdrop">
                 <Border MaxWidth="380" VerticalAlignment="Center" HorizontalAlignment="Center"

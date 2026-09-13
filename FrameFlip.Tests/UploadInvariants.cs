@@ -33,7 +33,11 @@ public static class UploadInvariants
             Directory.CreateDirectory(root);
             File.WriteAllText(Path.Combine(root, "schon_da.blend"), "alt");
 
-            var settings = new AppSettings { RemoteEnabled = true, PairingSecret = "x", FileFolder = root };
+            var settings = new AppSettings
+            {
+                RemoteEnabled = true, TermsAccepted = AppSettings.TermsVersion,
+                PairingSecret = "x", FileFolder = root
+            };
             var answers = new List<JsonElement>();
 
             using var service = new UploadService(() => settings, answer => answers.Add(Parse(answer)));

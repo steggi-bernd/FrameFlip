@@ -1,0 +1,60 @@
+/* Derselbe Ton wie die Zuschauerseite - diese Seiten gehoeren sichtbar dazu. */
+:root {
+  --bg: #07070d; --panel: #0b0b14; --surface: #11111b; --line: #1e1e2b;
+  --ink: #f4f4f8; --muted: #9b9bb0; --faint: #6b6b80; --accent: #a855f7;
+  --sans: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --mono: ui-monospace, "Cascadia Mono", "SF Mono", Menlo, Consolas, monospace;
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0; background: var(--bg); color: var(--ink);
+  font-family: var(--sans); line-height: 1.7;
+  font-size: clamp(13px, 1.15vw, 15px);
+  -webkit-text-size-adjust: 100%;
+}
+
+.rahmen { max-width: 46rem; margin: 0 auto; padding: clamp(24px, 5vw, 64px) clamp(18px, 4vw, 32px) 80px; }
+
+header { display: flex; align-items: center; gap: 10px; margin-bottom: clamp(28px, 5vw, 48px); flex-wrap: wrap; }
+header .mark { font-weight: 650; letter-spacing: .04em; font-size: 15px; }
+header nav { margin-left: auto; display: flex; gap: 14px; flex-wrap: wrap; }
+header nav a { color: var(--faint); font-size: 12px; text-decoration: none; }
+header nav a:hover, header nav a[aria-current] { color: var(--accent); }
+
+h1 { font-size: clamp(20px, 2.6vw, 28px); margin: 0 0 6px; font-weight: 650; letter-spacing: -.01em; }
+h2 { font-size: clamp(14px, 1.5vw, 17px); margin: 40px 0 10px; font-weight: 600; }
+h3 { font-size: clamp(12px, 1.25vw, 14px); margin: 26px 0 6px; font-weight: 600; color: var(--muted); }
+
+.lead { color: var(--muted); margin: 0 0 8px; }
+p, li { color: var(--ink); }
+p { margin: 0 0 14px; }
+ul { padding-left: 1.25em; margin: 0 0 14px; }
+li { margin-bottom: 6px; }
+
+a { color: var(--accent); }
+
+dl { margin: 0 0 14px; display: grid; grid-template-columns: minmax(9rem, auto) 1fr; gap: 6px 18px; }
+dt { color: var(--faint); font-size: .9em; }
+dd { margin: 0; }
+
+.kasten {
+  background: var(--panel); border: 1px solid var(--line); border-left: 2px solid var(--accent);
+  border-radius: 10px; padding: 16px 18px; margin: 20px 0;
+}
+.kasten p:last-child { margin-bottom: 0; }
+
+.luecke {
+  background: color-mix(in srgb, #f472b6 12%, transparent);
+  border: 1px dashed #f472b6; border-radius: 6px;
+  padding: 2px 7px; font-family: var(--mono); font-size: .88em; color: #f472b6;
+}
+
+.en { margin-top: 56px; padding-top: 28px; border-top: 1px solid var(--line); }
+.en h1, .en h2, .en h3 { color: var(--muted); }
+
+footer {
+  margin-top: 56px; padding-top: 20px; border-top: 1px solid var(--line);
+  color: var(--faint); font-size: 11.5px;
+}

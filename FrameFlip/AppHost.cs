@@ -376,7 +376,17 @@ public sealed class AppHost : IDisposable
     /// <summary>Rueckgabe: Fehlertext fuer den Dialog, oder null bei Erfolg.</summary>
     private string? ApplySettings(AppSettings settings)
     {
+        /* Was hinauswollte, bevor Normalize es abgeschaltet hat.
+         *
+         * Der Riegel selbst sitzt in Normalize und ist damit dicht. Eine Oberflaeche,
+         * die einen Schalter umlegt und dann feststellt, dass er von selbst wieder
+         * zurueckspringt, laesst den Benutzer aber im Dunkeln. Also wird VOR dem
+         * Normalisieren nachgesehen, was gewollt war, und daraus eine Meldung. */
+        bool wollteHinaus = settings.RemoteEnabled || settings.WatchEnabled;
+
         settings.Normalize();
+
+        if (wollteHinaus && !settings.TermsOk) return Localization.Strings.T("S_TermsMissing");
 
         if (!HotKeyDefinition.TryParse(settings.Hotkey, out var definition))
             return Localization.Strings.T("S_HotkeyInvalid");
