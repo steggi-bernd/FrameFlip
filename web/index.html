@@ -32,7 +32,7 @@
   nichts - eine falsche Pruefsumme heisst: leere Seite.
 -->
 <meta http-equiv="Content-Security-Policy"
-      content="default-src 'none'; img-src 'self' blob: data:; style-src 'sha256-5IaJxOJLkRuGxiY4Hvl3YroIDWAuf5ObBJXbljIG/d8='; script-src 'self' 'sha256-Sz/h7CgvuIZtCjfSFfHq7P980gBsqPIGGGhN0wcOX9k='; connect-src 'self' wss: ws:; manifest-src 'self'; worker-src 'self'; base-uri 'none'; form-action 'none'">
+      content="default-src 'none'; img-src 'self' blob: data:; style-src 'sha256-FRX3dqq1KZoqHsobtu2bJU1WT+HZV+90+HRqWgkLowQ='; script-src 'self' 'sha256-Sz/h7CgvuIZtCjfSFfHq7P980gBsqPIGGGhN0wcOX9k='; connect-src 'self' wss: ws:; manifest-src 'self'; worker-src 'self'; base-uri 'none'; form-action 'none'">
 
 <title>FrameFlip</title>
 
@@ -277,6 +277,9 @@
     display: flex; justify-content: space-between; align-items: center; gap: 10px;
     flex-wrap: wrap;
   }
+  .note a { color: var(--faint); text-decoration: underline; }
+  .note a:hover { color: var(--muted); }
+
   .note button {
     background: transparent; border: 0; padding: 0;
     color: var(--faint); font-size: var(--t-label); text-decoration: underline;
@@ -414,6 +417,10 @@
 
     <div class="note">
       <span>View only · End-to-end encrypted</span>
+      <span>
+        <a href="../recht/datenschutz.html">Privacy</a> ·
+        <a href="../recht/nutzungsbedingungen.html">Terms</a>
+      </span>
       <button id="forget" title="Remove this device's access">Forget access</button>
     </div>
   </div>
