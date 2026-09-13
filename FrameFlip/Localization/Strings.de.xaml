@@ -504,7 +504,6 @@
     <sys:String x:Key="D_TermsBody">FrameFlip hat bisher ausschließlich auf diesem Rechner gearbeitet. Was du gleich einschaltest, baut eine Verbindung über einen Server im Internet auf.  Alles, was dabei übertragen wird, ist Ende zu Ende verschlüsselt – der Server sieht Zufallsbytes und speichert nichts. Er ist ein unentgeltliches Angebot ohne Zusage auf Verfügbarkeit, und die Nutzung erfolgt auf eigene Gefahr.</sys:String>
     <sys:String x:Key="D_TermsUse">Nutzungsbedingungen</sys:String>
     <sys:String x:Key="D_TermsPrivacy">Datenschutz</sys:String>
-    <sys:String x:Key="D_TermsImprint">Impressum</sys:String>
     <sys:String x:Key="D_TermsAgree">Ich habe die Nutzungsbedingungen und die Datenschutzerklärung gelesen und nutze den Dienst auf eigene Gefahr.</sys:String>
     <sys:String x:Key="D_TermsOwnRelay">Der Server ist ein Angebot, keine Voraussetzung: In den Einstellungen lässt sich ein anderer eintragen, und der Quelltext liegt offen – wer möchte, betreibt seinen eigenen.</sys:String>
     <sys:String x:Key="D_TermsLater">Nicht jetzt</sys:String>

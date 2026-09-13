@@ -649,12 +649,7 @@
                                        NavigateUri="https://relay.steggi-matrix.work/recht/datenschutz.html">
                                 <Run Text="{DynamicResource D_TermsPrivacy}" />
                             </Hyperlink>
-                            <Run Text="  ·  " />
-                            <Hyperlink RequestNavigate="OnTermsLink"
-                                       AutomationProperties.Name="{DynamicResource D_TermsImprint}"
-                                       NavigateUri="https://relay.steggi-matrix.work/recht/impressum.html">
-                                <Run Text="{DynamicResource D_TermsImprint}" />
-                            </Hyperlink>
+
                         </TextBlock>
 
                         <CheckBox x:Name="TermsAgree" Margin="0,20,0,0"
