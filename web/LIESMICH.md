@@ -154,6 +154,51 @@ curl -s  https://relay.steggi-matrix.work/health
 
 Das erste soll `200` und `text/html` melden, das zweite `{"ok":true,...}`.
 
+## Wie die Seite gebaut wird
+
+`index.html` wird **nicht von Hand bearbeitet**, sondern aus `teile/` zusammengesetzt:
+
+```bash
+python bauen.py
+node pruefstand/regel.mjs index.html sw.js
+```
+
+Der Grund sind die Prüfsummen. Die Inhaltsregel der Seite erlaubt kein
+`'unsafe-inline'` mehr, sondern nennt die SHA-256 des einen Skriptblocks und des
+einen Stilblocks. Der Unterschied ist der ganze Sinn: `'unsafe-inline'` erlaubt
+*jeden* Inline-Code, also auch eingeschleusten — eine Prüfsumme erlaubt genau diesen
+einen Block. Nachgemessen im Browser: Die Seite läuft, ein nachträglich eingefügtes
+`<script>` wird abgewiesen.
+
+Von Hand ginge das nicht: Jede Änderung an Stil oder Code ändert die Summe, und eine
+falsche Summe heißt **leere Seite**. Deshalb rechnet sie, wer die Datei zusammensetzt
+— und `pruefstand/regel.mjs` prüft, dass sie stimmt.
+
+Eine Falle dabei, in die ich prompt getappt bin: Python übersetzt beim Schreiben
+unter Windows jedes `
+` in `
+`. Die Summe wäre dann über einen anderen Text
+gebildet als den, der auf der Platte landet. `bauen.py` nagelt die Zeilenenden fest.
+
+## Was die Seite fremden Daten gegenüber annimmt: nichts
+
+Der Kanal ist verschlüsselt und beglaubigt — wer hereinredet, hat den Schlüssel. Das
+ist trotzdem kein Grund, seinen Zahlen zu trauen: Der Link für die freien Plätze ist
+ein Ausweis zum Weitergeben, und läuft FrameFlip gerade nicht, kann jemand mit diesem
+Link den leeren Host-Platz einnehmen und dem nächsten Zuschauer liefern, was er will.
+
+Deshalb:
+
+* **Kein `innerHTML`, nirgends.** Die Form steht im Dokument, es wechselt nur Text.
+* `zahl()` lässt ausschließlich endliche Zahlen durch, `text()` beschneidet
+  Zeichenketten. Alles andere wird zum Gedankenstrich.
+* Ein Zustand, der kein Objekt ist, wird verworfen.
+* Der Dateiname beim Sichern entsteht aus einer geprüften Zahl, nie aus dem, was ankam.
+
+Nachgemessen mit einem feindlichen Zustand (`<img onerror=…>` in jedem Feld,
+Zeichenketten statt Zahlen, `Infinity`, `NaN`, Listen, `null`): kein Skript lief,
+kein Element entstand, alles wurde Text oder Gedankenstrich.
+
 ## Prüfen ohne Server
 
 Der ganze Weg lässt sich auf dem eigenen Rechner durchspielen — echter Relay, echtes

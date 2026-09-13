@@ -25,7 +25,9 @@ function slice(from, to, what) {
 
 const core   = slice("const SEATS", "/* --------------------------------------------------------------- Das Geheimnis */", "Der Krypto-Teil");
 const flow   = slice("const Result = {", "/* --------------------------------------------------------------- Platz suchen */", "Der Verbindungsablauf");
-const search = slice("const ask = el(", "run();", "Die Platzsuche");
+// Bis zur MARKE, nicht bis "run();" - das steht inzwischen in einem Zweig,
+// und ein Schnitt mitten hinein ergibt unbalancierte Klammern.
+const search = slice("const ask = el(", "/* --------------------------------------------------------------- Start */", "Die Platzsuche");
 
 // Was die Seite anzeigen würde - hier wird es nur gezählt.
 const seen = { states: 0, previews: 0, lastState: null, jpegBytes: 0, said: [], hinweis: "", geleert: 0 };

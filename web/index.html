@@ -17,14 +17,22 @@
   Die engere Fassung mit dem genauen Wirtsnamen setzt Caddy als Kopfzeile dazu;
   beide Regeln gelten dann gleichzeitig, und es gilt die Schnittmenge.
 
-  script-src braucht 'self' NEBEN 'unsafe-inline'. Inline-Code allein genuegt fuer
-  diese Seite zwar - aber ein Dienstarbeiter erbt die Regel aus der Antwort seines
-  eigenen Skripts, und ohne 'self' verbietet er damit sich selbst. Die Anmeldung
-  scheitert dann mit "An unknown error occurred when fetching the script", und die
-  Seite laesst sich nicht als Programm ablegen.
+  script-src braucht 'self'. Ein Dienstarbeiter erbt die Regel aus der Antwort
+  seines eigenen Skripts, und ohne 'self' verbiete er damit sich selbst - die
+  Anmeldung scheitert dann mit "An unknown error occurred when fetching the script",
+  und die Seite laesst sich nicht als Programm ablegen.
+
+  STATT 'unsafe-inline' stehen hier PRUEFSUMMEN des einen Skripts und des einen
+  Stilblocks. Der Unterschied ist der ganze Sinn: 'unsafe-inline' erlaubt JEDEN
+  Inline-Code, also auch eingeschleusten. Eine Pruefsumme erlaubt genau diesen einen
+  Block und sonst nichts. Selbst wenn es je gelaenge, Markup in die Seite zu bringen,
+  liefe daraus kein Code.
+
+  Die Werte setzt der Zusammenbau ein (web/bauen.py). Von Hand geaendert wird hier
+  nichts - eine falsche Pruefsumme heisst: leere Seite.
 -->
 <meta http-equiv="Content-Security-Policy"
-      content="default-src 'none'; img-src 'self' blob: data:; style-src 'unsafe-inline'; script-src 'self' 'unsafe-inline'; connect-src 'self' wss: ws:; manifest-src 'self'; worker-src 'self'; base-uri 'none'; form-action 'none'">
+      content="default-src 'none'; img-src 'self' blob: data:; style-src 'sha256-5IaJxOJLkRuGxiY4Hvl3YroIDWAuf5ObBJXbljIG/d8='; script-src 'self' 'sha256-Sz/h7CgvuIZtCjfSFfHq7P980gBsqPIGGGhN0wcOX9k='; connect-src 'self' wss: ws:; manifest-src 'self'; worker-src 'self'; base-uri 'none'; form-action 'none'">
 
 <title>FrameFlip</title>
 
@@ -368,8 +376,14 @@
     </div>
 
     <div class="headline">
-      <span class="pct" id="percent">–<small>%</small></span>
-      <span class="frames" id="frames">–</span>
+      <!-- Feste Bausteine, wechselnder Text.
+
+           Frueher wurde hier innerHTML zusammengesetzt - mit Werten, die aus der
+           Leitung kamen. Wer am anderen Ende sitzt, haette damit Markup einschleusen
+           koennen. Jetzt steht die Form im Dokument und es wechselt nur noch
+           textContent; einschleusen laesst sich dort nichts. -->
+      <span class="pct"><span id="percent">–</span><small>%</small></span>
+      <span class="frames"><b id="frameNow">–</b><span id="frameOf"></span></span>
     </div>
 
     <div class="bar"><i id="barFill"></i></div>
@@ -665,48 +679,80 @@ function clock(seconds) {
 
 const put = (id, text) => { el(id).textContent = text; };
 
+/* Was von der Gegenseite kommt, wird NICHT geglaubt.
+
+   Der Kanal ist verschluesselt und beglaubigt - wer hier hereinredet, hat den
+   Schluessel. Das ist aber kein Grund, seinen Zahlen zu trauen: Der Link fuer die
+   freien Plaetze ist ein Ausweis zum Weitergeben, und laeuft FrameFlip gerade
+   nicht, kann jemand mit diesem Link den leeren Host-Platz einnehmen und dem
+   naechsten Zuschauer liefern, was er will. Aus einer erfundenen Bildnummer soll
+   dann trotzdem nur eine Zeichenkette werden und niemals Markup oder ein Befehl.
+
+   Deshalb zwei Schleusen: zahl() laesst ausschliesslich endliche Zahlen durch,
+   text() schneidet Zeichenketten auf eine Laenge, die eine Zeile nicht sprengt. */
+function zahl(wert) {
+  return typeof wert === "number" && Number.isFinite(wert) ? wert : null;
+}
+
+function ganz(wert) {
+  const n = zahl(wert);
+  return n === null ? null : Math.trunc(n);
+}
+
+function text(wert, grenze) {
+  return typeof wert === "string" ? wert.slice(0, grenze || 60) : "";
+}
+
 function show(state) {
+  // JSON.parse liefert auch null, Zahlen oder Listen. Nur ein Objekt ist ein Zustand.
+  if (!state || typeof state !== "object" || Array.isArray(state)) return;
+
   lastState = state;
 
-  const has = name => state[name] !== undefined && state[name] !== null;
   const busy = state.rendering === true;
+  const prozent = zahl(state.percent);
+  const bild = ganz(state.frame);
 
   el("chip").className = "chip " + (busy ? "live" : "idle");
-  el("chip").textContent = busy ? (state.activity || "rendering") : "ready";
+  el("chip").textContent = busy ? (text(state.activity, 24) || "rendering") : "ready";
 
-  el("scene").textContent = state.scene || "";
+  el("scene").textContent = text(state.scene, 60);
 
-  el("percent").innerHTML = has("percent")
-    ? state.percent.toFixed(1) + "<small>%</small>"
-    : "–<small>%</small>";
+  put("percent", prozent === null ? "–" : prozent.toFixed(1));
+  el("barFill").style.width = clamp(prozent === null ? 0 : prozent, 0, 100) + "%";
 
-  el("barFill").style.width = (has("percent") ? Math.min(100, state.percent) : 0) + "%";
+  put("frameNow", bild === null ? "–" : String(bild));
+  put("frameOf", bild !== null && ganz(state.last) !== null ? " / " + ganz(state.last) : "");
 
-  el("frames").innerHTML = has("frame")
-    ? "<b>" + state.frame + "</b>" + (has("last") ? " / " + state.last : "")
-    : "–";
+  put("elapsed", clock(zahl(state.elapsed)));
+  put("remaining", busy ? clock(zahl(state.remaining)) : "–");
 
-  put("elapsed", clock(state.elapsed));
-  put("remaining", busy && has("remaining") ? clock(state.remaining) : "–");
-  put("spf", has("secondsPerFrame") ? state.secondsPerFrame.toFixed(2) + " s" : "–");
-  put("written", has("written") ? String(state.written) : "–");
+  const jeBild = zahl(state.secondsPerFrame);
+  put("spf", jeBild === null ? "–" : jeBild.toFixed(2) + " s");
 
-  put("sample", has("sample")
-    ? state.sample + (has("sampleTotal") ? " / " + state.sampleTotal : "")
-    : "–");
+  const geschrieben = ganz(state.written);
+  put("written", geschrieben === null ? "–" : String(geschrieben));
 
-  put("size", has("width") && has("height") ? state.width + " × " + state.height : "–");
-  put("memory", has("memoryMb") ? Math.round(state.memoryMb) + " MB" : "–");
-  put("cpu", has("cpu") ? state.cpu.toFixed(0) + " %" : "–");
-  put("gpu", has("gpu") ? state.gpu.toFixed(0) + " %" : "–");
+  const probe = ganz(state.sample), proben = ganz(state.sampleTotal);
+  put("sample", probe === null ? "–" : probe + (proben === null ? "" : " / " + proben));
 
-  put("ram", has("freeMb")
-    ? (state.freeMb / 1024).toFixed(1) + (has("totalMb") ? " / " + (state.totalMb / 1024).toFixed(0) : "") + " GB"
-    : "–");
+  const breite = ganz(state.width), höhe = ganz(state.height);
+  put("size", breite === null || höhe === null ? "–" : breite + " × " + höhe);
+
+  const speicher = zahl(state.memoryMb);
+  put("memory", speicher === null ? "–" : Math.round(speicher) + " MB");
+
+  const cpu = zahl(state.cpu), gpu = zahl(state.gpu);
+  put("cpu", cpu === null ? "–" : cpu.toFixed(0) + " %");
+  put("gpu", gpu === null ? "–" : gpu.toFixed(0) + " %");
+
+  const frei = zahl(state.freeMb), gesamt = zahl(state.totalMb);
+  put("ram", frei === null ? "–"
+    : (frei / 1024).toFixed(1) + (gesamt === null ? "" : " / " + (gesamt / 1024).toFixed(0)) + " GB");
 
   put("saveName", dateiname());
 
-  say(busy ? (state.activity || "rendering") : "ready", busy ? "live" : "idle");
+  say(busy ? (text(state.activity, 24) || "rendering") : "ready", busy ? "live" : "idle");
 }
 
 /* ----------------------------------------------------------------- Ansichten
@@ -977,8 +1023,9 @@ function blank() {
   el("chip").className = "chip";
   el("chip").textContent = "waiting";
   el("scene").textContent = "";
-  el("percent").innerHTML = "–<small>%</small>";
-  el("frames").textContent = "–";
+  put("percent", "–");
+  put("frameNow", "–");
+  put("frameOf", "");
   el("barFill").style.width = "0%";
 
   for (const id of ["elapsed", "remaining", "spf", "written", "sample", "size", "memory", "cpu", "gpu", "ram"]) {
@@ -1029,12 +1076,15 @@ addEventListener("resize", () => { bühne.anwenden(); groß.anwenden(); });
 
 /* ------------------------------------------------------------------- Sichern */
 
-function dateiname() {
-  const nummer = lastState && lastState.frame !== undefined && lastState.frame !== null
-    ? String(lastState.frame).padStart(4, "0")
-    : "current";
+/* Der Dateiname entsteht aus einer geprueften Zahl, nicht aus dem, was ankam.
 
-  return `frameflip_${nummer}.jpg`;
+   Eine Zeichenkette von der Gegenseite haette hier als Dateiname gelandet. Browser
+   raeumen so etwas zwar auf, aber ein Name, der aus fremder Hand stammt, hat in
+   einem Download nichts zu suchen. */
+function dateiname() {
+  const nummer = lastState ? ganz(lastState.frame) : null;
+
+  return "frameflip_" + (nummer === null ? "current" : String(nummer).padStart(4, "0")) + ".jpg";
 }
 
 function sichern() {
@@ -1459,7 +1509,21 @@ async function run() {
   }
 }
 
-run();
+/* --------------------------------------------------------------- Start */
+
+/* Ohne WebCrypto geht hier gar nichts - und das soll man sehen.
+
+   crypto.subtle gibt es nur in einem sicheren Zusammenhang: https, oder der eigene
+   Rechner. Wird die Seite je ueber http von einer fremden Adresse ausgeliefert,
+   fehlt sie, und jeder Aufruf darauf endet in einem Fehler, den niemand deuten kann.
+   Eine klare Zeile ist die bessere Auskunft als eine Seite, die stumm nichts tut. */
+if (!globalThis.crypto || !crypto.subtle) {
+  say("not a secure context", "gone");
+  empty.textContent = "This page needs HTTPS. Without it the browser withholds the "
+                    + "cryptography, and nothing here can work.";
+} else {
+  run();
+}
 
 /* ------------------------------------------------------------ Installierbar
 
