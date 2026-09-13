@@ -63,6 +63,16 @@ Der Relay sieht Zufallsbytes. <strong>Auch ich als Betreiber kann die Inhalte ni
 lesen.</strong> Gespeichert wird nichts; was nicht sofort zugestellt werden kann, wird
 verworfen.</p>
 
+<h3>Betriebsüberwachung</h3>
+<p>In Abständen von wenigen Minuten wird festgehalten, <strong>wieviele Räume der Relay
+gerade belegt hat</strong> — eine Zahl, sonst nichts. Sie dient dazu, rechtzeitig zu
+bemerken, wenn die Kapazität knapp wird.</p>
+
+<p>Dabei entstehen keine personenbezogenen Daten: Es werden weder Raumkennungen noch
+Adressen noch Zeitpunkte einzelner Verbindungen festgehalten, sondern ausschließlich
+der Gesamtstand. Aus „um 14:03 Uhr waren 37 Räume belegt" lässt sich niemand
+wiedererkennen.</p>
+
 <h3>Was es <em>nicht</em> gibt</h3>
 <ul>
   <li>keine Konten, Namen, E-Mail-Adressen oder Kennwörter auf dem Server</li>
@@ -136,6 +146,11 @@ address — unavoidable in order to deliver data at all — and nothing else.</p
   and passed to your device by QR code or link — it never crosses the network. The relay
   sees random bytes, and so do I as its operator. Nothing is stored.</li>
 </ul>
+
+<p><strong>Operational monitoring:</strong> every few minutes the number of rooms
+currently in use is recorded — a single figure, so that a shortage of capacity is
+noticed in time. No room identifiers, no addresses, no per-connection timestamps:
+nobody can be recognised from "at 14:03 there were 37 rooms in use".</p>
 
 <p>No accounts, no cookies, no analytics, no third parties, no transfers outside the EU,
 no profiling.</p>

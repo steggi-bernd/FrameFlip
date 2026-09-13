@@ -1,0 +1,277 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<meta name="referrer" content="no-referrer">
+<meta http-equiv="Content-Security-Policy"
+      content="default-src 'none'; style-src 'unsafe-inline'; script-src 'unsafe-inline'; connect-src 'self'; base-uri 'none'; form-action 'none'">
+<title>Auslastung · FrameFlip-Relay</title>
+<style>
+  :root {
+    --bg: #07070d; --panel: #0b0b14; --surface: #11111b; --line: #1e1e2b;
+    --ink: #f4f4f8; --muted: #9b9bb0; --faint: #6b6b80;
+    --accent: #a855f7; --cyan: #22d3ee; --warn: #f472b6;
+    --mono: ui-monospace, "Cascadia Mono", "SF Mono", Menlo, Consolas, monospace;
+    --sans: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0; background: var(--bg); color: var(--ink);
+    font-family: var(--sans); font-size: clamp(13px, 1.1vw, 15px);
+  }
+
+  .rahmen { max-width: 62rem; margin: 0 auto; padding: clamp(20px, 4vw, 44px) clamp(16px, 3vw, 28px) 64px; }
+
+  header { display: flex; align-items: baseline; gap: 12px; margin-bottom: 28px; flex-wrap: wrap; }
+  header h1 { font-size: clamp(17px, 2vw, 22px); margin: 0; font-weight: 650; }
+  header .stand { margin-left: auto; font-size: 11px; color: var(--faint); font-family: var(--mono); }
+
+  .zahlen { display: grid; gap: 12px; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); margin-bottom: 32px; }
+
+  .kachel { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 16px 18px; }
+  .kachel label { display: block; font-size: 9px; letter-spacing: .12em; text-transform: uppercase; color: var(--faint); margin-bottom: 6px; }
+  .kachel .wert { font-family: var(--mono); font-size: clamp(22px, 3vw, 30px); line-height: 1; font-variant-numeric: tabular-nums; }
+  .kachel .wert small { font-size: .45em; color: var(--faint); margin-left: 3px; }
+  .kachel.eng .wert { color: var(--warn); }
+
+  section { margin-bottom: 36px; }
+  section h2 { font-size: 12px; letter-spacing: .1em; text-transform: uppercase; color: var(--faint); margin: 0 0 12px; font-weight: 600; }
+
+  .tafel { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 16px; overflow-x: auto; }
+  svg { display: block; width: 100%; height: auto; }
+
+  .hinweis { color: var(--faint); font-size: 11px; line-height: 1.7; margin-top: 10px; }
+
+  footer { margin-top: 40px; padding-top: 18px; border-top: 1px solid var(--line); color: var(--faint); font-size: 11px; line-height: 1.7; }
+  footer b { color: var(--muted); font-weight: 500; }
+
+  .leer { color: var(--faint); font-size: 12px; padding: 30px 0; text-align: center; }
+</style>
+</head>
+<body>
+<div class="rahmen">
+
+<header>
+  <h1>Auslastung des FrameFlip-Relays</h1>
+  <span class="stand" id="stand">lädt …</span>
+</header>
+
+<div class="zahlen">
+  <div class="kachel"><label>Jetzt belegt</label><div class="wert" id="jetzt">–<small>/ 128</small></div></div>
+  <div class="kachel"><label>Höchstwert heute</label><div class="wert" id="heute">–</div></div>
+  <div class="kachel"><label>Höchstwert insgesamt</label><div class="wert" id="gesamt">–</div></div>
+  <div class="kachel" id="engKachel"><label>Tage über 100</label><div class="wert" id="eng">–</div></div>
+</div>
+
+<section>
+  <h2>Die letzten 24 Stunden</h2>
+  <div class="tafel"><svg id="tag" viewBox="0 0 900 220" preserveAspectRatio="none"></svg></div>
+</section>
+
+<section>
+  <h2>Höchstwert je Tag</h2>
+  <div class="tafel"><svg id="tage" viewBox="0 0 900 220" preserveAspectRatio="none"></svg></div>
+</section>
+
+<footer>
+  Erfasst wird <b>eine Zahl</b>: wieviele Räume der Relay gerade belegt hat. Keine
+  Raumkennungen, keine Adressen, nichts, was auf eine Person zurückführte — es gibt
+  hier nichts zu schützen, und deshalb steht hier auch nichts.
+  <br>
+  Ein Raum ist FrameFlip plus höchstens ein Gast. Eine ruhende Installation belegt
+  drei, eine stark genutzte bis zu sieben. Die harte Grenze liegt bei <b>128</b>;
+  ab 100 meldet sich Gatus.
+</footer>
+
+</div>
+
+<script>
+"use strict";
+
+const GRENZE = 128;
+const WARNUNG = 100;
+
+const el = id => document.getElementById(id);
+
+/* Die Daten liegen als CSV je Monat daneben. Eine Liste sagt, welche es gibt -
+   so muss die Seite nicht raten und nicht auf gut Glück nach Dateien fragen. */
+async function hole(name) {
+  const antwort = await fetch(name, { cache: "no-store" });
+  if (!antwort.ok) throw new Error(name + ": " + antwort.status);
+  return antwort.text();
+}
+
+function lies(text) {
+  const reihen = [];
+
+  for (const zeile of text.split("\n")) {
+    const [zeit, raeume] = zeile.split(",");
+    if (!zeit || zeit === "zeit") continue;
+
+    const t = Date.parse(zeit);
+    const n = Number(raeume);
+
+    if (Number.isFinite(t) && Number.isFinite(n)) reihen.push({ t, n });
+  }
+
+  return reihen.sort((a, b) => a.t - b.t);
+}
+
+const zweiStellig = n => String(n).padStart(2, "0");
+const tagVon = t => { const d = new Date(t); return `${d.getFullYear()}-${zweiStellig(d.getMonth() + 1)}-${zweiStellig(d.getDate())}`; };
+
+/* Gezeichnet wird von Hand in SVG - eine Bibliothek für zwei Diagramme wäre mehr
+   Abhängigkeit als Nutzen, und die Inhaltsregel lässt ohnehin nichts nachladen. */
+function flaeche(svg, punkte, vonT, bisT) {
+  const B = 900, H = 220, links = 42, unten = 26, oben = 12;
+
+  svg.textContent = "";
+
+  const ns = "http://www.w3.org/2000/svg";
+  const mach = (art, werte) => {
+    const e = document.createElementNS(ns, art);
+    for (const [k, v] of Object.entries(werte)) e.setAttribute(k, v);
+    return e;
+  };
+
+  const hoechst = Math.max(GRENZE * 0.25, ...punkte.map(p => p.n));
+  const x = t => links + (t - vonT) / (bisT - vonT) * (B - links - 8);
+  const y = n => H - unten - (n / hoechst) * (H - unten - oben);
+
+  // Gitter und Beschriftung
+  for (const wert of [0, Math.round(hoechst / 2), Math.round(hoechst)]) {
+    svg.appendChild(mach("line", { x1: links, x2: B - 8, y1: y(wert), y2: y(wert), stroke: "#1e1e2b", "stroke-width": 1 }));
+
+    const s = mach("text", { x: 4, y: y(wert) + 4, fill: "#6b6b80", "font-size": 10, "font-family": "ui-monospace, monospace" });
+    s.textContent = wert;
+    svg.appendChild(s);
+  }
+
+  if (WARNUNG <= hoechst) {
+    svg.appendChild(mach("line", { x1: links, x2: B - 8, y1: y(WARNUNG), y2: y(WARNUNG), stroke: "#f472b6", "stroke-width": 1, "stroke-dasharray": "4 4", opacity: .6 }));
+  }
+
+  if (punkte.length < 2) {
+    const s = mach("text", { x: B / 2, y: H / 2, fill: "#6b6b80", "font-size": 12, "text-anchor": "middle" });
+    s.textContent = "noch zu wenig Daten";
+    svg.appendChild(s);
+    return;
+  }
+
+  let d = `M ${x(punkte[0].t)} ${y(punkte[0].n)}`;
+  for (const p of punkte.slice(1)) d += ` L ${x(p.t)} ${y(p.n)}`;
+
+  svg.appendChild(mach("path", {
+    d: d + ` L ${x(punkte[punkte.length - 1].t)} ${y(0)} L ${x(punkte[0].t)} ${y(0)} Z`,
+    fill: "#a855f7", opacity: .16
+  }));
+
+  svg.appendChild(mach("path", { d, fill: "none", stroke: "#a855f7", "stroke-width": 1.8, "stroke-linejoin": "round" }));
+}
+
+function balken(svg, tage) {
+  const B = 900, H = 220, links = 42, unten = 26, oben = 12;
+
+  svg.textContent = "";
+
+  const ns = "http://www.w3.org/2000/svg";
+  const mach = (art, werte) => {
+    const e = document.createElementNS(ns, art);
+    for (const [k, v] of Object.entries(werte)) e.setAttribute(k, v);
+    return e;
+  };
+
+  if (tage.length === 0) {
+    const s = mach("text", { x: B / 2, y: H / 2, fill: "#6b6b80", "font-size": 12, "text-anchor": "middle" });
+    s.textContent = "noch keine vollen Tage";
+    svg.appendChild(s);
+    return;
+  }
+
+  const hoechst = Math.max(GRENZE * 0.25, ...tage.map(t => t.n));
+  const breite = (B - links - 8) / tage.length;
+  const y = n => H - unten - (n / hoechst) * (H - unten - oben);
+
+  for (const wert of [0, Math.round(hoechst / 2), Math.round(hoechst)]) {
+    svg.appendChild(mach("line", { x1: links, x2: B - 8, y1: y(wert), y2: y(wert), stroke: "#1e1e2b", "stroke-width": 1 }));
+    const s = mach("text", { x: 4, y: y(wert) + 4, fill: "#6b6b80", "font-size": 10, "font-family": "ui-monospace, monospace" });
+    s.textContent = wert;
+    svg.appendChild(s);
+  }
+
+  tage.forEach((tag, i) => {
+    const h = Math.max(1, y(0) - y(tag.n));
+
+    svg.appendChild(mach("rect", {
+      x: links + i * breite + breite * 0.15, y: y(tag.n),
+      width: Math.max(1, breite * 0.7), height: h,
+      fill: tag.n >= WARNUNG ? "#f472b6" : "#22d3ee", opacity: .85, rx: 2
+    }));
+
+    // Nur jede paar Säulen beschriften, sonst überlagert es sich.
+    if (i % Math.ceil(tage.length / 10) === 0) {
+      const s = mach("text", { x: links + i * breite + breite / 2, y: H - 8, fill: "#6b6b80", "font-size": 9, "text-anchor": "middle" });
+      s.textContent = tag.tag.slice(5);
+      svg.appendChild(s);
+    }
+  });
+}
+
+async function zeichne() {
+  let monate;
+
+  try {
+    monate = (await hole("monate.txt")).split("\n").map(s => s.trim()).filter(Boolean);
+  } catch (e) {
+    el("stand").textContent = "keine Daten gefunden";
+    return;
+  }
+
+  const reihen = [];
+
+  // Die letzten beiden Monate reichen für 24 Stunden und dreißig Tage.
+  for (const monat of monate.slice(-2)) {
+    try { reihen.push(...lies(await hole(monat + ".csv"))); } catch (e) { /* fehlender Monat ist kein Fehler */ }
+  }
+
+  reihen.sort((a, b) => a.t - b.t);
+
+  if (reihen.length === 0) { el("stand").textContent = "noch keine Messwerte"; return; }
+
+  const jetzt = reihen[reihen.length - 1];
+  const heuteTag = tagVon(Date.now());
+
+  el("jetzt").innerHTML = jetzt.n + '<small>/ ' + GRENZE + '</small>';
+  el("stand").textContent = "Stand " + new Date(jetzt.t).toLocaleString("de-DE");
+
+  const heute = reihen.filter(p => tagVon(p.t) === heuteTag);
+  el("heute").textContent = heute.length ? Math.max(...heute.map(p => p.n)) : "–";
+  el("gesamt").textContent = Math.max(...reihen.map(p => p.n));
+
+  // Höchstwert je Tag
+  const jeTag = new Map();
+  for (const p of reihen) {
+    const tag = tagVon(p.t);
+    jeTag.set(tag, Math.max(jeTag.get(tag) ?? 0, p.n));
+  }
+
+  const tage = Array.from(jeTag, ([tag, n]) => ({ tag, n })).sort((a, b) => a.tag.localeCompare(b.tag)).slice(-30);
+
+  const enge = tage.filter(t => t.n >= WARNUNG).length;
+  el("eng").textContent = enge;
+  if (enge > 0) el("engKachel").classList.add("eng");
+
+  const bis = Date.now(), von = bis - 24 * 3600 * 1000;
+  flaeche(el("tag"), reihen.filter(p => p.t >= von), von, bis);
+  balken(el("tage"), tage);
+}
+
+zeichne();
+setInterval(zeichne, 5 * 60 * 1000);
+</script>
+</body>
+</html>
