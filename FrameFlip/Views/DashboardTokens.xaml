@@ -652,8 +652,8 @@
          fluchtete nichts, obwohl jedes einzelne Feld richtig war. -->
 
     <Style x:Key="SettingRowStyle" TargetType="{x:Type views:SettingRow}">
-        <Setter Property="Margin" Value="0,0,0,2" />
-        <Setter Property="Padding" Value="14,11" />
+        <Setter Property="Margin" Value="0,0,0,1" />
+        <Setter Property="Padding" Value="12,7" />
         <Setter Property="Template">
             <Setter.Value>
                 <ControlTemplate TargetType="{x:Type views:SettingRow}">
@@ -755,7 +755,7 @@
     <!-- Eine Gruppe ersetzt die Trennlinien. Eine Linie sagt "hier ist ein Schnitt";
          eine Ueberschrift sagt, worum es im Abschnitt geht. -->
     <Style x:Key="SettingGroupStyle" TargetType="{x:Type views:SettingGroup}">
-        <Setter Property="Margin" Value="0,0,0,22" />
+        <Setter Property="Margin" Value="0,0,0,14" />
         <Setter Property="Template">
             <Setter.Value>
                 <ControlTemplate TargetType="{x:Type views:SettingGroup}">
@@ -765,7 +765,7 @@
                                    Foreground="{StaticResource DesktopFaint}" />
                         <Border Background="{StaticResource DesktopPanel}" CornerRadius="10"
                                 BorderBrush="{StaticResource DesktopLine}" BorderThickness="1"
-                                Padding="4,6">
+                                Padding="4,3">
                             <ItemsPresenter />
                         </Border>
                     </StackPanel>

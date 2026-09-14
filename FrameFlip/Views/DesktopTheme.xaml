@@ -76,9 +76,13 @@
         <Setter Property="Foreground" Value="{StaticResource DesktopMuted}" />
         <Setter Property="Template">
             <Setter.Value>
+                <!-- Ein Strich unter der gewaehlten Lasche, keine gefuellte Flaeche.
+                     Eine Lasche im Kachelgewand setzt voraus, dass unter ihr eine
+                     Flaeche beginnt, auf der sie aufsitzt. Die gibt es hier nicht
+                     mehr - sie haette dann auf einer Linie geschwebt. -->
                 <ControlTemplate TargetType="TabItem">
-                    <Border x:Name="Chrome" CornerRadius="9,9,0,0" Margin="0,0,2,0"
-                            Background="Transparent" BorderBrush="Transparent" BorderThickness="1,1,1,0">
+                    <Border x:Name="Chrome" Margin="0,0,4,0" Background="Transparent"
+                            BorderBrush="Transparent" BorderThickness="0,0,0,2">
                         <ContentPresenter ContentSource="Header" Margin="{TemplateBinding Padding}"
                                           HorizontalAlignment="Center" VerticalAlignment="Center"
                                           RecognizesAccessKey="True" />
@@ -88,12 +92,11 @@
                             <Setter Property="Foreground" Value="{StaticResource DesktopInk}" />
                         </Trigger>
                         <Trigger Property="IsSelected" Value="True">
-                            <Setter TargetName="Chrome" Property="Background" Value="{StaticResource DesktopSurface}" />
-                            <Setter TargetName="Chrome" Property="BorderBrush" Value="{StaticResource DesktopLine}" />
+                            <Setter TargetName="Chrome" Property="BorderBrush" Value="{StaticResource DesktopAccent}" />
                             <Setter Property="Foreground" Value="{StaticResource DesktopInk}" />
                         </Trigger>
                         <Trigger Property="IsKeyboardFocused" Value="True">
-                            <Setter TargetName="Chrome" Property="BorderBrush" Value="{StaticResource DesktopAccent}" />
+                            <Setter TargetName="Chrome" Property="Background" Value="{StaticResource DesktopSubtle}" />
                         </Trigger>
                     </ControlTemplate.Triggers>
                 </ControlTemplate>
@@ -119,18 +122,19 @@
                             <TabPanel IsItemsHost="True" Panel.ZIndex="1" Margin="0,0,0,-1" />
                         </Border>
 
-                        <Border Grid.Row="1" Background="{StaticResource DesktopSurface}"
-                                BorderBrush="{StaticResource DesktopLine}" BorderThickness="1,0,1,1"
-                                CornerRadius="0,0,9,9" Padding="18,16,18,18">
+                        <!-- Ohne Kasten. Der Inhalt liegt auf der Seite, nicht in
+                             einer zweiten Flaeche darauf: Die Reiter grenzen schon
+                             ab, und eine graue Flaeche auf einer grauen Seite ist
+                             ein Rahmen um nichts.
 
-                            <!-- Der Name ist nicht frei waehlbar: TabControl sucht
-                                 seinen Inhaltsbereich ueber genau diese Zeichenkette.
-                                 Heisst er anders, bleibt der Rumpf leer - die Reiter
-                                 sind da, anklickbar, und darunter ist nichts. Kein
-                                 Fehler, keine Meldung, nur eine leere Flaeche. -->
-                            <ContentPresenter x:Name="PART_SelectedContentHost"
-                                              ContentSource="SelectedContent" />
-                        </Border>
+                             Der Name des Inhaltsbereichs ist nicht frei waehlbar -
+                             TabControl sucht ihn ueber genau diese Zeichenkette.
+                             Heisst er anders, bleibt der Rumpf leer: die Reiter sind
+                             da, anklickbar, und darunter ist nichts. Kein Fehler,
+                             keine Meldung, nur eine leere Flaeche. -->
+                        <ContentPresenter x:Name="PART_SelectedContentHost" Grid.Row="1"
+                                          Margin="0,14,0,0"
+                                          ContentSource="SelectedContent" />
                     </Grid>
                 </ControlTemplate>
             </Setter.Value>
