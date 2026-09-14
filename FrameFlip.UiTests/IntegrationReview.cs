@@ -286,6 +286,28 @@ internal static partial class Program
         Check(de.Length == de.Distinct().Count() && en.Length == en.Distinct().Count(), "Merged language dictionaries contain no duplicate keys");
         Check(de.Order().SequenceEqual(en.Order()), "Merged languages contain the same keys");
 
+        /* Jeder benutzte Schluessel muss es auch geben.
+         *
+         * Der Vergleich darueber faengt das nicht: Er haelt die beiden Woerterbuecher
+         * gegeneinander, und ein Schluessel, der in BEIDEN fehlt, faellt dabei nicht
+         * auf. DynamicResource auf etwas Unbekanntes wirft auch nicht - es bleibt
+         * einfach leer. Genau so ist eine Gruppenueberschrift verschwunden, ohne dass
+         * irgendwo etwas gemeldet worden waere. */
+        var vorhanden = de.ToHashSet();
+        foreach (var datei in Directory.GetFiles(Path.Combine("FrameFlip", "Views"), "*.xaml"))
+        {
+            var benutzt = System.Text.RegularExpressions.Regex
+                .Matches(File.ReadAllText(datei), @"DynamicResource ([A-Za-z]_[A-Za-z0-9]+)")
+                .Select(m => m.Groups[1].Value)
+                .Distinct()
+                .Where(k => !vorhanden.Contains(k))
+                .ToArray();
+
+            Check(benutzt.Length == 0,
+                $"{Path.GetFileName(datei)} uses only keys that exist" +
+                (benutzt.Length == 0 ? "" : ": " + string.Join(", ", benutzt)));
+        }
+
         /* Der Wortlaut des ffmpeg-Hinweises gehoert hierher.
          *
          * Frueher stand er als deutsche Zeichenkette im FfmpegLocator und wurde dort

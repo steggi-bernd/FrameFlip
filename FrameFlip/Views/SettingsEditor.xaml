@@ -175,23 +175,66 @@
                 </ScrollViewer>
             </TabItem>
 
-        <TabItem Style="{StaticResource DesktopTab}" Header="{DynamicResource D_Permissions}">
- <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" Padding="0,8,12,18"><StackPanel>
- <TextBlock Text="{DynamicResource D_PermissionsIntro}" TextWrapping="Wrap" Foreground="{StaticResource DesktopMuted}" Margin="0,0,0,22" />
- <CheckBox x:Name="BridgeBox" Content="{DynamicResource D_BlenderBridge}" Style="{StaticResource DesktopCheckBox}" Margin="0,0,0,20" />
- <TextBlock Text="{DynamicResource S_BlenderLabel}" Style="{StaticResource DesktopLabel}" Margin="0,0,0,8" />
- <DockPanel><Button DockPanel.Dock="Right" Content="…" Style="{StaticResource DesktopButton}" Click="OnBrowseBlender" Margin="8,0,0,0" /><TextBox x:Name="BlenderPathBox" Style="{StaticResource DashTextBox}" /></DockPanel>
- <CheckBox x:Name="RenderBox" Content="{DynamicResource S_RenderEnable}" Style="{StaticResource DesktopCheckBox}" Margin="0,14,0,8" />
- <TextBlock Text="{DynamicResource S_RenderHint}" TextWrapping="Wrap" Foreground="{StaticResource DesktopMuted}" FontSize="11" />
- <Separator Margin="0,22" Background="{StaticResource DesktopLine}" />
- <TextBlock Text="{DynamicResource S_ExchangeFolder}" Style="{StaticResource DesktopLabel}" Margin="0,0,0,8" />
- <DockPanel><Button DockPanel.Dock="Right" Content="…" Style="{StaticResource DesktopButton}" Click="OnBrowseFolder" Margin="8,0,0,0" /><TextBox x:Name="FolderBox" Style="{StaticResource DashTextBox}" /></DockPanel>
- <CheckBox x:Name="FileAccessBox" Content="{DynamicResource D_FileRead}" Style="{StaticResource DesktopCheckBox}" Margin="0,14,0,12" />
- <CheckBox x:Name="PushBox" Content="{DynamicResource S_PushEnable}" Style="{StaticResource DesktopCheckBox}" />
- <TextBlock Text="{DynamicResource S_PushHint}" TextWrapping="Wrap" Foreground="{StaticResource DesktopMuted}" FontSize="11" Margin="0,8,0,0" />
- </StackPanel></ScrollViewer>
- </TabItem>
- <TabItem x:Name="AppearanceTab" Style="{StaticResource DesktopTab}" Header="{DynamicResource D_Appearance}"><ContentControl x:Name="AppearanceHost" /></TabItem>
+            <TabItem Style="{StaticResource DesktopTab}" Header="{DynamicResource D_Permissions}">
+                <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" Padding="0,4,10,8">
+                    <StackPanel>
+                        <TextBlock Text="{DynamicResource D_PermissionsIntro}" TextWrapping="Wrap"
+                                   Foreground="{StaticResource DesktopMuted}" FontSize="11.5" Margin="0,0,0,14" />
+
+                        <views:SettingGroup Style="{StaticResource SettingGroupStyle}" Header="{DynamicResource S_BlenderLabel}">
+                            <views:SettingRow Style="{StaticResource SettingRowStyle}"
+                                              Header="{DynamicResource D_BlenderBridge}"
+                                              Explain="{DynamicResource X_BridgeEnable}" Important="True">
+                                <CheckBox x:Name="BridgeBox" Style="{StaticResource DesktopCheckBox}" />
+                            </views:SettingRow>
+
+                            <views:SettingRow Style="{StaticResource SettingRowStyle}"
+                                              Header="{DynamicResource S_BlenderLabel}"
+                                              Explain="{DynamicResource X_BlenderPath}">
+                                <DockPanel Width="300">
+                                    <Button DockPanel.Dock="Right" Content="…" Style="{StaticResource DesktopButton}"
+                                            Click="OnBrowseBlender" Margin="8,0,0,0" />
+                                    <TextBox x:Name="BlenderPathBox" Style="{StaticResource DashTextBox}" />
+                                </DockPanel>
+                            </views:SettingRow>
+
+                            <views:SettingRow Style="{StaticResource SettingRowStyle}"
+                                              Header="{DynamicResource S_RenderEnable}"
+                                              Explain="{DynamicResource X_RenderEnable}"
+                                              Footnote="{DynamicResource S_RenderHint}" Important="True">
+                                <CheckBox x:Name="RenderBox" Style="{StaticResource DesktopCheckBox}" />
+                            </views:SettingRow>
+                        </views:SettingGroup>
+
+                        <views:SettingGroup Style="{StaticResource SettingGroupStyle}" Header="{DynamicResource S_ExchangeFolder}">
+                            <views:SettingRow Style="{StaticResource SettingRowStyle}"
+                                              Header="{DynamicResource S_ExchangeFolder}"
+                                              Explain="{DynamicResource X_ExchangeFolder}" Important="True">
+                                <DockPanel Width="300">
+                                    <Button DockPanel.Dock="Right" Content="…" Style="{StaticResource DesktopButton}"
+                                            Click="OnBrowseFolder" Margin="8,0,0,0" />
+                                    <TextBox x:Name="FolderBox" Style="{StaticResource DashTextBox}" />
+                                </DockPanel>
+                            </views:SettingRow>
+
+                            <views:SettingRow Style="{StaticResource SettingRowStyle}"
+                                              Header="{DynamicResource D_FileRead}"
+                                              Explain="{DynamicResource X_LibraryEnable}">
+                                <CheckBox x:Name="FileAccessBox" Style="{StaticResource DesktopCheckBox}" />
+                            </views:SettingRow>
+
+                            <views:SettingRow Style="{StaticResource SettingRowStyle}"
+                                              Header="{DynamicResource S_PushEnable}"
+                                              Explain="{DynamicResource X_PushEnable}"
+                                              Footnote="{DynamicResource S_PushHint}">
+                                <CheckBox x:Name="PushBox" Style="{StaticResource DesktopCheckBox}" />
+                            </views:SettingRow>
+                        </views:SettingGroup>
+                    </StackPanel>
+                </ScrollViewer>
+            </TabItem>
+
+            <TabItem x:Name="AppearanceTab" Style="{StaticResource DesktopTab}" Header="{DynamicResource D_Appearance}"><ContentControl x:Name="AppearanceHost" /></TabItem>
  </TabControl>
 
         <TextBlock x:Name="StatusText" Grid.Row="1" Margin="0,14,0,0"

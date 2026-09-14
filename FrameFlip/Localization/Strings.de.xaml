@@ -212,6 +212,13 @@
     <sys:String x:Key="X_PushEnable">Erlaubt dem Handy, Dateien in den Austauschordner zu legen. Aus, wenn die Verbindung nur in eine Richtung gehen soll.</sys:String>
     <sys:String x:Key="X_LockToDisplay">Koppelt die Wiedergabe an den Bildschirmtakt, wenn beide fast gleich sind. Verhindert Ruckler bei 60 fps auf 60 Hz – abschalten, wenn du die Zeitachse exakt brauchst.</sys:String>
     <sys:String x:Key="X_CloseOnFocusLoss">Die Vorschau schließt, sobald du woanders hinklickst. Abschalten, wenn die Sequenz während der Arbeit in Blender stehen bleiben soll.</sys:String>
+    <sys:String x:Key="X_UiScale">Vergrößert oder verkleinert die gesamte Oberfläche. Der richtige Hebel, wenn dir Schrift und Flächen zu klein oder zu groß vorkommen – geht auch mit Strg und + oder −.</sys:String>
+    <sys:String x:Key="X_TileSize">Wie groß die Vorschaukacheln im Projektbereich sind. Größer zeigt mehr vom Bild, kleiner zeigt mehr Bilder auf einmal.</sys:String>
+    <sys:String x:Key="X_MonitorShare">Wieviel Breite die Metriken rechts bekommen. Höher, wenn du beim Rendern vor allem auf die Zahlen siehst – niedriger, wenn das Bild zählt.</sys:String>
+    <sys:String x:Key="X_NavigationWidth">Die Breite der Sequenzliste links. Breiter, wenn deine Dateinamen lang sind.</sys:String>
+    <sys:String x:Key="X_LowerPanelHeight">Die Höhe der unteren Flächen, wenn das Fenster zu schmal für drei Spalten wird und sie nach unten rutschen.</sys:String>
+    <sys:String x:Key="X_MonitorFirst">Tauscht Sequenzliste und Metriken. Für alle, die die Zahlen lieber links haben.</sys:String>
+    <sys:String x:Key="X_ReduceMotion">Schaltet Überblendungen und Bewegung ab. Sinnvoll bei empfindlicher Wahrnehmung – und auf schwacher Hardware, wo jede Animation Rechenzeit kostet, die der Render braucht.</sys:String>
 
     <!-- ============================================================ Bereitschaft -->
     <sys:String x:Key="S_ReadyTitle">NOCH NICHT VOLLSTÄNDIG</sys:String>
@@ -394,6 +401,7 @@
     <sys:String x:Key="D_PermissionsIntro">Lege fest, wie Blender angebunden ist und was dein gekoppeltes Gerät auf diesem PC tun darf.</sys:String>
     <sys:String x:Key="D_BlenderBridge">FrameFlip-Bridge für Renderstatus aktivieren</sys:String>
     <sys:String x:Key="D_FileRead">Dateien aus dem Austauschordner lesen erlauben</sys:String>
+    <sys:String x:Key="D_WorkspaceBehaviour">Verhalten</sys:String>
     <sys:String x:Key="D_Appearance">Arbeitsbereich</sys:String>
     <sys:String x:Key="D_AppearanceIntro">Diese Anpassungen werden sofort angewendet und gespeichert. Bei wenig Platz ordnen sich die Bereiche automatisch untereinander an.</sys:String>
     <sys:String x:Key="D_UiScale">Oberflächenskalierung</sys:String>

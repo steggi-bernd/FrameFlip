@@ -212,6 +212,13 @@
     <sys:String x:Key="X_PushEnable">Lets the phone put files into the exchange folder. Off if the connection should go one way only.</sys:String>
     <sys:String x:Key="X_LockToDisplay">Locks playback to the display refresh when the two nearly match. Prevents judder at 60 fps on 60 Hz – switch off if you need the exact timeline.</sys:String>
     <sys:String x:Key="X_CloseOnFocusLoss">The preview closes as soon as you click elsewhere. Switch off to keep the sequence up while you work in Blender.</sys:String>
+    <sys:String x:Key="X_UiScale">Makes the whole interface larger or smaller. The right lever when text and surfaces feel too small or too big – Ctrl with + or − does it too.</sys:String>
+    <sys:String x:Key="X_TileSize">How large the preview tiles in the projects area are. Larger shows more of the image, smaller shows more images at once.</sys:String>
+    <sys:String x:Key="X_MonitorShare">How much width the metrics on the right get. More if you mostly watch the numbers while rendering – less if the image is what counts.</sys:String>
+    <sys:String x:Key="X_NavigationWidth">The width of the sequence list on the left. Wider if your file names are long.</sys:String>
+    <sys:String x:Key="X_LowerPanelHeight">The height of the lower areas once the window gets too narrow for three columns and they move below.</sys:String>
+    <sys:String x:Key="X_MonitorFirst">Swaps the sequence list and the metrics. For everyone who would rather have the numbers on the left.</sys:String>
+    <sys:String x:Key="X_ReduceMotion">Turns off fades and movement. Useful for motion sensitivity – and on weak hardware, where every animation costs compute the render needs.</sys:String>
 
     <!-- ============================================================== Readiness -->
     <sys:String x:Key="S_ReadyTitle">NOT QUITE COMPLETE</sys:String>
@@ -394,6 +401,7 @@
     <sys:String x:Key="D_PermissionsIntro">Choose how Blender connects and what your paired device can do on this PC.</sys:String>
     <sys:String x:Key="D_BlenderBridge">Enable FrameFlip bridge for render status</sys:String>
     <sys:String x:Key="D_FileRead">Allow reading files in the exchange folder</sys:String>
+    <sys:String x:Key="D_WorkspaceBehaviour">Behaviour</sys:String>
     <sys:String x:Key="D_Appearance">Workspace</sys:String>
     <sys:String x:Key="D_AppearanceIntro">These adjustments apply and save immediately. Panels automatically stack when space is limited.</sys:String>
     <sys:String x:Key="D_UiScale">Interface scale</sys:String>
