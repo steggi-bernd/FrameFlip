@@ -118,10 +118,15 @@ public partial class MainWindow
         }
         return false;
     }
-    private void OnLayoutPreferences(object sender, RoutedEventArgs e)
-    {
-        ShowSettingsPage(); _settingsPage?.SelectAppearance();
-    }
+    /* Der Knopf "Layout" in der Titelzeile ist weg.
+     *
+     * Er tat nichts, als auf die Einstellungsseite zu wechseln und dort den Reiter
+     * "Arbeitsflaeche" zu waehlen - eine Weiche im Kopfbereich, die dorthin fuehrte,
+     * wo die Navigation daneben ohnehin hinfuehrt.
+     *
+     * SelectAppearance bleibt: Die Bereitschaftsanzeige und kuenftige Verweise
+     * koennen weiterhin gezielt auf einen Reiter springen. Nur der Knopf war
+     * ueberfluessig, nicht die Faehigkeit. */
     private void RestorePageFocus()
     {
         if (_page == "dashboard") StageArea.Focus();

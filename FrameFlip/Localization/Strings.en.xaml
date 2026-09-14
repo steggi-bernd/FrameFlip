@@ -335,7 +335,6 @@
     <sys:String x:Key="D_Smaller">Smaller · Ctrl −</sys:String>
     <sys:String x:Key="D_Larger">Larger · Ctrl +</sys:String>
     <sys:String x:Key="D_ResetScale">Reset scale · Ctrl 0</sys:String>
-    <sys:String x:Key="D_Layout">Layout</sys:String>
     <sys:String x:Key="D_LayoutHint">Drag the divider to resize · Ctrl + / − to scale</sys:String>
     <sys:String x:Key="D_Overview">Overview</sys:String>
     <sys:String x:Key="D_Projects">Projects</sys:String>

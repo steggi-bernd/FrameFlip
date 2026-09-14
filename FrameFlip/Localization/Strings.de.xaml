@@ -335,7 +335,6 @@
     <sys:String x:Key="D_Smaller">Kleiner · Strg −</sys:String>
     <sys:String x:Key="D_Larger">Größer · Strg +</sys:String>
     <sys:String x:Key="D_ResetScale">Skalierung zurücksetzen · Strg 0</sys:String>
-    <sys:String x:Key="D_Layout">Layout</sys:String>
     <sys:String x:Key="D_LayoutHint">Flächen am Griff anpassen · Strg + / − zum Skalieren</sys:String>
     <sys:String x:Key="D_Overview">Übersicht</sys:String>
     <sys:String x:Key="D_Projects">Projekte</sys:String>
