@@ -173,6 +173,23 @@ public sealed class AppSettings
     public int BridgePort { get; set; } = 47823;
 
     /// <summary>
+    /// Wann sich das Addon zuletzt gemeldet hat - ueber Programmstarts hinweg.
+    ///
+    /// Ohne diesen Wert kann die Oberflaeche zwei voellig verschiedene Lagen nicht
+    /// auseinanderhalten: Jemand hat das Addon nie installiert, oder jemand hat es
+    /// laengst installiert und Blender gerade nicht offen. Beide sehen zur Laufzeit
+    /// gleich aus - es meldet sich nichts.
+    ///
+    /// Dem Neuling gehoert die Anleitung zum Einrichten. Dem anderen waere sie eine
+    /// Zumutung, und zwar jedes Mal, wenn er Blender schliesst. Deshalb wird der
+    /// Zeitpunkt aufgehoben und nicht nur der laufende Zustand angesehen.
+    ///
+    /// Kein personenbezogener Wert: ein Zeitstempel auf dem eigenen Rechner, der das
+    /// Geraet nie verlaesst.
+    /// </summary>
+    public DateTime? BridgeLastSeen { get; set; }
+
+    /// <summary>
     /// Die Seite zum Zusehen im Browser, ueber den Relay.
     ///
     /// Aus, solange niemand sie einschaltet. Eine Verbindung nach draussen, die man

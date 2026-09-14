@@ -72,6 +72,24 @@ public sealed class BridgeServer : IDisposable
     public int Connections => Volatile.Read(ref _connections);
     private int _connections;
 
+    /// <summary>
+    /// Wann sich zuletzt ein echtes Addon gemeldet hat - oder null, wenn nie.
+    ///
+    /// Gesetzt wird das erst NACH dem Handschlag, nicht beim Verbindungsaufbau. Auf
+    /// diesem Port landet alles, was den lokalen Rechner absucht; erst ein "hello"
+    /// mit passendem Token kann vom Addon kommen, denn nur es kennt das Token aus der
+    /// Handschlagdatei.
+    ///
+    /// Der Unterschied zaehlt, weil die Oberflaeche daraus eine Aussage macht. "Noch
+    /// keine Bruecke eingerichtet" darf nicht erscheinen, weil Blender gerade zu ist -
+    /// und nicht ausbleiben, weil ein Portscanner vorbeikam.
+    /// </summary>
+    public DateTime? LastGreetingUtc
+    {
+        get { long t = Interlocked.Read(ref _lastGreeting); return t == 0 ? null : new DateTime(t, DateTimeKind.Utc); }
+    }
+    private long _lastGreeting;
+
     public bool IsListening { get; private set; }
 
     public int Port => _port;
@@ -158,6 +176,10 @@ public sealed class BridgeServer : IDisposable
                         greeted = true;
                         connection = Guid.NewGuid().ToString("N");
                         Interlocked.Increment(ref _connections);
+
+                        // Ab hier steht fest: Das war das Addon. Kein anderer kennt
+                        // das Token aus der Handschlagdatei.
+                        Interlocked.Exchange(ref _lastGreeting, DateTime.UtcNow.Ticks);
                         continue;
                     }
 

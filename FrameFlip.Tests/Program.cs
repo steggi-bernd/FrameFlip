@@ -34,6 +34,7 @@ static int RunAll()
     RelayClientInvariants.Run();
     WatchInvariants.Run();
     PaceInvariants.Run();
+    ReadinessInvariants.Run();
     MachineInvariants.Run();
     RemoteCommandRouterInvariants.Run();
     RemotePreviewFollowInvariants.Run();
