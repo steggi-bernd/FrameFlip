@@ -96,6 +96,9 @@ public static class FloatFrameProcessor
         var b = frame.B;
         var a = frame.A;
 
+        var plan = new ShadePlan(gain, saturation, channel, black, span, inverseGamma, contrast,
+                                 needsTone, view, linearTools, displayTools);
+
         int height = frame.Height;
         int rowBlocks = (height + step - 1) / step;
 
@@ -117,64 +120,9 @@ public static class FloatFrameProcessor
                 int i = y * width + x;
 
                 float vr = r[i], vg = g[i], vb = b[i];
-
-                // --- lineare Seite ---
-
-                if (gain != 1f)
-                {
-                    vr *= gain;
-                    vg *= gain;
-                    vb *= gain;
-                }
-
-                if (!Same(saturation, 1f))
-                {
-                    float luma = LumaR * vr + LumaG * vg + LumaB * vb;
-                    vr = luma + (vr - luma) * saturation;
-                    vg = luma + (vg - luma) * saturation;
-                    vb = luma + (vb - luma) * saturation;
-
-                    // Uebersaettigung kann unter null druecken; negatives Licht gibt
-                    // es nicht, und die Sichtumwandlung koennte damit nichts anfangen.
-                    if (vr < 0) vr = 0;
-                    if (vg < 0) vg = 0;
-                    if (vb < 0) vb = 0;
-                }
-
-                for (int t = 0; t < linearTools.Length; t++)
-                    linearTools[t].Apply(ref vr, ref vg, ref vb);
-
-                // --- Sichtumwandlung: ab hier sind es Anzeigewerte von 0 bis 1 ---
-
-                view.Apply(ref vr, ref vg, ref vb);
-
-                // --- Anzeigeseite ---
-
-                if (needsTone)
-                {
-                    vr = Tone(vr, black, span, inverseGamma, contrast);
-                    vg = Tone(vg, black, span, inverseGamma, contrast);
-                    vb = Tone(vb, black, span, inverseGamma, contrast);
-                }
-
-                for (int t = 0; t < displayTools.Length; t++)
-                    displayTools[t].Apply(ref vr, ref vg, ref vb);
-
                 float alpha = a is null ? 1f : a[i];
 
-                if (channel != ChannelView.All)
-                {
-                    switch (channel)
-                    {
-                        case ChannelView.Red: vg = vb = vr; break;
-                        case ChannelView.Green: vr = vb = vg; break;
-                        case ChannelView.Blue: vr = vg = vb; break;
-                        case ChannelView.Alpha: vr = vg = vb = Math.Clamp(alpha, 0f, 1f); break;
-                        case ChannelView.Luminance:
-                            vr = vg = vb = LumaR * vr + LumaG * vg + LumaB * vb;
-                            break;
-                    }
-                }
+                Shade(in plan, ref vr, ref vg, ref vb, alpha);
 
                 byte blue = ToByte(vb);
                 byte green = ToByte(vg);
@@ -210,6 +158,173 @@ public static class FloatFrameProcessor
             }
         });
     }
+
+    /// <summary>
+    /// Alles, was einmal je Bild feststeht. Als Struktur, damit die innere Schleife
+    /// nicht zwoelf Einzelwerte durchreichen muss.
+    /// </summary>
+    private readonly struct ShadePlan
+    {
+        public ShadePlan(float gain, float saturation, ChannelView channel,
+                         float black, float span, float inverseGamma, float contrast, bool needsTone,
+                         IViewTransform view, IGradingTool[] linear, IGradingTool[] display)
+        {
+            Gain = gain;
+            Saturation = saturation;
+            Channel = channel;
+            Black = black;
+            Span = span;
+            InverseGamma = inverseGamma;
+            Contrast = contrast;
+            NeedsTone = needsTone;
+            View = view;
+            Linear = linear;
+            Display = display;
+        }
+
+        public readonly float Gain, Saturation, Black, Span, InverseGamma, Contrast;
+        public readonly bool NeedsTone;
+        public readonly ChannelView Channel;
+        public readonly IViewTransform View;
+        public readonly IGradingTool[] Linear, Display;
+    }
+
+    /// <summary>
+    /// Die ganze Kette fuer einen Bildpunkt - von linearem Szenenlicht zu
+    /// Anzeigewerten zwischen 0 und 1.
+    ///
+    /// Steht an einer Stelle, weil sie an zwei gebraucht wird: fuer die Anzeige mit
+    /// acht Bit und fuer den Export mit sechzehn. Zweimal abgeschrieben liefe sie
+    /// beim naechsten Werkzeug auseinander, und dann saehe das Ergebnis anders aus
+    /// als die Vorschau, auf die jemand sich verlassen hat.
+    /// </summary>
+    private static void Shade(in ShadePlan plan, ref float vr, ref float vg, ref float vb, float alpha)
+    {
+        // --- lineare Seite ---
+
+        if (plan.Gain != 1f)
+        {
+            vr *= plan.Gain;
+            vg *= plan.Gain;
+            vb *= plan.Gain;
+        }
+
+        if (!Same(plan.Saturation, 1f))
+        {
+            float luma = LumaR * vr + LumaG * vg + LumaB * vb;
+            vr = luma + (vr - luma) * plan.Saturation;
+            vg = luma + (vg - luma) * plan.Saturation;
+            vb = luma + (vb - luma) * plan.Saturation;
+
+            // Uebersaettigung kann unter null druecken; negatives Licht gibt es
+            // nicht, und die Sichtumwandlung koennte damit nichts anfangen.
+            if (vr < 0) vr = 0;
+            if (vg < 0) vg = 0;
+            if (vb < 0) vb = 0;
+        }
+
+        var linear = plan.Linear;
+        for (int t = 0; t < linear.Length; t++) linear[t].Apply(ref vr, ref vg, ref vb);
+
+        // --- Sichtumwandlung: ab hier sind es Anzeigewerte von 0 bis 1 ---
+
+        plan.View.Apply(ref vr, ref vg, ref vb);
+
+        // --- Anzeigeseite ---
+
+        if (plan.NeedsTone)
+        {
+            vr = Tone(vr, plan.Black, plan.Span, plan.InverseGamma, plan.Contrast);
+            vg = Tone(vg, plan.Black, plan.Span, plan.InverseGamma, plan.Contrast);
+            vb = Tone(vb, plan.Black, plan.Span, plan.InverseGamma, plan.Contrast);
+        }
+
+        var display = plan.Display;
+        for (int t = 0; t < display.Length; t++) display[t].Apply(ref vr, ref vg, ref vb);
+
+        if (plan.Channel == ChannelView.All) return;
+
+        switch (plan.Channel)
+        {
+            case ChannelView.Red: vg = vb = vr; break;
+            case ChannelView.Green: vr = vb = vg; break;
+            case ChannelView.Blue: vr = vg = vb; break;
+            case ChannelView.Alpha: vr = vg = vb = Math.Clamp(alpha, 0f, 1f); break;
+            case ChannelView.Luminance:
+                vr = vg = vb = LumaR * vr + LumaG * vg + LumaB * vb;
+                break;
+        }
+    }
+
+    /// <summary>
+    /// Wie <see cref="Apply(FloatFrame, ImageAdjustments, IViewTransform, PreparedGrading, IntPtr, int, int)"/>,
+    /// aber nach Rgba64 - sechzehn Bit je Kanal, Reihenfolge R, G, B, A.
+    ///
+    /// Fuer den Export. Acht Bit wuerden dort genau das wegwerfen, was die Korrektur
+    /// eben gewonnen hat: Ein Verlauf, den die Kurve gestreckt hat, zeigt auf acht
+    /// Bit Stufen, wo vorher keine waren - und eine Sequenz, die danach noch durch
+    /// eine Farbkorrektur soll, hat davon nichts mehr.
+    /// </summary>
+    public static unsafe void ApplyRgba64(FloatFrame frame, ImageAdjustments adjustments,
+                                          IViewTransform view, PreparedGrading grading,
+                                          IntPtr destination, int destinationStride)
+    {
+        var plan = BuildPlan(adjustments, view, grading);
+        ushort* target = (ushort*)destination.ToPointer();
+
+        int width = frame.Width;
+        var r = frame.R;
+        var g = frame.G;
+        var b = frame.B;
+        var a = frame.A;
+
+        Parallel.For(0, frame.Height, new ParallelOptions
+        {
+            MaxDegreeOfParallelism = Math.Clamp(Environment.ProcessorCount, 1, 8),
+        },
+        y =>
+        {
+            ushort* row = (ushort*)((byte*)target + (long)y * destinationStride);
+
+            for (int x = 0; x < width; x++)
+            {
+                int i = y * width + x;
+
+                float vr = r[i], vg = g[i], vb = b[i];
+                float alpha = a is null ? 1f : a[i];
+
+                Shade(in plan, ref vr, ref vg, ref vb, alpha);
+
+                ushort* pixel = row + x * 4;
+                pixel[0] = ToUShort(vr);
+                pixel[1] = ToUShort(vg);
+                pixel[2] = ToUShort(vb);
+                pixel[3] = ToUShort(Math.Clamp(alpha, 0f, 1f));
+            }
+        });
+    }
+
+    private static ShadePlan BuildPlan(ImageAdjustments adjustments, IViewTransform view, PreparedGrading grading)
+    {
+        float black = (float)adjustments.BlackPoint;
+        float white = (float)adjustments.WhitePoint;
+        float span = white - black;
+        if (MathF.Abs(span) < 1e-6f) span = 1e-6f;
+
+        float inverseGamma = 1f / MathF.Max(0.0001f, (float)adjustments.Gamma);
+        float contrast = (float)adjustments.Contrast;
+
+        bool needsTone = !Same(black, 0f) || !Same(white, 1f) ||
+                         !Same(inverseGamma, 1f) || !Same(contrast, 1f);
+
+        return new ShadePlan((float)Math.Pow(2.0, adjustments.Exposure), (float)adjustments.Saturation,
+                             adjustments.Channel, black, span, inverseGamma, contrast, needsTone, view,
+                             grading.SceneLinear ?? Array.Empty<IGradingTool>(),
+                             grading.Display ?? Array.Empty<IGradingTool>());
+    }
+
+    private static ushort ToUShort(float value)
+        => (ushort)Math.Clamp(MathF.Round(value * 65535f), 0f, 65535f);
 
     /// <summary>
     /// Die Tonwertkurve auf der Anzeigeseite. Dieselben vier Schritte wie im
