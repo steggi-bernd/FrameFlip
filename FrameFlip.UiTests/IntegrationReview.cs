@@ -195,5 +195,25 @@ internal static partial class Program
         var en = XDocument.Load(Locate("Strings.en.xaml")).Root!.Elements().Select(e => (string)e.Attribute(x + "Key")!).ToArray();
         Check(de.Length == de.Distinct().Count() && en.Length == en.Distinct().Count(), "Merged language dictionaries contain no duplicate keys");
         Check(de.Order().SequenceEqual(en.Order()), "Merged languages contain the same keys");
+
+        /* Der Wortlaut des ffmpeg-Hinweises gehoert hierher.
+         *
+         * Frueher stand er als deutsche Zeichenkette im FfmpegLocator und wurde dort
+         * geprueft - aber der Sucher kennt kein Fenster und kann einen Schluessel
+         * nicht aufloesen. Hier sind die Woerterbuecher geladen, also wird hier
+         * geprueft, was der Text leisten muss: einen Weg nennen und begruenden,
+         * warum ffmpeg nicht mitgeliefert wird. */
+        string Text(string datei, string key) => XDocument.Load(Locate(datei)).Root!.Elements()
+            .First(e => (string)e.Attribute(x + "Key")! == key).Value;
+
+        foreach (var (datei, grund) in new[] { ("Strings.de.xaml", "GPL"), ("Strings.en.xaml", "GPL") })
+        {
+            foreach (var key in new[] { "S_FfmpegHintWinget", "S_FfmpegHintManual" })
+            {
+                string text = Text(datei, key);
+                Check(text.Contains(grund), $"{datei}/{key} says why ffmpeg is not bundled");
+                Check(text.Length > 60, $"{datei}/{key} offers a way forward");
+            }
+        }
     }
 }

@@ -40,6 +40,7 @@
         <Grid.RowDefinitions>
             <RowDefinition Height="44" />
             <RowDefinition Height="3" />
+            <RowDefinition Height="Auto" />   <!-- Bereitschaft -->
             <RowDefinition Height="*" />
             <RowDefinition Height="30" />
         </Grid.RowDefinitions>
@@ -125,8 +126,32 @@
                     Background="{StaticResource DesktopAccent}" />
         </Border>
 
+        <!-- ====================================================== Bereitschaft -->
+
+        <!-- Was FrameFlip noch fehlt, damit es das kann, wofuer man es geholt hat.
+             Je Zeile genau eine Handlung - und keine Zeile fuer etwas, das jemand
+             selbst abgewaehlt hat.
+
+             Die Leiste hat keinen Schliessknopf, und das ist Absicht: Sie verschwindet,
+             sobald nichts mehr fehlt. Eine Anzeige, die man wegklicken muss, war eine
+             Zumutung; eine, die sich selbst ueberfluessig macht, ist ein Hinweis. -->
+        <Border x:Name="ReadyBar" Grid.Row="2" Visibility="Collapsed"
+                Background="{StaticResource DesktopSurface}"
+                BorderBrush="{StaticResource DesktopLine}" BorderThickness="0,0,0,1"
+                Padding="16,12">
+            <StackPanel>
+                <TextBlock views:Track.Text="{DynamicResource S_ReadyTitle}"
+                           Style="{StaticResource DashLabel}" Margin="0,0,0,8" />
+                <ItemsControl x:Name="ReadyRows">
+                    <ItemsControl.ItemsPanel>
+                        <ItemsPanelTemplate><StackPanel /></ItemsPanelTemplate>
+                    </ItemsControl.ItemsPanel>
+                </ItemsControl>
+            </StackPanel>
+        </Border>
+
         <!-- ============================================================ Rumpf -->
-        <Grid Grid.Row="2">
+        <Grid Grid.Row="3">
 
             <!-- ==================================================== Dashboard -->
             <Grid Style="{StaticResource BehindOverlay}" x:Name="DashboardBody" SizeChanged="OnDashboardSizeChanged">
@@ -806,7 +831,7 @@
         </Grid>
 
         <!-- ============================================================ Statuszeile -->
-        <Border Grid.Row="3" Background="{StaticResource DesktopPanel}"
+        <Border Grid.Row="4" Background="{StaticResource DesktopPanel}"
                 BorderBrush="{StaticResource DesktopLine}" BorderThickness="0,1,0,0">
             <Grid Margin="14,0">
                 <StackPanel Orientation="Horizontal" VerticalAlignment="Center">

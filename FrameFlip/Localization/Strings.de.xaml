@@ -188,6 +188,23 @@
     <sys:String x:Key="S_ImageUnreadable">Das Bild konnte nicht gelesen werden.</sys:String>
     <sys:String x:Key="S_FfmpegWrong">Diese Datei antwortet nicht wie ffmpeg. Bitte den Pfad prüfen.</sys:String>
 
+    <!-- ============================================================ Bereitschaft -->
+    <sys:String x:Key="S_ReadyTitle">NOCH NICHT VOLLSTÄNDIG</sys:String>
+    <sys:String x:Key="S_ReadyFfmpegMissing">Für den Videoexport fehlt ffmpeg. FrameFlip liefert es nicht mit, kann es aber von Windows holen lassen.</sys:String>
+    <sys:String x:Key="S_ReadyFfmpegNoWinget">Für den Videoexport fehlt ffmpeg, und die Paketverwaltung von Windows ist nicht verfügbar. Es lässt sich von Hand installieren und in den Einstellungen eintragen.</sys:String>
+    <sys:String x:Key="S_ReadyBridgeNever">Blender meldet noch nichts. Dafür braucht es das Addon FrameFlip Bridge – einmal installiert, meldet es jeden Render von selbst.</sys:String>
+    <sys:String x:Key="S_ReadyBridgeBlocked">Die Brücke ist eingeschaltet, lauscht aber nicht. Meist hält ein anderes Programm den Port.</sys:String>
+    <sys:String x:Key="S_ReadyRelayDown">Handy oder Zuschauerseite sind eingeschaltet, die Verbindung steht aber nicht.</sys:String>
+    <sys:String x:Key="S_ReadyInstall">Installieren</sys:String>
+    <sys:String x:Key="S_ReadyGetBridge">Addon holen</sys:String>
+    <sys:String x:Key="S_ReadyOpenSettings">Einstellungen</sys:String>
+    <sys:String x:Key="S_ReadyInstalling">wird geholt …</sys:String>
+    <sys:String x:Key="S_ReadyInstalled">ffmpeg ist da. Der Videoexport steht bereit.</sys:String>
+    <sys:String x:Key="S_ReadyInstallFailed">Das hat nicht geklappt. ffmpeg lässt sich von Hand installieren und in den Einstellungen eintragen.</sys:String>
+    <sys:String x:Key="S_ReadyNoFfmpegForExport">Ohne ffmpeg lässt sich kein Video vorbereiten. Was fehlt, steht oben im Dashboard.</sys:String>
+    <sys:String x:Key="S_FfmpegHintWinget">FrameFlip liefert ffmpeg nicht mit, weil übliche Builds unter der GPL stehen. Im Dashboard steht ein Knopf, der es von Windows holen lässt – oder hier von Hand den Pfad auswählen.</sys:String>
+    <sys:String x:Key="S_FfmpegHintManual">FrameFlip liefert ffmpeg nicht mit, weil übliche Builds unter der GPL stehen. Nach der Installation hier den Pfad auswählen.</sys:String>
+
     <sys:String x:Key="S_RemotePaired">Handy verbunden</sys:String>
     <sys:String x:Key="S_RemoteWaiting">Warte auf das Handy …</sys:String>
     <sys:String x:Key="S_RemoteConnecting">Verbinde mit dem Relais …</sys:String>

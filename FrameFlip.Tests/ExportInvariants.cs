@@ -308,10 +308,21 @@ public static class ExportInvariants
             try { File.Delete(fake); } catch (IOException) { }
         }
 
-        Check.That(FfmpegLocator.InstallHint.Contains("winget"),
-            "der Hinweis nennt einen konkreten Installationsweg");
-        Check.That(FfmpegLocator.InstallHint.Contains("GPL"),
-            "der Hinweis begruendet, warum ffmpeg nicht mitgeliefert wird");
+        /* Der Hinweis ist jetzt ein Ressourcenschluessel, kein fester Text.
+         *
+         * Frueher stand die deutsche Zeichenkette im Quelltext, und genau deshalb
+         * erschien sie auch auf Englisch gestellt deutsch. Aufloesen laesst sie sich
+         * hier aber nicht: Strings.T gibt ohne laufende WPF-Anwendung den Schluessel
+         * zurueck, und diese Klasse ist absichtlich ohne Fenster pruefbar.
+         *
+         * Der Wortlaut wird deshalb dort geprueft, wo die Woerterbuecher geladen sind
+         * - in FrameFlip.UiTests. Hier bleibt, was diese Schicht wirklich besitzt:
+         * dass sie einen Schluessel nennt und einen konkreten Weg kennt. */
+        Check.That(FfmpegLocator.InstallHintKey is "S_FfmpegHintWinget" or "S_FfmpegHintManual",
+            "der Hinweis wird als Ressourcenschluessel benannt, nicht als fester Text");
+
+        Check.That(FfmpegLocator.WingetPackage == "Gyan.FFmpeg",
+            "und es gibt einen konkreten Weg: ein benanntes Paket");
 
         // Auf diesem Rechner ist ffmpeg nicht installiert; die Suche muss das ohne
         // Ausnahme melden koennen.

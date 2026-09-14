@@ -5,6 +5,7 @@ using System.Windows;
 using FrameFlip.Configuration;
 using FrameFlip.Export;
 using FrameFlip.Imaging;
+using FrameFlip.Localization;
 using FrameFlip.Playback;
 using FrameFlip.Sequencing;
 
@@ -178,7 +179,9 @@ public partial class ExportWindow : Window
         if (string.IsNullOrWhiteSpace(path))
         {
             _ffmpegValidation = null;
-            FfmpegHint.Text = FfmpegLocator.InstallHint;
+            // Der Schluessel kommt vom Sucher, der Satz von hier: Er kennt kein
+            // Fenster und koennte den Text gar nicht aufloesen.
+            FfmpegHint.Text = Strings.T(FfmpegLocator.InstallHintKey);
             FfmpegHint.Foreground = (System.Windows.Media.Brush)FindResource("GapBrush");
             StartButton.IsEnabled = false;
             return;

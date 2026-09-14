@@ -211,6 +211,10 @@ public partial class MainWindow : Window
             var error = applySettings?.Invoke(next);
             if (error is not null) return error;
 
+            // Ein von Hand eingetragener ffmpeg-Pfad aendert die Antwort auf die
+            // Frage, ob es gefunden wird. Die gemerkte Antwort gilt dann nicht mehr.
+            ForgetFfmpeg();
+
             current = next;
 
             if (applySettings is null)
@@ -1674,7 +1678,16 @@ public partial class MainWindow : Window
         if (_prepping is not null) return;
 
         string? exe = FfmpegLocator.Locate(_getSettings().FfmpegPath);
-        if (exe is null) return;
+
+        // Frueher stand hier ein blankes return. Der Knopf tat dann nichts und sagte
+        // auch nicht warum - fuer jemanden, der FrameFlip gerade geholt hat, ist das
+        // ein kaputtes Programm und kein fehlendes Werkzeug.
+        if (exe is null)
+        {
+            Note(Strings.T("S_ReadyNoFfmpegForExport"));
+            RefreshReadiness();
+            return;
+        }
 
         var frames = sequence.Frames
             .Where(f => f.Number >= _inPoint && f.Number <= _outPoint)
@@ -2960,6 +2973,10 @@ public partial class MainWindow : Window
 
     private void Refresh()
     {
+        // Haengt am selben Takt wie alles Langsame. Neu gezeichnet wird nur, wenn
+        // sich die Zeilen wirklich geaendert haben.
+        RefreshReadiness();
+
         RenderJob? job = _monitor?.Job;
         bool running = job?.IsRunning == true;
 

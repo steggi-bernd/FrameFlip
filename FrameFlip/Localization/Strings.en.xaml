@@ -188,6 +188,23 @@
     <sys:String x:Key="S_ImageUnreadable">The image could not be read.</sys:String>
     <sys:String x:Key="S_FfmpegWrong">This file does not answer like ffmpeg. Please check the path.</sys:String>
 
+    <!-- ============================================================== Readiness -->
+    <sys:String x:Key="S_ReadyTitle">NOT QUITE COMPLETE</sys:String>
+    <sys:String x:Key="S_ReadyFfmpegMissing">Video export needs ffmpeg. FrameFlip does not ship it, but it can have Windows fetch it.</sys:String>
+    <sys:String x:Key="S_ReadyFfmpegNoWinget">Video export needs ffmpeg, and the Windows package manager is not available. You can install it by hand and enter the path in the settings.</sys:String>
+    <sys:String x:Key="S_ReadyBridgeNever">Blender is not reporting anything yet. That needs the FrameFlip Bridge add-on – installed once, it reports every render on its own.</sys:String>
+    <sys:String x:Key="S_ReadyBridgeBlocked">The bridge is switched on but not listening. Usually another program holds the port.</sys:String>
+    <sys:String x:Key="S_ReadyRelayDown">The phone or the watch page is switched on, but the connection is not up.</sys:String>
+    <sys:String x:Key="S_ReadyInstall">Install</sys:String>
+    <sys:String x:Key="S_ReadyGetBridge">Get the add-on</sys:String>
+    <sys:String x:Key="S_ReadyOpenSettings">Settings</sys:String>
+    <sys:String x:Key="S_ReadyInstalling">fetching …</sys:String>
+    <sys:String x:Key="S_ReadyInstalled">ffmpeg is here. Video export is ready.</sys:String>
+    <sys:String x:Key="S_ReadyInstallFailed">That did not work. You can install ffmpeg by hand and enter the path in the settings.</sys:String>
+    <sys:String x:Key="S_ReadyNoFfmpegForExport">Without ffmpeg no video can be prepared. What is missing is listed at the top of the dashboard.</sys:String>
+    <sys:String x:Key="S_FfmpegHintWinget">FrameFlip does not ship ffmpeg, because common builds are GPL licensed. The dashboard has a button that lets Windows fetch it – or pick the path here by hand.</sys:String>
+    <sys:String x:Key="S_FfmpegHintManual">FrameFlip does not ship ffmpeg, because common builds are GPL licensed. Once installed, pick the path here.</sys:String>
+
     <sys:String x:Key="S_RemotePaired">Phone connected</sys:String>
     <sys:String x:Key="S_RemoteWaiting">Waiting for the phone …</sys:String>
     <sys:String x:Key="S_RemoteConnecting">Connecting to the relay …</sys:String>
