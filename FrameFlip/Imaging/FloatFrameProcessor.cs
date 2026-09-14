@@ -1,3 +1,5 @@
+using FrameFlip.Imaging.Grading;
+
 namespace FrameFlip.Imaging;
 
 /// <summary>
@@ -37,9 +39,25 @@ public static class FloatFrameProcessor
     /// Reglerzug erneut gebraucht, und ihn jedes Mal neu von der Platte zu lesen
     /// waere der Unterschied zwischen fluessig und zaeh.
     /// </summary>
+    public static void Apply(FloatFrame frame, ImageAdjustments adjustments,
+                             IViewTransform view, IntPtr destination, int destinationStride)
+        => Apply(frame, adjustments, view, PreparedGrading.None, destination, destinationStride);
+
+    /// <inheritdoc cref="Apply(FloatFrame, ImageAdjustments, IViewTransform, IntPtr, int)"/>
+    /// <param name="grading">
+    /// Die Werkzeuge, bereits vorbereitet und nach Seite getrennt. Sie wirken NACH
+    /// der Grundkorrektur: erst Belichtung und Saettigung, dann die linearen
+    /// Werkzeuge, dann die Sichtumwandlung, dann Tonwertkurve und die uebrigen.
+    /// Die Grundkorrektur ist der schnelle Griff beim Beurteilen und bleibt deshalb
+    /// vorn - wer sie umgehen will, laesst sie neutral.
+    /// </param>
     public static unsafe void Apply(FloatFrame frame, ImageAdjustments adjustments,
-                                    IViewTransform view, IntPtr destination, int destinationStride)
+                                    IViewTransform view, PreparedGrading grading,
+                                    IntPtr destination, int destinationStride)
     {
+        var linearTools = grading.SceneLinear ?? Array.Empty<IGradingTool>();
+        var displayTools = grading.Display ?? Array.Empty<IGradingTool>();
+
         byte* target = (byte*)destination.ToPointer();
 
         float gain = (float)Math.Pow(2.0, adjustments.Exposure);
@@ -100,6 +118,9 @@ public static class FloatFrameProcessor
                     if (vb < 0) vb = 0;
                 }
 
+                for (int t = 0; t < linearTools.Length; t++)
+                    linearTools[t].Apply(ref vr, ref vg, ref vb);
+
                 // --- Sichtumwandlung: ab hier sind es Anzeigewerte von 0 bis 1 ---
 
                 view.Apply(ref vr, ref vg, ref vb);
@@ -112,6 +133,9 @@ public static class FloatFrameProcessor
                     vg = Tone(vg, black, span, inverseGamma, contrast);
                     vb = Tone(vb, black, span, inverseGamma, contrast);
                 }
+
+                for (int t = 0; t < displayTools.Length; t++)
+                    displayTools[t].Apply(ref vr, ref vg, ref vb);
 
                 float alpha = a is null ? 1f : a[i];
 
@@ -163,7 +187,15 @@ public static class FloatFrameProcessor
     /// </summary>
     public static void Measure(FloatFrame frame, ImageAdjustments adjustments, IViewTransform view,
                                Histogram histogram, int step = 1)
+        => Measure(frame, adjustments, view, PreparedGrading.None, histogram, step);
+
+    /// <inheritdoc cref="Measure(FloatFrame, ImageAdjustments, IViewTransform, Histogram, int)"/>
+    public static void Measure(FloatFrame frame, ImageAdjustments adjustments, IViewTransform view,
+                               PreparedGrading grading, Histogram histogram, int step = 1)
     {
+        var linearTools = grading.SceneLinear ?? Array.Empty<IGradingTool>();
+        var displayTools = grading.Display ?? Array.Empty<IGradingTool>();
+
         histogram.Clear();
         step = Math.Max(1, step);
 
@@ -203,11 +235,17 @@ public static class FloatFrameProcessor
                     vb = MathF.Max(0f, luma + (vb - luma) * saturation);
                 }
 
+                for (int t = 0; t < linearTools.Length; t++)
+                    linearTools[t].Apply(ref vr, ref vg, ref vb);
+
                 view.Apply(ref vr, ref vg, ref vb);
 
                 vr = Tone(vr, black, span, inverseGamma, contrast);
                 vg = Tone(vg, black, span, inverseGamma, contrast);
                 vb = Tone(vb, black, span, inverseGamma, contrast);
+
+                for (int t = 0; t < displayTools.Length; t++)
+                    displayTools[t].Apply(ref vr, ref vg, ref vb);
 
                 int br = ToByte(vr), bg = ToByte(vg), bb = ToByte(vb);
 
