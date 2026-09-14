@@ -69,6 +69,12 @@
                            Visibility="Collapsed"
                            ToolTip="{DynamicResource S_Adjusted}" />
 
+                <!-- Die Korrektur rechnet auf den Werten der Datei, nicht auf acht Bit. -->
+                <TextBlock x:Name="FloatBadge" Text="float" VerticalAlignment="Center" Margin="0,0,12,0"
+                           Foreground="{StaticResource MutedBrush}" FontSize="11"
+                           Visibility="Collapsed"
+                           ToolTip="{DynamicResource S_FloatPath}" />
+
                 <!-- Aufloesung, Farbtiefe und Dateigroesse. Ein Klick blendet die
                      Angaben aus; der Zustand wird in der Konfiguration gehalten. -->
                 <Button x:Name="MetaButton" Style="{StaticResource LinkButton}"

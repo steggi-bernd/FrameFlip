@@ -24,6 +24,7 @@ static int RunAll()
     GovernorInvariants.Run();
     ImagingInvariants.Run();
     ViewTransformInvariants.Run();
+    FloatImagingInvariants.Run();
     ExrInvariants.Run();
     RawCacheInvariants.Run();
     CadenceInvariants.Run();

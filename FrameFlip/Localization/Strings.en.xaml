@@ -10,6 +10,7 @@
     <sys:String x:Key="S_MeasuredRate">Frames per second actually displayed</sys:String>
     <sys:String x:Key="S_BufferAhead">How far the ring buffer reaches ahead. Once this number gets small, playback is about to stall – a smaller decode size helps.</sys:String>
     <sys:String x:Key="S_Adjusted">The display is corrected – the files are untouched</sys:String>
+    <sys:String x:Key="S_FloatPath">The correction is working on the file’s float values – exposure recovers detail from the highlights</sys:String>
     <sys:String x:Key="S_ToggleMeta">Show or hide image details (D)</sys:String>
     <sys:String x:Key="S_ZoomHint">Click for 100 %, click again to fit</sys:String>
 
