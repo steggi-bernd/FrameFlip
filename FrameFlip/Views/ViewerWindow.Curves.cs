@@ -66,7 +66,7 @@ public sealed partial class ViewerWindow
         CurveField.Changed += OnCurveChanged;
         CurveField.Released += OnCurveReleased;
 
-        _preparedGrading = _grading.Prepare();
+        SetUpTools();
 
         _coarseTimer = new DispatcherTimer(DispatcherPriority.Background)
         {

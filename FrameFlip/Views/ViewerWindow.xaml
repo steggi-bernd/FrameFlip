@@ -594,6 +594,152 @@
                                Foreground="{StaticResource MutedBrush}" TextWrapping="Wrap"
                                Text="{DynamicResource S_CurveHint}" />
 
+                    <!-- Weissabgleich -->
+                    <Grid Margin="0,16,0,0">
+                        <TextBlock Text="{DynamicResource S_WhiteBalance}" Style="{StaticResource PanelHeading}" />
+                        <Button Style="{StaticResource LinkButton}" HorizontalAlignment="Right"
+                                Content="+" Tag="WhiteBalanceBody" Click="OnSectionToggled" />
+                    </Grid>
+                    <StackPanel x:Name="WhiteBalanceBody" Visibility="Collapsed" Margin="0,6,0,0">
+                        <Grid Margin="0,0,0,2">
+                            <TextBlock Text="{DynamicResource S_Temperature}" Style="{StaticResource PanelLabel}" />
+                            <TextBlock x:Name="TemperatureValue" Style="{StaticResource PanelValue}" />
+                        </Grid>
+                        <Slider x:Name="TemperatureSlider" Style="{StaticResource PanelSlider}"
+                                Minimum="2000" Maximum="15000" Value="6500" SmallChange="50" LargeChange="250"
+                                ValueChanged="OnToolChanged" MouseDoubleClick="OnSliderReset" Tag="6500" />
+
+                        <Grid Margin="0,10,0,2">
+                            <TextBlock Text="{DynamicResource S_Tint}" Style="{StaticResource PanelLabel}" />
+                            <TextBlock x:Name="TintValue" Style="{StaticResource PanelValue}" />
+                        </Grid>
+                        <Slider x:Name="TintSlider" Style="{StaticResource PanelSlider}"
+                                Minimum="-100" Maximum="100" Value="0" SmallChange="1" LargeChange="5"
+                                ValueChanged="OnToolChanged" MouseDoubleClick="OnSliderReset" Tag="0" />
+                    </StackPanel>
+
+                    <!-- Dynamik -->
+                    <Grid Margin="0,16,0,2">
+                        <TextBlock Text="{DynamicResource S_Vibrance}" Style="{StaticResource PanelLabel}" />
+                        <TextBlock x:Name="VibranceValue" Style="{StaticResource PanelValue}" />
+                    </Grid>
+                    <Slider x:Name="VibranceSlider" Style="{StaticResource PanelSlider}"
+                            Minimum="-1" Maximum="1" Value="0" SmallChange="0.02" LargeChange="0.1"
+                            ValueChanged="OnToolChanged" MouseDoubleClick="OnSliderReset" Tag="0" />
+
+                    <!-- Schatten, Mitten, Lichter -->
+                    <Grid Margin="0,16,0,0">
+                        <TextBlock Text="{DynamicResource S_Zones}" Style="{StaticResource PanelHeading}" />
+                        <Button Style="{StaticResource LinkButton}" HorizontalAlignment="Right"
+                                Content="+" Tag="ZonesBody" Click="OnSectionToggled" />
+                    </Grid>
+                    <StackPanel x:Name="ZonesBody" Visibility="Collapsed" Margin="0,6,0,0">
+                        <TextBlock Text="{DynamicResource S_Shadows}" Style="{StaticResource PanelLabel}"
+                                   Margin="0,0,0,4" />
+                        <Slider x:Name="LiftRSlider" Style="{StaticResource PanelSlider}" Margin="0,0,0,3"
+                                Minimum="-0.3" Maximum="0.3" Value="0" SmallChange="0.005" LargeChange="0.02"
+                                ValueChanged="OnToolChanged" MouseDoubleClick="OnSliderReset" Tag="0"
+                                ToolTip="R" />
+                        <Slider x:Name="LiftGSlider" Style="{StaticResource PanelSlider}" Margin="0,0,0,3"
+                                Minimum="-0.3" Maximum="0.3" Value="0" SmallChange="0.005" LargeChange="0.02"
+                                ValueChanged="OnToolChanged" MouseDoubleClick="OnSliderReset" Tag="0"
+                                ToolTip="G" />
+                        <Slider x:Name="LiftBSlider" Style="{StaticResource PanelSlider}"
+                                Minimum="-0.3" Maximum="0.3" Value="0" SmallChange="0.005" LargeChange="0.02"
+                                ValueChanged="OnToolChanged" MouseDoubleClick="OnSliderReset" Tag="0"
+                                ToolTip="B" />
+
+                        <TextBlock Text="{DynamicResource S_Midtones}" Style="{StaticResource PanelLabel}"
+                                   Margin="0,12,0,4" />
+                        <Slider x:Name="GammaRSlider" Style="{StaticResource PanelSlider}" Margin="0,0,0,3"
+                                Minimum="0.4" Maximum="2.5" Value="1" SmallChange="0.02" LargeChange="0.1"
+                                ValueChanged="OnToolChanged" MouseDoubleClick="OnSliderReset" Tag="1"
+                                ToolTip="R" />
+                        <Slider x:Name="GammaGSlider" Style="{StaticResource PanelSlider}" Margin="0,0,0,3"
+                                Minimum="0.4" Maximum="2.5" Value="1" SmallChange="0.02" LargeChange="0.1"
+                                ValueChanged="OnToolChanged" MouseDoubleClick="OnSliderReset" Tag="1"
+                                ToolTip="G" />
+                        <Slider x:Name="GammaBSlider" Style="{StaticResource PanelSlider}"
+                                Minimum="0.4" Maximum="2.5" Value="1" SmallChange="0.02" LargeChange="0.1"
+                                ValueChanged="OnToolChanged" MouseDoubleClick="OnSliderReset" Tag="1"
+                                ToolTip="B" />
+
+                        <TextBlock Text="{DynamicResource S_Highlights}" Style="{StaticResource PanelLabel}"
+                                   Margin="0,12,0,4" />
+                        <Slider x:Name="GainRSlider" Style="{StaticResource PanelSlider}" Margin="0,0,0,3"
+                                Minimum="0.5" Maximum="1.8" Value="1" SmallChange="0.01" LargeChange="0.05"
+                                ValueChanged="OnToolChanged" MouseDoubleClick="OnSliderReset" Tag="1"
+                                ToolTip="R" />
+                        <Slider x:Name="GainGSlider" Style="{StaticResource PanelSlider}" Margin="0,0,0,3"
+                                Minimum="0.5" Maximum="1.8" Value="1" SmallChange="0.01" LargeChange="0.05"
+                                ValueChanged="OnToolChanged" MouseDoubleClick="OnSliderReset" Tag="1"
+                                ToolTip="G" />
+                        <Slider x:Name="GainBSlider" Style="{StaticResource PanelSlider}"
+                                Minimum="0.5" Maximum="1.8" Value="1" SmallChange="0.01" LargeChange="0.05"
+                                ValueChanged="OnToolChanged" MouseDoubleClick="OnSliderReset" Tag="1"
+                                ToolTip="B" />
+
+                        <TextBlock x:Name="ZonesHint" Margin="0,8,0,0" FontSize="10"
+                                   Foreground="{StaticResource MutedBrush}" TextWrapping="Wrap"
+                                   Text="{DynamicResource S_ZonesHint}" />
+                    </StackPanel>
+
+                    <!-- Farbbereiche -->
+                    <Grid Margin="0,16,0,0">
+                        <TextBlock Text="{DynamicResource S_ColourBands}" Style="{StaticResource PanelHeading}" />
+                        <Button Style="{StaticResource LinkButton}" HorizontalAlignment="Right"
+                                Content="+" Tag="BandsBody" Click="OnSectionToggled" />
+                    </Grid>
+                    <StackPanel x:Name="BandsBody" Visibility="Collapsed" Margin="0,6,0,0">
+                        <Grid Margin="0,0,0,8">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="*" />
+                            </Grid.ColumnDefinitions>
+                            <ToggleButton x:Name="BandHueButton" Grid.Column="0" Style="{StaticResource OverlayToggle}"
+                                          Margin="0,0,2,0" Content="{DynamicResource S_Hue}" IsChecked="True" Tag="0"
+                                          Checked="OnBandModePicked" />
+                            <ToggleButton x:Name="BandSatButton" Grid.Column="1" Style="{StaticResource OverlayToggle}"
+                                          Margin="2,0,2,0" Content="{DynamicResource S_Saturation}" Tag="1"
+                                          Checked="OnBandModePicked" />
+                            <ToggleButton x:Name="BandLumButton" Grid.Column="2" Style="{StaticResource OverlayToggle}"
+                                          Margin="2,0,0,0" Content="{DynamicResource S_Luminance}" Tag="2"
+                                          Checked="OnBandModePicked" />
+                        </Grid>
+
+                        <StackPanel x:Name="BandSliders" />
+                    </StackPanel>
+
+                    <!-- Tabelle -->
+                    <Grid Margin="0,16,0,0">
+                        <TextBlock Text="{DynamicResource S_Lut}" Style="{StaticResource PanelHeading}" />
+                        <Button Style="{StaticResource LinkButton}" HorizontalAlignment="Right"
+                                Content="+" Tag="LutBody" Click="OnSectionToggled" />
+                    </Grid>
+                    <StackPanel x:Name="LutBody" Visibility="Collapsed" Margin="0,6,0,0">
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <TextBlock x:Name="LutPathText" Grid.Column="0" VerticalAlignment="Center"
+                                       FontSize="10" Foreground="{StaticResource MutedBrush}"
+                                       TextTrimming="CharacterEllipsis" Margin="0,0,6,0"
+                                       Text="{DynamicResource S_NoLut}" />
+                            <Button x:Name="LutPickButton" Grid.Column="1" Style="{StaticResource OverlayButton}"
+                                    Content="…" Click="OnPickLutClicked" MinWidth="34" />
+                        </Grid>
+
+                        <Grid Margin="0,10,0,2">
+                            <TextBlock Text="{DynamicResource S_Strength}" Style="{StaticResource PanelLabel}" />
+                            <TextBlock x:Name="LutStrengthValue" Style="{StaticResource PanelValue}" />
+                        </Grid>
+                        <Slider x:Name="LutStrengthSlider" Style="{StaticResource PanelSlider}"
+                                Minimum="0" Maximum="1" Value="1" SmallChange="0.02" LargeChange="0.1"
+                                ValueChanged="OnToolChanged" MouseDoubleClick="OnSliderReset" Tag="1" />
+                    </StackPanel>
+
                     <!-- A/B -->
                     <TextBlock Text="{DynamicResource S_Compare}" Style="{StaticResource PanelHeading}" Margin="0,16,0,6" />
                     <Grid>

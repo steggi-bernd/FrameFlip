@@ -15,6 +15,75 @@ public static class GradingColourInvariants
         LiftGammaGain();
         Vibrance();
         Colorimetrics();
+        InSettings();
+    }
+
+    /// <summary>
+    /// Der Stapel in der Konfigurationsdatei.
+    ///
+    /// Die Werkzeuge einzeln zu speichern ist eine Sache, sie eingebettet in den
+    /// Einstellungen zu speichern eine andere: dort steckt die Liste zwei Ebenen
+    /// tief, und ob die Kennung des Typs dabei erhalten bleibt, entscheidet sich an
+    /// den Optionen des Lesers, nicht am Werkzeug.
+    /// </summary>
+    private static void InSettings()
+    {
+        Check.Group("Werkzeuge in den Einstellungen");
+
+        var stack = new GradingStack();
+        stack.Tools.Add(new WhiteBalanceTool { Kelvin = 4200, Tint = -25 });
+        stack.Tools.Add(new LiftGammaGainTool
+        {
+            Lift = new ColourTriplet(0.05f, 0f, -0.03f),
+            Gain = new ColourTriplet(1.1f, 1f, 0.95f),
+        });
+        stack.Tools.Add(new VibranceTool { Amount = 0.35f });
+        stack.Tools.Add(new HslTool());
+        stack.Tools[3] = new HslTool();
+        ((HslTool)stack.Tools[3]).Bands[5].Saturation = -40;
+
+        var settings = new FrameFlip.Configuration.AppSettings { Grading = stack };
+
+        string json = System.Text.Json.JsonSerializer.Serialize(settings);
+        var back = System.Text.Json.JsonSerializer.Deserialize<FrameFlip.Configuration.AppSettings>(json);
+
+        if (back?.Grading is null)
+        {
+            Check.That(false, "der Stapel kommt aus den Einstellungen zurueck");
+            return;
+        }
+
+        Check.That(back.Grading.Tools.Count == 4, "alle vier Werkzeuge", $"{back.Grading.Tools.Count}");
+
+        var wb = back.Grading.Tools.OfType<WhiteBalanceTool>().FirstOrDefault();
+        Check.That(wb is not null, "der Weissabgleich mit seinem Typ");
+        if (wb is not null)
+        {
+            Check.Near(wb.Kelvin, 4200, 1, "samt Temperatur");
+            Check.Near(wb.Tint, -25, 0.5, "und Tendenz");
+        }
+
+        var lgg = back.Grading.Tools.OfType<LiftGammaGainTool>().FirstOrDefault();
+        Check.That(lgg is not null && Math.Abs(lgg.Lift.R - 0.05f) < 0.001f, "die Zonen mit ihren Werten");
+
+        var hsl = back.Grading.Tools.OfType<HslTool>().FirstOrDefault();
+        Check.That(hsl is not null && hsl.Bands.Count == 8, "die acht Farbbereiche");
+        if (hsl is not null) Check.Near(hsl.Bands[5].Saturation, -40, 0.5, "samt dem gesetzten Band");
+
+        // Und nach dem Lesen muss sich damit rechnen lassen.
+        var prepared = back.Grading.Prepare();
+        Check.That(prepared.SceneLinear.Length == 1, "der Weissabgleich steht auf der linearen Seite");
+        Check.That(prepared.Display.Length == 3, "die uebrigen drei auf der Anzeigeseite",
+                   $"{prepared.Display.Length}");
+
+        // Eine Kopie darf sich nicht mitbewegen - das ist die Zusicherung hinter
+        // Clone, und sie faellt sonst erst auf, wenn ein festgehaltenes Rezept
+        // ploetzlich anders aussieht.
+        var copy = back.Grading.Clone();
+        wb!.Kelvin = 9000;
+
+        var copiedWb = copy.Tools.OfType<WhiteBalanceTool>().First();
+        Check.Near(copiedWb.Kelvin, 4200, 1, "eine Kopie bewegt sich nicht mit");
     }
 
     /// <summary>
