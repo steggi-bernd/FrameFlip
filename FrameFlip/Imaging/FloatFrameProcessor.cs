@@ -51,12 +51,27 @@ public static class FloatFrameProcessor
     /// Die Grundkorrektur ist der schnelle Griff beim Beurteilen und bleibt deshalb
     /// vorn - wer sie umgehen will, laesst sie neutral.
     /// </param>
+    /// <param name="step">
+    /// Nur jeder n-te Bildpunkt wird gerechnet; die uebrigen bekommen seinen Wert.
+    /// Bei 2 bleibt ein Viertel der Arbeit, bei 4 ein Sechzehntel.
+    ///
+    /// Gebraucht wird das beim Ziehen eines Reglers: ein 4K-Bild mit AgX kostet
+    /// rund 367 ms je Aktualisierung, und dreimal je Sekunde neu zu zeichnen ist
+    /// keine Bedienung. Dass die Vorschau dabei grob wird, faellt in der Bewegung
+    /// nicht auf - beim Loslassen steht wieder das volle Bild.
+    ///
+    /// Die Bitmap behaelt ihre Groesse. Sie zu verkleinern waere der naheliegende
+    /// Weg und der falsche: Zoom und Bildlage haengen daran, und beide duerfen
+    /// waehrend eines Reglerzugs nicht springen.
+    /// </param>
     public static unsafe void Apply(FloatFrame frame, ImageAdjustments adjustments,
                                     IViewTransform view, PreparedGrading grading,
-                                    IntPtr destination, int destinationStride)
+                                    IntPtr destination, int destinationStride, int step = 1)
     {
         var linearTools = grading.SceneLinear ?? Array.Empty<IGradingTool>();
         var displayTools = grading.Display ?? Array.Empty<IGradingTool>();
+
+        step = Math.Clamp(step, 1, 16);
 
         byte* target = (byte*)destination.ToPointer();
 
@@ -81,15 +96,23 @@ public static class FloatFrameProcessor
         var b = frame.B;
         var a = frame.A;
 
-        Parallel.For(0, frame.Height, new ParallelOptions
+        int height = frame.Height;
+        int rowBlocks = (height + step - 1) / step;
+
+        Parallel.For(0, rowBlocks, new ParallelOptions
         {
             MaxDegreeOfParallelism = Math.Clamp(Environment.ProcessorCount, 1, 8),
         },
-        y =>
+        block =>
         {
+            int y = block * step;
             byte* row = target + (long)y * destinationStride;
 
-            for (int x = 0; x < width; x++)
+            // Wie viele Zeilen und Spalten dieser Block noch abdeckt - am rechten
+            // und unteren Rand weniger als step.
+            int blockHeight = Math.Min(step, height - y);
+
+            for (int x = 0; x < width; x += step)
             {
                 int i = y * width + x;
 
@@ -153,11 +176,37 @@ public static class FloatFrameProcessor
                     }
                 }
 
-                byte* pixel = row + x * 4;
-                pixel[0] = ToByte(vb);
-                pixel[1] = ToByte(vg);
-                pixel[2] = ToByte(vr);
-                pixel[3] = ToByte(Math.Clamp(alpha, 0f, 1f));
+                byte blue = ToByte(vb);
+                byte green = ToByte(vg);
+                byte red = ToByte(vr);
+                byte opacity = ToByte(Math.Clamp(alpha, 0f, 1f));
+
+                if (step == 1)
+                {
+                    byte* pixel = row + x * 4;
+                    pixel[0] = blue;
+                    pixel[1] = green;
+                    pixel[2] = red;
+                    pixel[3] = opacity;
+                    continue;
+                }
+
+                // Den ganzen Block mit dem einen gerechneten Wert fuellen.
+                int blockWidth = Math.Min(step, width - x);
+
+                for (int dy = 0; dy < blockHeight; dy++)
+                {
+                    byte* line = target + (long)(y + dy) * destinationStride + x * 4;
+
+                    for (int dx = 0; dx < blockWidth; dx++)
+                    {
+                        line[0] = blue;
+                        line[1] = green;
+                        line[2] = red;
+                        line[3] = opacity;
+                        line += 4;
+                    }
+                }
             }
         });
     }

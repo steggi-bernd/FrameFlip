@@ -17,6 +17,7 @@ public static class FloatImagingInvariants
         Channels();
         HistogramMath();
         Reduction();
+        CoarsePreview();
         Performance();
     }
 
@@ -324,6 +325,134 @@ public static class FloatImagingInvariants
         }
 
         return new FloatFrame { Width = width, Height = height, R = r, G = g, B = b };
+    }
+
+    /// <summary>
+    /// Die grobe Vorschau fuer den Reglerzug: nur jeder n-te Bildpunkt wird
+    /// gerechnet, die uebrigen bekommen seinen Wert.
+    ///
+    /// Der wichtigste Punkt daran ist nicht das Tempo, sondern dass nichts
+    /// uebrigbleibt. Eine falsche Randrechnung hinterlaesst Streifen, die nie
+    /// beschrieben wurden - und uninitialisierter Speicher in einer Bitmap ist
+    /// schwarz, sieht also wie ein Bildfehler aus und nicht wie ein Rechenfehler.
+    /// </summary>
+    private static void CoarsePreview()
+    {
+        Check.Group("Grobe Vorschau beim Ziehen");
+
+        var view = new StandardViewTransform();
+
+        // Ungerade Groessen, damit die Bloecke am Rand nicht aufgehen.
+        const int width = 37, height = 23;
+        var frame = Gradient(width, height, (x, y) => (x + y) / 40f);
+        int stride = width * 4;
+
+        foreach (int step in new[] { 1, 2, 3, 4, 8, 16 })
+        {
+            var buffer = Marshal.AllocHGlobal(stride * height);
+
+            try
+            {
+                // Vorbelegen mit einem Wert, der nie herauskommen kann: was danach
+                // noch darin steht, wurde nicht geschrieben.
+                for (int i = 0; i < stride * height; i++) Marshal.WriteByte(buffer, i, 0xCD);
+
+                FloatFrameProcessor.Apply(frame, ImageAdjustments.Neutral, view,
+                                          FrameFlip.Imaging.Grading.PreparedGrading.None,
+                                          buffer, stride, step);
+
+                var pixels = new byte[stride * height];
+                Marshal.Copy(buffer, pixels, 0, pixels.Length);
+
+                int untouched = 0;
+                for (int i = 0; i < pixels.Length; i += 4)
+                {
+                    // Alpha ist in diesem Frame immer 255; ein Pixel, das noch die
+                    // Vorbelegung traegt, wurde ausgelassen.
+                    if (pixels[i] == 0xCD && pixels[i + 1] == 0xCD &&
+                        pixels[i + 2] == 0xCD && pixels[i + 3] == 0xCD) untouched++;
+                }
+
+                Check.That(untouched == 0, $"Schrittweite {step}: jedes Pixel ist beschrieben",
+                           $"{untouched} von {width * height} ausgelassen");
+            }
+            finally
+            {
+                Marshal.FreeHGlobal(buffer);
+            }
+        }
+
+        // An den Stellen, die tatsaechlich gerechnet werden, muss dasselbe
+        // herauskommen wie im vollen Durchgang.
+        var full = RenderAll(frame, view, 1, width, height, stride);
+        var coarse = RenderAll(frame, view, 4, width, height, stride);
+
+        int mismatched = 0;
+        for (int y = 0; y < height; y += 4)
+        {
+            for (int x = 0; x < width; x += 4)
+            {
+                int i = (y * width + x) * 4;
+                if (full[i] != coarse[i] || full[i + 1] != coarse[i + 1] || full[i + 2] != coarse[i + 2])
+                    mismatched++;
+            }
+        }
+
+        Check.That(mismatched == 0, "die gerechneten Stellen stimmen mit dem vollen Bild ueberein",
+                   $"{mismatched} Abweichungen");
+
+        // Und der Zweck der Uebung: es muss schneller sein.
+        var big = Gradient(1920, 1080, (x, y) => (x + y) / 1000f);
+        var target = Marshal.AllocHGlobal(1920 * 1080 * 4);
+
+        try
+        {
+            var adjustments = new ImageAdjustments { Exposure = -1, Gamma = 1.2 };
+
+            FloatFrameProcessor.Apply(big, adjustments, view, target, 1920 * 4);
+
+            var watch = System.Diagnostics.Stopwatch.StartNew();
+            FloatFrameProcessor.Apply(big, adjustments, view,
+                                      FrameFlip.Imaging.Grading.PreparedGrading.None, target, 1920 * 4);
+            double fullMs = watch.Elapsed.TotalMilliseconds;
+
+            watch.Restart();
+            FloatFrameProcessor.Apply(big, adjustments, view,
+                                      FrameFlip.Imaging.Grading.PreparedGrading.None, target, 1920 * 4, 4);
+            double coarseMs = watch.Elapsed.TotalMilliseconds;
+
+            Console.WriteLine($"  [i]    1080p voll {fullMs:0.#} ms, mit Schrittweite 4 {coarseMs:0.#} ms");
+
+            // Ein Sechzehntel der Punkte; der Rest ist Fuellen und Speicherzugriff.
+            // Ein Faktor von wenigstens drei ist die Aussage, auf die es ankommt.
+            Check.That(coarseMs * 3 < fullMs, "die grobe Vorschau ist deutlich schneller",
+                       $"{coarseMs:0.#} ms gegen {fullMs:0.#} ms");
+        }
+        finally
+        {
+            Marshal.FreeHGlobal(target);
+        }
+    }
+
+    private static byte[] RenderAll(FloatFrame frame, IViewTransform view, int step,
+                                    int width, int height, int stride)
+    {
+        var buffer = Marshal.AllocHGlobal(stride * height);
+
+        try
+        {
+            FloatFrameProcessor.Apply(frame, ImageAdjustments.Neutral, view,
+                                      FrameFlip.Imaging.Grading.PreparedGrading.None,
+                                      buffer, stride, step);
+
+            var pixels = new byte[stride * height];
+            Marshal.Copy(buffer, pixels, 0, pixels.Length);
+            return pixels;
+        }
+        finally
+        {
+            Marshal.FreeHGlobal(buffer);
+        }
     }
 
     private static (byte R, byte G, byte B, byte A) Render(FloatFrame frame, ImageAdjustments adjustments,
