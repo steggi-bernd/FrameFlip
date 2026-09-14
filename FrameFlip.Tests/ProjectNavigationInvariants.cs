@@ -19,6 +19,21 @@ public static class ProjectNavigationInvariants
     public static void Run()
     {
         Check.Group("Projektseite - Navigation und erneuter Scan");
+        /* Eine anklickbare Kachel muss auf die MAUS reagieren, und zwar von selbst.
+         *
+         * Sie konnte es lange nicht: Fokus, Tastatur und Bedienungshilfen lagen in
+         * ClickCard, der Mausklick aber bei jedem Aufrufer einzeln. Drei hatten ihn,
+         * der vierte - der Rueckwegknopf im Projektpfad - vergass ihn. Er liess sich
+         * mit der Tastatur ausloesen und meldete sich brav bei den Bedienungshilfen,
+         * weshalb er im Automatentest tadellos lief und unter dem Mauszeiger nichts
+         * tat. Genau diese Luecke schliesst die Zusicherung. */
+        bool geklickt = false;
+        var probe = new ClickCard("Probe", () => geklickt = true);
+        probe.RaiseEvent(new MouseButtonEventArgs(Mouse.PrimaryDevice, 0, MouseButton.Left)
+        { RoutedEvent = UIElement.MouseLeftButtonUpEvent });
+        Check.That(geklickt, "eine ClickCard reagiert ohne Zutun des Aufrufers auf die Maus");
+
+
         // Die Ordner sind absichtlich nicht vorhanden; weder Scan noch zuletzt
         // geoeffnete Sequenzen stammen aus dem Benutzerprofil.
         string root = Path.Combine(Path.GetTempPath(), "frameflip-navigation-" + Guid.NewGuid().ToString("N"));

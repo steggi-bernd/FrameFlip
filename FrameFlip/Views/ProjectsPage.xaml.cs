@@ -190,6 +190,10 @@ public partial class ProjectsPage : UserControl
         Body.Children.Clear();
         Crumbs.Children.Clear();
         StackBar.Content = null;
+
+        // Auch den Rueckweg: In der Uebersicht gibt es keine Stufe darueber, und ein
+        // Pfeil, der nichts tut, ist schlimmer als keiner.
+        BackHost.Content = null;
         Note.Visibility = Visibility.Collapsed;
 
         if (_navigation.Project is null) Overview();
@@ -447,8 +451,12 @@ public partial class ProjectsPage : UserControl
             weg.Add((crumb.Name, () => { _navigation.OpenFolder(ziel); Render(); }));
         }
 
-        // Eine Stufe zurueck. Ganz oben gibt es keine, dann fehlt der Knopf.
-        if (weg.Count > 1) Crumbs.Children.Add(BackStep(weg[^2].Go));
+        /* Eine Stufe zurueck - im Kopf, neben dem Namen.
+         *
+         * Erst stand er am Anfang der Krumenzeile. Dort ist er richtig gedacht und
+         * falsch platziert: Wer zurueck will, sieht auf den Ordnernamen, an dem er
+         * gerade steht, nicht auf eine Zeile darunter. */
+        BackHost.Content = weg.Count > 1 ? BackStep(weg[^2].Go) : null;
 
         for (int i = 0; i < weg.Count; i++)
         {
@@ -730,8 +738,6 @@ public partial class ProjectsPage : UserControl
 
         if (card is ClickCard active)
         {
-            active.MouseLeftButtonUp += (_, _) => active.Activate();
-
             // Der Rand zeigt beides an, Zeigen wie Tastaturfokus - sonst waere beim
             // Durchtabben nicht zu sehen, wo man gerade steht.
             active.MouseEnter += (_, _) => Mark(active, true);
@@ -1095,7 +1101,6 @@ public partial class ProjectsPage : UserControl
                 Child = label,
             };
 
-            button.MouseLeftButtonUp += (_, _) => button.Activate();
             button.MouseEnter += (_, _) => label.Foreground = (Brush)FindResource("ForegroundBrush");
             button.MouseLeave += (_, _) => label.Foreground = (Brush)FindResource("MutedBrush");
             button.GotKeyboardFocus += (_, _) => label.Foreground = (Brush)FindResource("ForegroundBrush");
@@ -1179,16 +1184,15 @@ public partial class ProjectsPage : UserControl
             Text = "\u2190",
             HorizontalAlignment = HorizontalAlignment.Center,
             VerticalAlignment = VerticalAlignment.Center,
-            FontSize = 13,
+            FontSize = 18,
             Foreground = (Brush)FindResource("DesktopMuted"),
         };
 
         return new ClickCard(T("D_BackStep"), click)
         {
-            Width = 24,
-            Height = 22,
-            Margin = new Thickness(0, 0, 10, 4),
-            CornerRadius = new CornerRadius(6),
+            Width = 38,
+            Height = 38,
+            CornerRadius = new CornerRadius(10),
             Background = (Brush)FindResource("DesktopSurface"),
             BorderBrush = (Brush)FindResource("DesktopLine"),
             BorderThickness = new Thickness(1),
