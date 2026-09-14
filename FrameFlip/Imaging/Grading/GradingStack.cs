@@ -43,9 +43,29 @@ public sealed class GradingStack
         return new PreparedGrading(linear.ToArray(), display.ToArray());
     }
 
+    /// <summary>
+    /// Eine Kopie, deren Werkzeuge nicht mehr dieselben Objekte sind.
+    ///
+    /// Gebraucht, sobald ein Rezept festgehalten wird, waehrend am Original
+    /// weitergeregelt wird - beim Vergleich zweier Einstellungen und spaeter beim
+    /// Stapellauf, der nicht mitbekommen darf, dass jemand am Regler zieht.
+    /// </summary>
     public GradingStack Clone() => new()
     {
-        Tools = Tools.Select(t => t is CurvesTool curves ? curves.Clone() : t).ToList(),
+        Tools = Tools.Select(Copy).ToList(),
+    };
+
+    private static IGradingTool Copy(IGradingTool tool) => tool switch
+    {
+        CurvesTool curves => curves.Clone(),
+        LiftGammaGainTool lgg => lgg.Clone(),
+        WhiteBalanceTool wb => new WhiteBalanceTool { Kelvin = wb.Kelvin, Tint = wb.Tint },
+        VibranceTool vibrance => new VibranceTool { Amount = vibrance.Amount },
+
+        // Ein Werkzeug, das hier fehlt, wuerde geteilt statt kopiert - und der
+        // Fehler faellt erst auf, wenn eine festgehaltene Einstellung sich
+        // mitbewegt. Lieber sofort laut.
+        _ => throw new NotSupportedException($"Kein Kopierweg fuer {tool.GetType().Name}."),
     };
 }
 

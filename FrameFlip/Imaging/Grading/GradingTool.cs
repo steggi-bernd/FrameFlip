@@ -47,6 +47,9 @@ public enum GradingStage
 [JsonPolymorphic(TypeDiscriminatorPropertyName = "kind",
                  UnknownDerivedTypeHandling = JsonUnknownDerivedTypeHandling.FailSerialization)]
 [JsonDerivedType(typeof(CurvesTool), CurvesTool.KindName)]
+[JsonDerivedType(typeof(WhiteBalanceTool), WhiteBalanceTool.KindName)]
+[JsonDerivedType(typeof(LiftGammaGainTool), LiftGammaGainTool.KindName)]
+[JsonDerivedType(typeof(VibranceTool), VibranceTool.KindName)]
 public interface IGradingTool
 {
     /// <summary>Kennung fuer die Speicherung. Bleibt stabil, auch wenn der Anzeigename wechselt.</summary>

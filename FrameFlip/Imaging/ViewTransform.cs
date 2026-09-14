@@ -184,14 +184,6 @@ public sealed class AgxViewTransform : IViewTransform
     /// </summary>
     private static float[] BuildRec709ToEGamut()
     {
-        // Rec.709 nach CIE XYZ mit Weisspunkt D65 - die uebliche sRGB-Matrix.
-        float[] rec709ToXyz =
-        {
-            0.4123908f, 0.3575843f, 0.1804808f,
-            0.2126390f, 0.7151687f, 0.0721923f,
-            0.0193308f, 0.1191948f, 0.9505322f,
-        };
-
         // E-Gamut nach CIE XYZ D65, aus der Konfiguration. Die Zeilensummen ergeben
         // den Weisspunkt D65 - daran laesst sich die Richtung pruefen.
         float[] eGamutToXyz =
@@ -201,45 +193,7 @@ public sealed class AgxViewTransform : IViewTransform
             -0.1037815116f, -0.07290725703f, 1.265746519f,
         };
 
-        return Multiply(Invert(eGamutToXyz), rec709ToXyz);
-    }
-
-    private static float[] Multiply(float[] a, float[] b)
-    {
-        var result = new float[9];
-
-        for (int row = 0; row < 3; row++)
-        {
-            for (int column = 0; column < 3; column++)
-            {
-                result[row * 3 + column] =
-                    a[row * 3] * b[column] +
-                    a[row * 3 + 1] * b[3 + column] +
-                    a[row * 3 + 2] * b[6 + column];
-            }
-        }
-
-        return result;
-    }
-
-    private static float[] Invert(float[] m)
-    {
-        double a = m[0], b = m[1], c = m[2];
-        double d = m[3], e = m[4], f = m[5];
-        double g = m[6], h = m[7], i = m[8];
-
-        double determinant = a * (e * i - f * h) - b * (d * i - f * g) + c * (d * h - e * g);
-        if (Math.Abs(determinant) < 1e-12)
-            throw new InvalidOperationException("Matrix laesst sich nicht umkehren.");
-
-        double s = 1.0 / determinant;
-
-        return new[]
-        {
-            (float)((e * i - f * h) * s), (float)((c * h - b * i) * s), (float)((b * f - c * e) * s),
-            (float)((f * g - d * i) * s), (float)((a * i - c * g) * s), (float)((c * d - a * f) * s),
-            (float)((d * h - e * g) * s), (float)((b * g - a * h) * s), (float)((a * e - b * d) * s),
-        };
+        return Colorimetry.Multiply(Colorimetry.Invert(eGamutToXyz), Colorimetry.Rec709ToXyz);
     }
 }
 
