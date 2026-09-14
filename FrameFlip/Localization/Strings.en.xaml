@@ -213,7 +213,7 @@
     <sys:String x:Key="X_LockToDisplay">Locks playback to the display refresh when the two nearly match. Prevents judder at 60 fps on 60 Hz – switch off if you need the exact timeline.</sys:String>
     <sys:String x:Key="X_CloseOnFocusLoss">The preview closes as soon as you click elsewhere. Switch off to keep the sequence up while you work in Blender.</sys:String>
     <sys:String x:Key="X_UiScale">Makes the whole interface larger or smaller. The right lever when text and surfaces feel too small or too big – Ctrl with + or − does it too.</sys:String>
-    <sys:String x:Key="X_TileSize">How large the preview tiles in the projects area are. Larger shows more of the image, smaller shows more images at once.</sys:String>
+    <sys:String x:Key="X_TileSize">How wide a system tile – CPU, memory, GPU – should be at least. That decides how many fit side by side: narrower puts three in a row, wider only one.</sys:String>
     <sys:String x:Key="X_MonitorShare">How much width the metrics on the right get. More if you mostly watch the numbers while rendering – less if the image is what counts.</sys:String>
     <sys:String x:Key="X_NavigationWidth">The width of the sequence list on the left. Wider if your file names are long.</sys:String>
     <sys:String x:Key="X_LowerPanelHeight">The height of the lower areas once the window gets too narrow for three columns and they move below.</sys:String>

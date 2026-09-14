@@ -83,9 +83,102 @@ public partial class FramePreviewWindow : Window
         {
             case Key.Left or Key.Up: Step(-1); break;
             case Key.Right or Key.Down: Step(1); break;
+
+            // Erst der Zoom zurueck, dann schliessen. Wer hineingezoomt hat und Esc
+            // drueckt, will fast immer das eine und nicht das andere.
+            case Key.Escape when !Lupe.Matrix.IsIdentity: Anpassen(); break;
             case Key.Escape: Close(); break;
+
+            case Key.D0 or Key.NumPad0: Anpassen(); break;
+            case Key.Add or Key.OemPlus: Zoomen(1.25, Mitte()); break;
+            case Key.Subtract or Key.OemMinus: Zoomen(1 / 1.25, Mitte()); break;
+
             case Key.Enter or Key.Space when _frames.Count > 1: _combine(_frames[_index]); break;
         }
+    }
+
+    /* ------------------------------------------------------------------- Lupe
+
+       Zoom auf den Zeiger und Schieben - dasselbe, was die Zuschauerseite im
+       Browser kann. Ohne das war die Vorschau im Projektbereich eine Ansicht, in
+       der man nichts nachsehen konnte: Ein Rendersfehler ist oft zwanzig Pixel
+       gross, und die sieht man in einer eingepassten Ansicht nicht.
+
+       Gerechnet wird ueber eine Matrix und nicht ueber Skalierung plus Rand. Der
+       Unterschied ist der ganze Punkt: Beim Zoomen soll die Stelle UNTER DEM ZEIGER
+       dort bleiben, wo der Zeiger ist. Mit einer Matrix ist das eine Zeile -
+       verschieben, skalieren, zurueckverschieben. Mit getrennten Werten wird es eine
+       Rechnung, die man beim zweiten Zoomschritt falsch hat. */
+
+    private const double Kleinste = 1, Groesste = 24;
+
+    private System.Windows.Point _griff;
+    private bool _schiebt;
+
+    private System.Windows.Point Mitte() => new(Stage.ActualWidth / 2, Stage.ActualHeight / 2);
+
+    /// <summary>Zurueck auf eingepasst. Auch nach jedem Bildwechsel.</summary>
+    private void Anpassen()
+    {
+        Lupe.Matrix = System.Windows.Media.Matrix.Identity;
+        Stage.Cursor = null;
+    }
+
+    private void Zoomen(double faktor, System.Windows.Point um)
+    {
+        var m = Lupe.Matrix;
+
+        double jetzt = m.M11;
+        double ziel = Math.Clamp(jetzt * faktor, Kleinste, Groesste);
+
+        if (Math.Abs(ziel - jetzt) < 0.0001) return;
+
+        // Um den Punkt skalieren: hin, skalieren, zurueck.
+        m.ScaleAt(ziel / jetzt, ziel / jetzt, um.X, um.Y);
+
+        Lupe.Matrix = m;
+
+        Stage.Cursor = ziel > 1 ? Cursors.SizeAll : null;
+    }
+
+    private void OnWheel(object sender, MouseWheelEventArgs e)
+    {
+        Zoomen(e.Delta > 0 ? 1.2 : 1 / 1.2, e.GetPosition(Stage));
+        e.Handled = true;
+    }
+
+    private void OnGrab(object sender, MouseButtonEventArgs e)
+    {
+        // Ein Doppelklick passt wieder ein - der kuerzeste Weg zurueck.
+        if (e.ClickCount == 2) { Anpassen(); return; }
+
+        // Bei eingepasster Ansicht gibt es nichts zu schieben.
+        if (Lupe.Matrix.M11 <= 1) return;
+
+        _griff = e.GetPosition(Stage);
+        _schiebt = true;
+        Stage.CaptureMouse();
+    }
+
+    private void OnDrag(object sender, MouseEventArgs e)
+    {
+        if (!_schiebt) return;
+
+        var jetzt = e.GetPosition(Stage);
+        var m = Lupe.Matrix;
+
+        m.Translate(jetzt.X - _griff.X, jetzt.Y - _griff.Y);
+
+        Lupe.Matrix = m;
+        _griff = jetzt;
+    }
+
+    private void OnRelease(object sender, MouseEventArgs e)
+    {
+        if (!_schiebt) return;
+
+        _schiebt = false;
+        Stage.ReleaseMouseCapture();
     }
 
     private void Step(int direction)
@@ -99,6 +192,12 @@ public partial class FramePreviewWindow : Window
     private void Load()
     {
         string path = _frames[_index];
+
+        // Beim Bildwechsel wieder einpassen. Den Zoom mitzunehmen klingt bequem und
+        // ist es nicht: Zwei Frames derselben Sequenz sind gleich gross, aber der
+        // Ausschnitt, den man am einen pruefen wollte, ist am naechsten selten der
+        // gesuchte - und man landet blind in einer Ecke.
+        Anpassen();
 
         Caption.Text = Path.GetFileName(path);
         Trouble.Visibility = Visibility.Collapsed;

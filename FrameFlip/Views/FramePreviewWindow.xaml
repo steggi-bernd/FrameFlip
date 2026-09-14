@@ -71,9 +71,23 @@
         </Border>
 
         <!-- ============================================================ Buehne -->
-        <Grid Grid.Row="1" Background="{StaticResource DesktopStage}" ClipToBounds="True">
+        <Grid x:Name="Stage" Grid.Row="1" Background="{StaticResource DesktopStage}" ClipToBounds="True"
+              MouseWheel="OnWheel" MouseLeftButtonDown="OnGrab" MouseMove="OnDrag"
+              MouseLeftButtonUp="OnRelease" MouseLeave="OnRelease">
+
+            <!-- Der Zoom haengt an einer eigenen Verschiebung, nicht am Rand des
+                 Bildes: Ein Rand verschoebe auch die Buehne, und beim Hineinzoomen
+                 waere die Stelle unter dem Zeiger nicht mehr dort, wo der Zeiger ist.
+
+                 RenderTransform statt LayoutTransform, weil die Kachel beim Zoomen
+                 nicht neu vermessen werden soll - sie wird nur anders gezeichnet. -->
             <Image x:Name="Picture" Margin="24" Stretch="Uniform"
-                   RenderOptions.BitmapScalingMode="HighQuality" />
+                   RenderOptions.BitmapScalingMode="HighQuality"
+                   RenderTransformOrigin="0,0">
+                <Image.RenderTransform>
+                    <MatrixTransform x:Name="Lupe" />
+                </Image.RenderTransform>
+            </Image>
 
             <!-- EXR und halb geschriebene Dateien lassen sich nicht anzeigen.
                  Das gehört dann auch dagestanden, statt eine leere Fläche zu

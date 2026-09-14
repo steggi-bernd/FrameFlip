@@ -5,6 +5,7 @@ using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Interop;
 using System.Windows.Media;
+using System.Windows.Media.Imaging;
 using System.Windows.Threading;
 using System.Xml.Linq;
 using FrameFlip.Configuration;
@@ -15,6 +16,10 @@ internal static partial class Program
 {
     private static object? Call(MainWindow window, string method, params object?[] args)
         => typeof(MainWindow).GetMethod(method, BindingFlags.Instance | BindingFlags.NonPublic)!.Invoke(window, args);
+
+    /// <summary>Wie oben, aber fuer jedes Fenster - die Lupe sitzt in einem anderen.</summary>
+    private static object? CallOn(object ziel, string method, params object?[] args)
+        => ziel.GetType().GetMethod(method, BindingFlags.Instance | BindingFlags.NonPublic)!.Invoke(ziel, args);
 
     private static void Flush()
         => Dispatcher.CurrentDispatcher.Invoke(() => { }, DispatcherPriority.ContextIdle);
@@ -275,6 +280,92 @@ internal static partial class Program
             "ohne Erklaerung erscheint kein (i)");
 
         Render(holder, 460, 400, "SettingRow.png");
+    }
+
+    /// <summary>
+    /// Die Lupe der Einzelbildvorschau: Zoom auf den Zeiger, Schieben, Einpassen.
+    ///
+    /// Gemessen wird die Matrix und nicht das Bild. Von aussen laesst sich der Zoom
+    /// gar nicht pruefen - das Fenster haengt als Kind am Hauptfenster, und wie weit
+    /// ein Bild hineingezoomt ist, meldet keine Bedienungshilfe. Die Matrix sagt es
+    /// genau.
+    ///
+    /// Die eigentliche Zusicherung ist die dritte: Beim Zoomen muss die Stelle UNTER
+    /// DEM ZEIGER dort bleiben, wo der Zeiger ist. Das ist der Unterschied zwischen
+    /// einer Lupe und einem Bild, das beim Scrollen in die Ecke wandert.
+    /// </summary>
+    private static void TestPreviewZoom()
+    {
+        string ordner = Path.Combine(_out, "Lupe-Beispiel");
+        Directory.CreateDirectory(ordner);
+
+        var bilder = new List<string>();
+
+        for (int i = 1; i <= 3; i++)
+        {
+            var zeichnung = new DrawingVisual();
+            using (var dc = zeichnung.RenderOpen())
+            {
+                dc.DrawRectangle(new SolidColorBrush(Color.FromRgb(28, 24, 46)), null, new Rect(0, 0, 320, 180));
+                dc.DrawEllipse(Brushes.White, null, new Point(40 * i, 90), 12, 12);
+            }
+
+            var bitmap = new RenderTargetBitmap(320, 180, 96, 96, PixelFormats.Pbgra32);
+            bitmap.Render(zeichnung);
+
+            var encoder = new PngBitmapEncoder();
+            encoder.Frames.Add(BitmapFrame.Create(bitmap));
+
+            string datei = Path.Combine(ordner, $"frame_{i:0000}.png");
+            using (var stream = File.Create(datei)) encoder.Save(stream);
+
+            bilder.Add(datei);
+        }
+
+        var fenster = new FramePreviewWindow(bilder[0], bilder, _ => { });
+        var flaeche = (FrameworkElement)fenster.Content;
+        Layout(flaeche, 900, 620);
+
+        var lupe = (MatrixTransform)typeof(FramePreviewWindow)
+            .GetField("Lupe", BindingFlags.Instance | BindingFlags.NonPublic)!.GetValue(fenster)!;
+
+        void Zoom(double faktor, Point um)
+            => CallOn(fenster, "Zoomen", faktor, um);
+
+        Check(lupe.Matrix.IsIdentity, "frisch geoeffnet ist die Ansicht eingepasst");
+
+        var zeiger = new Point(300, 200);
+        Zoom(2, zeiger);
+
+        Check(Math.Abs(lupe.Matrix.M11 - 2) < .001, $"zweifach heisst zweifach ({lupe.Matrix.M11:0.###})");
+
+        /* Vor dem Zoomen war die Abbildung die Identitaet - der Bildpunkt unter dem
+         * Zeiger hatte also genau dessen Koordinaten. Eine Skalierung UM diesen Punkt
+         * laesst ihn liegen: Er muss nach dem Zoomen wieder auf sich selbst fallen.
+         * Tut er das nicht, wandert das Bild beim Scrollen davon - genau der Fehler,
+         * den die Zuschauerseite im Browser einmal hatte. */
+        var getroffen = lupe.Matrix.Transform(zeiger);
+
+        Check(Math.Abs(getroffen.X - zeiger.X) < .5 && Math.Abs(getroffen.Y - zeiger.Y) < .5,
+            $"die Stelle unter dem Zeiger bleibt unter dem Zeiger ({getroffen.X:0.#}/{getroffen.Y:0.#})");
+
+        Zoom(1000, zeiger);
+        Check(lupe.Matrix.M11 <= 24.001, $"der Zoom hat eine Obergrenze ({lupe.Matrix.M11:0.#})");
+
+        Zoom(0.0001, zeiger);
+        Check(lupe.Matrix.M11 >= 1, $"und eine Untergrenze - kleiner als eingepasst gibt es nicht ({lupe.Matrix.M11:0.###})");
+
+        Zoom(4, zeiger);
+        CallOn(fenster, "Anpassen");
+        Check(lupe.Matrix.IsIdentity, "Einpassen setzt alles zurueck");
+
+        // Beim Bildwechsel ebenfalls: Der Ausschnitt vom vorigen Frame ist am
+        // naechsten selten der gesuchte.
+        Zoom(3, zeiger);
+        CallOn(fenster, "Step", 1);
+        Check(lupe.Matrix.IsIdentity, "ein Bildwechsel passt wieder ein");
+
+        fenster.Close();
     }
 
     private static void TestResourceMerge()
