@@ -35,6 +35,16 @@ public partial class ExportWindow : Window
     private bool _closing;
     private bool _running;
 
+    /// <summary>Laeuft waehrend des Exports - Grundlage fuer Restzeit und Durchsatz.</summary>
+    private readonly System.Diagnostics.Stopwatch _runClock = new();
+
+    /// <summary>
+    /// Eine im Hintergrund fertig kodierte Fassung, die zu den aktuellen Einstellungen
+    /// passt - oder null. Wird bei jeder Aenderung neu gesucht, denn jede Aenderung
+    /// kann sie ungueltig machen.
+    /// </summary>
+    private string? _prepared;
+
     private sealed record ScaleOption(string Name, int Width)
     {
         public override string ToString() => Name;
@@ -60,8 +70,33 @@ public partial class ExportWindow : Window
         PresetBox.SelectedItem = ExportPreset.All.FirstOrDefault(p => p.Name == settings.ExportPreset)
                                  ?? ExportPreset.H264;
 
-        FpsBox.ItemsSource = FpsOption.All;
-        FpsBox.SelectedItem = FpsOption.Closest(playbackFps);
+        // Die Wiedergaberate darf frei eingestellt werden; die Liste hier kennt nur
+        // die ueblichen Werte. Wer bei 37,5 zugesehen hat und dann exportiert, soll
+        // nicht stillschweigend 30 bekommen - also kommt sein Wert in die Liste.
+        var rates = FpsOption.All.ToList();
+
+        if (playbackFps > 0 && !rates.Any(o => Math.Abs(o.Value - playbackFps) < 0.001))
+        {
+            rates.Add(new FpsOption(playbackFps,
+                playbackFps.ToString("0.###", System.Globalization.CultureInfo.InvariantCulture)));
+
+            rates.Sort((a, b) => a.Value.CompareTo(b.Value));
+        }
+
+        QualityBox.ItemsSource = ExportQuality.All;
+        QualityBox.SelectedItem = ExportQuality.All.FirstOrDefault(q => q.Name == settings.ExportQuality)
+                                  ?? ExportQuality.High;
+
+        SpeedBox.ItemsSource = ExportSpeed.All;
+        SpeedBox.SelectedItem = ExportSpeed.All.FirstOrDefault(s => s.Name == settings.ExportSpeed)
+                                ?? ExportSpeed.Balanced;
+
+        QualityHint.Text = CurrentQuality.Hint;
+        SpeedHint.Text = CurrentSpeed.Hint;
+
+        FpsBox.ItemsSource = rates;
+        FpsBox.SelectedItem = rates.FirstOrDefault(o => Math.Abs(o.Value - playbackFps) < 0.001)
+                              ?? FpsOption.Closest(playbackFps);
 
         ScaleBox.ItemsSource = BuildScaleOptions();
         ScaleBox.SelectedIndex = 0;
@@ -333,6 +368,85 @@ public partial class ExportWindow : Window
         SummaryText.Text =
             $"{request.OutputFrameCount} Frames bei {CurrentFps:0.###} fps  ·  " +
             $"{duration.TotalSeconds:0.0} s Laufzeit  ·  {width} × {height}{correction}";
+
+        ShowEstimate(request);
+        LookForPrepared(request);
+    }
+
+    /// <summary>
+    /// Was vermutlich herauskommt: Groesse und Dauer.
+    ///
+    /// Beides mit "ca." und beides aus den aktuellen Einstellungen - wer die Qualitaet
+    /// eine Stufe hoeher stellt, soll die Folge sofort sehen und nicht erst nach dem
+    /// Export. Die Dauer stuetzt sich auf das, was diese Maschine beim letzten Mal
+    /// geschafft hat; beim ersten Export steht dort ein vorsichtiger Anfangswert.
+    /// </summary>
+    private void ShowEstimate(ExportRequest request)
+    {
+        if (EstimateText is null) return;
+
+        var parts = new List<string>();
+
+        double calibration = _settings.ExportSizeFactor > 0 ? _settings.ExportSizeFactor : 1.0;
+
+        if (ExportEstimate.Bytes(request, CurrentQuality, CurrentSpeed, calibration) is { } bytes && bytes > 0)
+            parts.Add("ca. " + ExportEstimate.Size(bytes));
+
+        double throughput = _settings.ExportThroughput > 0
+            ? _settings.ExportThroughput
+            : ExportEstimate.DefaultThroughput;
+
+        if (ExportEstimate.Duration(request, CurrentSpeed, throughput) is { } span)
+            parts.Add("ca. " + ExportEstimate.Clock(span) + " Export");
+
+        if (_prepared is { Length: > 0 }) parts.Clear();
+
+        EstimateText.Text = parts.Count > 0 ? string.Join("  ·  ", parts) : string.Empty;
+        EstimateText.Visibility = parts.Count > 0 ? Visibility.Visible : Visibility.Collapsed;
+    }
+
+    /// <summary>
+    /// Nachsehen, ob das Dashboard diesen Fall schon kodiert hat.
+    ///
+    /// Streng verglichen wird, und das ist Absicht: Eine Fassung, die nur fast passt,
+    /// waere schlimmer als gar keine - sie kaeme heraus, ohne dass jemand merkt, dass
+    /// er etwas anderes eingestellt hatte. Passt etwas nicht, wird ganz normal
+    /// kodiert, und der Benutzer verliert nichts ausser der Abkuerzung.
+    /// </summary>
+    private void LookForPrepared(ExportRequest request)
+    {
+        _prepared = null;
+
+        // Eine eingerechnete Bildkorrektur entsteht erst hier im Dialog - dafuer kann
+        // es nichts Vorbereitetes geben.
+        if (request.Adjustments is not null || _inOutFrames.Count < 2)
+        {
+            PreparedHint.Visibility = Visibility.Collapsed;
+            return;
+        }
+
+        var print = new VideoFingerprint(
+            _sequence.Pattern.Describe(),
+            request.Frames.Count > 0 ? request.Frames[0].Number : 0,
+            request.Frames.Count > 0 ? request.Frames[^1].Number : 0,
+            request.Frames.Count,
+            request.Fps,
+            _sourceWidth,
+            _sourceHeight,
+            request.TargetWidth,
+            request.Preset.Name,
+            request.Gaps.ToString(),
+            PreparedVideo.NewestTicks(request.Frames.Select(f => f.Path)));
+
+        if (PreparedVideo.TryFind(print, request.Preset.Extension, out string found))
+        {
+            _prepared = found;
+            PreparedHint.Visibility = Visibility.Visible;
+        }
+        else
+        {
+            PreparedHint.Visibility = Visibility.Collapsed;
+        }
     }
 
     private ExportRequest BuildRequest() => new()
@@ -347,7 +461,31 @@ public partial class ExportWindow : Window
         SourceHeight = _sourceHeight,
         Threads = _threadBudget(),
         Adjustments = AdjustmentsForExport,
+        Crf = ExportEstimate.Crf(CurrentPreset, CurrentQuality),
+        Speed = CurrentSpeed.Value,
     };
+
+    private ExportQuality CurrentQuality
+        => QualityBox?.SelectedItem as ExportQuality ?? ExportQuality.High;
+
+    private ExportSpeed CurrentSpeed
+        => SpeedBox?.SelectedItem as ExportSpeed ?? ExportSpeed.Balanced;
+
+    private void OnQualityChanged(object sender, System.Windows.Controls.SelectionChangedEventArgs e)
+    {
+        if (QualityHint is null) return;
+
+        QualityHint.Text = CurrentQuality.Hint;
+        UpdateSummary();
+    }
+
+    private void OnSpeedChanged(object sender, System.Windows.Controls.SelectionChangedEventArgs e)
+    {
+        if (SpeedHint is null) return;
+
+        SpeedHint.Text = CurrentSpeed.Hint;
+        UpdateSummary();
+    }
 
     private void OnBrowseOutput(object sender, RoutedEventArgs e)
     {
@@ -452,7 +590,40 @@ public partial class ExportWindow : Window
 
         _settings.ExportPreset = CurrentPreset.Name;
         _settings.ExportHoldLastFrame = CurrentGaps == GapHandling.HoldLast;
+        _settings.ExportQuality = CurrentQuality.Name;
+        _settings.ExportSpeed = CurrentSpeed.Name;
         _persist(_settings);
+
+        // Die fertige Fassung an ihren Platz bringen. Kopiert wird, nicht verschoben:
+        // Wer zweimal exportiert, soll nicht beim zweiten Mal warten muessen.
+        if (_prepared is { Length: > 0 } ready && File.Exists(ready))
+        {
+            try
+            {
+                File.Copy(ready, request.OutputPath, overwrite: true);
+
+                long copied = 0;
+                try { copied = new FileInfo(request.OutputPath).Length; } catch (Exception) { }
+
+                ShowStatus($"Übernommen: {Path.GetFileName(request.OutputPath)}" +
+                           (copied > 0 ? $"  ({copied / (1024.0 * 1024):0.0} MB)" : "") +
+                           "  ·  war bereits vorbereitet", accent: false);
+
+                ProgressPanel.Visibility = Visibility.Visible;
+                Progress.Value = 1;
+                ProgressLeft.Text = "übernommen";
+                ProgressRight.Text = "100 %";
+
+                RevealInExplorer(request.OutputPath);
+                return;
+            }
+            catch (Exception copyFailed)
+            {
+                // Gescheitert heisst hier nur: dann eben kodieren.
+                ShowStatus("Die vorbereitete Fassung liess sich nicht kopieren (" +
+                           copyFailed.Message + ") – es wird neu kodiert.", accent: true);
+            }
+        }
 
         BeginRunningState();
 
@@ -496,10 +667,67 @@ public partial class ExportWindow : Window
         try { size = new FileInfo(result.OutputPath!).Length; } catch (Exception) { }
 
         ShowStatus($"Fertig: {Path.GetFileName(result.OutputPath)}" +
-                   (size > 0 ? $"  ({size / (1024.0 * 1024):0.0} MB)" : ""), accent: false);
+                   (size > 0 ? $"  ({size / (1024.0 * 1024):0.0} MB)" : "") +
+                   $"  ·  {ExportEstimate.Clock(_runClock.Elapsed)}", accent: false);
 
         Progress.Value = 1;
+        ProgressRight.Text = "100 %";
+
+        RememberThroughput(request);
+        RememberSize(request, size);
         RevealInExplorer(result.OutputPath!);
+    }
+
+    /// <summary>
+    /// Behalten, was die Maschine geschafft hat.
+    ///
+    /// Damit wird die Dauerschaetzung mit jedem Export besser. Gemittelt wird mit dem
+    /// bisherigen Wert, damit ein einzelner Lauf unter ungewoehnlicher Last - etwa
+    /// waehrend eines Renders - die Schaetzung nicht dauerhaft verzieht.
+    /// </summary>
+    private void RememberThroughput(ExportRequest request)
+    {
+        double seconds = _runClock.Elapsed.TotalSeconds;
+        if (seconds < 1) return;
+
+        double megapixels = (double)ExportEstimate.OutputWidth(request)
+                            * ExportEstimate.OutputHeight(request)
+                            * request.OutputFrameCount / 1_000_000.0;
+
+        double passes = request.Preset.TwoPassPalette ? 1.5 : 1.0;
+        double measured = megapixels / seconds * passes / CurrentSpeed.Factor;
+
+        if (!(measured > 0) || double.IsInfinity(measured)) return;
+
+        _settings.ExportThroughput = _settings.ExportThroughput > 0
+            ? _settings.ExportThroughput * 0.6 + measured * 0.4
+            : measured;
+
+        _persist(_settings);
+    }
+
+    /// <summary>
+    /// Behalten, wie weit die Schaetzung danebenlag.
+    ///
+    /// Gemittelt wie beim Durchsatz, damit ein einzelner ungewoehnlicher Export - ein
+    /// Standbild, eine Szene voller Rauch - die Schaetzung nicht dauerhaft verzieht.
+    /// </summary>
+    private void RememberSize(ExportRequest request, long actual)
+    {
+        if (actual <= 0) return;
+
+        // Ohne Kalibrierung rechnen, sonst misst man die eigene Korrektur mit.
+        if (ExportEstimate.Bytes(request, CurrentQuality, CurrentSpeed) is not { } raw || raw <= 0) return;
+
+        double factor = actual / (double)raw;
+
+        if (!(factor > ExportEstimate.MinFactor) || factor > ExportEstimate.MaxFactor) return;
+
+        _settings.ExportSizeFactor = _settings.ExportSizeFactor > 0
+            ? _settings.ExportSizeFactor * 0.6 + factor * 0.4
+            : factor;
+
+        _persist(_settings);
     }
 
     private void OnProgress(ExportProgress progress)
@@ -512,10 +740,27 @@ public partial class ExportWindow : Window
                 ? $"{progress.Stage} ({progress.PassIndex + 1}/{progress.PassCount})"
                 : progress.Stage;
 
-            ShowStatus(progress.Frame > 0
-                ? $"{stage}: Frame {progress.Frame} von {progress.TotalFrames}" +
+            ProgressLeft.Text = progress.Frame > 0
+                ? $"{stage}  ·  Frame {progress.Frame} von {progress.TotalFrames}" +
                   (progress.Fps > 0 ? $"  ·  {progress.Fps:0} fps" : "")
-                : stage + " …", accent: false);
+                : stage + " …";
+
+            // Die Restzeit kommt aus dem, was wirklich passiert ist - nicht aus der
+            // Schaetzung von vorhin. Erst ab fuenf Prozent, sonst rechnet sie aus
+            // einem Anlaufwert eine Zahl, die gleich darauf wieder falsch ist.
+            double done = progress.Fraction;
+            var elapsed = _runClock.Elapsed;
+
+            string right = $"{done * 100:0} %";
+
+            if (done > 0.05 && elapsed.TotalSeconds > 1.5)
+            {
+                var left = TimeSpan.FromSeconds(elapsed.TotalSeconds * (1 - done) / done);
+
+                right += $"  ·  noch {ExportEstimate.Clock(left)}";
+            }
+
+            ProgressRight.Text = right;
         }));
     }
 
@@ -523,9 +768,16 @@ public partial class ExportWindow : Window
     {
         _running = true;
         StartButton.Content = "Abbrechen";
-        Progress.Visibility = Visibility.Visible;
-        Progress.Value = 0;
 
+        ProgressPanel.Visibility = Visibility.Visible;
+        Progress.Value = 0;
+        ProgressLeft.Text = "wird vorbereitet …";
+        ProgressRight.Text = "0 %";
+
+        _runClock.Restart();
+
+        QualityBox.IsEnabled = false;
+        SpeedBox.IsEnabled = false;
         PresetBox.IsEnabled = false;
         FpsBox.IsEnabled = false;
         ScaleBox.IsEnabled = false;
@@ -543,6 +795,10 @@ public partial class ExportWindow : Window
         _running = false;
         StartButton.Content = "Exportieren";
 
+        _runClock.Stop();
+
+        QualityBox.IsEnabled = true;
+        SpeedBox.IsEnabled = true;
         PresetBox.IsEnabled = true;
         FpsBox.IsEnabled = true;
         ScaleBox.IsEnabled = true;

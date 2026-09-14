@@ -7,6 +7,7 @@
             <RowDefinition Height="Auto" />
             <RowDefinition Height="Auto" />
             <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
             <RowDefinition Height="*" />
         </Grid.RowDefinitions>
 
@@ -51,12 +52,16 @@
              sie nicht - sie sind das Dokument, zu dem die Ordner gehören. -->
         <ContentControl Grid.Row="2" x:Name="StackBar" Margin="0,12,0,0" />
 
-        <TextBlock x:Name="Note" Grid.Row="3" VerticalAlignment="Top" MaxWidth="620"
+<!-- Eigene Zeile, nicht dieselbe wie die Liste. Vorher lagen beide in
+             Zeile 3 uebereinander: Solange es keine Projekte gab, aber schon
+             zuletzt geoeffnete Sequenzen, ragte der Hinweis quer durch deren
+             Kacheln. -->
+        <TextBlock x:Name="Note" Grid.Row="3" Margin="0,14,0,0" MaxWidth="620"
                    HorizontalAlignment="Left" TextWrapping="Wrap" Visibility="Collapsed"
                    FontFamily="{StaticResource BodyFont}" FontSize="12.5"
                    Foreground="{StaticResource FaintBrush}" />
 
-        <ScrollViewer Grid.Row="3" Margin="0,14,0,0" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+        <ScrollViewer Grid.Row="4" Margin="0,14,0,0" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
             <StackPanel x:Name="Body" />
         </ScrollViewer>
     </Grid>

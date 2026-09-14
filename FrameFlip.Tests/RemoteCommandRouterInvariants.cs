@@ -94,6 +94,7 @@ public static class RemoteCommandRouterInvariants
             var settings = new AppSettings
             {
                 RemoteEnabled = true,
+                TermsAccepted = AppSettings.TermsVersion,
                 PairingSecret = "x",
                 FileFolder = folder,
                 FileAccessEnabled = true,

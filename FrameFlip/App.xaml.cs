@@ -31,6 +31,25 @@ public partial class App : Application
                                               Views.WindowIcon.Apply(window);
                                           }));
 
+        // Der Fanghaken gilt fuer beide Wege. Ein Fehler in einer Ansicht soll das
+        // Fenster nicht mitnehmen - vorher endete die Vorschau-Kopie bei jedem
+        // Fehler wortlos, und aus Sicht des Benutzers war das Programm einfach weg.
+        DispatcherUnhandledException += OnDispatcherUnhandledException;
+
+        // Der Normalfall ist das ganze Programm: Ablagebereich, Tastenkombination,
+        // Bruecke. Die isolierte Oberflaechen-Vorschau - ohne Hintergrunddienste und
+        // ohne Zugriff auf die echte Konfiguration - bleibt als Schalter erhalten,
+        // weil sie beim Entwickeln der Ansichten weiterhin gebraucht wird.
+        //
+        // Waehrend des Umbaus war es umgekehrt: Die Kopie startete isoliert, damit
+        // sie neben der laufenden Fassung nichts anfasst. Als Hauptfassung waere das
+        // genau falsch herum.
+        if (e.Args.Contains("--ui-preview", StringComparer.OrdinalIgnoreCase))
+        {
+            Views.DesktopPreview.Start();
+            return;
+        }
+
         // Mit eigenem Konfigurationspfad darf eine Testinstanz neben der normalen laufen.
         string mutexName = FrameFlip.Configuration.SettingsStore.Override is { Length: > 0 }
             ? @"Local\FrameFlip.SingleInstance.Test"
@@ -75,14 +94,28 @@ public partial class App : Application
             // Ohne ausreichende Rechte bleibt es bei Normal.
         }
 
-        DispatcherUnhandledException += OnDispatcherUnhandledException;
-
         _host = new AppHost();
         _host.Start();
 
         // Rohcache-Ordner aufraeumen, die eine fruehere Sitzung nicht loeschen konnte -
         // etwa nach einem Absturz. Im Hintergrund, damit der Start nicht wartet.
         Task.Run(() => FrameFlip.Caching.RawFrameCache.CleanOrphans(TimeSpan.FromHours(6)));
+
+        // Dasselbe fuer vorbereitete Videos, die niemand exportiert hat. Sie sind
+        // gross, und ihr einziger Zweck war eine Abkuerzung, die nicht genommen wurde.
+        Task.Run(FrameFlip.Playback.PreparedVideo.CleanOld);
+
+        // "--show" oeffnet das Fenster gleich beim Start.
+        //
+        // FrameFlip lebt im Ablagebereich: Es startet still und wartet auf die
+        // Tastenkombination. Das ist richtig fuer den taeglichen Gebrauch und
+        // unpraktisch in jedem anderen Fall - beim Vergleichen zweier Staende, beim
+        // Vorfuehren, nach einer frischen Installation. Wer es einmal sehen will,
+        // soll es nicht erst im Ablagebereich suchen muessen.
+        if (e.Args.Contains("--show", StringComparer.OrdinalIgnoreCase))
+        {
+            Dispatcher.BeginInvoke(new Action(() => _host?.ShowMain()));
+        }
 
         // "--preview <datei>" oeffnet die Vorschau direkt, ohne Umweg ueber den Explorer.
         for (int i = 0; i < e.Args.Length - 1; i++)
@@ -142,7 +175,11 @@ public partial class App : Application
 
     private void OnDispatcherUnhandledException(object sender, DispatcherUnhandledExceptionEventArgs e)
     {
-        // Ein Fehler in der Vorschau darf die Tray-Anwendung nicht mitnehmen.
+        // Ein Fehler in einer Ansicht darf die Tray-Anwendung nicht mitnehmen.
+        // Verschluckt wird er trotzdem nicht: Mit gesetztem FRAMEFLIP_CONFIG steht
+        // er im Protokoll daneben, sonst waere ein stiller Fehler schlimmer als ein
+        // lauter.
+        Configuration.SettingsStore.Trace("Unbehandelt: " + e.Exception);
         e.Handled = true;
     }
 

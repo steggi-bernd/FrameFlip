@@ -194,6 +194,19 @@ Still missing:
   processes of its own, because Blender offers no way to cancel one from the inside
 * The phone app itself — the other end of the link above
 
+## Supporting this
+
+FrameFlip is free, and so is the relay it can use. If it saves you time and you would
+like to chip in towards the server that keeps the relay running:
+
+**[ko-fi.com/besteck](https://ko-fi.com/besteck)**
+
+To be clear about what that does and does not buy: **nothing.** There are no supporter
+features, no priority, no guarantee that the relay stays up, and no support obligation.
+Everyone gets the same program and the same relay. It is a thank-you, not a purchase —
+and if you would rather not depend on my server at all,
+[run your own](EIGENER-LEUCHTTURM.md). It takes about five minutes.
+
 ## Licence
 
 MIT — see [LICENSE](LICENSE).

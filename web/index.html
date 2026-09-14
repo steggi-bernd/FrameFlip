@@ -1,0 +1,1599 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+<meta name="robots" content="noindex, nofollow">
+<meta name="referrer" content="no-referrer">
+<!--
+  connect-src nennt das Schema AUSDRUECKLICH, nicht nur 'self'.
+
+  WebKit - also jedes Safari und alles auf einem iPhone - rechnet 'self' bei
+  WebSockets nicht auf wss:// an. Die Seite laedt dann ganz normal, und die
+  Verbindung zum Leuchtturm wird stumm verworfen: Bild und Zahlen bleiben leer,
+  ohne dass irgendwo etwas steht. Am Schreibtisch faellt es nicht auf, weil
+  Chromium und Firefox es grosszuegiger auslegen.
+
+  Die engere Fassung mit dem genauen Wirtsnamen setzt Caddy als Kopfzeile dazu;
+  beide Regeln gelten dann gleichzeitig, und es gilt die Schnittmenge.
+
+  script-src braucht 'self'. Ein Dienstarbeiter erbt die Regel aus der Antwort
+  seines eigenen Skripts, und ohne 'self' verbiete er damit sich selbst - die
+  Anmeldung scheitert dann mit "An unknown error occurred when fetching the script",
+  und die Seite laesst sich nicht als Programm ablegen.
+
+  STATT 'unsafe-inline' stehen hier PRUEFSUMMEN des einen Skripts und des einen
+  Stilblocks. Der Unterschied ist der ganze Sinn: 'unsafe-inline' erlaubt JEDEN
+  Inline-Code, also auch eingeschleusten. Eine Pruefsumme erlaubt genau diesen einen
+  Block und sonst nichts. Selbst wenn es je gelaenge, Markup in die Seite zu bringen,
+  liefe daraus kein Code.
+
+  Die Werte setzt der Zusammenbau ein (web/bauen.py). Von Hand geaendert wird hier
+  nichts - eine falsche Pruefsumme heisst: leere Seite.
+-->
+<meta http-equiv="Content-Security-Policy"
+      content="default-src 'none'; img-src 'self' blob: data:; style-src 'sha256-FRX3dqq1KZoqHsobtu2bJU1WT+HZV+90+HRqWgkLowQ='; script-src 'self' 'sha256-eQY2l14LdMUEOXdyPWeAsHgIS3BEkk2MD7is70Aiqqg='; connect-src 'self' wss: ws:; manifest-src 'self'; worker-src 'self'; base-uri 'none'; form-action 'none'">
+
+<title>FrameFlip</title>
+
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icon-192.png" sizes="192x192">
+<link rel="apple-touch-icon" href="icon-192.png">
+<meta name="theme-color" content="#07070d">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="FrameFlip">
+
+<style>
+  :root {
+    --bg: #07070d;      --panel: #0b0b14;   --stage: #05050a;
+    --surface: #11111b; --line: #1e1e2b;    --ink: #f4f4f8;
+    --muted: #9b9bb0;   --faint: #6b6b80;   --accent: #a855f7;
+    --blue: #60a5fa;    --cyan: #22d3ee;    --warn: #f472b6;
+    --mono: ui-monospace, "Cascadia Mono", "SF Mono", Menlo, Consolas, monospace;
+    --sans: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+
+    /* Elastisch statt fest.
+
+       Jede Groesse waechst mit der Flaeche, aber innerhalb von Grenzen: clamp()
+       nennt kleinsten Wert, gewuenschten und groessten. Auf einem schmalen Handy
+       wird nichts unleserlich klein, auf einem grossen Schirm nichts laecherlich
+       verloren - und dazwischen gibt es keinen Sprung, an dem es kippt. */
+    --pad: clamp(12px, 2.2vw, 22px);
+    --gap: clamp(10px, 1.6vw, 18px);
+    --t-label: clamp(8px, .95vw, 9.5px);
+    --t-small: clamp(9.5px, 1.05vw, 11.5px);
+    --t-body: clamp(11px, 1.25vw, 13.5px);
+    --t-mark: clamp(13px, 1.5vw, 16px);
+    --t-huge: clamp(28px, 4.4vw, 46px);
+  }
+
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+
+  html, body {
+    margin: 0; height: 100%; overflow: hidden;
+    background: var(--bg); color: var(--ink);
+    font-family: var(--sans);
+    -webkit-text-size-adjust: 100%;
+  }
+
+  body {
+    display: flex; flex-direction: column;
+    padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
+  }
+
+  /* ------------------------------------------------------------- Kopfzeile */
+  header {
+    display: flex; align-items: center; gap: 10px;
+    padding: clamp(10px, 1.4vw, 16px) var(--pad);
+    border-bottom: 1px solid var(--line);
+    background: var(--panel); flex: none;
+  }
+
+  .mark { font-weight: 650; letter-spacing: .04em; font-size: var(--t-mark); }
+
+  .dot {
+    width: 8px; height: 8px; border-radius: 50%;
+    background: var(--faint); flex: none;
+    transition: background .3s, box-shadow .3s;
+  }
+  .dot.live { background: var(--accent); box-shadow: 0 0 10px var(--accent); }
+  .dot.idle { background: var(--blue); }
+  .dot.gone { background: var(--warn); }
+
+  .standing {
+    font-size: var(--t-small); color: var(--muted);
+    margin-left: auto; text-align: right;
+  }
+
+  .install {
+    flex: none; padding: 6px 11px; border-radius: 999px;
+    background: color-mix(in srgb, var(--accent) 16%, transparent);
+    border: 1px solid color-mix(in srgb, var(--accent) 45%, transparent);
+    color: var(--accent); font-size: var(--t-label); font-weight: 600;
+    letter-spacing: .08em; text-transform: uppercase;
+    cursor: pointer; display: none; white-space: nowrap;
+  }
+  .install.on { display: block; }
+  .install:hover { background: color-mix(in srgb, var(--accent) 26%, transparent); }
+
+  /* ------------------------------------------------------------- Rumpf */
+  main {
+    flex: 1; min-height: 0;
+    display: grid; gap: 1px;
+    background: var(--line);
+    grid-template-rows: minmax(38vh, auto) 1fr;
+  }
+
+  /* Quer und am Schreibtisch nebeneinander, hoch untereinander. Die Schwelle
+     liegt am Seitenverhaeltnis, nicht an der Breite: Ein Handy im Querformat ist
+     schmal und hat trotzdem Platz fuer zwei Spalten. Die Seitenspalte waechst mit
+     dem Schirm, statt bei einer festen Breite stehenzubleiben. */
+  @media (min-aspect-ratio: 1/1) {
+    main {
+      grid-template-rows: 1fr;
+      grid-template-columns: 1fr clamp(240px, 26vw, 380px);
+    }
+  }
+
+  /* ------------------------------------------------------------- Bühne */
+  .stage {
+    position: relative; background: var(--stage);
+    display: flex; align-items: center; justify-content: center;
+    min-height: 0; overflow: hidden; touch-action: none;
+  }
+
+  /* KEIN transform-origin hier.
+     Es stand einmal auf "0 0", waehrend die Rechnung von der Mitte ausging - das
+     Bild wuchs dadurch aus der oberen linken Ecke heraus, egal wo der Zeiger war.
+     Die Voreinstellung ist die Mitte, und genau damit rechnet die Ansicht. */
+  .stage img, .vstage img {
+    max-width: 100%; max-height: 100%;
+    display: block; cursor: zoom-in;
+    user-select: none; -webkit-user-drag: none;
+  }
+  .stage img.grab, .vstage img.grab { cursor: grab; }
+  .stage img.grabbing, .vstage img.grabbing { cursor: grabbing; }
+
+  .stage .empty {
+    color: var(--faint); font-size: var(--t-small);
+    text-align: center; padding: 24px; line-height: 1.7; max-width: 32em;
+  }
+
+  /* Werkzeuge auf der Bühne - erscheinen nur, wenn es ein Bild gibt. */
+  .tools {
+    position: absolute; left: 50%; bottom: 10px; transform: translateX(-50%);
+    display: none; align-items: center; gap: 2px; padding: 4px;
+    background: rgba(11, 11, 20, .86); border: 1px solid var(--line);
+    border-radius: 11px; backdrop-filter: blur(8px);
+  }
+  .tools.on { display: flex; }
+
+  .tools button, .vtools button {
+    min-width: 32px; height: 30px; padding: 0 8px;
+    background: transparent; border: 0; border-radius: 8px;
+    color: var(--muted); font-family: var(--mono); font-size: 13px;
+    cursor: pointer; line-height: 1;
+  }
+  .tools button:hover, .vtools button:hover { background: var(--surface); color: var(--ink); }
+  .tools .level, .vtools .level {
+    min-width: 48px; text-align: center; color: var(--faint);
+    font-size: 10.5px; font-family: var(--mono); cursor: default;
+  }
+  .tools .sep, .vtools .sep { width: 1px; height: 18px; background: var(--line); margin: 0 3px; }
+
+  /* ------------------------------------------------------------- Seite */
+  .side {
+    background: var(--panel);
+    overflow-y: auto; -webkit-overflow-scrolling: touch;
+    padding: var(--pad);
+  }
+
+  /* ---------------------------------------------------- Zustand & Fortschritt */
+  .state { display: flex; align-items: center; gap: 8px; margin-bottom: var(--gap); }
+
+  .chip {
+    font-size: var(--t-label); letter-spacing: .14em; text-transform: uppercase;
+    padding: 4px 9px; border-radius: 999px; font-weight: 600;
+    color: var(--faint); background: var(--surface); border: 1px solid var(--line);
+    white-space: nowrap;
+  }
+  .chip.live {
+    color: var(--accent); border-color: color-mix(in srgb, var(--accent) 45%, transparent);
+    background: color-mix(in srgb, var(--accent) 14%, transparent);
+  }
+  .chip.idle { color: var(--blue); border-color: color-mix(in srgb, var(--blue) 40%, transparent); }
+
+  .scene {
+    font-size: var(--t-small); color: var(--muted);
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  }
+
+  .headline { display: flex; align-items: baseline; gap: 10px; margin-bottom: 10px; }
+
+  .headline .pct {
+    font-family: var(--mono); font-size: var(--t-huge); line-height: 1;
+    font-variant-numeric: tabular-nums; letter-spacing: -.02em;
+  }
+  .headline .pct small { font-size: .42em; color: var(--faint); margin-left: 2px; }
+
+  .headline .frames {
+    margin-left: auto; text-align: right;
+    font-family: var(--mono); font-size: var(--t-body); color: var(--muted);
+    font-variant-numeric: tabular-nums;
+  }
+  .headline .frames b { color: var(--ink); font-weight: 500; }
+
+  .bar { height: 6px; border-radius: 3px; background: var(--surface); overflow: hidden; position: relative; }
+  .bar i {
+    position: absolute; inset: 0 auto 0 0; display: block;
+    background: linear-gradient(90deg, var(--accent), var(--cyan));
+    width: 0; transition: width .45s ease; border-radius: 3px;
+  }
+
+  .times {
+    display: flex; justify-content: space-between;
+    margin: 7px 0 var(--gap); font-size: var(--t-label); color: var(--faint);
+    font-family: var(--mono); font-variant-numeric: tabular-nums;
+  }
+  .times b { color: var(--muted); font-weight: 400; }
+
+  /* ------------------------------------------------------------- Zahlen */
+  .grid {
+    display: grid; gap: var(--gap) clamp(10px, 1.6vw, 20px);
+    grid-template-columns: repeat(auto-fit, minmax(clamp(78px, 8vw, 104px), 1fr));
+  }
+
+  .cell label {
+    display: block; font-size: var(--t-label); letter-spacing: .12em;
+    text-transform: uppercase; color: var(--faint); margin-bottom: 3px;
+  }
+  .cell output {
+    font-family: var(--mono); font-size: var(--t-body);
+    font-variant-numeric: tabular-nums; color: var(--ink);
+  }
+
+  .rule { grid-column: 1 / -1; height: 1px; background: var(--line); margin: 1px 0; }
+
+  /* -------------------------------------------------------- Bild sichern */
+  .save {
+    width: 100%; margin-top: calc(var(--gap) + 4px);
+    padding: clamp(10px, 1.3vw, 14px); border-radius: 10px;
+    background: var(--surface); border: 1px solid var(--line);
+    color: var(--ink); font-family: inherit; font-size: var(--t-small);
+    font-weight: 600; letter-spacing: .03em; cursor: pointer;
+    display: none; align-items: center; justify-content: center; gap: 8px;
+  }
+  .save.on { display: flex; }
+  .save:hover { border-color: color-mix(in srgb, var(--accent) 55%, transparent); color: var(--accent); }
+  .save b { font-family: var(--mono); font-weight: 400; color: var(--faint); }
+
+  /* Die Fussnote gehoert unter die Zahlen, nicht in einen eigenen Balken quer
+     ueber die Seite: Sie ist eine Randbemerkung, kein Bedienelement. */
+  .note {
+    margin-top: var(--gap); padding-top: 12px; border-top: 1px solid var(--line);
+    font-size: var(--t-label); line-height: 1.7; color: var(--faint);
+    display: flex; justify-content: space-between; align-items: center; gap: 10px;
+    flex-wrap: wrap;
+  }
+  .note a { color: var(--faint); text-decoration: underline; }
+  .note a:hover { color: var(--muted); }
+
+  .note button {
+    background: transparent; border: 0; padding: 0;
+    color: var(--faint); font-size: var(--t-label); text-decoration: underline;
+    cursor: pointer; font-family: inherit; white-space: nowrap;
+  }
+  .note button:hover { color: var(--muted); }
+
+  /* --------------------------------------------------- Isolierte Vorschau */
+  .viewer { position: fixed; inset: 0; z-index: 20; background: #04040a; display: none; }
+  .viewer.on { display: block; }
+
+  .vstage {
+    position: absolute; inset: 0;
+    display: flex; align-items: center; justify-content: center;
+    overflow: hidden; touch-action: none;
+  }
+  .vstage img { max-width: 94%; max-height: 84%; }
+
+  .vtools {
+    position: absolute; left: 50%; transform: translateX(-50%);
+    bottom: calc(18px + env(safe-area-inset-bottom));
+    display: flex; align-items: center; gap: 2px; padding: 4px;
+    background: rgba(11, 11, 20, .9); border: 1px solid var(--line);
+    border-radius: 12px; backdrop-filter: blur(8px);
+  }
+
+  .vclose {
+    position: absolute; right: 12px;
+    top: calc(12px + env(safe-area-inset-top));
+    width: 38px; height: 38px; border-radius: 50%;
+    background: rgba(11, 11, 20, .9); border: 1px solid var(--line);
+    color: var(--muted); font-size: 15px; cursor: pointer; line-height: 1;
+  }
+  .vclose:hover { color: var(--ink); background: var(--surface); }
+
+  /* ------------------------------------------------------------- Kennwort */
+  .ask {
+    position: fixed; inset: 0; z-index: 30;
+    /* Deckend, nicht durchscheinend: Wer nach einem Kennwort gefragt wird, soll
+       nichts sehen, was er ohne Kennwort nicht sehen duerfte. */
+    background: var(--bg);
+    display: none; align-items: center; justify-content: center; padding: 24px;
+  }
+  .ask.on { display: flex; }
+
+  .ask form {
+    background: var(--panel); border: 1px solid var(--line);
+    border-radius: 14px; padding: clamp(20px, 3vw, 30px);
+    width: 100%; max-width: 340px; text-align: center;
+  }
+  .ask h2 { margin: 0 0 8px; font-size: var(--t-mark); font-weight: 600; }
+  .ask p  { margin: 0 0 18px; font-size: var(--t-small); color: var(--muted); line-height: 1.6; }
+
+  .ask input {
+    width: 100%; padding: 11px 12px; text-align: center;
+    font-family: var(--mono); font-size: 16px; letter-spacing: .1em;
+    color: var(--ink); background: var(--surface);
+    border: 1px solid var(--line); border-radius: 9px;
+  }
+  .ask input:focus { outline: none; border-color: var(--accent); }
+
+  .ask button[type=submit] {
+    width: 100%; margin-top: 12px; padding: 11px;
+    font-size: var(--t-small); font-weight: 600; letter-spacing: .04em;
+    color: #0b0b14; background: var(--accent);
+    border: 0; border-radius: 9px; cursor: pointer;
+  }
+  .ask .wrong { color: var(--warn); font-size: var(--t-small); margin: 12px 0 0; min-height: 14px; }
+</style>
+</head>
+<body>
+
+<header>
+  <span class="dot" id="dot"></span>
+  <span class="mark">FrameFlip</span>
+  <button class="install" id="install">Install</button>
+  <span class="standing" id="standing">connecting …</span>
+</header>
+
+<main>
+  <div class="stage" id="stage">
+    <div class="empty" id="empty">No frame yet.</div>
+
+    <div class="tools" id="tools">
+      <button id="zoomOut" title="Zoom out" aria-label="Zoom out">−</button>
+      <span class="level" id="level">100 %</span>
+      <button id="zoomIn" title="Zoom in" aria-label="Zoom in">+</button>
+      <span class="sep"></span>
+      <button id="zoomFit" title="Fit" aria-label="Fit">⤢</button>
+    </div>
+  </div>
+
+  <div class="side">
+    <div class="state">
+      <span class="chip" id="chip">waiting</span>
+      <span class="scene" id="scene"></span>
+    </div>
+
+    <div class="headline">
+      <!-- Feste Bausteine, wechselnder Text.
+
+           Frueher wurde hier innerHTML zusammengesetzt - mit Werten, die aus der
+           Leitung kamen. Wer am anderen Ende sitzt, haette damit Markup einschleusen
+           koennen. Jetzt steht die Form im Dokument und es wechselt nur noch
+           textContent; einschleusen laesst sich dort nichts. -->
+      <span class="pct"><span id="percent">–</span><small>%</small></span>
+      <span class="frames"><b id="frameNow">–</b><span id="frameOf"></span></span>
+    </div>
+
+    <div class="bar"><i id="barFill"></i></div>
+
+    <div class="times">
+      <span>elapsed <b id="elapsed">–</b></span>
+      <span>remaining <b id="remaining">–</b></span>
+    </div>
+
+    <div class="grid">
+      <div class="cell"><label>Per frame</label><output id="spf">–</output></div>
+      <div class="cell"><label>Written</label><output id="written">–</output></div>
+      <div class="cell"><label>Samples</label><output id="sample">–</output></div>
+
+      <div class="rule"></div>
+
+      <div class="cell"><label>Resolution</label><output id="size">–</output></div>
+      <div class="cell"><label>Memory</label><output id="memory">–</output></div>
+      <div class="cell"><label>RAM free</label><output id="ram">–</output></div>
+
+      <div class="rule"></div>
+
+      <div class="cell"><label>CPU</label><output id="cpu">–</output></div>
+      <div class="cell"><label>GPU</label><output id="gpu">–</output></div>
+    </div>
+
+    <button class="save" id="save">↓ Save this frame <b id="saveName"></b></button>
+
+    <div class="note">
+      <span>View only · End-to-end encrypted</span>
+      <span>
+        <a href="../recht/datenschutz.html">Privacy</a> ·
+        <a href="../recht/nutzungsbedingungen.html">Terms</a>
+      </span>
+      <button id="forget" title="Remove this device's access">Forget access</button>
+    </div>
+  </div>
+</main>
+
+<!-- Die isolierte Vorschau. Eigene Flaeche, eigene Ansicht - damit das Bild nicht
+     mit der Seite um den Platz streiten muss. -->
+<div class="viewer" id="viewer" aria-hidden="true">
+  <div class="vstage" id="vstage"></div>
+
+  <div class="vtools">
+    <button id="vOut" title="Zoom out" aria-label="Zoom out">−</button>
+    <span class="level" id="vLevel">100 %</span>
+    <button id="vIn" title="Zoom in" aria-label="Zoom in">+</button>
+    <span class="sep"></span>
+    <button id="vLeft" title="Rotate left" aria-label="Rotate left">⟲</button>
+    <button id="vRight" title="Rotate right" aria-label="Rotate right">⟳</button>
+    <span class="sep"></span>
+    <button id="vFit" title="Fit" aria-label="Fit">⤢</button>
+    <button id="vSave" title="Save frame" aria-label="Save frame">↓</button>
+  </div>
+
+  <button class="vclose" id="vClose" title="Close" aria-label="Close">✕</button>
+</div>
+
+<div class="ask" id="ask">
+  <form id="askForm" autocomplete="off">
+    <h2>Password</h2>
+    <p>The open seats are taken. To watch as well, enter the password shown on the PC.</p>
+    <input id="askInput" type="password" inputmode="text" autocomplete="off"
+           autocapitalize="off" spellcheck="false" aria-label="Password">
+    <button type="submit">Watch</button>
+    <p class="wrong" id="askWrong"></p>
+  </form>
+</div>
+
+<script>
+"use strict";
+
+/* ===========================================================================
+   Das Protokoll steht in PROTOCOL.md des Relays. Diese Datei ist die zweite
+   Umsetzung davon - die erste ist FrameFlip selbst. Jede Abweichung hier ist ein
+   Bruch der Schnittstelle, kein Detail.
+
+   Was der Server dabei erfaehrt: eine Raumkennung. Sonst nichts. Das Geheimnis
+   steht hinter der Raute der Adresse, und diesen Teil schickt ein Browser
+   grundsaetzlich nicht mit - nicht im Aufruf, nicht im Referrer, nirgends.
+   =========================================================================== */
+
+const SEATS       = 6;                        // muss zu WatchKey.Seats passen
+const FREE_SEATS  = 2;                        // ... und zu WatchKey.FreeSeats
+const ROOM_INFO   = "frameflip/v1/watchroom";
+const SEAT_INFO   = "frameflip/v1/watchseat";
+const HOST_INFO   = "frameflip/v1/host";
+const CLIENT_INFO = "frameflip/v1/client";
+const CONFIRM_INFO = "frameflip/v2/confirm";
+
+const VERSION = 2;
+const SALT_BYTES = 16, TAG_BYTES = 16, COUNTER_BYTES = 8, NONCE_BYTES = 12;
+const OVERHEAD = COUNTER_BYTES + TAG_BYTES;
+
+const KIND_JSON = 0x01, KIND_PREVIEW = 0x02;
+
+const enc = new TextEncoder();
+
+/* ------------------------------------------------------------------ Kleinkram */
+
+function fromBase64Url(text) {
+  let s = String(text).replace(/-/g, "+").replace(/_/g, "/");
+  while (s.length % 4) s += "=";
+
+  const raw = atob(s);
+  const out = new Uint8Array(raw.length);
+  for (let i = 0; i < raw.length; i++) out[i] = raw.charCodeAt(i);
+  return out;
+}
+
+const toHex = bytes => Array.from(bytes, b => b.toString(16).padStart(2, "0")).join("");
+
+async function hkdf(secret, info, salt, bytes) {
+  const key = await crypto.subtle.importKey("raw", secret, "HKDF", false, ["deriveBits"]);
+  const bits = await crypto.subtle.deriveBits(
+    { name: "HKDF", hash: "SHA-256", salt: salt, info: enc.encode(info) }, key, bytes * 8);
+
+  return new Uint8Array(bits);
+}
+
+/* Der Nachweis, dass die Gegenseite denselben Schluessel hat. Bindet beide Salze
+   und die Rolle, damit ein Platzhalter im Raum nicht als echtes Geraet durchgeht. */
+async function confirmation(seatKey, senderIsHost, hostSalt, clientSalt) {
+  const info = enc.encode(CONFIRM_INFO);
+  const transcript = new Uint8Array(info.length + 1 + SALT_BYTES * 2);
+
+  transcript.set(info, 0);
+  transcript[info.length] = senderIsHost ? 1 : 2;
+  transcript.set(hostSalt, info.length + 1);
+  transcript.set(clientSalt, info.length + 1 + SALT_BYTES);
+
+  const key = await crypto.subtle.importKey(
+    "raw", seatKey, { name: "HMAC", hash: "SHA-256" }, false, ["sign"]);
+
+  return new Uint8Array(await crypto.subtle.sign("HMAC", key, transcript));
+}
+
+function sameBytes(a, b) {
+  if (a.length !== b.length) return false;
+
+  // Ohne fruehen Ausstieg. Hier haengt zwar nichts Geheimes an der Laufzeit, aber
+  // ein Vergleich von Pruefsummen, der bei der ersten Abweichung aufhoert, ist eine
+  // Angewohnheit, die man sich an der falschen Stelle teuer bezahlt.
+  let diff = 0;
+  for (let i = 0; i < a.length; i++) diff |= a[i] ^ b[i];
+  return diff === 0;
+}
+
+/* ------------------------------------------------------- Der verschluesselte Kanal */
+
+class Channel {
+  constructor(sendKey, receiveKey) {
+    this.sendKey = sendKey;
+    this.receiveKey = receiveKey;
+    this.next = 0n;
+    this.lastSeen = 0n;
+    this.sawAny = false;
+  }
+
+  static async establish(seatKey, hostSalt, clientSalt) {
+    const salt = new Uint8Array(SALT_BYTES * 2);
+    salt.set(hostSalt, 0);
+    salt.set(clientSalt, SALT_BYTES);
+
+    // Wir sind der Client: Wir senden mit dem Client-Schluessel und lesen den des Hosts.
+    const mine  = await hkdf(seatKey, CLIENT_INFO, salt, 32);
+    const yours = await hkdf(seatKey, HOST_INFO, salt, 32);
+
+    const usable = raw => crypto.subtle.importKey(
+      "raw", raw, { name: "AES-GCM" }, false, ["encrypt", "decrypt"]);
+
+    return new Channel(await usable(mine), await usable(yours));
+  }
+
+  async seal(payload) {
+    const frame = new Uint8Array(OVERHEAD + payload.length);
+    new DataView(frame.buffer).setBigUint64(0, this.next++, false);
+
+    const nonce = new Uint8Array(NONCE_BYTES);
+    nonce.set(frame.subarray(0, COUNTER_BYTES), NONCE_BYTES - COUNTER_BYTES);
+
+    const sealed = new Uint8Array(await crypto.subtle.encrypt(
+      { name: "AES-GCM", iv: nonce, additionalData: frame.subarray(0, COUNTER_BYTES), tagLength: 128 },
+      this.sendKey, payload));
+
+    // WebCrypto haengt die Pruefsumme hinten an, auf der Leitung steht sie vorn.
+    frame.set(sealed.subarray(sealed.length - TAG_BYTES), COUNTER_BYTES);
+    frame.set(sealed.subarray(0, sealed.length - TAG_BYTES), OVERHEAD);
+
+    return frame;
+  }
+
+  async open(frame) {
+    if (frame.length < OVERHEAD) return null;
+
+    const counter = new DataView(frame.buffer, frame.byteOffset, frame.byteLength).getBigUint64(0, false);
+    if (this.sawAny && counter <= this.lastSeen) return null;
+
+    const nonce = new Uint8Array(NONCE_BYTES);
+    nonce.set(frame.subarray(0, COUNTER_BYTES), NONCE_BYTES - COUNTER_BYTES);
+
+    const body = new Uint8Array(frame.length - OVERHEAD + TAG_BYTES);
+    body.set(frame.subarray(OVERHEAD), 0);
+    body.set(frame.subarray(COUNTER_BYTES, OVERHEAD), frame.length - OVERHEAD);
+
+    let plain;
+    try {
+      plain = await crypto.subtle.decrypt(
+        { name: "AES-GCM", iv: nonce, additionalData: frame.subarray(0, COUNTER_BYTES), tagLength: 128 },
+        this.receiveKey, body);
+    } catch (e) {
+      return null;   // falscher Schluessel oder verfaelscht - beides derselbe Fall
+    }
+
+    // Erst jetzt weiterzaehlen. Andernfalls koennte ein Fremder mit einer erfundenen
+    // hohen Zahl die echte Gegenseite fuer den Rest der Sitzung aussperren.
+    this.lastSeen = counter;
+    this.sawAny = true;
+
+    return new Uint8Array(plain);
+  }
+}
+
+/* --------------------------------------------------------------- Das Geheimnis */
+
+/* Aus der Adresse holen und sofort daraus entfernen.
+
+   Der Sinn ist handfest: Danach steht in der Adresszeile nur noch der Pfad. Ein
+   Screenshot vom Handy verraet nichts, der Verlauf behaelt nichts, und wer kurz
+   ueber die Schulter sieht, sieht nichts.
+
+   Abgelegt wird im localStorage, nicht nur fuer die Sitzung. Das ist noetig, damit
+   die Seite sich installieren laesst: Ein installiertes Programm startet unter
+   seiner eigenen Adresse, ohne Raute - ohne bleibende Ablage waere es bei jedem
+   Start leer. Wer das nicht will, hat unten "Forget access". */
+const KEY_SECRET = "frameflip.watch.key";
+const KEY_CODE = "frameflip.watch.code";
+
+function keep(name, value) {
+  try {
+    if (value) localStorage.setItem(name, value);
+    else localStorage.removeItem(name);
+  } catch (e) { /* privates Fenster: dann eben nur fuer diesen Besuch */ }
+}
+
+function kept(name) {
+  try { return localStorage.getItem(name) || ""; } catch (e) { return ""; }
+}
+
+function secretFromAddress() {
+  const raw = location.hash.replace(/^#/, "").trim();
+
+  if (raw) {
+    keep(KEY_SECRET, raw);
+
+    // Ein neuer Link heisst auch: das alte Kennwort passt womoeglich nicht mehr.
+    keep(KEY_CODE, "");
+
+    history.replaceState(null, "", location.pathname);
+    return raw;
+  }
+
+  return kept(KEY_SECRET);
+}
+
+const rememberedCode = () => kept(KEY_CODE);
+const rememberCode = code => keep(KEY_CODE, code);
+
+/* ------------------------------------------------------------------- Anzeige */
+
+const el = id => document.getElementById(id);
+const dot = el("dot"), standing = el("standing"), stage = el("stage"), empty = el("empty");
+const tools = el("tools"), viewer = el("viewer"), vstage = el("vstage");
+
+const clamp = (v, lo, hi) => Math.min(hi, Math.max(lo, v));
+
+let pictureUrl = null;   // die derzeitige blob-Adresse des Bildes
+let lastJpeg = null;     // die Bytes, fuer das Sichern
+let lastState = null;
+
+function say(text, mood) {
+  standing.textContent = text;
+  dot.className = "dot" + (mood ? " " + mood : "");
+}
+
+function clock(seconds) {
+  if (seconds === undefined || seconds === null) return "–";
+
+  const s = Math.max(0, Math.round(seconds));
+  const h = Math.floor(s / 3600), m = Math.floor((s % 3600) / 60), r = s % 60;
+
+  return h > 0
+    ? h + ":" + String(m).padStart(2, "0") + ":" + String(r).padStart(2, "0")
+    : m + ":" + String(r).padStart(2, "0");
+}
+
+const put = (id, text) => { el(id).textContent = text; };
+
+/* Was von der Gegenseite kommt, wird NICHT geglaubt.
+
+   Der Kanal ist verschluesselt und beglaubigt - wer hier hereinredet, hat den
+   Schluessel. Das ist aber kein Grund, seinen Zahlen zu trauen: Der Link fuer die
+   freien Plaetze ist ein Ausweis zum Weitergeben, und laeuft FrameFlip gerade
+   nicht, kann jemand mit diesem Link den leeren Host-Platz einnehmen und dem
+   naechsten Zuschauer liefern, was er will. Aus einer erfundenen Bildnummer soll
+   dann trotzdem nur eine Zeichenkette werden und niemals Markup oder ein Befehl.
+
+   Deshalb zwei Schleusen: zahl() laesst ausschliesslich endliche Zahlen durch,
+   text() schneidet Zeichenketten auf eine Laenge, die eine Zeile nicht sprengt. */
+function zahl(wert) {
+  return typeof wert === "number" && Number.isFinite(wert) ? wert : null;
+}
+
+function ganz(wert) {
+  const n = zahl(wert);
+  return n === null ? null : Math.trunc(n);
+}
+
+function text(wert, grenze) {
+  return typeof wert === "string" ? wert.slice(0, grenze || 60) : "";
+}
+
+function show(state) {
+  // JSON.parse liefert auch null, Zahlen oder Listen. Nur ein Objekt ist ein Zustand.
+  if (!state || typeof state !== "object" || Array.isArray(state)) return;
+
+  lastState = state;
+
+  const busy = state.rendering === true;
+  const prozent = zahl(state.percent);
+  const bild = ganz(state.frame);
+
+  el("chip").className = "chip " + (busy ? "live" : "idle");
+  el("chip").textContent = busy ? (text(state.activity, 24) || "rendering") : "ready";
+
+  el("scene").textContent = text(state.scene, 60);
+
+  put("percent", prozent === null ? "–" : prozent.toFixed(1));
+  el("barFill").style.width = clamp(prozent === null ? 0 : prozent, 0, 100) + "%";
+
+  put("frameNow", bild === null ? "–" : String(bild));
+  put("frameOf", bild !== null && ganz(state.last) !== null ? " / " + ganz(state.last) : "");
+
+  put("elapsed", clock(zahl(state.elapsed)));
+  put("remaining", busy ? clock(zahl(state.remaining)) : "–");
+
+  const jeBild = zahl(state.secondsPerFrame);
+  put("spf", jeBild === null ? "–" : jeBild.toFixed(2) + " s");
+
+  const geschrieben = ganz(state.written);
+  put("written", geschrieben === null ? "–" : String(geschrieben));
+
+  const probe = ganz(state.sample), proben = ganz(state.sampleTotal);
+  put("sample", probe === null ? "–" : probe + (proben === null ? "" : " / " + proben));
+
+  const breite = ganz(state.width), höhe = ganz(state.height);
+  put("size", breite === null || höhe === null ? "–" : breite + " × " + höhe);
+
+  const speicher = zahl(state.memoryMb);
+  put("memory", speicher === null ? "–" : Math.round(speicher) + " MB");
+
+  const cpu = zahl(state.cpu), gpu = zahl(state.gpu);
+  put("cpu", cpu === null ? "–" : cpu.toFixed(0) + " %");
+  put("gpu", gpu === null ? "–" : gpu.toFixed(0) + " %");
+
+  const frei = zahl(state.freeMb), gesamt = zahl(state.totalMb);
+  put("ram", frei === null ? "–"
+    : (frei / 1024).toFixed(1) + (gesamt === null ? "" : " / " + (gesamt / 1024).toFixed(0)) + " GB");
+
+  put("saveName", dateiname());
+
+  say(busy ? (text(state.activity, 24) || "rendering") : "ready", busy ? "live" : "idle");
+}
+
+/* ----------------------------------------------------------------- Ansichten
+
+   EINE Ansicht, zweimal eingehaengt: auf der Buehne und in der isolierten
+   Vorschau. Zwei Umsetzungen desselben Gedankens waeren zwei Orte, an denen
+   dieselbe Rechnung schiefgehen kann - und die Rechnung ist hier der ganze Punkt.
+
+   Gerechnet wird durchweg gegen die MITTE der Flaeche, nie gegen den Kasten des
+   Bildes. Der wandert ja mit der Verschiebung mit; wer gegen ihn rechnet, jagt
+   seinem eigenen Ergebnis hinterher. Aus demselben Grund steht im Stil KEIN
+   transform-origin - die Voreinstellung ist die Mitte. */
+function macheAnsicht(flaeche, anzeige, { drehbar = false, beiKlick = null } = {}) {
+  let bild = null;
+  let maß = 1, tx = 0, ty = 0, dreh = 0;
+
+  /* Wie weit sich das Bild schieben laesst.
+
+     Der Betrag der Differenz, nicht nur der Ueberstand. Das ist der Unterschied,
+     an dem es haengt: Ist das Bild kleiner als die Flaeche, war es frueher starr
+     in der Mitte festgenagelt - und der Punkt unter dem Zeiger konnte gar nicht
+     dort bleiben. Es zog erst zur Mitte und dann langsam zum Zeiger, genau wie es
+     sich angefuehlt hat. Jetzt darf es sich auch im freien Raum bewegen, solange
+     es die Flaeche nicht verlaesst. */
+  function grenzen() {
+    if (!bild) return;
+
+    const f = flaeche.getBoundingClientRect();
+    const quer = dreh % 180 !== 0;
+
+    const breite = (quer ? bild.clientHeight : bild.clientWidth) * maß;
+    const höhe = (quer ? bild.clientWidth : bild.clientHeight) * maß;
+
+    /* Der Betrag allein ergibt ein V: Ist das Bild viel kleiner oder viel groesser
+       als die Flaeche, gibt es reichlich Raum - aber genau dort, wo beide ungefaehr
+       gleich gross sind, geht er gegen null. Und das ist der Zoomschritt, in dem
+       der Punkt unter dem Zeiger am weitesten wegrutscht: Er braucht dort umso mehr
+       Verschiebung, je weiter er von der Mitte weg liegt.
+
+       Ein Viertel der Flaeche als Untergrenze fuellt diese Senke. Mehr als ein
+       Viertel kann das Bild dadurch nie aus der Mitte wandern - es bleibt immer weit
+       ueberwiegend zu sehen, und der Zeiger trifft trotzdem. */
+    const x = Math.max(Math.abs(breite - f.width) / 2, f.width * 0.25);
+    const y = Math.max(Math.abs(höhe - f.height) / 2, f.height * 0.25);
+
+    tx = clamp(tx, -x, x);
+    ty = clamp(ty, -y, y);
+  }
+
+  function anwenden() {
+    if (!bild) return;
+
+    grenzen();
+
+    // Die Reihenfolge zaehlt: erst skalieren, dann drehen, dann verschieben.
+    // Dadurch bleibt die Verschiebung in Bildschirmrichtung, auch wenn das Bild
+    // hochkant steht - sonst zoege ein Zug nach rechts es nach unten.
+    bild.style.transform = `translate(${tx}px, ${ty}px) rotate(${dreh}deg) scale(${maß})`;
+    bild.className = maß > passend() * 1.01 ? "grab" : "";
+
+    if (anzeige) anzeige.textContent = Math.round(maß * 100) + " %";
+  }
+
+  /* Der kleinste sinnvolle Maßstab: so, dass das Bild ganz hineinpasst.
+
+     Nach einer Vierteldrehung tauschen Breite und Höhe - ein liegendes Bild
+     braucht hochkant deutlich weniger Maßstab, um noch ganz zu sein. */
+  function passend() {
+    if (!bild || !bild.clientWidth) return 1;
+    if (dreh % 180 === 0) return 1;   // ungedreht passt es durch das Layout schon
+
+    const f = flaeche.getBoundingClientRect();
+
+    return Math.min(1, Math.min(f.width / bild.clientHeight, f.height / bild.clientWidth));
+  }
+
+  /* Zoomen dorthin, wo der Zeiger ist.
+
+     Der Punkt unter dem Zeiger soll unter dem Zeiger BLEIBEN - vom ersten Schritt
+     an, nicht erst, wenn genug Ueberstand da ist. Mit p als Abstand des Zeigers
+     von der Mitte und k als Aenderung des Maßstabs ist die neue Verschiebung
+     t' = p - k * (p - t). */
+  function zoom(ziel, cx, cy) {
+    if (!bild) return;
+
+    const klein = passend();
+    const next = clamp(ziel, klein, klein * 12);
+    const k = next / maß;
+
+    if (cx === undefined) {
+      tx *= k;
+      ty *= k;
+    } else {
+      const f = flaeche.getBoundingClientRect();
+      const px = cx - (f.left + f.width / 2);
+      const py = cy - (f.top + f.height / 2);
+
+      tx = px - k * (px - tx);
+      ty = py - k * (py - ty);
+    }
+
+    maß = next;
+    anwenden();
+  }
+
+  function einpassen() {
+    maß = passend();
+    tx = 0;
+    ty = 0;
+    anwenden();
+  }
+
+  function drehen(schritt) {
+    if (!drehbar) return;
+
+    dreh = (dreh + schritt + 360) % 360;
+    einpassen();
+  }
+
+  function setzeBild(url, behalten) {
+    if (!bild) {
+      bild = document.createElement("img");
+      bild.alt = "";
+      bild.addEventListener("dblclick", event => {
+        const klein = passend();
+        zoom(maß > klein * 1.01 ? klein : klein * 2.5, event.clientX, event.clientY);
+      });
+      flaeche.appendChild(bild);
+    }
+
+    bild.src = url;
+
+    // Beim Bildwechsel wird Zoom und Drehung NICHT zurueckgesetzt: Wer sich gerade
+    // eine Ecke ansieht, will beim naechsten Frame dieselbe Ecke sehen.
+    if (!behalten) {
+      dreh = 0;
+      if (bild.complete && bild.clientWidth) einpassen();
+      else bild.onload = einpassen;
+    }
+  }
+
+  function weg() {
+    if (bild) { bild.remove(); bild = null; }
+    maß = 1; tx = 0; ty = 0; dreh = 0;
+    if (anzeige) anzeige.textContent = "100 %";
+  }
+
+  // ---------------------------------------------------------- Rad und Finger
+
+  flaeche.addEventListener("wheel", event => {
+    if (!bild) return;
+
+    event.preventDefault();
+    zoom(maß * (event.deltaY < 0 ? 1.18 : 1 / 1.18), event.clientX, event.clientY);
+  }, { passive: false });
+
+  const zeiger = new Map();
+  let greifpunkt = null, kneifAbstand = 0, kneifStart = 1, gezogen = 0;
+
+  flaeche.addEventListener("pointerdown", event => {
+    if (!bild) return;
+
+    zeiger.set(event.pointerId, { x: event.clientX, y: event.clientY });
+    flaeche.setPointerCapture(event.pointerId);
+
+    if (zeiger.size === 1) {
+      greifpunkt = { x: event.clientX - tx, y: event.clientY - ty };
+      gezogen = 0;
+      bild.className = "grabbing";
+    }
+
+    if (zeiger.size === 2) {
+      const [a, b] = Array.from(zeiger.values());
+      kneifAbstand = Math.hypot(a.x - b.x, a.y - b.y);
+      kneifStart = maß;
+      greifpunkt = null;
+    }
+  });
+
+  flaeche.addEventListener("pointermove", event => {
+    if (!zeiger.has(event.pointerId)) return;
+
+    const vorher = zeiger.get(event.pointerId);
+    zeiger.set(event.pointerId, { x: event.clientX, y: event.clientY });
+
+    if (zeiger.size === 2) {
+      const [a, b] = Array.from(zeiger.values());
+      const jetzt = Math.hypot(a.x - b.x, a.y - b.y);
+
+      if (kneifAbstand > 0) zoom(kneifStart * (jetzt / kneifAbstand), (a.x + b.x) / 2, (a.y + b.y) / 2);
+
+      return;
+    }
+
+    if (greifpunkt) {
+      gezogen += Math.hypot(event.clientX - vorher.x, event.clientY - vorher.y);
+      tx = event.clientX - greifpunkt.x;
+      ty = event.clientY - greifpunkt.y;
+      anwenden();
+    }
+  });
+
+  function loslassen(event) {
+    const war = zeiger.size;
+    zeiger.delete(event.pointerId);
+
+    if (zeiger.size < 2) kneifAbstand = 0;
+
+    if (zeiger.size === 0) {
+      greifpunkt = null;
+      if (bild) anwenden();
+
+      // Ein Zug ist kein Klick. Nur wer das Bild nicht bewegt hat, wollte es
+      // oeffnen - sonst kaeme die Vorschau nach jedem Verschieben hoch.
+      if (war === 1 && gezogen < 5 && beiKlick) beiKlick();
+    }
+  }
+
+  flaeche.addEventListener("pointerup", loslassen);
+  flaeche.addEventListener("pointercancel", loslassen);
+
+  return { setzeBild, weg, zoom, einpassen, drehen, anwenden, maß: () => maß };
+}
+
+const bühne = macheAnsicht(stage, el("level"), { beiKlick: openViewer });
+const groß = macheAnsicht(vstage, el("vLevel"), { drehbar: true });
+
+function showPicture(jpeg) {
+  lastJpeg = jpeg;
+
+  const next = URL.createObjectURL(new Blob([jpeg], { type: "image/jpeg" }));
+
+  bühne.setzeBild(next, true);
+  empty.style.display = "none";
+  tools.classList.add("on");
+  el("save").classList.add("on");
+  put("saveName", dateiname());
+
+  if (viewer.classList.contains("on")) groß.setzeBild(next, true);
+
+  // Die alte Adresse erst freigeben, wenn die neue steht - sonst blitzt es weiss auf.
+  const old = pictureUrl;
+  pictureUrl = next;
+  if (old) setTimeout(() => URL.revokeObjectURL(old), 1000);
+}
+
+/* Alles vom Bildschirm nehmen.
+
+   Wird gerufen, bevor nach einem Kennwort gefragt wird. Ohne das staende hinter der
+   Abfrage noch, was eine fruehere Verbindung geliefert hat - und ein Kennwort, das
+   man umgehen kann, indem man dahinterschaut, ist keines. */
+function blank() {
+  closeViewer();
+
+  bühne.weg();
+  groß.weg();
+
+  if (pictureUrl) { URL.revokeObjectURL(pictureUrl); pictureUrl = null; }
+
+  lastJpeg = null;
+  lastState = null;
+
+  tools.classList.remove("on");
+  el("save").classList.remove("on");
+  empty.style.display = "";
+  empty.textContent = "No frame yet.";
+
+  el("chip").className = "chip";
+  el("chip").textContent = "waiting";
+  el("scene").textContent = "";
+  put("percent", "–");
+  put("frameNow", "–");
+  put("frameOf", "");
+  el("barFill").style.width = "0%";
+
+  for (const id of ["elapsed", "remaining", "spf", "written", "sample", "size", "memory", "cpu", "gpu", "ram"]) {
+    put(id, "–");
+  }
+}
+
+/* ------------------------------------------------------- Die isolierte Vorschau */
+
+function openViewer() {
+  if (!pictureUrl) return;
+
+  viewer.classList.add("on");
+  viewer.setAttribute("aria-hidden", "false");
+
+  groß.setzeBild(pictureUrl, false);
+}
+
+function closeViewer() {
+  viewer.classList.remove("on");
+  viewer.setAttribute("aria-hidden", "true");
+}
+
+el("zoomIn").onclick = () => bühne.zoom(bühne.maß() * 1.5);
+el("zoomOut").onclick = () => bühne.zoom(bühne.maß() / 1.5);
+el("zoomFit").onclick = () => bühne.einpassen();
+
+el("vClose").onclick = closeViewer;
+el("vIn").onclick = () => groß.zoom(groß.maß() * 1.5);
+el("vOut").onclick = () => groß.zoom(groß.maß() / 1.5);
+el("vFit").onclick = () => groß.einpassen();
+el("vLeft").onclick = () => groß.drehen(-90);
+el("vRight").onclick = () => groß.drehen(90);
+
+// Ein Klick neben das Bild schließt - auf das Bild selbst nicht.
+vstage.addEventListener("click", event => { if (event.target === vstage) closeViewer(); });
+
+addEventListener("keydown", event => {
+  if (!viewer.classList.contains("on")) return;
+
+  if (event.key === "Escape") closeViewer();
+  else if (event.key === "+" || event.key === "=") groß.zoom(groß.maß() * 1.5);
+  else if (event.key === "-") groß.zoom(groß.maß() / 1.5);
+  else if (event.key === "0") groß.einpassen();
+});
+
+addEventListener("resize", () => { bühne.anwenden(); groß.anwenden(); });
+
+/* ------------------------------------------------------------------- Sichern */
+
+/* Der Dateiname entsteht aus einer geprueften Zahl, nicht aus dem, was ankam.
+
+   Eine Zeichenkette von der Gegenseite haette hier als Dateiname gelandet. Browser
+   raeumen so etwas zwar auf, aber ein Name, der aus fremder Hand stammt, hat in
+   einem Download nichts zu suchen. */
+function dateiname() {
+  const nummer = lastState ? ganz(lastState.frame) : null;
+
+  return "frameflip_" + (nummer === null ? "current" : String(nummer).padStart(4, "0")) + ".jpg";
+}
+
+function sichern() {
+  if (!lastJpeg) return;
+
+  const url = URL.createObjectURL(new Blob([lastJpeg], { type: "image/jpeg" }));
+  const a = document.createElement("a");
+
+  a.href = url;
+  a.download = dateiname();
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+
+  setTimeout(() => URL.revokeObjectURL(url), 2000);
+}
+
+el("save").onclick = sichern;
+el("vSave").onclick = sichern;
+
+el("forget").onclick = () => {
+  keep(KEY_SECRET, "");
+  keep(KEY_CODE, "");
+  location.reload();
+};
+
+/* ---------------------------------------------------------------- Ablegen
+
+   Der Knopf erscheint nur, wenn der Browser das Ablegen auch anbietet. Ihn immer
+   zu zeigen und dann nichts zu tun, waere die schlechtere Auskunft.
+
+   Auf einem iPhone gibt es dieses Ereignis nicht - dort fuehrt der Weg ueber
+   "Teilen" und "Zum Home-Bildschirm". Das steht dann als Hinweis in der Fusszeile,
+   statt einen Knopf anzubieten, der nichts bewirkt. */
+let ablegen = null;
+
+addEventListener("beforeinstallprompt", event => {
+  event.preventDefault();
+  ablegen = event;
+  el("install").classList.add("on");
+});
+
+el("install").onclick = async () => {
+  if (!ablegen) return;
+
+  ablegen.prompt();
+  await ablegen.userChoice;
+
+  ablegen = null;
+  el("install").classList.remove("on");
+};
+
+addEventListener("appinstalled", () => el("install").classList.remove("on"));
+
+const Result = {
+  Paired: "paired",    // drin, Kanal steht
+  Taken: "taken",      // hier sitzt schon jemand
+  Alone: "alone",      // Raum da, aber kein FrameFlip
+  Blocked: "blocked",  // die Verbindung kam gar nicht erst zustande
+  Broken: "broken",    // sie stand und ist abgerissen
+  Wrong: "wrong"       // falscher Schluessel - Kennwort oder alter Link
+};
+
+/* Jede offene Verbindung dieser Seite.
+
+   Sie werden mitgezaehlt, damit beim Verlassen der Seite wirklich alle zugehen.
+   Ein Platz, den niemand mehr benutzt, aber auch niemand freigibt, ist aus Sicht
+   des Leuchtturms besetzt - und der naechste Zuschauer steht davor. Auf einem Handy
+   ist das der Normalfall und nicht die Ausnahme: Der Reiter wandert in den
+   Hintergrund, die Verbindung bleibt und beantwortet brav jeden Ping. */
+const live = new Set();
+
+function drop(socket) {
+  live.delete(socket);
+  try { socket.close(); } catch (e) { /* war schon zu */ }
+}
+
+addEventListener("pagehide", () => {
+  for (const socket of Array.from(live)) drop(socket);
+});
+
+/* Ein Versuch auf einem Platz.
+
+   Aufgeloest wird mit ZWEI Dingen: dem Ausgang - und einem Versprechen, das erst
+   faellt, wenn die Verbindung endet. Das zweite ist nicht Beiwerk. Ohne es weiss
+   der aeussere Lauf nicht, wann er wieder anfangen soll; er suchte nach kurzer Pause
+   munter weiter, waehrend er laengst verbunden war, faende seinen eigenen Platz als
+   besetzt vor, naehme den naechsten - und haette nach ein paar Runden alle sechs
+   Plaetze selbst belegt. Genau das ist passiert. */
+function trySeat(room, seatKey) {
+  return new Promise(resolve => {
+    // Dasselbe Schema wie die Seite selbst. Steht sie auf https - und im Betrieb
+    // tut sie das -, ist es wss. Auf dem eigenen Rechner zum Pruefen ist es ws.
+    const scheme = location.protocol === "https:" ? "wss://" : "ws://";
+
+    let socket;
+
+    try {
+      socket = new WebSocket(scheme + location.host + "/r/" + room + "?role=client");
+    } catch (e) {
+      resolve({ outcome: Result.Blocked, closed: Promise.resolve() });
+      return;
+    }
+
+    socket.binaryType = "arraybuffer";
+    live.add(socket);
+
+    let channel = null, mySalt = null, theirSalt = null, confirmed = false;
+    let settled = false;
+
+    // Ob die Verbindung ueberhaupt zustande kam. Der Unterschied ist wichtig: Ein
+    // Aufbau, der nie gelingt, ist etwas ganz anderes als ein belegter Platz - und
+    // er darf niemals nach einem Kennwort fragen lassen.
+    let opened = false;
+
+    /* Wie lange der Platz gehalten wird, wenn FrameFlip aus dem Raum verschwindet.
+
+       Kurz sitzenbleiben lohnt sich: Wer neu laedt, kurz das Netz wechselt oder
+       FrameFlip neu startet, ist in Sekunden zurueck, und der Zuschauer ist ohne
+       Suchen wieder dabei.
+
+       Ewig sitzenbleiben lohnt sich nicht. Ein Raum gilt beim Leuchtturm als belegt,
+       solange irgendjemand darin sitzt - auch ein vergessener Reiter auf einem Handy,
+       dessen PC seit Tagen aus ist. Nach dieser Frist wird der Platz also
+       zurueckgegeben und ganz normal weitergesucht; kommt FrameFlip wieder, ist die
+       Seite binnen Sekunden zurueck. */
+    const HOLD_WITHOUT_HOST = 20000;
+
+    let waiting = null;
+
+    let ended;
+    const closed = new Promise(fall => { ended = fall; });
+
+    const done = outcome => {
+      if (settled) return;
+      settled = true;
+
+      // Alles ausser dem Platz, den wir behalten wollen, wird SOFORT freigegeben.
+      // Ein aufgegebener Versuch, dessen Verbindung offen bleibt, belegt einen Platz
+      // fuer niemanden.
+      if (outcome !== Result.Paired) drop(socket);
+
+      resolve({ outcome, closed });
+    };
+
+    socket.onopen = () => { opened = true; };
+
+    socket.onerror = () => done(opened ? Result.Broken : Result.Blocked);
+
+    /* Nachrichten NACHEINANDER, nicht durcheinander.
+
+       onmessage darf async sein - aber dann ruft der Browser es erneut auf, sobald
+       der laufende Aufruf auf das erste await trifft. Und genau das passiert hier:
+       Begruessung und Schluesselnachweis kommen dicht hintereinander, der Aufbau des
+       Kanals braucht vier await. Trifft der Nachweis in dieses Fenster, gibt es den
+       Kanal noch nicht; er faellt durch die Pruefung auf eine Begruessung, wird
+       verworfen, und die Verbindung haengt fuer immer - ohne Fehler, ohne Meldung. */
+    let pending = Promise.resolve();
+
+    socket.onmessage = event => {
+      pending = pending.then(() => handle(event)).catch(() => { /* eine kaputte Nachricht beendet nicht die Leitung */ });
+    };
+
+    socket.onclose = () => {
+      live.delete(socket);
+
+      if (waiting) { clearTimeout(waiting); waiting = null; }
+
+      // Hinten anstellen, nicht vordraengeln: Der Leuchtturm schickt seine
+      // Abweisung als Text und schliesst unmittelbar danach. Wer hier sofort
+      // entscheidet, kommt der noch wartenden Meldung zuvor und macht aus
+      // "Platz belegt" ein "Schluessel falsch".
+      pending = pending.then(() => {
+        if (!opened) done(Result.Blocked);
+        else {
+          done(confirmed ? Result.Broken : Result.Wrong);
+          if (confirmed) say("connection lost", "gone");
+        }
+
+        ended();
+      });
+    };
+
+    async function handle(event) {
+      // Text gehoert dem Leuchtturm, Binaer der Gegenseite. Der Rahmentyp
+      // entscheidet, nie der Inhalt.
+      if (typeof event.data === "string") {
+        let control;
+        try { control = JSON.parse(event.data); } catch (e) { return; }
+
+        if (control.t === "error") {
+          // "role already taken" heisst: hier sitzt schon jemand. Alles andere ist
+          // eine Abweisung, die ein anderer Platz auch nicht heilt.
+          done(/taken|full/i.test(control.why || "") ? Result.Taken : Result.Broken);
+          return;
+        }
+
+        if (control.t === "waiting") {
+          // Wir sind drin, aber FrameFlip nicht. Auf einem der freien Plaetze heisst
+          // das: Das Programm laeuft nicht. Auf einem hinteren: Es ist kein Kennwort
+          // gesetzt, also gibt es diesen Platz gar nicht.
+          done(Result.Alone);
+          return;
+        }
+
+        if (control.t === "peer" && control.up) {
+          // Er ist zurueck - der Platz wird nicht mehr zurueckgegeben.
+          if (waiting) { clearTimeout(waiting); waiting = null; }
+
+          mySalt = crypto.getRandomValues(new Uint8Array(SALT_BYTES));
+
+          const hello = new Uint8Array(1 + SALT_BYTES);
+          hello[0] = VERSION;
+          hello.set(mySalt, 1);
+
+          socket.send(hello);
+          return;
+        }
+
+        if (control.t === "peer" && !control.up) {
+          say("FrameFlip is gone", "gone");
+          channel = null;
+          confirmed = false;
+
+          /* Den Platz nach einer Frist zurueckgeben.
+
+             Geschlossen wird, nicht aufgegeben: Das Schliessen loest "closed" aus,
+             der aeussere Lauf faengt von vorn an, findet den Raum leer und sagt
+             genau das - "FrameFlip is unreachable" - waehrend er weiter nachfragt.
+             Die Auskunft bleibt also stehen; nur der Raum ist wieder frei. */
+          if (!waiting) waiting = setTimeout(() => { waiting = null; drop(socket); }, HOLD_WITHOUT_HOST);
+        }
+
+        return;
+      }
+
+      const data = new Uint8Array(event.data);
+
+      /* --- 1. Die Begruessung der Gegenseite: offen, Fassung und Salz --- */
+      if (!channel) {
+        if (data.length !== 1 + SALT_BYTES || data[0] !== VERSION) return;
+
+        theirSalt = data.subarray(1);
+        channel = await Channel.establish(seatKey, theirSalt, mySalt);
+
+        socket.send(await channel.seal(await confirmation(seatKey, false, theirSalt, mySalt)));
+        return;
+      }
+
+      /* --- 2. Ihr Schluesselnachweis. Stimmt er nicht, ist es der falsche Schluessel --- */
+      if (!confirmed) {
+        const proof = await channel.open(data);
+        const expected = await confirmation(seatKey, true, theirSalt, mySalt);
+
+        if (!proof || !sameBytes(proof, expected)) {
+          channel = null;
+          done(Result.Wrong);
+          return;
+        }
+
+        confirmed = true;
+        done(Result.Paired);
+        say("connected", "idle");
+        return;
+      }
+
+      /* --- 3. Von hier an nur noch Nutzlast --- */
+      const payload = await channel.open(data);
+      if (!payload || payload.length < 1) return;
+
+      const kind = payload[0];
+
+      if (kind === KIND_JSON) {
+        try { show(JSON.parse(new TextDecoder().decode(payload.subarray(1)))); }
+        catch (e) { /* eine unleserliche Meldung ist kein Grund aufzuhoeren */ }
+        return;
+      }
+
+      if (kind === KIND_PREVIEW && payload.length > 5) {
+        showPicture(payload.subarray(5));   // 1 Byte Art, 4 Byte Bildnummer
+      }
+    }
+  });
+}
+
+/* --------------------------------------------------------------- Platz suchen */
+
+const ask = el("ask"), askForm = el("askForm"), askInput = el("askInput"), askWrong = el("askWrong");
+
+function askForCode(message) {
+  return new Promise(resolve => {
+    // Erst leeren, dann fragen - sonst steht hinter der Abfrage noch, was eine
+    // fruehere Verbindung geliefert hat.
+    blank();
+
+    askWrong.textContent = message || "";
+    askInput.value = "";
+    ask.classList.add("on");
+    setTimeout(() => askInput.focus(), 50);
+
+    askForm.onsubmit = event => {
+      event.preventDefault();
+
+      const typed = askInput.value.trim();
+      if (!typed) return;
+
+      ask.classList.remove("on");
+      resolve(typed);
+    };
+  });
+}
+
+async function run() {
+  const text = secretFromAddress();
+
+  if (!text) {
+    say("link incomplete", "gone");
+    empty.textContent = "This link carries no secret. Create a new one on the PC and copy all of it.";
+    return;
+  }
+
+  let secret;
+  try {
+    secret = fromBase64Url(text);
+    if (secret.length !== 32) throw new Error("Länge");
+  } catch (e) {
+    say("link unusable", "gone");
+    empty.textContent = "There is nothing to do with this link.";
+    return;
+  }
+
+  const rooms = [];
+  for (let seat = 0; seat < SEATS; seat++) {
+    rooms.push(toHex(await hkdf(secret, ROOM_INFO, new Uint8Array([seat]), 16)));
+  }
+
+  const freeKey = await hkdf(secret, SEAT_INFO, new Uint8Array(0), 32);
+
+  let code = rememberedCode();
+  let codeKey = code ? await hkdf(secret, SEAT_INFO, enc.encode(code), 32) : null;
+  let wait = 2000;
+
+  for (;;) {
+    let landed = false;
+
+    // Wieviele Plaetze besetzt waren - getrennt nach frei und kennwortgeschuetzt.
+    // Nur volle FREIE Plaetze rechtfertigen die Frage nach dem Kennwort. Frueher
+    // fiel jeder andere Ausgang stillschweigend bis dorthin durch, und ein Browser,
+    // der die Verbindung gar nicht zulaesst, sah damit aus wie ein volles Haus.
+    let besetztFrei = 0, besetztGesamt = 0, versucht = 0;
+
+    for (let seat = 0; seat < SEATS; seat++) {
+      const protectedSeat = seat >= FREE_SEATS;
+
+      if (protectedSeat && !codeKey) break;
+
+      say(seat === 0 ? "connecting …" : "looking for a free seat …");
+
+      versucht++;
+
+      const { outcome, closed } = await trySeat(rooms[seat], protectedSeat ? codeKey : freeKey);
+
+      if (outcome === Result.Paired) {
+        landed = true;
+        wait = 2000;
+
+        // HIER BLEIBEN, bis die Leitung endet.
+        //
+        // Ohne dieses Warten lief der aeussere Lauf sofort weiter, suchte nach
+        // kurzer Pause erneut ab Platz 0, fand seinen eigenen Platz besetzt, nahm
+        // den naechsten - und hatte nach ein paar Runden alle sechs Plaetze selbst
+        // belegt. Fuer jeden anderen war dann kein Platz mehr frei.
+        await closed;
+        break;
+      }
+
+      if (outcome === Result.Taken) {
+        besetztGesamt++;
+        if (!protectedSeat) besetztFrei++;
+        continue;
+      }
+
+      if (outcome === Result.Blocked) {
+        say("cannot connect", "gone");
+        empty.textContent = "The browser will not allow the connection to the relay, "
+                          + "or the relay is unreachable right now. Still trying.";
+        landed = true;
+        break;
+      }
+
+      if (outcome === Result.Alone) {
+        if (!protectedSeat) {
+          say("FrameFlip is unreachable", "gone");
+          empty.textContent = "FrameFlip is not running, or watching is switched off there.";
+        } else {
+          // Ein hinterer Platz ohne FrameFlip heisst: Es ist kein Kennwort gesetzt.
+          say("no seat free", "gone");
+          empty.textContent = "Two people are already watching. More is only possible "
+                            + "once a password is set on the PC.";
+        }
+
+        landed = true;   // Warten statt weitersuchen - die anderen Plaetze sind auch leer.
+        break;
+      }
+
+      if (outcome === Result.Wrong && protectedSeat) {
+        rememberCode("");
+        code = await askForCode("That was not the right password.");
+        rememberCode(code);
+        codeKey = await hkdf(secret, SEAT_INFO, enc.encode(code), 32);
+        seat = FREE_SEATS - 1;   // die geschuetzten Plaetze noch einmal durchgehen
+        continue;
+      }
+
+      if (outcome === Result.Wrong) {
+        say("link no longer valid", "gone");
+        empty.textContent = "This link has been renewed. The current one is shown on the PC.";
+        landed = true;
+        break;
+      }
+
+      // Bleibt Result.Broken: Die Verbindung stand und riss ab. Nicht den naechsten
+      // Platz belegen - abwarten und denselben noch einmal versuchen.
+      say("connection lost", "gone");
+      landed = true;
+      break;
+    }
+
+    if (!landed) {
+      // Alle freien Plaetze besetzt und noch kein Kennwort: dann eben danach fragen.
+      if (!codeKey && besetztFrei >= FREE_SEATS) {
+        code = await askForCode("");
+        rememberCode(code);
+        codeKey = await hkdf(secret, SEAT_INFO, enc.encode(code), 32);
+        continue;
+      }
+
+      // Wirklich alles voll. Das laut sagen, statt still weiterzusuchen - sonst
+      // steht man vor einer Seite, die ohne Grund nichts anzeigt.
+      if (besetztGesamt >= versucht && versucht > 0) {
+        say("no seat free", "gone");
+        empty.textContent = "All " + versucht + " seats are taken right now. "
+                          + "This page continues on its own as soon as one frees up.";
+      }
+    }
+
+    say("retrying …", "gone");
+    await new Promise(done => setTimeout(done, wait));
+    wait = Math.min(wait * 2, 30000);
+  }
+}
+
+/* --------------------------------------------------------------- Start */
+
+/* Ohne WebCrypto geht hier gar nichts - und das soll man sehen.
+
+   crypto.subtle gibt es nur in einem sicheren Zusammenhang: https, oder der eigene
+   Rechner. Wird die Seite je ueber http von einer fremden Adresse ausgeliefert,
+   fehlt sie, und jeder Aufruf darauf endet in einem Fehler, den niemand deuten kann.
+   Eine klare Zeile ist die bessere Auskunft als eine Seite, die stumm nichts tut. */
+if (!globalThis.crypto || !crypto.subtle) {
+  say("not a secure context", "gone");
+  empty.textContent = "This page needs HTTPS. Without it the browser withholds the "
+                    + "cryptography, and nothing here can work.";
+} else {
+  run();
+}
+
+/* ------------------------------------------------------------ Installierbar
+
+   Der Dienstarbeiter ist nicht dafuer da, Daten vorzuhalten - es gibt hier nichts
+   vorzuhalten, was laenger als ein paar Sekunden gilt. Er haelt die Huelle bereit,
+   damit sich die Seite als Programm ablegen laesst. Alles Lebendige kommt
+   weiterhin ueber die verschluesselte Leitung.
+
+   Scheitert die Anmeldung, steht der Grund in der Fusszeile. Das ist nicht
+   Zierde: Ohne diese Zeile bleibt "das Installieren wird nicht angeboten" eine
+   Beobachtung ohne Ursache, und auf einem Handy laesst sich keine Entwicklerkonsole
+   oeffnen, um nachzusehen. */
+const appnote = document.createElement("span");
+appnote.style.cssText = "flex-basis:100%;color:var(--faint)";
+document.querySelector(".note").appendChild(appnote);
+
+function vermerk(text) { appnote.textContent = text; }
+
+// Auf einem iPhone gibt es kein beforeinstallprompt - dort fuehrt der Weg ueber
+// "Teilen" und "Zum Home-Bildschirm". Ein Knopf, der nichts bewirkt, waere eine
+// Enttaeuschung; der Hinweis ist die ehrlichere Auskunft.
+const apfel = /iPad|iPhone|iPod/.test(navigator.userAgent)
+  || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
+
+if (apfel && !navigator.standalone) vermerk("To install: Share → Add to Home Screen");
+
+if (!("serviceWorker" in navigator)) {
+  if (!apfel) vermerk("App install unavailable: this browser has no service workers.");
+} else {
+  addEventListener("load", () => {
+    navigator.serviceWorker.register("sw.js")
+      .then(() => { if (!apfel) vermerk(""); })
+      .catch(error => vermerk("App install unavailable: " + (error && error.message ? error.message : error)));
+  });
+}
+</script>
+</body>
+</html>

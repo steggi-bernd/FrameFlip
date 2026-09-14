@@ -1,0 +1,298 @@
+# Die Zuschauerseite
+
+`index.html` ist die ganze Seite. Eine Datei, kein Beiwerk, nichts nachzuladen — sie
+lässt sich prüfen, indem man sie liest.
+
+Sie zeigt **nur** Zahlen und das jeweils neueste Bild. Es gibt keinen Weg, von ihr aus
+etwas auszulösen: FrameFlip öffnet eingehende Nutzlast in diesen Räumen gar nicht
+erst, und der Schlüssel, mit dem ein Befehl verstanden würde, ist ein anderer als
+der, den der Link enthält.
+
+## Warum der Leuchtturm und nicht das Heimnetz
+
+Ein eigener Server auf dem PC bräuchte eine Öffnung in der Firewall — einen Weg von
+außen nach innen. Hier baut FrameFlip die Verbindung selbst auf, nach draußen, wie
+ein Browser auch. Es gibt keinen Eingang, der offen stehen könnte, und es ist
+gleichgültig, in welchem Netz der Zuschauer sitzt.
+
+Der Leuchtturm bleibt dabei ein **blinder Durchgang**. Er sieht Zufallsbytes und eine
+Raumkennung; die Schlüssel entstehen aus einem Geheimnis, das hinter der Raute der
+Adresse steht, und diesen Teil schickt ein Browser grundsätzlich nicht zum Server.
+
+## Plätze
+
+Ein Raum des Relays fasst zwei Verbindungen — FrameFlip und einen Zuschauer. Mehrere
+Zuschauer brauchen deshalb mehrere Räume; sie entstehen, indem die Platznummer in die
+Ableitung eingeht. FrameFlip sitzt in allen, ein Browser sucht sich einen freien.
+
+| Platz | Wer hereinkommt |
+|---|---|
+| 0, 1 | der Link allein genügt |
+| 2 – 5 | zusätzlich das Kennwort, das am PC steht |
+
+**Am Relay ist dafür nichts zu ändern.** Er sieht gewöhnliche Räume und muss von
+Zuschauern nichts wissen. Jeder Zuschauer hat außerdem seinen eigenen Kanal mit
+eigenen Salzen — keiner kann lesen, was ein anderer bekommt, selbst wenn beide
+denselben Link haben.
+
+### Plätze gehen bei Bedarf auf, nicht auf Vorrat
+
+Ein Raum gilt beim Relay als belegt, **sobald jemand darin sitzt** — auch wenn das
+nur FrameFlip selbst ist und nie ein Zuschauer kommt. Sechs Plätze dauerhaft offen zu
+halten hieße, sechs Räume für Leute freizuhalten, die nicht da sind. Der Relay fasst
+128 Räume insgesamt; bei sieben je Installation wären das achtzehn gleichzeitige
+Nutzer, bei dreien mehr als vierzig.
+
+Offen bleibt deshalb immer **einer mehr, als besetzt sind** — mindestens aber die
+freien:
+
+```
+  niemand sieht zu    frei frei zu zu zu zu          2 offen
+  einer sieht zu      besetzt frei zu zu zu zu       2 offen
+  zwei sehen zu       besetzt besetzt frei zu zu zu  3 offen
+```
+
+Der eine im Voraus ist keine Großzügigkeit, sondern Notwendigkeit: Der Relay bringt
+nur zusammen, was schon da ist. Ein Platz, der erst aufginge, wenn jemand danach
+fragt, käme immer zu spät — der Zuschauer fände einen leeren Raum vor und zöge weiter.
+
+Beim Schließen wird dagegen **gewartet** (30 Sekunden, im Prüfstand 3). Wer die Seite
+neu lädt oder kurz das Netz wechselt, ist in Sekunden zurück; ohne die Wartezeit
+entstünde genau das Verbindungsflattern, gegen das die Grenzen des Relays gedacht
+sind.
+
+## Aufstellen
+
+Die Seite muss über **dasselbe Herkunftsgebiet** ausgeliefert werden wie der Relay
+(`relay.steggi-matrix.work`), sonst greift `connect-src 'self'` in der Inhaltsregel
+nicht. Zwei Handgriffe auf dem Leuchtturm:
+
+**1. Die Datei ablegen** — in ein Verzeichnis, das Caddy sehen kann:
+
+```bash
+mkdir -p ~/caddy/watch
+# index.html dorthin kopieren
+```
+
+Und in `~/caddy/docker-compose.yml` bei `volumes` ergänzen:
+
+```yaml
+      - ./watch:/srv/watch:ro
+```
+
+**2. Den Block in `~/caddy/Caddyfile`** — der bestehende Eintrag für den Relay
+bekommt einen zweiten Pfad davor:
+
+```caddy
+relay.steggi-matrix.work {
+    redir /w /w/
+
+    handle_path /w/* {
+        root * /srv/watch
+        file_server
+
+        header {
+            Cache-Control          "no-store"
+            X-Content-Type-Options "nosniff"
+            Referrer-Policy        "no-referrer"
+            Content-Security-Policy "default-src 'none'; img-src 'self' blob: data:; style-src 'unsafe-inline'; script-src 'unsafe-inline'; connect-src 'self' wss://relay.steggi-matrix.work; manifest-src 'self'; worker-src 'self'; base-uri 'none'; form-action 'none'"
+        }
+    }
+
+    # Alles Übrige bleibt, wie es war: der Relay selbst.
+    handle {
+        reverse_proxy frameflip-relay:8080
+    }
+}
+```
+
+Zwei Dinge sind daran wichtig:
+
+* `handle_path` statt `handle` — es schneidet `/w` vom Pfad ab, sodass `/w/` die
+  `index.html` trifft und `/w/sw.js` wirklich den Dienstarbeiter. Mit einem
+  `rewrite * /index.html` käme stattdessen auf **jeden** Pfad die Seite zurück,
+  auch auf Manifest und Zeichen — und installieren ließe sie sich nicht.
+
+* Die Reihenfolge — der `/w/`-Block muss **vor** dem allgemeinen `handle` stehen,
+  sonst geht der Aufruf an den Relay, und der kennt den Pfad nicht.
+
+Dann neu laden:
+
+```bash
+cd ~/caddy && docker compose up -d --force-recreate
+```
+
+## Das Bild ansehen
+
+Ein Klick auf das Bild öffnet eine **eigene Fläche** dafür: näher heransehen (Rad,
+Zusammenkneifen, Doppeltippen), drehen, schieben, sichern. Esc schließt, ein Klick
+neben das Bild auch.
+
+Auf der Bühne selbst wird bewusst **nicht** gezoomt. Dort teilt sich das Bild den
+Platz mit den Zahlen; jede Verschiebung wäre sofort am Rand, und ein Zug zum
+Verschieben ließe sich nicht von einem Klick zum Öffnen unterscheiden.
+
+Drei Dinge, die dabei leicht schiefgehen — alle drei sind passiert:
+
+* Im Stil darf **kein** `transform-origin` stehen. Es stand einmal auf `0 0`,
+  während die Rechnung von der Mitte ausging — das Bild wuchs dadurch aus der oberen
+  linken Ecke heraus, ganz gleich wo der Zeiger war.
+
+* Gerechnet wird gegen die **Mitte der Fläche**, nie gegen den Kasten des Bildes.
+  Der wandert ja mit der Verschiebung mit; wer gegen ihn rechnet, jagt seinem
+  eigenen Ergebnis hinterher.
+
+* Die Begrenzung der Verschiebung braucht eine **Untergrenze**. Nur den Überstand
+  zuzulassen ergibt ein V: viel Raum, wenn das Bild deutlich kleiner oder deutlich
+  größer als die Fläche ist — und fast keinen genau dort, wo beide gleich groß sind.
+  Das ist aber der Zoomschritt, in dem der Punkt unter dem Zeiger am weitesten
+  wegrutschen will. Ein Viertel der Fläche als Untergrenze füllt die Senke; weiter
+  als ein Viertel kann das Bild dadurch nie aus der Mitte wandern.
+
+Nachgemessen: null Punkte Abweichung über vierzehn Zoomschritte, in zwei
+verschiedenen Ecken, auf beiden Flächen.
+
+## Die Bremse am Ausgang
+
+Der Relay begrenzt, was eine Verbindung ihm zumutet — Nachrichten und Bytes je
+Sekunde. Wer darüber liegt, wird nicht gebremst, sondern **getrennt**, ohne Vorwarnung
+und mitten im Satz.
+
+Gemessen am laufenden Stand: Eine Dateiübertragung — 128-KiB-Stücke, vier gleichzeitig
+unterwegs — fiel nach **10,5 MiB und 1,1 Sekunden**. Auf einer schnellen Leitung sind
+das zweistellige MiB je Sekunde, und keine Grenze, die als Schutz noch etwas bedeutet,
+lässt das durch.
+
+Die Bremse sitzt deshalb in `RelayClient.PumpAsync` und nicht im Dateiweg: Der Relay
+zählt die **Verbindung**, nicht das Feature. Vorschaubilder, Zustandsmeldungen,
+Dateistücke und alles Künftige teilen sich dieselbe Leitung und müssen sich dasselbe
+Budget teilen.
+
+Mit Bremse, gegen dieselben Grenzen gemessen: **40 MiB in 24 Sekunden, nicht
+getrennt.**
+
+Die Werte liegen bewusst unter denen des Relays — 48 statt 64 Nachrichten, 3 statt
+4 MiB je Sekunde. Sie sind kein Nachbau seiner Grenzen, sondern ein Abstand dazu: Der
+Relay darf streng bleiben, ohne dass ein Zittern in der Laufzeit gleich eine Trennung
+bedeutet.
+
+## Als Programm ablegen
+
+`manifest.webmanifest` und `sw.js` machen die Seite installierbar — am Handy über
+„Zum Startbildschirm", am Schreibtisch über das Installieren-Zeichen in der
+Adresszeile. Sie startet dann unter ihrer eigenen Adresse, **ohne Raute**; das
+Geheimnis liegt deshalb im `localStorage` statt nur für die Sitzung. „Zugang
+entfernen" unten in der Seite löscht es wieder.
+
+**Die Inhaltsregel darf nicht auf dem Dienstarbeiter liegen.** Ein Dienstarbeiter
+erbt die Regel aus der Antwort seines *eigenen* Skripts. Lag dort
+`script-src 'unsafe-inline'` ohne `'self'`, verbot er damit sich selbst — die
+Anmeldung scheiterte mit „unknown error when fetching the script", und die Seite
+ließ sich nicht ablegen. Caddy setzt die Regel deshalb nur noch auf `/` und
+`/index.html`, und `'self'` steht mit dabei.
+
+Der Dienstarbeiter hält **nur die Hülle** bereit — Seite, Manifest, Zeichen. Er
+fasst nichts an, was durch die verschlüsselte Leitung kommt: Ein Bild aus einem
+Render soll auf dem Gerät nicht länger liegen, als es zu sehen ist.
+
+## Nachsehen, ob es steht
+
+```bash
+curl -sI https://relay.steggi-matrix.work/w/ | head -3
+curl -s  https://relay.steggi-matrix.work/health
+```
+
+Das erste soll `200` und `text/html` melden, das zweite `{"ok":true,...}`.
+
+## Wie die Seite gebaut wird
+
+`index.html` wird **nicht von Hand bearbeitet**, sondern aus `teile/` zusammengesetzt:
+
+```bash
+python bauen.py
+node pruefstand/regel.mjs index.html sw.js
+```
+
+Der Grund sind die Prüfsummen. Die Inhaltsregel der Seite erlaubt kein
+`'unsafe-inline'` mehr, sondern nennt die SHA-256 des einen Skriptblocks und des
+einen Stilblocks. Der Unterschied ist der ganze Sinn: `'unsafe-inline'` erlaubt
+*jeden* Inline-Code, also auch eingeschleusten — eine Prüfsumme erlaubt genau diesen
+einen Block. Nachgemessen im Browser: Die Seite läuft, ein nachträglich eingefügtes
+`<script>` wird abgewiesen.
+
+Von Hand ginge das nicht: Jede Änderung an Stil oder Code ändert die Summe, und eine
+falsche Summe heißt **leere Seite**. Deshalb rechnet sie, wer die Datei zusammensetzt
+— und `pruefstand/regel.mjs` prüft, dass sie stimmt.
+
+Eine Falle dabei, in die ich prompt getappt bin: Python übersetzt beim Schreiben
+unter Windows jedes `
+` in `
+`. Die Summe wäre dann über einen anderen Text
+gebildet als den, der auf der Platte landet. `bauen.py` nagelt die Zeilenenden fest.
+
+## Was die Seite fremden Daten gegenüber annimmt: nichts
+
+Der Kanal ist verschlüsselt und beglaubigt — wer hereinredet, hat den Schlüssel. Das
+ist trotzdem kein Grund, seinen Zahlen zu trauen: Der Link für die freien Plätze ist
+ein Ausweis zum Weitergeben, und läuft FrameFlip gerade nicht, kann jemand mit diesem
+Link den leeren Host-Platz einnehmen und dem nächsten Zuschauer liefern, was er will.
+
+Deshalb:
+
+* **Kein `innerHTML`, nirgends.** Die Form steht im Dokument, es wechselt nur Text.
+* `zahl()` lässt ausschließlich endliche Zahlen durch, `text()` beschneidet
+  Zeichenketten. Alles andere wird zum Gedankenstrich.
+* Ein Zustand, der kein Objekt ist, wird verworfen.
+* Der Dateiname beim Sichern entsteht aus einer geprüften Zahl, nie aus dem, was ankam.
+
+Nachgemessen mit einem feindlichen Zustand (`<img onerror=…>` in jedem Feld,
+Zeichenketten statt Zahlen, `Infinity`, `NaN`, Listen, `null`): kein Skript lief,
+kein Element entstand, alles wurde Text oder Gedankenstrich.
+
+## Prüfen ohne Server
+
+Der ganze Weg lässt sich auf dem eigenen Rechner durchspielen — echter Relay, echtes
+FrameFlip, und die Krypta der Seite wird aus dieser Datei herausgeschnitten und
+ausgeführt statt nachgebaut:
+
+```bash
+go build -o relay.exe .        # im Ordner frameflip-relay
+node client.mjs index.html 127.0.0.1:8080 <geheimnis> <kennwort>
+```
+
+Zwei Dinge sind dabei schon aufgefallen und behoben, die in keiner Durchsicht
+auftauchen würden:
+
+* `onmessage` darf `async` sein, wird dann aber erneut aufgerufen, sobald der
+  laufende Aufruf auf das erste `await` trifft. Begrüßung und Schlüsselnachweis
+  kommen dicht hintereinander — traf der Nachweis in dieses Fenster, gab es den Kanal
+  noch nicht, und die Verbindung hing für immer. Die Seite reiht Nachrichten deshalb
+  auf und behandelt sie nacheinander.
+
+* Wer an einen leeren Platz sendet, staut Nachrichten im Ausgangspuffer auf. Sobald
+  jemand hereinkommt, ergießt sich der Stau auf ihn, und der Relay trennt ihn als
+  „zu langsam", bevor er ein Bild gesehen hat. **Nichts senden, solange niemand
+  zusieht** ist deshalb keine Sparsamkeit, sondern Bedingung.
+
+* `connect-src 'self'` genügt für WebSockets **nicht**. WebKit — also jedes Safari
+  und alles auf einem iPhone — rechnet `'self'` dort nicht auf `wss://` an. Die Seite
+  lädt dann ganz normal und bleibt stumm leer, ohne dass irgendwo etwas steht. Das
+  Schema muss ausdrücklich genannt werden; die enge Fassung mit dem genauen
+  Wirtsnamen setzt Caddy als Kopfzeile dazu.
+
+* **Die Seite fraß sich selbst alle Plätze weg.** Nach dem Verbinden verließ die
+  Platzsuche zwar ihre Schleife, die äußere Schleife lief aber weiter, wartete kurz
+  und suchte erneut ab Platz 0 — fand dort ihre *eigene* offene Verbindung als
+  besetzt vor, nahm den nächsten, und hatte nach ein paar Runden alle sechs Plätze
+  selbst belegt. Danach kam kein Zuschauer mehr herein. `trySeat` liefert deshalb ein
+  zweites Versprechen mit, das erst fällt, wenn die Verbindung endet; erst dann wird
+  wieder gesucht. Ein aufgegebener Versuch schließt seine Verbindung außerdem sofort,
+  und beim Verlassen der Seite (`pagehide`) gehen alle zu — auf einem Handy wandert
+  ein Reiter ständig in den Hintergrund, und ein Platz, den niemand mehr benutzt,
+  aber auch niemand freigibt, ist aus Sicht des Relays besetzt.
+
+* Ein gescheiterter Verbindungsaufbau darf nicht wie ein belegter Platz aussehen.
+  Er tat es: Der Ausgang fiel durch alle Prüfungen bis zur Kennwortfrage, und man
+  tippte ein Kennwort ein, das nichts besser machen konnte. `Result.Blocked` ist
+  deshalb ein eigener Ausgang, und nach dem Kennwort wird nur gefragt, wenn beide
+  freien Plätze wirklich besetzt waren.

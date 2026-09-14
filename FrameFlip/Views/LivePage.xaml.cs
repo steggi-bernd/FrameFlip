@@ -33,30 +33,73 @@ public partial class LivePage : UserControl
     /// <summary>Woher die Lastwerte kommen. Ohne Messung bleiben die Kacheln leer.</summary>
     public static Func<LoadSnapshot?> Load { get; set; } = () => null;
 
-    public LivePage()
+    private readonly DesktopLayout _layout;
+    private readonly Action<string> _openSequence;
+    private readonly Action _projects;
+    private bool _draggingPanels;
+    private bool _stacked;
+    public LivePage() : this(new DesktopLayout(), _ => { }, () => { }) { }
+    public LivePage(DesktopLayout layout, Action<string> openSequence, Action projects)
     {
-        InitializeComponent();
-        BuildTiles();
-        Unloaded += (_, _) => _gpu.Dispose();
+        _layout = layout; _openSequence = openSequence; _projects = projects;
+        InitializeComponent(); BuildTiles();
+        HotkeyHint.Text = Localization.Strings.T("D_HotkeyHint", Configuration.SettingsStore.Load().Hotkey);
+        Loaded += (_, _) => { _layout.Changed += ApplyPanelLayout; ApplyPanelLayout(); };
+        Unloaded += (_, _) => { _layout.Changed -= ApplyPanelLayout; _gpu.Dispose(); };
+        PanelSplitter.DragStarted += (_, _) => _draggingPanels = true;
+        PanelSplitter.DragCompleted += (_, _) =>
+        {
+            _draggingPanels = false;
+            double total = PrimaryColumn.ActualWidth + MonitorColumn.ActualWidth;
+            if (total > 0) _layout.MonitorShare = (_layout.MonitorFirst ? PrimaryColumn.ActualWidth : MonitorColumn.ActualWidth) / total;
+            _layout.Save();
+        };
+        PanelSplitter.MouseDoubleClick += (_, _) => { _layout.MonitorShare = .4; _layout.Save(); };
     }
-
+    private void OnPanelsSizeChanged(object sender, SizeChangedEventArgs e) => ApplyPanelLayout();
+    private void ApplyPanelLayout()
+    {
+        if (_draggingPanels || Panels.ActualWidth <= 0) return;
+        _stacked = Panels.ActualWidth < 810;
+        double share = _layout.MonitorFirst ? _layout.MonitorShare : 1 - _layout.MonitorShare;
+        PrimaryColumn.MinWidth = _stacked ? 0 : 300;
+        MonitorColumn.MinWidth = _stacked ? 0 : 280;
+        PrimaryColumn.Width = new GridLength(_stacked ? 1 : share, GridUnitType.Star);
+        DividerColumn.Width = new GridLength(_stacked ? 0 : 16);
+        MonitorColumn.Width = _stacked ? new GridLength(0) : new GridLength(1 - share, GridUnitType.Star);
+        Grid.SetColumn(RenderPanel, _stacked ? 0 : _layout.MonitorFirst ? 2 : 0);
+        Grid.SetColumn(MonitorPanel, _stacked ? 0 : _layout.MonitorFirst ? 0 : 2);
+        Grid.SetRow(RenderPanel, _stacked && _layout.MonitorFirst ? 1 : 0);
+        Grid.SetRow(MonitorPanel, _stacked && !_layout.MonitorFirst ? 1 : 0);
+        MonitorPanel.Margin = new Thickness(0, _stacked && !_layout.MonitorFirst ? 8 : 0, 0, 14);
+        PanelSplitter.Visibility = _stacked ? Visibility.Collapsed : Visibility.Visible;
+        double metricsWidth = _stacked ? Panels.ActualWidth - 38 : Panels.ActualWidth * _layout.MonitorShare - 54;
+        Tiles.Columns = Math.Clamp((int)Math.Round(metricsWidth / _layout.TileSize), 1, 3);
+    }
+    private void OnSwap(object sender, RoutedEventArgs e) { _layout.MonitorFirst = !_layout.MonitorFirst; _layout.Save(); }
+    private void OnProjects(object sender, RoutedEventArgs e) => _projects();
+    private void OnOpenSequence(object sender, RoutedEventArgs e)
+    {
+        var dialog = new Microsoft.Win32.OpenFileDialog { Filter = "Bildsequenz|*.png;*.jpg;*.jpeg;*.tif;*.tiff;*.bmp;*.webp", Multiselect = false };
+        if (dialog.ShowDialog(Window.GetWindow(this)) == true) _openSequence(dialog.FileName);
+    }
     private void BuildTiles()
     {
-        foreach (var label in new[] { "GPU-LAST", "VRAM", "GPU-TEMPERATUR", "CPU", "RAM", "CYCLES-SPEICHER" })
+        foreach (var label in new[] { "D_GpuLoad", "D_Vram", "D_GpuTemp", "D_Cpu", "D_Ram", "D_Cycles" })
         {
             var caption = new TextBlock
             {
-                Text = label,
+                Text = Localization.Strings.T(label),
                 FontFamily = (FontFamily)FindResource("HeadFont"),
                 FontWeight = FontWeights.Bold,
-                FontSize = 9.5,
+                FontSize = 10.5,
                 Foreground = (Brush)FindResource("MutedBrush"),
             };
 
             var value = new TextBlock
             {
                 FontFamily = (FontFamily)FindResource("DisplayFont"),
-                FontSize = 34,
+                FontSize = 32,
                 Foreground = (Brush)FindResource("ForegroundBrush"),
             };
 
@@ -93,10 +136,10 @@ public partial class LivePage : UserControl
 
             var card = new Border
             {
-                Margin = new Thickness(0, 0, 10, 10),
-                Padding = new Thickness(15, 13, 15, 13),
-                CornerRadius = new CornerRadius(14),
-                Background = (Brush)FindResource("AppSurface"),
+                Margin = new Thickness(0, 0, 6, 8),
+                Padding = new Thickness(12, 14, 10, 14),
+                CornerRadius = new CornerRadius(8),
+                Background = (Brush)FindResource("DesktopBg"),
                 BorderBrush = (Brush)FindResource("PanelBorder"),
                 BorderThickness = new Thickness(1),
                 Child = stack,
@@ -132,10 +175,10 @@ public partial class LivePage : UserControl
         BigNumber.Text = share is double value ? Math.Round(value * 100).ToString("0") : "—";
         BigUnit.Foreground = (Brush)FindResource(animation ? "AccentBrush" : "AppBlue");
 
-        RemainingLabel.Text = animation ? "RESTZEIT" : "EINZELBILD";
+        RemainingLabel.Text = Localization.Strings.T(animation ? "D_Remaining" : "D_Still");
         RemainingValue.Visibility = animation ? Visibility.Visible : Visibility.Collapsed;
         RemainingValue.Text = job.Remaining is TimeSpan left ? Clock(left) : "—";
-        ElapsedValue.Text = Clock(job.Elapsed) + " gelaufen";
+        ElapsedValue.Text = Localization.Strings.T("D_Elapsed", Clock(job.Elapsed));
 
         BarTrack.Visibility = animation ? Visibility.Visible : Visibility.Collapsed;
 
@@ -162,7 +205,7 @@ public partial class LivePage : UserControl
             ? $"SAMPLE {sample} / {total}"
             : "SAMPLE — / —";
 
-        SampleBar.Width = (job.Stats.SampleProgress ?? 0) * Math.Max(0, ActualWidth - 56);
+        SampleBar.Width = (job.Stats.SampleProgress ?? 0) * Math.Max(0, ((FrameworkElement)SampleBar.Parent).ActualWidth);
     }
 
     private void UpdateTiles(RenderJob? job)

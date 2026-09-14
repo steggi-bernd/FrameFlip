@@ -27,6 +27,7 @@ public sealed class AppHost : IDisposable
 
     /// <summary>Nimmt Meldungen des Blender-Addons entgegen. Null, wenn abgeschaltet.</summary>
     private Bridge.RenderMonitor? _renderMonitor;
+    private Web.WatchService? _watch;
 
     /// <summary>Besitzt die optionale Verbindung zum Handy.</summary>
     private readonly AppRemoteController _remote;
@@ -53,7 +54,8 @@ public sealed class AppHost : IDisposable
             {
                 LivePage.Load = () => _load.LastSnapshot;
                 return createMain?.Invoke() ?? new MainWindow(_renderMonitor, () => _remote.State,
-                    ShowSettings, OpenFile, ShowPairing, _settings, settings => SettingsStore.Save(settings));
+                    ShowSettings, OpenFile, ShowPairing, _settings, settings => SettingsStore.Save(settings),
+                    ApplySettings, () => _settings, () => _watch, RenewWatchLink, SetWatchCode);
             },
             createSettings ?? (() => new SettingsWindow(_settings, ApplySettings, () => _remote.State)),
             createPairing ?? (() => new PairingWindow(_settings, ApplySettings, () => _remote.State)),
@@ -112,10 +114,122 @@ public sealed class AppHost : IDisposable
         }
 
         StartRemote();
+        StartWatch();
 
         // Startballast (JIT, XAML-Parser, Icon-Erzeugung) wieder abgeben. Die App
         // steht danach nur noch am Hotkey und soll im Leerlauf nichts festhalten.
         Task.Delay(3000).ContinueWith(_ => MemoryTrimmer.TrimNow(), TaskScheduler.Default);
+    }
+
+    // ------------------------------------------------------------ Zusehen im Netz
+
+    /// <summary>
+    /// Die Seite zum Zusehen starten, falls eingeschaltet.
+    ///
+    /// Sie bekommt drei Lesezugriffe und sonst nichts: den Renderzustand, die
+    /// Systemlast und den Pfad des zuletzt geschriebenen Bildes. Der Pfad bleibt im
+    /// Programm - nach draussen geht nur das fertig verkleinerte JPEG.
+    /// </summary>
+    private void StartWatch()
+    {
+        if (!_settings.WatchEnabled) return;
+
+        // Ohne brauchbaren Relay-Namen gaebe es nur eine Adresse, die niemanden
+        // erreicht. Das faellt spaeter auf und ist dann schwer zu deuten.
+        if (!Remote.PairingInvite.IsUsableHost(_settings.RelayHost))
+        {
+            Notify(Localization.Strings.T("S_WatchNoRelay"));
+            return;
+        }
+
+        var key = WatchKeyForSettings();
+
+        var newest = new Web.NewestFrame(() => _renderMonitor?.Job,
+                                         Decoding.FrameDecoderRegistry.CreateDefault());
+
+        // newest.Path statt des Objekts: Der Dienst braucht nur den Pfad, und die
+        // Entkopplung macht ihn pruefbar, ohne dass ein Pruefstand je die Merkliste
+        // des Benutzers anfassen muesste.
+        _watch = new Web.WatchService(key, _settings.RelayHost, _renderMonitor,
+                                      () => _load.LastSnapshot, newest.Path);
+
+        _watch.Start();
+    }
+
+    /// <summary>
+    /// Holt das gespeicherte Zuschauer-Geheimnis - oder legt beim ersten Mal eines an.
+    ///
+    /// Angelegt wird nur, wenn keines da ist. Ein neues bei jedem Start waere bequem
+    /// zu schreiben und in der Sache falsch: Der Link soll gelten, bis jemand ihn
+    /// ausdruecklich erneuert, sonst ist ein Lesezeichen auf dem Handy nach jedem
+    /// Neustart wertlos.
+    /// </summary>
+    private Remote.WatchKey WatchKeyForSettings()
+    {
+        if (Remote.WatchStore.TryUnprotect(_settings.WatchSecret, out var stored) && stored is not null)
+            return stored;
+
+        var fresh = Remote.WatchKey.Create(null);
+
+        _settings.WatchSecret = Remote.WatchStore.Protect(fresh);
+        SettingsStore.Save(_settings);
+
+        return fresh;
+    }
+
+    /// <summary>
+    /// Erzeugt einen neuen Link und macht damit jeden alten unwirksam.
+    ///
+    /// Der Widerruf ist vollstaendig, weil er an der Wurzel ansetzt: Mit einem neuen
+    /// Geheimnis liegen auch alle Raeume woanders. Wer den alten Link oeffnet, landet
+    /// in Raeumen, in denen schlicht niemand sitzt. Das eingestellte Kennwort bleibt -
+    /// es zu verwerfen, waere eine zweite Ueberraschung fuer einen Handgriff, der nur
+    /// eine bewirken soll.
+    /// </summary>
+    public void RenewWatchLink()
+    {
+        string? code = Remote.WatchStore.TryUnprotect(_settings.WatchSecret, out var old) && old is not null
+            ? old.Code
+            : null;
+
+        _settings.WatchSecret = Remote.WatchStore.Protect(Remote.WatchKey.Create(code));
+        SettingsStore.Save(_settings);
+
+        ApplyWatch();
+    }
+
+    /// <summary>Setzt das Kennwort fuer die hinteren Plaetze. Leer heisst: nur die freien.</summary>
+    public void SetWatchCode(string? code)
+    {
+        if (!Remote.WatchKey.IsUsableCode(code)) return;
+
+        var key = WatchKeyForSettings().WithCode(string.IsNullOrWhiteSpace(code) ? null : code.Trim());
+
+        _settings.WatchSecret = Remote.WatchStore.Protect(key);
+        SettingsStore.Save(_settings);
+
+        ApplyWatch();
+    }
+
+    /// <summary>Der Dienst hinter der Zuschauerseite - oder null, wenn er nicht laeuft.</summary>
+    public Web.WatchService? Watch => _watch;
+
+    /// <summary>
+    /// Ein- und ausschalten, ohne das Programm neu zu starten.
+    ///
+    /// Beim Einschalten entsteht ein neues Zeichen in der Adresse. Wer die alte noch
+    /// offen hat, sieht ab dann nichts mehr - und das ist der Sinn eines Schalters.
+    /// </summary>
+    public void ApplyWatch()
+    {
+        var closing = _watch;
+        _watch = null;
+
+        // Nicht abwarten: Das Schliessen einer Verbindung kann an einem haengenden
+        // Socket Sekunden dauern, und die Oberflaeche steht sonst so lange.
+        if (closing is not null) _ = closing.DisposeAsync().AsTask();
+
+        StartWatch();
     }
 
     // ------------------------------------------------------------ Tray
@@ -243,10 +357,16 @@ public sealed class AppHost : IDisposable
     public void ShowMain() => _windows.ShowMain();
 
     /// <summary>Der Kopplungscode als eigenes Fenster, ueber dem Hauptfenster.</summary>
-    private void ShowPairing() => _windows.ShowPairing();
+    private void ShowPairing()
+    {
+        if (_windows.Main is MainWindow main) { main.ShowSettingsPage(true); main.Activate(); }
+        else _windows.ShowPairing();
+    }
 
     private void ShowSettings()
     {
+        if (_windows.Main is MainWindow main && _viewer is null)
+        { main.ShowSettingsPage(); main.Activate(); return; }
         // Der Callback gehoert zu diesem Viewer, auch wenn inzwischen ein
         // anderer geoeffnet wurde. Der Controller besitzt keine Viewer-Sitzung.
         var viewer = _viewer;
@@ -259,22 +379,59 @@ public sealed class AppHost : IDisposable
     /// <summary>Rueckgabe: Fehlertext fuer den Dialog, oder null bei Erfolg.</summary>
     private string? ApplySettings(AppSettings settings)
     {
+        /* Was hinauswollte, bevor Normalize es abgeschaltet hat.
+         *
+         * Der Riegel selbst sitzt in Normalize und ist damit dicht. Eine Oberflaeche,
+         * die einen Schalter umlegt und dann feststellt, dass er von selbst wieder
+         * zurueckspringt, laesst den Benutzer aber im Dunkeln. Also wird VOR dem
+         * Normalisieren nachgesehen, was gewollt war, und daraus eine Meldung. */
+        bool wollteHinaus = settings.RemoteEnabled || settings.WatchEnabled;
+
         settings.Normalize();
+
+        if (wollteHinaus && !settings.TermsOk) return Localization.Strings.T("S_TermsMissing");
 
         if (!HotKeyDefinition.TryParse(settings.Hotkey, out var definition))
             return Localization.Strings.T("S_HotkeyInvalid");
 
-        if (definition != _hotkeys.Current)
+        // Nur anfassen, wenn die Kombination selbst geaendert wurde.
+        //
+        // Verglichen wurde hier frueher mit der GERADE REGISTRIERTEN - und die kann
+        // von der eingestellten abweichen, naemlich dann, wenn das Registrieren beim
+        // Start fehlgeschlagen ist, weil ein anderes Programm die Kombination haelt.
+        // Dann schlug jeder Versuch fehl, IRGENDEINE Einstellung zu speichern, mit
+        // der Meldung, die Kombination sei belegt. Ein Schalter fuer eine Seite im
+        // Netz hat mit der Tastenkombination aber nichts zu tun, und ein Fehlschlag
+        // an einer Stelle darf nicht alles andere blockieren.
+        //
+        // Wer die Kombination wirklich aendert, bekommt die Meldung weiterhin - dort
+        // gehoert sie hin.
+        if (!string.Equals(settings.Hotkey, _settings.Hotkey, StringComparison.OrdinalIgnoreCase))
         {
             var previous = _hotkeys.Current;
+
             if (!_hotkeys.Register(definition))
             {
                 _hotkeys.Register(previous);
                 return Localization.Strings.T("S_HotkeyBusy");
             }
         }
+        else if (definition != _hotkeys.Current)
+        {
+            // Unveraendert, aber noch nicht aktiv: Ein stiller zweiter Versuch. Klappt
+            // er nicht, bleibt es dabei - gemeldet wurde es beim Start.
+            _hotkeys.Register(definition);
+        }
 
-        var previousSettings = _settings;
+        // Eine Kopie des bisherigen Standes, bevor der neue uebernommen wird.
+        //
+        // Ohne das Kopieren geht der Vergleich weiter unten schief, sobald ein
+        // Aufrufer das Objekt aendert, das er von getSettings() bekommen hat - dann
+        // ist "vorher" dieselbe Instanz wie "nachher", und keine Aenderung faellt
+        // mehr auf. Genau daran startete die Seite im Netz nicht: Der Schalter stand
+        // auf an, gespeichert war es auch, nur der Server erfuhr nie davon.
+        var previousSettings = _settings.Clone();
+
         _settings = settings;
         Localization.Strings.Apply(Localization.Strings.Parse(_settings.Language));
         SettingsStore.Save(_settings);
@@ -283,6 +440,16 @@ public sealed class AppHost : IDisposable
         // Nur bei echter Aenderung neu aufbauen. Sonst risse jedes Speichern im
         // Einstellungsdialog eine stehende Verbindung ab.
         _remote.SettingsChanged(previousSettings);
+
+        // Dasselbe fuer die Seite im Netz: Nur wenn sich Schalter oder Port geaendert
+        // haben. Ein Neuaufbau bei jedem Speichern wuerde das Zeichen in der Adresse
+        // erneuern, und die offene Seite auf dem Handy waere ohne Grund tot.
+        if (previousSettings.WatchEnabled != _settings.WatchEnabled
+            || previousSettings.WatchSecret != _settings.WatchSecret
+            || previousSettings.RelayHost != _settings.RelayHost)
+        {
+            ApplyWatch();
+        }
 
         // Puffer- und Budgetwerte greifen beim naechsten Oeffnen des Viewers.
         return null;
@@ -303,6 +470,18 @@ public sealed class AppHost : IDisposable
         _disposed = true;
 
         _load.Dispose();
+
+        // Beim Beenden warten wir kurz: Die Verbindungen sollen sauber enden,
+        // damit im Raum kein Platz als belegt zurueckbleibt, bis der Leuchtturm die
+        // Leiche selbst bemerkt.
+        var watch = _watch;
+        _watch = null;
+
+        if (watch is not null)
+        {
+            try { watch.DisposeAsync().AsTask().Wait(TimeSpan.FromSeconds(2)); }
+            catch (Exception) { /* beim Beenden ist ein haengender Socket kein Anlass */ }
+        }
 
         _remote.Dispose();
 

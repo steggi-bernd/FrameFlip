@@ -47,6 +47,52 @@ public sealed class AppSettings
     public int MemoryBudgetMb { get; set; } = 1024;
 
     /// <summary>
+    /// Ob Abspielen die Folge erst vollstaendig in den Speicher liest.
+    ///
+    /// Voreingestellt an: Eine Folge von der Platte abzuspielen ruckelt genau dann am
+    /// staerksten, wenn nebenan ein Render laeuft - also in dem Fall, fuer den es
+    /// FrameFlip gibt.
+    /// </summary>
+    public bool Prebuffer { get; set; } = true;
+
+    /// <summary>
+    /// Ob beim Vorausladen nebenher schon ein Video entsteht.
+    ///
+    /// Die Bilder werden dabei ohnehin alle gelesen; sie im selben Zug an ffmpeg zu
+    /// reichen kostet wenig zusaetzlich und erspart beim spaeteren Export das ganze
+    /// Kodieren. Die fertige Datei liegt im Temp-Ordner und wird nur dann an ihren
+    /// Platz gebracht, wenn wirklich exportiert wird - wer nie exportiert, hat nur
+    /// eine Datei im Temp-Ordner, die beim naechsten Start aufgeraeumt wird.
+    /// </summary>
+    public bool PrepareVideo { get; set; }
+
+    /// <summary>Zuletzt gewaehlte Qualitaetsstufe im Exportdialog.</summary>
+    public string ExportQuality { get; set; } = "Hoch";
+
+    /// <summary>Zuletzt gewaehltes Encoder-Tempo im Exportdialog.</summary>
+    public string ExportSpeed { get; set; } = "Ausgewogen";
+
+    /// <summary>
+    /// Was diese Maschine beim letzten Export geschafft hat, in Megabildpunkten je
+    /// Sekunde.
+    ///
+    /// Damit wird die Dauerschaetzung mit jedem Export besser. Eine feste Zahl im
+    /// Code koennte das nicht: Zwischen einem Notebook und einer Renderkiste liegt
+    /// leicht der Faktor zehn.
+    /// </summary>
+    public double ExportThroughput { get; set; }
+
+    /// <summary>
+    /// Wie sich die geschaetzte Groesse beim letzten Export zur tatsaechlichen
+    /// verhalten hat. 0 heisst: noch nie gemessen.
+    ///
+    /// Damit lernt die Schaetzung das Material kennen. Wer immer dieselbe Art Szene
+    /// rendert - und das tun die meisten - bekommt nach zwei Exporten eine Zahl, die
+    /// stimmt.
+    /// </summary>
+    public double ExportSizeFactor { get; set; }
+
+    /// <summary>
     /// Dekodiergroesse als Stufe: 0 = voll, 1 = halb, 2 = viertel. Verlaengert den
     /// Puffervorlauf um das Vier- bzw. Sechzehnfache.
     /// </summary>
@@ -127,6 +173,29 @@ public sealed class AppSettings
     public int BridgePort { get; set; } = 47823;
 
     /// <summary>
+    /// Die Seite zum Zusehen im Browser, ueber den Relay.
+    ///
+    /// Aus, solange niemand sie einschaltet. Eine Verbindung nach draussen, die man
+    /// nicht bestellt hat, ist genau die Art Ueberraschung, die ein Programm nicht
+    /// bereiten soll - und die Vorschau selbst braucht sie nicht.
+    ///
+    /// Der Weg fuehrt bewusst ueber denselben Relay wie die Kopplung ans Handy und
+    /// nicht ueber einen eigenen Server im Heimnetz. Ein eigener Server brauchte eine
+    /// Oeffnung in der Firewall, also einen Weg von aussen nach innen. So baut
+    /// FrameFlip die Verbindung selbst auf, nach draussen, wie ein Browser auch -
+    /// es gibt keinen Eingang, der offen stehen koennte.
+    /// </summary>
+    public bool WatchEnabled { get; set; }
+
+    /// <summary>
+    /// Zuschauer-Geheimnis und Kennwort, mit DPAPI geschuetzt.
+    ///
+    /// Beides zusammen in einem Feld, siehe <see cref="Remote.WatchStore"/>. Leer
+    /// heisst: Es gibt noch keinen Link; beim Einschalten entsteht einer.
+    /// </summary>
+    public string WatchSecret { get; set; } = string.Empty;
+
+    /// <summary>
     /// Renderfortschritt an ein gekoppeltes Handy weiterreichen.
     ///
     /// Bleibt aus, solange kein Relay eingetragen und kein Handy gekoppelt ist.
@@ -134,6 +203,25 @@ public sealed class AppSettings
     /// aufgebaut und kein Schluessel erzeugt.
     /// </summary>
     public bool RemoteEnabled { get; set; }
+
+    /// <summary>
+    /// Welcher Fassung der Nutzungsbedingungen zugestimmt wurde. 0 heisst: keiner.
+    ///
+    /// Eine Zahl und kein Ja/Nein, damit sich die Zustimmung erneuern laesst. Aendern
+    /// sich die Bedingungen wesentlich, wird <see cref="TermsVersion"/> hochgezaehlt -
+    /// und die alte Zustimmung traegt nicht mehr. Ein Haken, der einmal gesetzt fuer
+    /// immer gilt, waere eine Zustimmung zu etwas, das der Nutzer nie gesehen hat.
+    /// </summary>
+    public int TermsAccepted { get; set; }
+
+    /// <summary>
+    /// Die derzeit gueltige Fassung. Beim Aendern der Bedingungen hochzaehlen.
+    /// </summary>
+    public const int TermsVersion = 1;
+
+    /// <summary>Liegt eine Zustimmung zur aktuellen Fassung vor?</summary>
+    [JsonIgnore]
+    public bool TermsOk => TermsAccepted >= TermsVersion;
 
     /// <summary>
     /// Wirtsname des Relays, ohne Schema und Pfad - die Verbindung wird immer als
@@ -286,6 +374,22 @@ public sealed class AppSettings
         // Ein leeres Feld heisst "nimm den Standard", nicht "kein Relay". Wer keinen
         // will, schaltet die Fernsteuerung ab - das ist der eindeutige Weg.
         RelayHost = RelayHost?.Trim() is { Length: > 0 } host ? host : DefaultRelayHost;
+
+        /* Ohne Zustimmung geht NICHTS nach draussen.
+         *
+         * Der Riegel sitzt hier und nicht in der Oberflaeche. Die Oberflaeche ist ein
+         * Weg von vielen - es gibt den Einstellungsdialog, die Kopplungstafel, eine von
+         * Hand geaenderte config.json und jeden kuenftigen Weg, den noch niemand
+         * gebaut hat. Jeden einzeln zu sichern hiesse, einen davon zu vergessen.
+         *
+         * Normalize laeuft dagegen bei jedem Laden und bei jeder Uebernahme. Was hier
+         * abgeschaltet wird, bleibt abgeschaltet, ganz gleich wer es eingeschaltet hat.
+         * Die Oberflaeche holt die Zustimmung ein; durchgesetzt wird sie hier. */
+        if (TermsAccepted < TermsVersion)
+        {
+            RemoteEnabled = false;
+            WatchEnabled = false;
+        }
 
         // Eingeschaltet ohne Schluessel waere ein Zustand, den die Oberflaeche
         // anzeigt und der nichts tut. Lieber ehrlich aus.

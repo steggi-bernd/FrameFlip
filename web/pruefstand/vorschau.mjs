@@ -1,0 +1,95 @@
+// Eine Probe des Leuchtturms auf dem eigenen Rechner.
+//
+// Genau das, was Caddy später tut: /w/ liefert die Seite aus, alles andere geht an
+// den Relay - WebSocket-Aufstieg inbegriffen. Dadurch liegen Seite und Relay im
+// selben Herkunftsgebiet, und "connect-src 'self'" in der Inhaltsregel greift hier
+// wie dort. Ohne diesen Gleichlauf prüfte die Vorschau etwas anderes als den Betrieb.
+//
+//   node vorschau.mjs <watch.html> <port> <relay-host:port>
+
+import fs from "node:fs";
+import http from "node:http";
+import net from "node:net";
+import path from "node:path";
+
+const [, , PAGE, PORT = "8090", RELAY = "127.0.0.1:8080"] = process.argv;
+const [relayHost, relayPort] = RELAY.split(":");
+
+const server = http.createServer((request, response) => {
+  if (request.url === "/w" ) {
+    response.writeHead(302, { Location: "/w/" });
+    response.end();
+    return;
+  }
+
+  if (request.url.startsWith("/w/")) {
+    // Genau wie Caddy: Was als Datei danebenliegt, wird ausgeliefert; alles andere
+    // ist die Seite selbst.
+    const name = request.url.slice(3).split("?")[0] || "index.html";
+    const ordner = path.dirname(PAGE);
+
+    const arten = {
+      ".html": "text/html; charset=utf-8",
+      ".js": "text/javascript; charset=utf-8",
+      ".webmanifest": "application/manifest+json; charset=utf-8",
+      ".png": "image/png"
+    };
+
+    // Nur Namen ohne Pfadanteil - ein Aufruf soll nicht aus dem Ordner herausführen.
+    const datei = /^[A-Za-z0-9._-]+$/.test(name) && name !== "index.html"
+      ? path.join(ordner, name)
+      : PAGE;
+
+    if (!fs.existsSync(datei)) { response.writeHead(404); response.end("Nichts hier.\n"); return; }
+
+    response.writeHead(200, {
+      "Content-Type": arten[path.extname(datei)] || "application/octet-stream",
+      "Cache-Control": "no-store",
+      "X-Content-Type-Options": "nosniff",
+      "Referrer-Policy": "no-referrer"
+    });
+
+    // Frisch von der Platte lesen: Beim Anschauen wird oft nachgebessert, und ein
+    // Neustart für jede Änderung wäre die falsche Art von Sorgfalt.
+    response.end(fs.readFileSync(datei));
+    return;
+  }
+
+  // Gewöhnliche Aufrufe an den Relay weiterreichen, etwa /health.
+  const onward = http.request(
+    { host: relayHost, port: Number(relayPort), path: request.url, method: request.method, headers: request.headers },
+    upstream => {
+      response.writeHead(upstream.statusCode || 502, upstream.headers);
+      upstream.pipe(response);
+    });
+
+  onward.on("error", () => { response.writeHead(502); response.end("Leuchtturm antwortet nicht.\n"); });
+  request.pipe(onward);
+});
+
+// Der Aufstieg zum WebSocket geht roh weiter: Die Anfrage noch einmal schreiben,
+// dann beide Richtungen aneinanderlegen. Mehr ist ein Durchgang nicht.
+server.on("upgrade", (request, socket, head) => {
+  const upstream = net.connect(Number(relayPort), relayHost, () => {
+    const lines = [`GET ${request.url} HTTP/1.1`];
+
+    for (let i = 0; i < request.rawHeaders.length; i += 2) {
+      lines.push(`${request.rawHeaders[i]}: ${request.rawHeaders[i + 1]}`);
+    }
+
+    upstream.write(lines.join("\r\n") + "\r\n\r\n");
+    if (head && head.length) upstream.write(head);
+
+    upstream.pipe(socket);
+    socket.pipe(upstream);
+  });
+
+  const give = () => { try { socket.destroy(); } catch { } try { upstream.destroy(); } catch { } };
+
+  upstream.on("error", give);
+  socket.on("error", give);
+});
+
+server.listen(Number(PORT), "127.0.0.1", () => {
+  console.log(`Vorschau auf http://127.0.0.1:${PORT}/w/  (Relay: ${RELAY})`);
+});

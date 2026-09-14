@@ -38,25 +38,43 @@ public partial class FramePreviewWindow : Window
         int start = _frames.FindIndex(f => string.Equals(f, path, StringComparison.OrdinalIgnoreCase));
         _index = start < 0 ? 0 : start;
 
-        Click(Previous, () => Step(-1));
-        Click(Next, () => Step(1));
-        Click(Combine, () => _combine(_frames[_index]));
+        // Ein einzelnes Bild ist nichts zum Blaettern und nichts zum Zusammenfuegen.
+        bool many = _frames.Count > 1;
 
-        // Ein einzelnes Bild ist nichts zum Zusammenfuegen.
-        if (_frames.Count < 2)
-        {
-            Combine.Opacity = 0.45;
-            Previous.Opacity = 0.45;
-            Next.Opacity = 0.45;
-        }
+        Previous.IsEnabled = many;
+        Next.IsEnabled = many;
+        Combine.IsEnabled = many;
+        PositionPill.Visibility = many ? Visibility.Visible : Visibility.Collapsed;
+
+        Hint.Text = Localization.Strings.T(many ? "S_PreviewHintMany" : "S_PreviewHintOne");
 
         KeyDown += OnKey;
 
         // Auch dieses Fenster kann auf einem Bildschirm landen, den es nicht mehr
         // gibt - siehe WindowPlacer.
-        SourceInitialized += (_, _) => WindowPlacer.EnsureVisible(this);
+        SourceInitialized += (_, _) =>
+        {
+            WindowPlacer.EnsureVisible(this);
+
+            // Dieselbe Behandlung wie das Hauptfenster: eigene Leiste, aber echtes
+            // Fensterverhalten beim Ziehen und Andocken.
+            ShellChrome.Attach(this);
+        };
 
         Load();
+    }
+
+    private void OnMinimize(object sender, RoutedEventArgs e) => SystemCommands.MinimizeWindow(this);
+
+    private void OnCloseWindow(object sender, RoutedEventArgs e) => Close();
+
+    private void OnPrevious(object sender, RoutedEventArgs e) => Step(-1);
+
+    private void OnNext(object sender, RoutedEventArgs e) => Step(1);
+
+    private void OnCombine(object sender, RoutedEventArgs e)
+    {
+        if (_frames.Count > 0) _combine(_frames[_index]);
     }
 
     private void OnKey(object sender, KeyEventArgs e)
@@ -109,9 +127,11 @@ public partial class FramePreviewWindow : Window
         {
         }
 
-        if (_frames.Count > 1) parts.Add(Localization.Strings.T("S_OfCount", _index + 1, _frames.Count));
-
         Detail.Text = string.Join("   ·   ", parts);
+
+        // Die Stelle in der Reihe steht rechts, nicht mitten in den Bildangaben:
+        // Sie aendert sich beim Blaettern, die anderen bleiben meist gleich.
+        Position.Text = Localization.Strings.T("S_OfCount", _index + 1, _frames.Count);
     }
 
     /// <summary>
@@ -140,13 +160,6 @@ public partial class FramePreviewWindow : Window
         {
             return null;
         }
-    }
-
-    private void Click(Border button, Action action)
-    {
-        button.MouseLeftButtonUp += (_, _) => action();
-        button.MouseEnter += (_, _) => button.Background = (Brush)FindResource("SurfaceBrush");
-        button.MouseLeave += (_, _) => button.Background = (Brush)FindResource("AppSurface");
     }
 
     private static string Size(long bytes) => bytes switch

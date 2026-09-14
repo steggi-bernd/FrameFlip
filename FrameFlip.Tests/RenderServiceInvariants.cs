@@ -60,6 +60,7 @@ public static class RenderServiceInvariants
                        answers[^1].GetProperty("why").GetString());
 
             settings.LibraryAccessEnabled = true;
+            settings.TermsAccepted = AppSettings.TermsVersion;
             settings.RemoteEnabled = true;
 
             // Mit Bibliothek, aber ohne Render-Erlaubnis: Auch das blosse Nachsehen

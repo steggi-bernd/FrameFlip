@@ -23,6 +23,20 @@ public sealed record ExportRequest
     public int Threads { get; init; }
 
     /// <summary>
+    /// Qualitaetswert, der den des Formats ersetzt. Null laesst die Vorgabe stehen.
+    ///
+    /// Formate ohne CRF - ProRes, GIF - ignorieren ihn; dort entscheidet das Profil
+    /// beziehungsweise die Farbpalette ueber die Guete.
+    /// </summary>
+    public int? Crf { get; init; }
+
+    /// <summary>
+    /// Wie gruendlich der Encoder suchen darf ("veryfast", "medium", "slow").
+    /// Null laesst die Vorgabe des Formats stehen.
+    /// </summary>
+    public string? Speed { get; init; }
+
+    /// <summary>
     /// Anzeigekorrektur, die in das Video eingerechnet werden soll. null laesst das
     /// Material unveraendert - der Regelfall, denn die Korrektur ist zunaechst nur
     /// ein Beurteilungswerkzeug.

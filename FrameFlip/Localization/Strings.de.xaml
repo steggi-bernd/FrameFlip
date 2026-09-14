@@ -308,4 +308,207 @@
     <sys:String x:Key="S_NoFolderSet">kein Ordner gewählt</sys:String>
     <sys:String x:Key="S_ChooseFolder">Wählen …</sys:String>
 
+    <sys:String x:Key="D_Minimize">Minimieren</sys:String>
+    <sys:String x:Key="D_Maximize">Maximieren / Wiederherstellen</sys:String>
+    <sys:String x:Key="D_Restore">Wiederherstellen</sys:String>
+    <sys:String x:Key="D_Close">Fenster schließen</sys:String>
+    <sys:String x:Key="D_Workspace">ARBEITSBEREICH</sys:String>
+    <sys:String x:Key="D_ManageDevices">Gerät verbinden →</sys:String>
+    <sys:String x:Key="D_ResizeNav">Ziehen: Navigationsbreite · Doppelklick: zurücksetzen</sys:String>
+    <sys:String x:Key="D_Smaller">Kleiner · Strg −</sys:String>
+    <sys:String x:Key="D_Larger">Größer · Strg +</sys:String>
+    <sys:String x:Key="D_ResetScale">Skalierung zurücksetzen · Strg 0</sys:String>
+    <sys:String x:Key="D_Layout">Layout</sys:String>
+    <sys:String x:Key="D_LayoutHint">Flächen am Griff anpassen · Strg + / − zum Skalieren</sys:String>
+    <sys:String x:Key="D_Overview">Übersicht</sys:String>
+    <sys:String x:Key="D_Projects">Projekte</sys:String>
+    <sys:String x:Key="D_Settings">Einstellungen</sys:String>
+    <sys:String x:Key="D_Studio">Dein Render-Arbeitsplatz.</sys:String>
+    <sys:String x:Key="D_StudioIntro">Sequenzen ansehen. Render im Blick behalten.</sys:String>
+    <sys:String x:Key="D_Swap">⇄  Bereiche tauschen</sys:String>
+    <sys:String x:Key="D_RenderSession">RENDER-SESSION</sys:String>
+    <sys:String x:Key="D_Ready">Bereit für den nächsten Frame.</sys:String>
+    <sys:String x:Key="D_ReadyHint">Öffne eine Bildsequenz oder starte einen Render in Blender. Mit aktiver FrameFlip-Bridge erscheint der Fortschritt hier automatisch.</sys:String>
+    <sys:String x:Key="D_OpenSequence">Sequenz öffnen</sys:String>
+    <sys:String x:Key="D_BrowseProjects">Projekte ansehen</sys:String>
+    <sys:String x:Key="D_QuickPreview">Ein Tastendruck. Die ganze Sequenz.</sys:String>
+    <sys:String x:Key="D_HotkeyHint">Im Explorer ein Bild auswählen und {0} drücken.</sys:String>
+    <sys:String x:Key="D_System">SYSTEMMONITOR</sys:String>
+    <sys:String x:Key="D_UnknownMetric">— bedeutet: Für diesen Wert liegt noch keine Messung vor.</sys:String>
+    <sys:String x:Key="D_ResizePanels">Ziehen: Flächen aufteilen · Doppelklick: zurücksetzen</sys:String>
+    <sys:String x:Key="D_GpuLoad">GPU-LAST</sys:String>
+    <sys:String x:Key="D_Vram">VRAM</sys:String>
+    <sys:String x:Key="D_GpuTemp">TEMPERATUR</sys:String>
+    <sys:String x:Key="D_Cpu">CPU</sys:String>
+    <sys:String x:Key="D_Ram">RAM</sys:String>
+    <sys:String x:Key="D_Cycles">CYCLES-SPEICHER</sys:String>
+    <sys:String x:Key="D_Remaining">RESTZEIT</sys:String>
+    <sys:String x:Key="D_Still">EINZELBILD</sys:String>
+    <sys:String x:Key="D_Elapsed">{0} vergangen</sys:String>
+    <sys:String x:Key="D_SettingsIntro">Alles an einem Ort. Wiedergabe, Geräte und dein persönlicher Arbeitsbereich.</sys:String>
+    <sys:String x:Key="D_Discard">Änderungen verwerfen</sys:String>
+    <sys:String x:Key="D_Apply">Übernehmen</sys:String>
+    <sys:String x:Key="D_ClassicQr">Klassischer QR-Code (dunkel auf hell)</sys:String>
+    <sys:String x:Key="D_Permissions">Blender &amp; Dateien</sys:String>
+    <sys:String x:Key="D_PermissionsIntro">Lege fest, wie Blender angebunden ist und was dein gekoppeltes Gerät auf diesem PC tun darf.</sys:String>
+    <sys:String x:Key="D_BlenderBridge">FrameFlip-Bridge für Renderstatus aktivieren</sys:String>
+    <sys:String x:Key="D_FileRead">Dateien aus dem Austauschordner lesen erlauben</sys:String>
+    <sys:String x:Key="D_Appearance">Arbeitsbereich</sys:String>
+    <sys:String x:Key="D_AppearanceIntro">Diese Anpassungen werden sofort angewendet und gespeichert. Bei wenig Platz ordnen sich die Bereiche automatisch untereinander an.</sys:String>
+    <sys:String x:Key="D_UiScale">Oberflächenskalierung</sys:String>
+    <sys:String x:Key="D_TileSize">Größe der Systemkacheln</sys:String>
+    <sys:String x:Key="D_MonitorShare">Breite des Systembereichs</sys:String>
+    <sys:String x:Key="D_NavigationWidth">Breite der Navigation</sys:String>
+    <sys:String x:Key="D_MonitorFirst">Systemmonitor zuerst anzeigen</sys:String>
+    <sys:String x:Key="D_ReduceMotion">Bewegung reduzieren</sys:String>
+    <sys:String x:Key="D_ResetLayout">Standardlayout wiederherstellen</sys:String>
+    <sys:String x:Key="D_SaveToPair">Fernsteuerung aktivieren und übernehmen, um den Kopplungscode anzuzeigen.</sys:String>
+    <sys:String x:Key="D_BlenderRequired">Bitte Fernsteuerung aktivieren und eine vorhandene blender.exe auswählen.</sys:String>
+    <sys:String x:Key="D_FolderRequired">Bitte Fernsteuerung aktivieren und einen vorhandenen Austauschordner auswählen.</sys:String>
+    <sys:String x:Key="D_ReadRequired">Zum Ablegen von Dateien muss auch der Lesezugriff aktiviert sein.</sys:String>
+    <sys:String x:Key="D_Saved">Einstellungen übernommen.</sys:String>
+    <sys:String x:Key="D_Preview">UI-VORSCHAU</sys:String>
+    <sys:String x:Key="D_PreviewHint">UI-Vorschau · Hintergrunddienste sind in dieser Kopie pausiert.</sys:String>
+
+    <!-- Dashboard: Titelzeile, Reiter -->
+    <sys:String x:Key="D_NavDashboard">Übersicht</sys:String>
+    <sys:String x:Key="D_NavProjects">Projekte</sys:String>
+    <sys:String x:Key="D_NavSettings">Einstellungen</sys:String>
+    <sys:String x:Key="D_Idle">bereit</sys:String>
+    <sys:String x:Key="D_Rendering">rendert</sys:String>
+
+    <!-- Dashboard: Sequenzspalte -->
+    <sys:String x:Key="D_Sequences">SEQUENZEN</sys:String>
+    <sys:String x:Key="D_Open">ÖFFNEN</sys:String>
+    <sys:String x:Key="D_ShowQr">QR ZEIGEN</sys:String>
+    <sys:String x:Key="D_TagGaps">LÜCKEN</sys:String>
+    <sys:String x:Key="D_Today">heute</sys:String>
+    <sys:String x:Key="D_Yesterday">gestern</sys:String>
+
+    <!-- Dashboard: Bühne und Transport -->
+    <sys:String x:Key="D_StageEmpty">Kein Frame geladen.</sys:String>
+    <sys:String x:Key="D_Newest">NEUESTER</sys:String>
+    <sys:String x:Key="D_Fit">EINPASSEN</sys:String>
+    <sys:String x:Key="D_Play">ABSPIELEN</sys:String>
+    <sys:String x:Key="D_Pause">PAUSE</sys:String>
+    <sys:String x:Key="D_Loop">SCHLEIFE</sys:String>
+    <sys:String x:Key="D_SetIn">START SETZEN</sys:String>
+    <sys:String x:Key="D_SetOut">ENDE SETZEN</sys:String>
+    <sys:String x:Key="D_JumpIn">Zum Startpunkt</sys:String>
+    <sys:String x:Key="D_JumpOut">Zum Endpunkt</sys:String>
+    <sys:String x:Key="D_StepBack">Ein Bild zurück</sys:String>
+    <sys:String x:Key="D_StepForward">Ein Bild vor</sys:String>
+    <sys:String x:Key="D_InOut">START {0} · ENDE {1} · {2} Bilder</sys:String>
+
+    <!-- Dashboard: rechte Spalte -->
+    <sys:String x:Key="D_Metrics">METRIKEN</sys:String>
+    <sys:String x:Key="D_Log">PROTOKOLL</sys:String>
+    <sys:String x:Key="D_Gaps">LÜCKEN</sys:String>
+    <sys:String x:Key="D_FrameOf">{0} / {1}</sys:String>
+    <sys:String x:Key="D_SampleOf">{0} / {1}</sys:String>
+    <sys:String x:Key="D_SecPerFrame">SEKUNDEN JE BILD</sys:String>
+    <sys:String x:Key="D_Written">GESCHRIEBEN</sys:String>
+    <sys:String x:Key="D_Slowest">LANGSAMSTES</sys:String>
+    <sys:String x:Key="D_Remote">FERNSTEUERUNG</sys:String>
+    <sys:String x:Key="D_PairDevice">GERÄT KOPPELN</sys:String>
+    <sys:String x:Key="D_OpenFolder">ORDNER ÖFFNEN</sys:String>
+    <sys:String x:Key="D_ExportVideo">VIDEO EXPORTIEREN</sys:String>
+    <sys:String x:Key="D_NoActivity">Keine Aktivität.</sys:String>
+    <sys:String x:Key="D_LogStarted">FrameFlip gestartet.</sys:String>
+    <sys:String x:Key="D_LogOpened">{0} geöffnet · {1} Bilder.</sys:String>
+    <sys:String x:Key="D_LogSaved">{0} geschrieben.</sys:String>
+    <sys:String x:Key="D_GapsIntro">{0} · {1} fehlende Bilder.</sys:String>
+    <sys:String x:Key="D_GapsNone">Keine Sequenz geöffnet.</sys:String>
+    <sys:String x:Key="D_GapsClean">Lückenlos.</sys:String>
+    <sys:String x:Key="D_GapsList">Fehlt: {0}</sys:String>
+    <sys:String x:Key="D_Pending">AUSSTEHEND</sys:String>
+    <sys:String x:Key="D_Missing">FEHLT</sys:String>
+
+    <!-- Dashboard: Statuszeile -->
+    <sys:String x:Key="D_NMissing">{0} fehlen</sys:String>
+    <sys:String x:Key="D_Overlay">Overlay</sys:String>
+    <sys:String x:Key="D_RelayConnected">Gerät verbunden</sys:String>
+    <sys:String x:Key="D_RelayWaiting">wartet auf Gerät</sys:String>
+    <sys:String x:Key="D_RelayOff">Fernsteuerung aus</sys:String>
+
+
+    <!-- Dashboard: Sequenzspalte als Renderliste -->
+    <sys:String x:Key="D_NoRenders">Noch kein Render aufgezeichnet. Sobald du in Blender mit aktiver FrameFlip-Bridge renderst, steht die Datei hier. Mit ÖFFNEN lässt sich eine Bildsequenz auch von Hand laden.</sys:String>
+    <sys:String x:Key="D_NoOutput">kein Render aufgezeichnet</sys:String>
+    <sys:String x:Key="D_OpenHint">Bildsequenz von Hand öffnen</sys:String>
+    <sys:String x:Key="D_ImageFilter">Bildsequenz</sys:String>
+    <sys:String x:Key="D_StageNoFrames">Im Ausgabeordner liegt kein lesbares Bild.</sys:String>
+    <sys:String x:Key="D_StageNoOutput">Für diese Datei ist noch kein Ausgabeordner bekannt. Er wird beim nächsten Render über die Bridge vermerkt.</sys:String>
+
+    <!-- Projekte: durchsuchte Ordner -->
+    <sys:String x:Key="D_WatchedFolders">DURCHSUCHTE ORDNER</sys:String>
+    <sys:String x:Key="D_RemoveFolder">Ordner nicht mehr durchsuchen</sys:String>
+    <sys:String x:Key="D_FolderGone">nicht gefunden</sys:String>
+
+
+    <!-- Dashboard: Bildrate, Mitlaufen, Kopplung -->
+    <sys:String x:Key="D_Rate">Bildrate</sys:String>
+    <sys:String x:Key="D_RateHint">Bildrate der Wiedergabe – aus der Liste wählen oder frei eintippen (1 bis 240).</sys:String>
+    <sys:String x:Key="D_FollowHint">Beim neuesten Bild bleiben, während weiter gerendert wird</sys:String>
+    <sys:String x:Key="D_PairTitle">GERÄT KOPPELN</sys:String>
+    <sys:String x:Key="D_PairOff">Die Fernsteuerung ist ausgeschaltet. Einschalten legt einen Kopplungsschlüssel an und zeigt den Code.</sys:String>
+    <sys:String x:Key="D_PairEnable">Einschalten</sys:String>
+    <sys:String x:Key="D_PairFailed">Der Schlüssel ließ sich nicht ablegen.</sys:String>
+    <sys:String x:Key="D_LogPairing">Fernsteuerung eingeschaltet.</sys:String>
+
+    <sys:String x:Key="D_ClearRecent">LISTE LEEREN</sys:String>
+    <sys:String x:Key="D_Preloading">VORAUSLADEN</sys:String>
+    <sys:String x:Key="D_PaceFast">SCHNELL</sys:String>
+    <sys:String x:Key="D_PaceMedium">MITTEL</sys:String>
+    <sys:String x:Key="D_PaceSlow">LANGSAM</sys:String>
+    <sys:String x:Key="D_PaceRendering">Es wird gerendert – FrameFlip laedt zurueckhaltend, damit Blender die Kerne behaelt.</sys:String>
+    <sys:String x:Key="D_PaceBusy">Die Maschine ist ausgelastet – es wird mit einem Kern geladen.</sys:String>
+    <sys:String x:Key="D_LogPreload">Vorausladen gestartet ({0} Bilder).</sys:String>
+    <sys:String x:Key="D_LogPreloadDone">{0} Bilder im Speicher.</sys:String>
+    <sys:String x:Key="D_LogPreloadPart">Nur {0} von {1} Bildern passten ins Budget.</sys:String>
+    <sys:String x:Key="D_LogPreloadStop">Vorausladen abgebrochen.</sys:String>
+    <sys:String x:Key="D_Prebuffer">VORLADEN</sys:String>
+    <sys:String x:Key="D_PrebufferHint">Vor dem Abspielen die ganze Folge in den Speicher lesen – danach laeuft sie ohne Stocken.</sys:String>
+    <sys:String x:Key="D_PrepareVideo">VIDEO VORBEREITEN</sys:String>
+    <sys:String x:Key="D_PrepareVideoHint">Waehrend die Folge laeuft, nebenher schon ein Video kodieren. Es liegt im Temp-Ordner und wird nur gespeichert, wenn du exportierst – der Export dauert dann nur noch den Kopiervorgang.</sys:String>
+    <sys:String x:Key="D_LogPrepare">Video wird im Hintergrund vorbereitet.</sys:String>
+    <sys:String x:Key="D_LogPrepareReady">Vorbereitetes Video war schon da.</sys:String>
+    <sys:String x:Key="D_LogPrepareDone">Video vorbereitet.</sys:String>
+    <sys:String x:Key="D_LogPrepareFailed">Vorbereitung fehlgeschlagen: {0}</sys:String>
+    <sys:String x:Key="D_ExportReady">Fertig vorbereitet – der Export kopiert nur noch.</sys:String>
+    <sys:String x:Key="D_PaceNarrow">In {0} statt {1} Punkten Breite gelesen, damit die ganze Folge in den Speicher passt.</sys:String>
+    <sys:String x:Key="S_PreviewHintMany">Mit den Pfeiltasten blättern · Eingabe oder Leertaste fügt zusammen · Esc schließt</sys:String>
+    <sys:String x:Key="S_PreviewHintOne">Ein einzelnes Bild – zum Zusammenfügen braucht es mehrere im selben Ordner.</sys:String>
+    <sys:String x:Key="S_WatchNoRelay">Ohne brauchbare Relay-Adresse gibt es keine Seite zum Zusehen.</sys:String>
+    <sys:String x:Key="D_Watch">IM BROWSER ZUSEHEN</sys:String>
+    <sys:String x:Key="D_WatchOff">Aus. Eingeschaltet zeigt eine Seite im Browser den Fortschritt und das neueste Bild – nur lesen, sonst nichts.</sys:String>
+    <sys:String x:Key="D_WatchOn">Im Browser öffnen, überall. Zeigt nur Zahlen und das neueste Bild, und nur solange FrameFlip läuft.</sys:String>
+    <sys:String x:Key="D_WatchNoRelay">Keine brauchbare Relay-Adresse eingetragen – unter Einstellungen nachtragen.</sys:String>
+    <sys:String x:Key="D_WatchRenew">Link erneuern</sys:String>
+    <sys:String x:Key="D_WatchPass">Kennwort ab dem dritten Zuschauer</sys:String>
+    <sys:String x:Key="D_WatchPassHint">Die ersten beiden kommen mit dem Link allein herein. Wer als Dritter dazu will, braucht dieses Kennwort. Leer lassen heißt: höchstens zwei.</sys:String>
+    <sys:String x:Key="D_WatchNobody">Niemand sieht gerade zu.</sys:String>
+    <sys:String x:Key="D_WatchOneViewer">Eine Person sieht zu.</sys:String>
+    <sys:String x:Key="D_WatchViewers">{0} Personen sehen zu.</sys:String>
+    <sys:String x:Key="D_WatchSeats">{0} von {1} Plätzen frei.</sys:String>
+    <sys:String x:Key="D_WatchLocked">Zu viele Fehlversuche am Kennwort – die hinteren Plätze bleiben noch {0} Minuten zu.</sys:String>
+    <sys:String x:Key="D_WatchRenewed">Neuer Link erzeugt – der alte gilt nicht mehr.</sys:String>
+    <sys:String x:Key="D_WatchPassSet">Kennwort gesetzt.</sys:String>
+    <sys:String x:Key="D_WatchPassCleared">Kennwort entfernt – jetzt können höchstens zwei zusehen.</sys:String>
+    <sys:String x:Key="D_WatchPassShort">Mindestens vier Zeichen.</sys:String>
+    <sys:String x:Key="D_On">AN</sys:String>
+    <sys:String x:Key="D_Off">AUS</sys:String>
+    <sys:String x:Key="D_LogWatchOn">Seite zum Zusehen eingeschaltet.</sys:String>
+    <sys:String x:Key="D_LogWatchOff">Seite zum Zusehen ausgeschaltet.</sys:String>
+    <sys:String x:Key="D_TermsTitle">BEVOR ES NACH DRAUSSEN GEHT</sys:String>
+    <sys:String x:Key="D_TermsBody">FrameFlip hat bisher ausschließlich auf diesem Rechner gearbeitet. Was du gleich einschaltest, baut eine Verbindung über einen Server im Internet auf.  Alles, was dabei übertragen wird, ist Ende zu Ende verschlüsselt – der Server sieht Zufallsbytes und speichert nichts. Er ist ein unentgeltliches Angebot ohne Zusage auf Verfügbarkeit, und die Nutzung erfolgt auf eigene Gefahr.</sys:String>
+    <sys:String x:Key="D_TermsUse">Nutzungsbedingungen</sys:String>
+    <sys:String x:Key="D_TermsPrivacy">Datenschutz</sys:String>
+    <sys:String x:Key="D_TermsAgree">Ich habe die Nutzungsbedingungen und die Datenschutzerklärung gelesen und nutze den Dienst auf eigene Gefahr.</sys:String>
+    <sys:String x:Key="D_TermsOwnRelay">Der Server ist ein Angebot, keine Voraussetzung: In den Einstellungen lässt sich ein anderer eintragen, und der Quelltext liegt offen – wer möchte, betreibt seinen eigenen.</sys:String>
+    <sys:String x:Key="D_TermsLater">Nicht jetzt</sys:String>
+    <sys:String x:Key="D_TermsGo">Zustimmen und einschalten</sys:String>
+    <sys:String x:Key="D_TermsAccepted">Zugestimmt – Verbindungen nach draußen sind jetzt erlaubt.</sys:String>
+    <sys:String x:Key="D_TermsDeclined">Nicht zugestimmt – es geht nichts nach draußen.</sys:String>
+    <sys:String x:Key="S_TermsMissing">Ohne Zustimmung zu den Nutzungsbedingungen baut FrameFlip keine Verbindung nach draußen auf.</sys:String>
 </ResourceDictionary>

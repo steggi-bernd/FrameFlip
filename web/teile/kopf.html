@@ -1,0 +1,472 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+<meta name="robots" content="noindex, nofollow">
+<meta name="referrer" content="no-referrer">
+<!--
+  connect-src nennt das Schema AUSDRUECKLICH, nicht nur 'self'.
+
+  WebKit - also jedes Safari und alles auf einem iPhone - rechnet 'self' bei
+  WebSockets nicht auf wss:// an. Die Seite laedt dann ganz normal, und die
+  Verbindung zum Leuchtturm wird stumm verworfen: Bild und Zahlen bleiben leer,
+  ohne dass irgendwo etwas steht. Am Schreibtisch faellt es nicht auf, weil
+  Chromium und Firefox es grosszuegiger auslegen.
+
+  Die engere Fassung mit dem genauen Wirtsnamen setzt Caddy als Kopfzeile dazu;
+  beide Regeln gelten dann gleichzeitig, und es gilt die Schnittmenge.
+
+  script-src braucht 'self'. Ein Dienstarbeiter erbt die Regel aus der Antwort
+  seines eigenen Skripts, und ohne 'self' verbiete er damit sich selbst - die
+  Anmeldung scheitert dann mit "An unknown error occurred when fetching the script",
+  und die Seite laesst sich nicht als Programm ablegen.
+
+  STATT 'unsafe-inline' stehen hier PRUEFSUMMEN des einen Skripts und des einen
+  Stilblocks. Der Unterschied ist der ganze Sinn: 'unsafe-inline' erlaubt JEDEN
+  Inline-Code, also auch eingeschleusten. Eine Pruefsumme erlaubt genau diesen einen
+  Block und sonst nichts. Selbst wenn es je gelaenge, Markup in die Seite zu bringen,
+  liefe daraus kein Code.
+
+  Die Werte setzt der Zusammenbau ein (web/bauen.py). Von Hand geaendert wird hier
+  nichts - eine falsche Pruefsumme heisst: leere Seite.
+-->
+<meta http-equiv="Content-Security-Policy"
+      content="default-src 'none'; img-src 'self' blob: data:; style-src __STYLE_HASH__; script-src 'self' __SCRIPT_HASH__; connect-src 'self' wss: ws:; manifest-src 'self'; worker-src 'self'; base-uri 'none'; form-action 'none'">
+
+<title>FrameFlip</title>
+
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icon-192.png" sizes="192x192">
+<link rel="apple-touch-icon" href="icon-192.png">
+<meta name="theme-color" content="#07070d">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="FrameFlip">
+
+<style>
+  :root {
+    --bg: #07070d;      --panel: #0b0b14;   --stage: #05050a;
+    --surface: #11111b; --line: #1e1e2b;    --ink: #f4f4f8;
+    --muted: #9b9bb0;   --faint: #6b6b80;   --accent: #a855f7;
+    --blue: #60a5fa;    --cyan: #22d3ee;    --warn: #f472b6;
+    --mono: ui-monospace, "Cascadia Mono", "SF Mono", Menlo, Consolas, monospace;
+    --sans: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+
+    /* Elastisch statt fest.
+
+       Jede Groesse waechst mit der Flaeche, aber innerhalb von Grenzen: clamp()
+       nennt kleinsten Wert, gewuenschten und groessten. Auf einem schmalen Handy
+       wird nichts unleserlich klein, auf einem grossen Schirm nichts laecherlich
+       verloren - und dazwischen gibt es keinen Sprung, an dem es kippt. */
+    --pad: clamp(12px, 2.2vw, 22px);
+    --gap: clamp(10px, 1.6vw, 18px);
+    --t-label: clamp(8px, .95vw, 9.5px);
+    --t-small: clamp(9.5px, 1.05vw, 11.5px);
+    --t-body: clamp(11px, 1.25vw, 13.5px);
+    --t-mark: clamp(13px, 1.5vw, 16px);
+    --t-huge: clamp(28px, 4.4vw, 46px);
+  }
+
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+
+  html, body {
+    margin: 0; height: 100%; overflow: hidden;
+    background: var(--bg); color: var(--ink);
+    font-family: var(--sans);
+    -webkit-text-size-adjust: 100%;
+  }
+
+  body {
+    display: flex; flex-direction: column;
+    padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
+  }
+
+  /* ------------------------------------------------------------- Kopfzeile */
+  header {
+    display: flex; align-items: center; gap: 10px;
+    padding: clamp(10px, 1.4vw, 16px) var(--pad);
+    border-bottom: 1px solid var(--line);
+    background: var(--panel); flex: none;
+  }
+
+  .mark { font-weight: 650; letter-spacing: .04em; font-size: var(--t-mark); }
+
+  .dot {
+    width: 8px; height: 8px; border-radius: 50%;
+    background: var(--faint); flex: none;
+    transition: background .3s, box-shadow .3s;
+  }
+  .dot.live { background: var(--accent); box-shadow: 0 0 10px var(--accent); }
+  .dot.idle { background: var(--blue); }
+  .dot.gone { background: var(--warn); }
+
+  .standing {
+    font-size: var(--t-small); color: var(--muted);
+    margin-left: auto; text-align: right;
+  }
+
+  .install {
+    flex: none; padding: 6px 11px; border-radius: 999px;
+    background: color-mix(in srgb, var(--accent) 16%, transparent);
+    border: 1px solid color-mix(in srgb, var(--accent) 45%, transparent);
+    color: var(--accent); font-size: var(--t-label); font-weight: 600;
+    letter-spacing: .08em; text-transform: uppercase;
+    cursor: pointer; display: none; white-space: nowrap;
+  }
+  .install.on { display: block; }
+  .install:hover { background: color-mix(in srgb, var(--accent) 26%, transparent); }
+
+  /* ------------------------------------------------------------- Rumpf */
+  main {
+    flex: 1; min-height: 0;
+    display: grid; gap: 1px;
+    background: var(--line);
+    grid-template-rows: minmax(38vh, auto) 1fr;
+  }
+
+  /* Quer und am Schreibtisch nebeneinander, hoch untereinander. Die Schwelle
+     liegt am Seitenverhaeltnis, nicht an der Breite: Ein Handy im Querformat ist
+     schmal und hat trotzdem Platz fuer zwei Spalten. Die Seitenspalte waechst mit
+     dem Schirm, statt bei einer festen Breite stehenzubleiben. */
+  @media (min-aspect-ratio: 1/1) {
+    main {
+      grid-template-rows: 1fr;
+      grid-template-columns: 1fr clamp(240px, 26vw, 380px);
+    }
+  }
+
+  /* ------------------------------------------------------------- Bühne */
+  .stage {
+    position: relative; background: var(--stage);
+    display: flex; align-items: center; justify-content: center;
+    min-height: 0; overflow: hidden; touch-action: none;
+  }
+
+  /* KEIN transform-origin hier.
+     Es stand einmal auf "0 0", waehrend die Rechnung von der Mitte ausging - das
+     Bild wuchs dadurch aus der oberen linken Ecke heraus, egal wo der Zeiger war.
+     Die Voreinstellung ist die Mitte, und genau damit rechnet die Ansicht. */
+  .stage img, .vstage img {
+    max-width: 100%; max-height: 100%;
+    display: block; cursor: zoom-in;
+    user-select: none; -webkit-user-drag: none;
+  }
+  .stage img.grab, .vstage img.grab { cursor: grab; }
+  .stage img.grabbing, .vstage img.grabbing { cursor: grabbing; }
+
+  .stage .empty {
+    color: var(--faint); font-size: var(--t-small);
+    text-align: center; padding: 24px; line-height: 1.7; max-width: 32em;
+  }
+
+  /* Werkzeuge auf der Bühne - erscheinen nur, wenn es ein Bild gibt. */
+  .tools {
+    position: absolute; left: 50%; bottom: 10px; transform: translateX(-50%);
+    display: none; align-items: center; gap: 2px; padding: 4px;
+    background: rgba(11, 11, 20, .86); border: 1px solid var(--line);
+    border-radius: 11px; backdrop-filter: blur(8px);
+  }
+  .tools.on { display: flex; }
+
+  .tools button, .vtools button {
+    min-width: 32px; height: 30px; padding: 0 8px;
+    background: transparent; border: 0; border-radius: 8px;
+    color: var(--muted); font-family: var(--mono); font-size: 13px;
+    cursor: pointer; line-height: 1;
+  }
+  .tools button:hover, .vtools button:hover { background: var(--surface); color: var(--ink); }
+  .tools .level, .vtools .level {
+    min-width: 48px; text-align: center; color: var(--faint);
+    font-size: 10.5px; font-family: var(--mono); cursor: default;
+  }
+  .tools .sep, .vtools .sep { width: 1px; height: 18px; background: var(--line); margin: 0 3px; }
+
+  /* ------------------------------------------------------------- Seite */
+  .side {
+    background: var(--panel);
+    overflow-y: auto; -webkit-overflow-scrolling: touch;
+    padding: var(--pad);
+  }
+
+  /* ---------------------------------------------------- Zustand & Fortschritt */
+  .state { display: flex; align-items: center; gap: 8px; margin-bottom: var(--gap); }
+
+  .chip {
+    font-size: var(--t-label); letter-spacing: .14em; text-transform: uppercase;
+    padding: 4px 9px; border-radius: 999px; font-weight: 600;
+    color: var(--faint); background: var(--surface); border: 1px solid var(--line);
+    white-space: nowrap;
+  }
+  .chip.live {
+    color: var(--accent); border-color: color-mix(in srgb, var(--accent) 45%, transparent);
+    background: color-mix(in srgb, var(--accent) 14%, transparent);
+  }
+  .chip.idle { color: var(--blue); border-color: color-mix(in srgb, var(--blue) 40%, transparent); }
+
+  .scene {
+    font-size: var(--t-small); color: var(--muted);
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  }
+
+  .headline { display: flex; align-items: baseline; gap: 10px; margin-bottom: 10px; }
+
+  .headline .pct {
+    font-family: var(--mono); font-size: var(--t-huge); line-height: 1;
+    font-variant-numeric: tabular-nums; letter-spacing: -.02em;
+  }
+  .headline .pct small { font-size: .42em; color: var(--faint); margin-left: 2px; }
+
+  .headline .frames {
+    margin-left: auto; text-align: right;
+    font-family: var(--mono); font-size: var(--t-body); color: var(--muted);
+    font-variant-numeric: tabular-nums;
+  }
+  .headline .frames b { color: var(--ink); font-weight: 500; }
+
+  .bar { height: 6px; border-radius: 3px; background: var(--surface); overflow: hidden; position: relative; }
+  .bar i {
+    position: absolute; inset: 0 auto 0 0; display: block;
+    background: linear-gradient(90deg, var(--accent), var(--cyan));
+    width: 0; transition: width .45s ease; border-radius: 3px;
+  }
+
+  .times {
+    display: flex; justify-content: space-between;
+    margin: 7px 0 var(--gap); font-size: var(--t-label); color: var(--faint);
+    font-family: var(--mono); font-variant-numeric: tabular-nums;
+  }
+  .times b { color: var(--muted); font-weight: 400; }
+
+  /* ------------------------------------------------------------- Zahlen */
+  .grid {
+    display: grid; gap: var(--gap) clamp(10px, 1.6vw, 20px);
+    grid-template-columns: repeat(auto-fit, minmax(clamp(78px, 8vw, 104px), 1fr));
+  }
+
+  .cell label {
+    display: block; font-size: var(--t-label); letter-spacing: .12em;
+    text-transform: uppercase; color: var(--faint); margin-bottom: 3px;
+  }
+  .cell output {
+    font-family: var(--mono); font-size: var(--t-body);
+    font-variant-numeric: tabular-nums; color: var(--ink);
+  }
+
+  .rule { grid-column: 1 / -1; height: 1px; background: var(--line); margin: 1px 0; }
+
+  /* -------------------------------------------------------- Bild sichern */
+  .save {
+    width: 100%; margin-top: calc(var(--gap) + 4px);
+    padding: clamp(10px, 1.3vw, 14px); border-radius: 10px;
+    background: var(--surface); border: 1px solid var(--line);
+    color: var(--ink); font-family: inherit; font-size: var(--t-small);
+    font-weight: 600; letter-spacing: .03em; cursor: pointer;
+    display: none; align-items: center; justify-content: center; gap: 8px;
+  }
+  .save.on { display: flex; }
+  .save:hover { border-color: color-mix(in srgb, var(--accent) 55%, transparent); color: var(--accent); }
+  .save b { font-family: var(--mono); font-weight: 400; color: var(--faint); }
+
+  /* Die Fussnote gehoert unter die Zahlen, nicht in einen eigenen Balken quer
+     ueber die Seite: Sie ist eine Randbemerkung, kein Bedienelement. */
+  .note {
+    margin-top: var(--gap); padding-top: 12px; border-top: 1px solid var(--line);
+    font-size: var(--t-label); line-height: 1.7; color: var(--faint);
+    display: flex; justify-content: space-between; align-items: center; gap: 10px;
+    flex-wrap: wrap;
+  }
+  .note a { color: var(--faint); text-decoration: underline; }
+  .note a:hover { color: var(--muted); }
+
+  .note button {
+    background: transparent; border: 0; padding: 0;
+    color: var(--faint); font-size: var(--t-label); text-decoration: underline;
+    cursor: pointer; font-family: inherit; white-space: nowrap;
+  }
+  .note button:hover { color: var(--muted); }
+
+  /* --------------------------------------------------- Isolierte Vorschau */
+  .viewer { position: fixed; inset: 0; z-index: 20; background: #04040a; display: none; }
+  .viewer.on { display: block; }
+
+  .vstage {
+    position: absolute; inset: 0;
+    display: flex; align-items: center; justify-content: center;
+    overflow: hidden; touch-action: none;
+  }
+  .vstage img { max-width: 94%; max-height: 84%; }
+
+  .vtools {
+    position: absolute; left: 50%; transform: translateX(-50%);
+    bottom: calc(18px + env(safe-area-inset-bottom));
+    display: flex; align-items: center; gap: 2px; padding: 4px;
+    background: rgba(11, 11, 20, .9); border: 1px solid var(--line);
+    border-radius: 12px; backdrop-filter: blur(8px);
+  }
+
+  .vclose {
+    position: absolute; right: 12px;
+    top: calc(12px + env(safe-area-inset-top));
+    width: 38px; height: 38px; border-radius: 50%;
+    background: rgba(11, 11, 20, .9); border: 1px solid var(--line);
+    color: var(--muted); font-size: 15px; cursor: pointer; line-height: 1;
+  }
+  .vclose:hover { color: var(--ink); background: var(--surface); }
+
+  /* ------------------------------------------------------------- Kennwort */
+  .ask {
+    position: fixed; inset: 0; z-index: 30;
+    /* Deckend, nicht durchscheinend: Wer nach einem Kennwort gefragt wird, soll
+       nichts sehen, was er ohne Kennwort nicht sehen duerfte. */
+    background: var(--bg);
+    display: none; align-items: center; justify-content: center; padding: 24px;
+  }
+  .ask.on { display: flex; }
+
+  .ask form {
+    background: var(--panel); border: 1px solid var(--line);
+    border-radius: 14px; padding: clamp(20px, 3vw, 30px);
+    width: 100%; max-width: 340px; text-align: center;
+  }
+  .ask h2 { margin: 0 0 8px; font-size: var(--t-mark); font-weight: 600; }
+  .ask p  { margin: 0 0 18px; font-size: var(--t-small); color: var(--muted); line-height: 1.6; }
+
+  .ask input {
+    width: 100%; padding: 11px 12px; text-align: center;
+    font-family: var(--mono); font-size: 16px; letter-spacing: .1em;
+    color: var(--ink); background: var(--surface);
+    border: 1px solid var(--line); border-radius: 9px;
+  }
+  .ask input:focus { outline: none; border-color: var(--accent); }
+
+  .ask button[type=submit] {
+    width: 100%; margin-top: 12px; padding: 11px;
+    font-size: var(--t-small); font-weight: 600; letter-spacing: .04em;
+    color: #0b0b14; background: var(--accent);
+    border: 0; border-radius: 9px; cursor: pointer;
+  }
+  .ask .wrong { color: var(--warn); font-size: var(--t-small); margin: 12px 0 0; min-height: 14px; }
+</style>
+</head>
+<body>
+
+<header>
+  <span class="dot" id="dot"></span>
+  <span class="mark">FrameFlip</span>
+  <button class="install" id="install">Install</button>
+  <span class="standing" id="standing">connecting …</span>
+</header>
+
+<main>
+  <div class="stage" id="stage">
+    <div class="empty" id="empty">No frame yet.</div>
+
+    <div class="tools" id="tools">
+      <button id="zoomOut" title="Zoom out" aria-label="Zoom out">−</button>
+      <span class="level" id="level">100 %</span>
+      <button id="zoomIn" title="Zoom in" aria-label="Zoom in">+</button>
+      <span class="sep"></span>
+      <button id="zoomFit" title="Fit" aria-label="Fit">⤢</button>
+    </div>
+  </div>
+
+  <div class="side">
+    <div class="state">
+      <span class="chip" id="chip">waiting</span>
+      <span class="scene" id="scene"></span>
+    </div>
+
+    <div class="headline">
+      <!-- Feste Bausteine, wechselnder Text.
+
+           Frueher wurde hier innerHTML zusammengesetzt - mit Werten, die aus der
+           Leitung kamen. Wer am anderen Ende sitzt, haette damit Markup einschleusen
+           koennen. Jetzt steht die Form im Dokument und es wechselt nur noch
+           textContent; einschleusen laesst sich dort nichts. -->
+      <span class="pct"><span id="percent">–</span><small>%</small></span>
+      <span class="frames"><b id="frameNow">–</b><span id="frameOf"></span></span>
+    </div>
+
+    <div class="bar"><i id="barFill"></i></div>
+
+    <div class="times">
+      <span>elapsed <b id="elapsed">–</b></span>
+      <span>remaining <b id="remaining">–</b></span>
+    </div>
+
+    <div class="grid">
+      <div class="cell"><label>Per frame</label><output id="spf">–</output></div>
+      <div class="cell"><label>Written</label><output id="written">–</output></div>
+      <div class="cell"><label>Samples</label><output id="sample">–</output></div>
+
+      <div class="rule"></div>
+
+      <div class="cell"><label>Resolution</label><output id="size">–</output></div>
+      <div class="cell"><label>Memory</label><output id="memory">–</output></div>
+      <div class="cell"><label>RAM free</label><output id="ram">–</output></div>
+
+      <div class="rule"></div>
+
+      <div class="cell"><label>CPU</label><output id="cpu">–</output></div>
+      <div class="cell"><label>GPU</label><output id="gpu">–</output></div>
+    </div>
+
+    <button class="save" id="save">↓ Save this frame <b id="saveName"></b></button>
+
+    <div class="note">
+      <span>View only · End-to-end encrypted</span>
+      <span>
+        <a href="../recht/datenschutz.html">Privacy</a> ·
+        <a href="../recht/nutzungsbedingungen.html">Terms</a>
+      </span>
+      <button id="forget" title="Remove this device's access">Forget access</button>
+    </div>
+  </div>
+</main>
+
+<!-- Die isolierte Vorschau. Eigene Flaeche, eigene Ansicht - damit das Bild nicht
+     mit der Seite um den Platz streiten muss. -->
+<div class="viewer" id="viewer" aria-hidden="true">
+  <div class="vstage" id="vstage"></div>
+
+  <div class="vtools">
+    <button id="vOut" title="Zoom out" aria-label="Zoom out">−</button>
+    <span class="level" id="vLevel">100 %</span>
+    <button id="vIn" title="Zoom in" aria-label="Zoom in">+</button>
+    <span class="sep"></span>
+    <button id="vLeft" title="Rotate left" aria-label="Rotate left">⟲</button>
+    <button id="vRight" title="Rotate right" aria-label="Rotate right">⟳</button>
+    <span class="sep"></span>
+    <button id="vFit" title="Fit" aria-label="Fit">⤢</button>
+    <button id="vSave" title="Save frame" aria-label="Save frame">↓</button>
+  </div>
+
+  <button class="vclose" id="vClose" title="Close" aria-label="Close">✕</button>
+</div>
+
+<div class="ask" id="ask">
+  <form id="askForm" autocomplete="off">
+    <h2>Password</h2>
+    <p>The open seats are taken. To watch as well, enter the password shown on the PC.</p>
+    <input id="askInput" type="password" inputmode="text" autocomplete="off"
+           autocapitalize="off" spellcheck="false" aria-label="Password">
+    <button type="submit">Watch</button>
+    <p class="wrong" id="askWrong"></p>
+  </form>
+</div>
+
+<script>
+"use strict";
+
+/* ===========================================================================
+   Das Protokoll steht in PROTOCOL.md des Relays. Diese Datei ist die zweite
+   Umsetzung davon - die erste ist FrameFlip selbst. Jede Abweichung hier ist ein
+   Bruch der Schnittstelle, kein Detail.
+
+   Was der Server dabei erfaehrt: eine Raumkennung. Sonst nichts. Das Geheimnis
+   steht hinter der Raute der Adresse, und diesen Teil schickt ein Browser
+   grundsaetzlich nicht mit - nicht im Aufruf, nicht im Referrer, nirgends.
+   =========================================================================== */
+

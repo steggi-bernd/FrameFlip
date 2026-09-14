@@ -23,11 +23,11 @@ namespace FrameFlip.Views;
 /// </summary>
 public sealed class QrCodeView : FrameworkElement
 {
-    /// <summary>Ruhezone in Modulen. Vier ist das Minimum der Norm.</summary>
-    private const int Quiet = 4;
-
-    private static readonly Brush Dark = Brushes.Black;
-    private static readonly Brush Light = Brushes.White;
+    public static readonly DependencyProperty LightModulesProperty = DependencyProperty.Register(
+        nameof(LightModules), typeof(bool), typeof(QrCodeView),
+        new FrameworkPropertyMetadata(true, FrameworkPropertyMetadataOptions.AffectsRender));
+    public bool LightModules { get => (bool)GetValue(LightModulesProperty); set => SetValue(LightModulesProperty, value); }
+    private static readonly Brush Surface = new SolidColorBrush(System.Windows.Media.Color.FromRgb(25, 26, 35));
 
     public static readonly DependencyProperty TextProperty = DependencyProperty.Register(
         nameof(Text), typeof(string), typeof(QrCodeView),
@@ -54,7 +54,7 @@ public sealed class QrCodeView : FrameworkElement
             {
                 using var generator = new QRCodeGenerator();
 
-                // Fehlerkorrektur M: haelt einen Viertel Verlust aus. Q oder H waeren
+                // Fehlerkorrektur M: rekonstruiert ungefähr 15 Prozent verlorene Codewörter. Q oder H waeren
                 // robuster, machen den Code aber dichter - auf einem Bildschirm, der
                 // weder knittert noch verschmutzt, ist das der falsche Tausch.
                 using QRCodeData data = generator.CreateQrCode(text, QRCodeGenerator.ECCLevel.M);
@@ -77,13 +77,13 @@ public sealed class QrCodeView : FrameworkElement
         double side = Math.Min(ActualWidth, ActualHeight);
         if (side <= 0) return;
 
-        // Der weisse Grund gehoert zum Code, nicht zur Gestaltung: Ein dunkles Thema
-        // hinter einem QR-Code kehrt den Kontrast um, und viele Leser geben dann auf.
-        context.DrawRectangle(Light, null, new Rect(0, 0, side, side));
+        // Beide Varianten erhalten Kontrast, Ruhezone und unveränderte Module.
+        context.DrawRectangle(LightModules ? Surface : Brushes.White, null, new Rect(0, 0, side, side));
 
         if (_modules is not { Length: > 0 }) return;
 
-        int count = _modules.Length + Quiet * 2;
+        // QRCoder enthält bereits die vier Module Ruhezone.
+        int count = _modules.Length;
 
         // Auf ganze Pixel abrunden, sonst liegen die Modulkanten zwischen zwei
         // Geraetepixeln und der Code wird grau statt schwarzweiss.
@@ -91,7 +91,7 @@ public sealed class QrCodeView : FrameworkElement
         if (scale <= 0) return;
 
         double drawn = scale * count;
-        double offset = Math.Floor((side - drawn) / 2);
+        double offset = Math.Floor((side - drawn) / 2 * DevicePixels()) / DevicePixels();
 
         for (int y = 0; y < _modules.Length; y++)
         {
@@ -109,9 +109,9 @@ public sealed class QrCodeView : FrameworkElement
                 int run = 1;
                 while (x + run < row.Length && row[x + run]) run++;
 
-                context.DrawRectangle(Dark, null, new Rect(
-                    offset + (x + Quiet) * scale,
-                    offset + (y + Quiet) * scale,
+                context.DrawRectangle(LightModules ? Brushes.White : Brushes.Black, null, new Rect(
+                    offset + x * scale,
+                    offset + y * scale,
                     run * scale,
                     scale));
 
