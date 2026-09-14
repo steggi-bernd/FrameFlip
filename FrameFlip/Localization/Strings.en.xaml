@@ -13,6 +13,13 @@
     <sys:String x:Key="S_FloatPath">The correction is working on the file’s float values – exposure recovers detail from the highlights</sys:String>
     <sys:String x:Key="S_Curves">Curves</sys:String>
     <sys:String x:Key="S_CurveHint">Click to add a point, drag to move it, right-click to remove it.</sys:String>
+    <sys:String x:Key="D_NavAtelier">Atelier</sys:String>
+    <sys:String x:Key="S_OpenImage">Open image</sys:String>
+    <sys:String x:Key="S_NoImage">No image open</sys:String>
+    <sys:String x:Key="S_AtelierEmpty">Open an image to work on it. EXR carries the values above white that exposure can recover detail from.</sys:String>
+    <sys:String x:Key="S_CannotRead">cannot be read</sys:String>
+    <sys:String x:Key="S_Loading">reading …</sys:String>
+    <sys:String x:Key="S_EightBitSource">from 8 bit — no headroom above white</sys:String>
     <sys:String x:Key="S_ToolsNeedFloat">These tools work on the float values of an EXR. Pause playback to use them.</sys:String>
     <sys:String x:Key="S_WhiteBalance">White balance</sys:String>
     <sys:String x:Key="S_Temperature">Temperature</sys:String>
@@ -83,6 +90,7 @@
     <sys:String x:Key="S_NoClipping">Nothing is clipping.</sys:String>
     <sys:String x:Key="S_ClippedLow">{0} % crushed</sys:String>
     <sys:String x:Key="S_ClippedHigh">{0} % blown</sys:String>
+    <sys:String x:Key="S_AboveWhite">{0} % headroom above white</sys:String>
 
     <!-- ================================================================ Metrics -->
     <sys:String x:Key="S_Render">Render</sys:String>

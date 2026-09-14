@@ -81,6 +81,10 @@
                                  Checked="OnNavChanged" Tag="projects">
                         <TextBlock views:Track.Text="{DynamicResource D_NavProjects}" />
                     </RadioButton>
+                    <RadioButton x:Name="NavAtelier" Style="{StaticResource DashNavTab}" Margin="2,0,0,0"
+                                 Checked="OnNavChanged" Tag="atelier">
+                        <TextBlock views:Track.Text="{DynamicResource D_NavAtelier}" />
+                    </RadioButton>
                     <RadioButton x:Name="NavSettings" Style="{StaticResource DashNavTab}" Margin="2,0,0,0"
                                  Checked="OnNavChanged" Tag="settings">
                         <TextBlock views:Track.Text="{DynamicResource D_NavSettings}" />

@@ -28,6 +28,19 @@ public sealed class FloatFrame
     /// <summary>Aus welcher Ebene die Kanaele stammen - bei Multilayer etwa "ViewLayer.Combined".</summary>
     public string? Layer { get; init; }
 
+    /// <summary>
+    /// True, wenn die Werte Szenenlicht sind - also aus einer EXR stammen und nach
+    /// oben offen sind. False, wenn sie aus einem fertigen Bild zurueckgerechnet
+    /// wurden und zwischen 0 und 1 liegen.
+    ///
+    /// Der Unterschied entscheidet ueber die Sichtumwandlung, und zwar folgenreich:
+    /// Ein PNG ist bereits durch AgX gegangen, bevor es geschrieben wurde. Es ein
+    /// zweites Mal hindurchzuschicken hiesse, die Bildwerdung doppelt anzuwenden -
+    /// das Ergebnis waere flau und falsch. Solches Material braucht die einfache
+    /// Umwandlung, die genau die Dekodierung umkehrt und damit nichts tut.
+    /// </summary>
+    public bool IsSceneReferred { get; init; } = true;
+
     public int PixelCount => Width * Height;
 
     /// <summary>
@@ -92,6 +105,50 @@ public sealed class FloatFrame
         {
             return null;
         }
+    }
+
+    /// <summary>
+    /// Ein fertiges Bild zurueck in lineare Werte rechnen.
+    ///
+    /// Damit laesst sich auch ein PNG mit denselben Werkzeugen behandeln wie eine
+    /// EXR. Was es NICHT zurueckbringt, ist die Zeichnung oberhalb von Weiss - die
+    /// stand nie in der Datei. Der Belichtungsregler hebt hier also wirklich nur an,
+    /// statt etwas zu holen, und genau deshalb traegt der Frame mit, woher er kommt.
+    /// </summary>
+    public static FloatFrame FromBgra32(byte[] pixels, int width, int height, int stride)
+    {
+        int count = width * height;
+        var r = new float[count];
+        var g = new float[count];
+        var b = new float[count];
+        var a = new float[count];
+
+        for (int y = 0; y < height; y++)
+        {
+            int row = y * stride;
+
+            for (int x = 0; x < width; x++)
+            {
+                int at = row + x * 4;
+                int i = y * width + x;
+
+                b[i] = Srgb.Decode(pixels[at] / 255f);
+                g[i] = Srgb.Decode(pixels[at + 1] / 255f);
+                r[i] = Srgb.Decode(pixels[at + 2] / 255f);
+                a[i] = pixels[at + 3] / 255f;
+            }
+        }
+
+        return new FloatFrame
+        {
+            Width = width,
+            Height = height,
+            R = r,
+            G = g,
+            B = b,
+            A = a,
+            IsSceneReferred = false,
+        };
     }
 
     /// <summary>
@@ -180,6 +237,7 @@ public sealed class FloatFrame
             B = b,
             A = a,
             Layer = Layer,
+            IsSceneReferred = IsSceneReferred,
         };
     }
 }

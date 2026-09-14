@@ -452,6 +452,13 @@ public partial class MainWindow : Window
         ShowPage(key);
     }
 
+    /// <summary>
+    /// Die Atelierseite wird gehalten, nicht bei jedem Wechsel neu gebaut: Auf ihr
+    /// steht ein geoeffnetes Bild samt aller Reglerstellungen, und das waere nach
+    /// einem Blick in die Einstellungen sonst weg.
+    /// </summary>
+    private AtelierPage? _atelierPage;
+
     private void ShowPage(string key)
     {
         _page = key;
@@ -478,6 +485,7 @@ public partial class MainWindow : Window
         PageContent.Content = key switch
         {
             "projects" => new ProjectsPage(OpenFromProjects),
+            "atelier" => _atelierPage ??= new AtelierPage(_decoders, _getSettings(), next => _persist?.Invoke(next)),
             _ => _settingsPage ??= new SettingsPage(_getSettings, _apply, _remoteState, _layout),
         };
     }
