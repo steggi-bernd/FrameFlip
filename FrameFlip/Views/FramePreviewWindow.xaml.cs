@@ -1,4 +1,4 @@
-using System.Windows;
+﻿using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Media.Imaging;
@@ -27,6 +27,9 @@ public partial class FramePreviewWindow : Window
 
     private int _index;
 
+    /// <summary>Das unveraenderte Bild. Die Korrektur rechnet daraus, zeigt aber dieses, solange sie ruht.</summary>
+    private System.Windows.Media.Imaging.BitmapSource? _bild;
+
     public FramePreviewWindow(string path, IReadOnlyList<string> frames, Action<string> combine)
     {
         _combine = combine;
@@ -50,6 +53,11 @@ public partial class FramePreviewWindow : Window
 
         KeyDown += OnKey;
 
+        KanaeleFuellen();
+
+        // Ab hier sind alle Regler da; vorher waeren ihre Meldungen Unfug.
+        _bereit = true;
+
         // Auch dieses Fenster kann auf einem Bildschirm landen, den es nicht mehr
         // gibt - siehe WindowPlacer.
         SourceInitialized += (_, _) =>
@@ -65,6 +73,12 @@ public partial class FramePreviewWindow : Window
     }
 
     private void OnMinimize(object sender, RoutedEventArgs e) => SystemCommands.MinimizeWindow(this);
+
+    private void OnMaximize(object sender, RoutedEventArgs e)
+    {
+        if (WindowState == WindowState.Maximized) SystemCommands.RestoreWindow(this);
+        else SystemCommands.MaximizeWindow(this);
+    }
 
     private void OnCloseWindow(object sender, RoutedEventArgs e) => Close();
 
@@ -133,12 +147,24 @@ public partial class FramePreviewWindow : Window
 
         if (Math.Abs(ziel - jetzt) < 0.0001) return;
 
+        /* Ganz herausgezoomt heisst eingepasst - und zwar ohne Rest.
+         *
+         * Die Skalierung allein zurueckzudrehen genuegt nicht: Wer hineingezoomt und
+         * dann geschoben hat, traegt eine Verschiebung mit sich, und die bleibt beim
+         * Herauszoomen stehen. Das Bild sass danach bei einfacher Vergroesserung
+         * irgendwo neben der Mitte, statt wieder im Fenster zu liegen.
+         *
+         * Eine Verschiebung anteilig mit herunterzurechnen waere die aufwendigere
+         * Antwort auf dieselbe Frage. Bei einfacher Vergroesserung gibt es aber gar
+         * nichts zu verschieben - das Bild passt dann per Definition ins Fenster. */
+        if (ziel <= Kleinste) { Anpassen(); return; }
+
         // Um den Punkt skalieren: hin, skalieren, zurueck.
         m.ScaleAt(ziel / jetzt, ziel / jetzt, um.X, um.Y);
 
         Lupe.Matrix = m;
 
-        Stage.Cursor = ziel > 1 ? Cursors.SizeAll : null;
+        Stage.Cursor = Cursors.SizeAll;
     }
 
     private void OnWheel(object sender, MouseWheelEventArgs e)
@@ -204,7 +230,13 @@ public partial class FramePreviewWindow : Window
 
         var image = Decode(path);
 
+        _bild = image;
         Picture.Source = image;
+
+        // Pixel fuer die Korrektur bereitstellen und die Regler auf Ruhe setzen:
+        // Was am vorigen Bild richtig war, ist am naechsten eine Behauptung.
+        KorrekturQuelle(image);
+        Zuruecksetzen();
 
         if (image is null)
         {

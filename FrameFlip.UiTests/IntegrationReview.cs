@@ -355,6 +355,23 @@ internal static partial class Program
         Zoom(0.0001, zeiger);
         Check(lupe.Matrix.M11 >= 1, $"und eine Untergrenze - kleiner als eingepasst gibt es nicht ({lupe.Matrix.M11:0.###})");
 
+        /* Herauszoomen muss die Verschiebung mitnehmen.
+         *
+         * Wer hineinzoomt und dann schiebt, traegt einen Versatz mit sich. Dreht man
+         * nur die Skalierung zurueck, bleibt er stehen - das Bild sass danach bei
+         * einfacher Vergroesserung neben der Mitte statt wieder im Fenster. */
+        Zoom(4, zeiger);
+
+        var versetzt = lupe.Matrix;
+        versetzt.Translate(80, 40);
+        lupe.Matrix = versetzt;
+
+        Check(Math.Abs(lupe.Matrix.OffsetX) > 1, "ein Versatz steht im Weg");
+
+        Zoom(0.0001, zeiger);
+        Check(lupe.Matrix.IsIdentity,
+            $"ganz herausgezoomt liegt das Bild wieder im Fenster (Versatz {lupe.Matrix.OffsetX:0.#}/{lupe.Matrix.OffsetY:0.#})");
+
         Zoom(4, zeiger);
         CallOn(fenster, "Anpassen");
         Check(lupe.Matrix.IsIdentity, "Einpassen setzt alles zurueck");
@@ -364,6 +381,52 @@ internal static partial class Program
         Zoom(3, zeiger);
         CallOn(fenster, "Step", 1);
         Check(lupe.Matrix.IsIdentity, "ein Bildwechsel passt wieder ein");
+
+        /* ------------------------------------------------------- Farbkorrektur
+
+           Gemessen wird an den PIXELN. Dass ein Regler sich bewegen laesst, sagt
+           nichts darueber, ob das Bild danach anders aussieht - und genau das ist
+           die Frage. */
+        var belichtung = Find<Slider>(fenster, "ExposureSlider");
+        var umschalter = Find<System.Windows.Controls.Primitives.ToggleButton>(fenster, "AdjustToggle");
+        var spalte = Find<ColumnDefinition>(fenster, "PanelColumn");
+        var bereich = Find<Border>(fenster, "AdjustPanel");
+
+        Check(bereich.Visibility == Visibility.Collapsed && spalte.Width.Value == 0,
+            "der Korrekturbereich ist zu, solange ihn niemand aufmacht");
+
+        umschalter.IsChecked = true;
+        CallOn(fenster, "OnAdjustToggle", umschalter, new RoutedEventArgs());
+        Layout(flaeche, 900, 620);
+
+        Check(bereich.Visibility == Visibility.Visible && spalte.Width.Value > 100,
+            "aufgemacht bekommt er eine eigene Spalte neben der Buehne");
+
+        var bild = Find<System.Windows.Controls.Image>(fenster, "Picture");
+        var vorher = bild.Source;
+
+        belichtung.Value = 2;
+        Layout(flaeche, 900, 620);
+
+        Check(!ReferenceEquals(bild.Source, vorher),
+            "eine Korrektur zeigt ein anderes Bild als das Original");
+
+        var korrigiert = (BitmapSource)bild.Source;
+        var probe = new byte[4];
+        korrigiert.CopyPixels(new Int32Rect(160, 90, 1, 1), probe, 4, 0);
+
+        var quelle = (BitmapSource)vorher;
+        var urspruenglich = new byte[4];
+        quelle.CopyPixels(new Int32Rect(160, 90, 1, 1), urspruenglich, 4, 0);
+
+        Check(probe[0] != urspruenglich[0] || probe[1] != urspruenglich[1] || probe[2] != urspruenglich[2],
+            $"und die Pixel sind wirklich andere ({urspruenglich[2]},{urspruenglich[1]},{urspruenglich[0]} -> {probe[2]},{probe[1]},{probe[0]})");
+
+        CallOn(fenster, "Zuruecksetzen");
+        Layout(flaeche, 900, 620);
+
+        Check(ReferenceEquals(bild.Source, vorher),
+            "zurueckgesetzt zeigt es wieder das Original - nicht eine neutrale Kopie davon");
 
         fenster.Close();
     }
