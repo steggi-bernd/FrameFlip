@@ -18,6 +18,15 @@
          in der Titelzeile, dort wo der Entwurf die Menues zeigt, und legen sich
          ueber die drei Spalten. Das Dashboard bleibt der Ausgangszustand. -->
 
+    <Window.Resources>
+        <Style x:Key="BehindOverlay" TargetType="FrameworkElement">
+            <Style.Triggers>
+                <DataTrigger Binding="{Binding Visibility, ElementName=PairHost}" Value="Visible"><Setter Property="IsEnabled" Value="False"/></DataTrigger>
+                <DataTrigger Binding="{Binding Visibility, ElementName=TermsHost}" Value="Visible"><Setter Property="IsEnabled" Value="False"/></DataTrigger>
+            </Style.Triggers>
+        </Style>
+    </Window.Resources>
+
     <shell:WindowChrome.WindowChrome>
         <shell:WindowChrome CaptionHeight="44" ResizeBorderThickness="6"
                             GlassFrameThickness="0" CornerRadius="0" UseAeroCaptionButtons="False" />
@@ -59,7 +68,7 @@
                            FontFamily="{StaticResource HeadFont}" FontWeight="ExtraBold" FontSize="11.5"
                            Foreground="{StaticResource DesktopInk}" />
 
-                <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center"
+                <StackPanel x:Name="NavigationControls" Style="{StaticResource BehindOverlay}" Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center"
                             Margin="14,0,0,0" shell:WindowChrome.IsHitTestVisibleInChrome="True">
                     <Border Width="1" Height="18" Margin="0,0,14,0" Background="{StaticResource DesktopLine}" />
 
@@ -120,7 +129,7 @@
         <Grid Grid.Row="2">
 
             <!-- ==================================================== Dashboard -->
-            <Grid x:Name="DashboardBody" SizeChanged="OnDashboardSizeChanged">
+            <Grid Style="{StaticResource BehindOverlay}" x:Name="DashboardBody" SizeChanged="OnDashboardSizeChanged">
                 <Grid.RowDefinitions><RowDefinition x:Name="ViewerRow" Height="*"/><RowDefinition Height="Auto"/><RowDefinition x:Name="PanelsRow" Height="0"/></Grid.RowDefinitions>
 <!-- Die Seitenspalten sind Anteile, keine festen Breiten. Fest hiesse:
                      Das Fenster waechst, und nur die Mitte waechst mit - bei einem
@@ -599,7 +608,7 @@
                  Sie legen sich ueber das Dashboard statt es zu ersetzen: So bleibt
                  der Zustand der drei Spalten erhalten, und der Rueckweg ist ein
                  Klick ohne Neuaufbau. -->
-            <Border x:Name="PageHost" Background="{StaticResource DesktopBg}" Visibility="Collapsed">
+            <Border Style="{StaticResource BehindOverlay}" x:Name="PageHost" Background="{StaticResource DesktopBg}" Visibility="Collapsed">
                 <ContentControl x:Name="PageContent" Margin="28,22,28,22" HorizontalContentAlignment="Stretch" VerticalContentAlignment="Stretch" />
             </Border>
 
@@ -609,20 +618,21 @@
                  "QR ZEIGEN" auf die Einstellungsseite, wo je nach Zustand statt
                  eines Codes ein Satz stand, warum keiner da ist - eine Antwort auf
                  eine Frage, die niemand gestellt hatte. -->
-            <Grid x:Name="PairHost" Background="#B305050A" Visibility="Collapsed"
+            <Grid x:Name="PairHost" Panel.ZIndex="10" KeyboardNavigation.TabNavigation="Cycle" KeyboardNavigation.ControlTabNavigation="Cycle" Background="#B305050A" Visibility="Collapsed"
                   MouseLeftButtonDown="OnPairBackdrop">
-                <Border MaxWidth="380" VerticalAlignment="Center" HorizontalAlignment="Center"
+                <Border x:Name="PairCard" Margin="16" MaxWidth="380" VerticalAlignment="Center" HorizontalAlignment="Center"
                         CornerRadius="14" Padding="24" Background="{StaticResource DesktopPanel}"
                         BorderBrush="{StaticResource DesktopLine}" BorderThickness="1">
                     <Border.Effect>
                         <DropShadowEffect BlurRadius="40" ShadowDepth="10" Opacity="0.55" Color="#000000" />
                     </Border.Effect>
 
+                    <ScrollViewer x:Name="PairScroll" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" Padding="0,0,8,0">
                     <StackPanel>
                         <Grid>
                             <TextBlock views:Track.Text="{DynamicResource D_PairTitle}"
                                        Style="{StaticResource DashLabel}" VerticalAlignment="Center" />
-                            <Button Style="{StaticResource DashGhostSmall}" HorizontalAlignment="Right"
+                            <Button x:Name="PairCloseButton" Style="{StaticResource DashGhostSmall}" HorizontalAlignment="Right"
                                     Width="28" Padding="0" Click="OnPairClose"
                                     AutomationProperties.Name="{DynamicResource D_Close}">
                                 <Path Data="M0,0 L9,9 M9,0 L0,9" StrokeThickness="1.3"
@@ -708,6 +718,7 @@
                             </StackPanel>
                         </Border>
                     </StackPanel>
+                    </ScrollViewer>
                 </Border>
             </Grid>
 
@@ -732,14 +743,15 @@
 
                  Die drei Absaetze kommen aus dem Code, weil ihr Wortlaut davon
                  abhaengt, wessen Server eingetragen ist. -->
-            <Grid x:Name="TermsHost" Background="#F205050A" Visibility="Collapsed">
-                <Border MaxWidth="420" VerticalAlignment="Center" HorizontalAlignment="Center"
+            <Grid x:Name="TermsHost" Panel.ZIndex="20" KeyboardNavigation.TabNavigation="Cycle" KeyboardNavigation.ControlTabNavigation="Cycle" Background="#F205050A" Visibility="Collapsed">
+                <Border x:Name="TermsCard" Margin="16" MaxWidth="420" VerticalAlignment="Center" HorizontalAlignment="Center"
                         CornerRadius="14" Padding="26" Background="{StaticResource DesktopPanel}"
                         BorderBrush="{StaticResource DesktopLine}" BorderThickness="1">
                     <Border.Effect>
                         <DropShadowEffect BlurRadius="40" ShadowDepth="10" Opacity="0.55" Color="#000000" />
                     </Border.Effect>
 
+                    <ScrollViewer x:Name="TermsScroll" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" Padding="0,0,8,0">
                     <StackPanel>
                         <TextBlock views:Track.Text="{DynamicResource D_TermsTitle}"
                                    Style="{StaticResource DashLabel}" />
@@ -786,6 +798,7 @@
                             </Button>
                         </WrapPanel>
                     </StackPanel>
+                    </ScrollViewer>
                 </Border>
             </Grid>
         </Grid>

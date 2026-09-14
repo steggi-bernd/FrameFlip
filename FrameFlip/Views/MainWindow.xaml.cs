@@ -198,9 +198,14 @@ public partial class MainWindow : Window
              * TermsHost kann noch fehlen: Der Aufruf hier steht vor InitializeComponent. */
             if ((next.RemoteEnabled || next.WatchEnabled)
                 && !_getSettings().TermsOk
-                && TermsHost is { Visibility: not Visibility.Visible })
+                && !next.TermsOk)
             {
-                AskTerms(Wiederholung(next));
+                if (TermsHost is { Visibility: not Visibility.Visible })
+                    AskTerms(Wiederholung(next), next.RelayHost);
+                // Den angeforderten Stand erst nach Zustimmung an den Wirt geben.
+                // Auch eine Vorschau oder ein anderer Apply-Rueckruf darf vorher
+                // weder speichern noch den Entwurf durch Normalize veraendern.
+                return Strings.T("S_TermsMissing");
             }
 
             var error = applySettings?.Invoke(next);
@@ -1992,6 +1997,16 @@ public partial class MainWindow : Window
 
     private void OnWindowKeyDown(object sender, KeyEventArgs e)
     {
+        if (TermsHost.Visibility == Visibility.Visible)
+        {
+            if (e.Key == Key.Escape) { OnTermsLater(sender, e); e.Handled = true; }
+            return;
+        }
+        if (PairHost.Visibility == Visibility.Visible)
+        {
+            if (e.Key == Key.Escape) { OnPairClose(sender, e); e.Handled = true; }
+            return;
+        }
         if (Keyboard.Modifiers == ModifierKeys.Control)
         {
             if (e.Key == Key.O)
@@ -2351,9 +2366,15 @@ public partial class MainWindow : Window
         PairHost.Visibility = Visibility.Visible;
         RefreshPairing();
         RefreshWatch();
+        PairScroll.ScrollToTop();
+        PairCloseButton.Focus();
     }
 
-    private void OnPairClose(object sender, RoutedEventArgs e) => PairHost.Visibility = Visibility.Collapsed;
+    private void OnPairClose(object sender, RoutedEventArgs e)
+    {
+        PairHost.Visibility = Visibility.Collapsed;
+        RestorePageFocus();
+    }
 
     // ================================================================ Zusehen im Netz
 
@@ -2367,6 +2388,8 @@ public partial class MainWindow : Window
     private void OnWatchToggled(object sender, RoutedEventArgs e)
     {
         if (!_ready || sender is not ToggleButton toggle) return;
+        // RefreshWatch bildet nur den Bestand ab; das ist kein neuer Auftrag.
+        if ((toggle.IsChecked == true) == _getSettings().WatchEnabled) return;
 
         // Einschalten heisst: eine Verbindung nach draussen. Vorher wird gefragt.
         // Beim Ausschalten nicht - wer zumacht, braucht keine Zustimmung.
@@ -2587,7 +2610,13 @@ public partial class MainWindow : Window
 
         return () =>
         {
-            kopie.TermsAccepted = _getSettings().TermsAccepted;
+            var aktuell = _getSettings();
+            kopie.TermsAccepted = aktuell.TermsAccepted;
+            kopie.MainLeft = aktuell.MainLeft;
+            kopie.MainTop = aktuell.MainTop;
+            kopie.MainWidth = aktuell.MainWidth;
+            kopie.MainHeight = aktuell.MainHeight;
+            kopie.MainMaximized = aktuell.MainMaximized;
 
             if (_apply(kopie) is not null) return;
 
@@ -2604,7 +2633,7 @@ public partial class MainWindow : Window
     /// Zeigt die Tafel und fuehrt <paramref name="dann"/> aus, wenn zugestimmt wurde.
     /// Liegt die Zustimmung schon vor, geht es ohne Umweg weiter.
     /// </summary>
-    private void AskTerms(Action dann)
+    private void AskTerms(Action dann, string? relayHost = null)
     {
         if (_getSettings().TermsOk) { dann(); return; }
 
@@ -2620,7 +2649,7 @@ public partial class MainWindow : Window
          * Die Zustimmung bleibt trotzdem noetig. Worum es hier geht, ist der Schritt
          * nach draussen und dass FrameFlip ohne Gewaehr kommt - und das haengt nicht
          * daran, wem der Server gehoert. */
-        bool eigener = !string.Equals(_getSettings().RelayHost, AppSettings.DefaultRelayHost,
+        bool eigener = !string.Equals(relayHost ?? _getSettings().RelayHost, AppSettings.DefaultRelayHost,
                                       StringComparison.OrdinalIgnoreCase);
 
         TermsBody.Text = Strings.T(eigener ? "D_TermsBodyOwn" : "D_TermsBody");
@@ -2642,6 +2671,7 @@ public partial class MainWindow : Window
         TermsAgree.IsChecked = false;
         TermsGo.IsEnabled = false;
         TermsHost.Visibility = Visibility.Visible;
+        TermsScroll.ScrollToTop();
 
         // Den Tastaturschein auf die Tafel holen, damit Esc und Tab dort wirken.
         TermsAgree.Focus();
@@ -2662,6 +2692,7 @@ public partial class MainWindow : Window
         _afterTerms = null;
         _pairWasOpen = false;
         TermsHost.Visibility = Visibility.Collapsed;
+        RestorePageFocus();
 
         Note(Strings.T("D_TermsDeclined"));
     }
@@ -2684,7 +2715,8 @@ public partial class MainWindow : Window
 
         // Wer den Kopplungscode sehen wollte, bekommt ihn jetzt - diesmal einen,
         // der sich auch einloesen laesst.
-        if (_pairWasOpen) PairHost.Visibility = Visibility.Visible;
+        if (_pairWasOpen) { PairHost.Visibility = Visibility.Visible; PairCloseButton.Focus(); }
+        else RestorePageFocus();
         _pairWasOpen = false;
 
         var dann = _afterTerms;
@@ -2725,7 +2757,7 @@ public partial class MainWindow : Window
     {
         if (!ReferenceEquals(e.OriginalSource, PairHost)) return;
 
-        PairHost.Visibility = Visibility.Collapsed;
+        OnPairClose(sender, e);
     }
 
     /// <summary>

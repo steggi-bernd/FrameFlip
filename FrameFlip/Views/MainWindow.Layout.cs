@@ -122,6 +122,12 @@ public partial class MainWindow
     {
         ShowSettingsPage(); _settingsPage?.SelectAppearance();
     }
+    private void RestorePageFocus()
+    {
+        if (_page == "dashboard") StageArea.Focus();
+        else if (_page == "projects") NavProjects.Focus();
+        else NavSettings.Focus();
+    }
     private void AnimatePageChange()
     {
         if (_layout.ReduceMotion || !SystemParameters.ClientAreaAnimation) return;
