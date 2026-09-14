@@ -6,8 +6,9 @@ A second mode inside FrameFlip: grade one frame, then apply that grade to the wh
 sequence and write it out. Layers, masks driven by render data, and a colour toolset
 aimed at Photoshop and Lightroom rather than at a node graph.
 
-**Status:** design. Nothing here is built yet. Numbers marked *(estimate)* have not
-been measured — they are there to size decisions, not to be quoted.
+**Status:** steps 1 to 4 are built and running; 5 to 8 are still design. Where an
+earlier estimate turned out wrong, the measurement replaced it and the error is
+named — those passages are worth more than the numbers.
 
 ---
 
@@ -45,8 +46,18 @@ decoder registry, both cache stages, the ffmpeg export, the project library,
 localisation, settings. Splitting means duplicating it, or introducing a shared
 project and maintaining two releases, two test runs and two bug streams.
 
-So: **one binary, two modes.** The viewer starts as it does today. One key opens
-Atelier on the frame currently held. *Atelier* names the mode, not the product.
+So: **one binary, two modes.** *Atelier* names the mode, not the product.
+
+**Where it actually landed** — this section was written before the fact and guessed
+wrong. The plan was a mode of the preview window, opened with a key on the held
+frame. Built that way, it was in the wrong place: the preview opens on a hotkey and
+closes on Escape, which is right for judging a sequence and wrong for sitting with
+one image. The tools now live on their own page in the main window, beside Overview,
+Projects and Settings, and the preview keeps only what judging needs.
+
+The argument above still holds, only one step further out: the *binary* stays one,
+and both places share the same controls — the grading panel is a single control used
+by whoever needs it, not a copy.
 
 The weight argument mostly dissolves on inspection: .NET loads and JITs types on
 first use, so Atelier code sitting in the binary costs nothing in the working set
@@ -407,10 +418,31 @@ fit. A slider on 4K at 367 ms per update is unusable, so dragging has to work on
 reduced decode; at 25 % that is around 23 ms, which is fluid. And the cost is dominated
 by the view transform, not by the correction — the 3D LUT lookup roughly doubles it.
 
-**Rough batch sizing**: a 4K frame at ~370 ms through one layer, so ten layers put a
-300-frame sequence on eight cores in the tens of minutes rather than single digits.
-Worth optimising before step 4 — the LUT lookup is the obvious target, and a slab of
-`Vector256<float>` work is the obvious means.
+**Batch sizing — measured, and my estimate was wrong.** Step 4 is built, so a real
+run replaces the guess: 4K frames through five tools (white balance, curves,
+lift/gamma/gain, vibrance, HSL) plus AgX, written as 16-bit PNG.
+
+| Frames in parallel | Per frame | 300 frames would be |
+|---|---|---|
+| 1 | 1085 ms | 5.4 min |
+| 2 | 569 ms | 2.8 min |
+| 4 | 398 ms | 2.0 min |
+| 8 | 407 ms | 2.0 min |
+
+I had estimated "tens of minutes"; it is two. The error was in the reasoning, not the
+arithmetic: I priced each tool as if it cost what the view transform costs. It does
+not — the 3D LUT lookup dominates, and five point-wise tools on top of it barely
+register. Optimising the LUT would still be the right target if this needed to be
+faster, but it does not.
+
+The second surprise is that **eight in parallel is no better than four**. The frames
+are already parallel inside — rows are spread across cores within one image — so the
+outer pool starts competing with the inner one. Four is the sweet spot on this
+machine, which is roughly half the cores, and that is what the load governor hands
+out anyway.
+
+Small frames stay cheap: the same recipe on 960×540 runs at 21 ms per frame, so a
+24-frame sequence is done in half a second.
 
 **Failure has to be survivable.** A missing frame (the viewer already marks gaps red),
 a file still being written, a disk filling up mid-run. The batch reports which frames
@@ -461,14 +493,14 @@ the approximation disappears. The viewer's quick path can keep it.
 Each step is worth having on its own, which is the point — none of them is a bet on the
 next one landing.
 
-1. **EXR decoder, converting.** Tone-mapped to Bgra32 through Blender's OCIO config.
+1. ~~**EXR decoder, converting.**~~ **Done.** Tone-mapped to Bgra32 through Blender's OCIO config.
    Changes nothing structurally, makes the viewer properly useful for renders, and
    surfaces how much a hand-written reader hurts before anything else depends on it.
-2. **Float frames as a second path**, for the held frame only. Exposure, curves and the
+2. ~~**Float frames as a second path**~~ **Done**, for the held frame only. Exposure, curves and the
    histogram become real. Reveals what the time budget actually looks like.
-3. **Adjustment layers with the ★ tools.** Curves, white balance, LGG, HSL, vibrance,
+3. ~~**Adjustment layers with the ★ tools.**~~ **Done** except Clarity, which needs a pixel's neighbourhood and does not fit the point-wise form. Curves, white balance, LGG, HSL, vibrance,
    clarity, LUT. Single layer, no masks. Already a genuine grading tool.
-4. **The batch run and sequence export.** At this point the workflow closes, and Atelier
+4. ~~**The batch run and sequence export.**~~ **Done** for image sequences; video through ffmpeg is still open. At this point the workflow closes, and Atelier
    is finished as a product even if nothing further is built.
 5. **Layer stack, blend modes, luminance and gradient masks.**
 6. **Passes and light mixing.**
