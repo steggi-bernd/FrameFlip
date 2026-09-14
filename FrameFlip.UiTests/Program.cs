@@ -1,4 +1,4 @@
-using System.IO;
+﻿using System.IO;
 using System.Reflection;
 using System.Windows;
 using System.Windows.Controls;
@@ -27,7 +27,7 @@ internal static partial class Program
             foreach (var resource in new[] { "Views/Theme.xaml", "Views/DesktopTheme.xaml", "Views/DashboardTokens.xaml", "Localization/Strings.de.xaml" })
                 app.Resources.MergedDictionaries.Add(new ResourceDictionary { Source = new Uri("/FrameFlip;component/" + resource, UriKind.Relative) });
             TestLayout(); TestPlayback(); TestSettings(); TestQr();
-            TestMergedOverlays(); TestConsentFlow(); TestCheckboxTemplates(); TestResourceMerge();
+            TestMergedOverlays(); TestConsentFlow(); TestCheckboxTemplates(); TestSettingRow(); TestResourceMerge();
             Console.WriteLine($"PASS: {_checks} UI assertions. Images: {_out}");
             app.Shutdown(); return 0;
         }

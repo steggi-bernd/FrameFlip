@@ -188,6 +188,31 @@
     <sys:String x:Key="S_ImageUnreadable">Das Bild konnte nicht gelesen werden.</sys:String>
     <sys:String x:Key="S_FfmpegWrong">Diese Datei antwortet nicht wie ffmpeg. Bitte den Pfad prüfen.</sys:String>
 
+    <!-- ============================================ Erklärungen hinter dem (i)
+
+         Zwei Sätze: was die Einstellung tut, und wann man sie anfasst. Der zweite
+         ist der eigentliche Gewinn – "RAM-Budget (MB)" versteht jeder, aber wann
+         man daran dreht, stand nirgends. -->
+    <sys:String x:Key="S_WhatIsThis">Was ist das?</sys:String>
+    <sys:String x:Key="X_Hotkey">Die Tastenkombination, die die Vorschau öffnet – überall, auch wenn Blender gerade im Vordergrund ist. Ändere sie, wenn ein anderes Programm dieselbe Kombination belegt; FrameFlip meldet das beim Start.</sys:String>
+    <sys:String x:Key="X_Language">Sprache der Oberfläche. Wirkt sofort, ohne Neustart.</sys:String>
+    <sys:String x:Key="X_FrameRate">Mit wie vielen Bildern je Sekunde die Vorschau abspielt. Stell sie auf die Bildrate deines Projekts, sonst beurteilst du eine Bewegung, die es so nicht gibt.</sys:String>
+    <sys:String x:Key="X_MemoryBudget">Wieviel Arbeitsspeicher die dekodierten Bilder belegen dürfen. Höher setzen, wenn die Wiedergabe bei großen Sequenzen stockt – niedriger, wenn Blender beim Rendern zu wenig Speicher hat.</sys:String>
+    <sys:String x:Key="X_Prefetch">Wie viele Bilder vor und hinter der aktuellen Position im Voraus geladen werden. Mehr Vorlauf hilft beim Vorwärtsspielen, mehr Rücklauf beim Hin- und Herspringen.</sys:String>
+    <sys:String x:Key="X_AdaptiveLoad">FrameFlip misst CPU, GPU und Speicher und nimmt sich zurück, wenn die Maschine ausgelastet ist. Lass es an, solange du nebenher renderst – aus ergibt es nur Sinn, wenn du eine feste Last willst.</sys:String>
+    <sys:String x:Key="X_LoadInterval">Wie oft die Last gemessen wird. Kürzer reagiert schneller auf einen startenden Render, kostet aber selbst etwas.</sys:String>
+    <sys:String x:Key="X_MaxThreads">Obergrenze für die Dekodier-Threads. Herunter setzen, wenn die Vorschau dem Render Rechenzeit wegnimmt.</sys:String>
+    <sys:String x:Key="X_RelayHost">Der Server, über den PC und Handy sich finden. Der voreingestellte ist ein Angebot, keine Voraussetzung – trag deinen eigenen ein, und alles verbindet dorthin. Danach die Kopplung neu durchführen.</sys:String>
+    <sys:String x:Key="X_RemoteEnable">Erlaubt dem gekoppelten Handy, Renderfortschritt und Vorschaubilder zu empfangen. Ohne das geht nichts nach draußen.</sys:String>
+    <sys:String x:Key="X_LibraryEnable">Lässt das Handy die Projektbibliothek durchblättern und einzelne Dateien holen. Aus, wenn nur der Renderfortschritt hinaus soll.</sys:String>
+    <sys:String x:Key="X_BridgeEnable">Nimmt die Meldungen des Blender-Addons entgegen – nur über 127.0.0.1, aus dem Netz nicht erreichbar. Ohne das bleiben die Metriken leer.</sys:String>
+    <sys:String x:Key="X_BlenderPath">Welches Blender für Renderaufträge vom Handy benutzt wird. Nur nötig, wenn mehrere Fassungen installiert sind oder FrameFlip keine findet.</sys:String>
+    <sys:String x:Key="X_RenderEnable">Erlaubt dem Handy, einen Render zu starten und abzubrechen. Die einzige Einstellung, die einem fremden Gerät Rechenzeit auf diesem Rechner gibt.</sys:String>
+    <sys:String x:Key="X_ExchangeFolder">Der einzige Ordner, in den das Handy schreiben darf. Alles andere auf dieser Platte bleibt ihm verschlossen.</sys:String>
+    <sys:String x:Key="X_PushEnable">Erlaubt dem Handy, Dateien in den Austauschordner zu legen. Aus, wenn die Verbindung nur in eine Richtung gehen soll.</sys:String>
+    <sys:String x:Key="X_LockToDisplay">Koppelt die Wiedergabe an den Bildschirmtakt, wenn beide fast gleich sind. Verhindert Ruckler bei 60 fps auf 60 Hz – abschalten, wenn du die Zeitachse exakt brauchst.</sys:String>
+    <sys:String x:Key="X_CloseOnFocusLoss">Die Vorschau schließt, sobald du woanders hinklickst. Abschalten, wenn die Sequenz während der Arbeit in Blender stehen bleiben soll.</sys:String>
+
     <!-- ============================================================ Bereitschaft -->
     <sys:String x:Key="S_ReadyTitle">NOCH NICHT VOLLSTÄNDIG</sys:String>
     <sys:String x:Key="S_ReadyFfmpegMissing">Für den Videoexport fehlt ffmpeg. FrameFlip liefert es nicht mit, kann es aber von Windows holen lassen.</sys:String>

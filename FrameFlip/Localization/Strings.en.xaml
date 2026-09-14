@@ -188,6 +188,31 @@
     <sys:String x:Key="S_ImageUnreadable">The image could not be read.</sys:String>
     <sys:String x:Key="S_FfmpegWrong">This file does not answer like ffmpeg. Please check the path.</sys:String>
 
+    <!-- ============================================ Explanations behind the (i)
+
+         Two sentences: what the setting does, and when you touch it. The second is
+         the real gain – everyone understands "RAM budget (MB)", but when to change
+         it was written down nowhere. -->
+    <sys:String x:Key="S_WhatIsThis">What is this?</sys:String>
+    <sys:String x:Key="X_Hotkey">The key combination that opens the preview – anywhere, even while Blender is in front. Change it if another program holds the same combination; FrameFlip says so at startup.</sys:String>
+    <sys:String x:Key="X_Language">Language of the interface. Takes effect at once, no restart.</sys:String>
+    <sys:String x:Key="X_FrameRate">How many frames per second the preview plays. Set it to your project's rate, or you are judging a motion that does not exist.</sys:String>
+    <sys:String x:Key="X_MemoryBudget">How much memory the decoded frames may occupy. Raise it when playback stalls on large sequences – lower it when Blender runs short of memory while rendering.</sys:String>
+    <sys:String x:Key="X_Prefetch">How many frames ahead of and behind the current position are loaded in advance. More ahead helps playing forward, more behind helps jumping back and forth.</sys:String>
+    <sys:String x:Key="X_AdaptiveLoad">FrameFlip measures CPU, GPU and memory and holds back when the machine is busy. Leave it on while you render alongside – off only makes sense if you want a fixed load.</sys:String>
+    <sys:String x:Key="X_LoadInterval">How often the load is measured. Shorter reacts faster to a starting render but costs a little itself.</sys:String>
+    <sys:String x:Key="X_MaxThreads">Upper limit for decoder threads. Lower it when the preview takes compute time from the render.</sys:String>
+    <sys:String x:Key="X_RelayHost">The server through which PC and phone find each other. The preset one is an offer, not a requirement – enter your own and everything connects there. Redo the pairing afterwards.</sys:String>
+    <sys:String x:Key="X_RemoteEnable">Lets the paired phone receive render progress and preview images. Without it nothing leaves this machine.</sys:String>
+    <sys:String x:Key="X_LibraryEnable">Lets the phone browse the project library and fetch single files. Off if only the render progress should go out.</sys:String>
+    <sys:String x:Key="X_BridgeEnable">Receives the Blender add-on's reports – over 127.0.0.1 only, unreachable from the network. Without it the metrics stay empty.</sys:String>
+    <sys:String x:Key="X_BlenderPath">Which Blender is used for render jobs from the phone. Only needed when several versions are installed or FrameFlip finds none.</sys:String>
+    <sys:String x:Key="X_RenderEnable">Lets the phone start and cancel a render. The only setting that gives a remote device compute time on this machine.</sys:String>
+    <sys:String x:Key="X_ExchangeFolder">The only folder the phone may write into. Everything else on this disk stays closed to it.</sys:String>
+    <sys:String x:Key="X_PushEnable">Lets the phone put files into the exchange folder. Off if the connection should go one way only.</sys:String>
+    <sys:String x:Key="X_LockToDisplay">Locks playback to the display refresh when the two nearly match. Prevents judder at 60 fps on 60 Hz – switch off if you need the exact timeline.</sys:String>
+    <sys:String x:Key="X_CloseOnFocusLoss">The preview closes as soon as you click elsewhere. Switch off to keep the sequence up while you work in Blender.</sys:String>
+
     <!-- ============================================================== Readiness -->
     <sys:String x:Key="S_ReadyTitle">NOT QUITE COMPLETE</sys:String>
     <sys:String x:Key="S_ReadyFfmpegMissing">Video export needs ffmpeg. FrameFlip does not ship it, but it can have Windows fetch it.</sys:String>

@@ -1,4 +1,4 @@
-<ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" xmlns:sys="clr-namespace:System;assembly=System.Runtime">
+﻿<ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" xmlns:views="clr-namespace:FrameFlip.Views" xmlns:sys="clr-namespace:System;assembly=System.Runtime">
     <SolidColorBrush x:Key="DesktopBg" Color="#101116" />
     <SolidColorBrush x:Key="DesktopSurface" Color="#191A23" />
     <SolidColorBrush x:Key="DesktopLine" Color="#30313E" />

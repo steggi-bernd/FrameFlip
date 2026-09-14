@@ -1,4 +1,4 @@
-using System.IO;
+﻿using System.IO;
 using System.Reflection;
 using System.Windows;
 using System.Windows.Controls;
@@ -185,6 +185,96 @@ internal static partial class Program
             Layout(holder, 230, 140);
             Check(rich.ActualHeight > 30 && Inside(rich, holder), style + " preserves and wraps a TextBlock label");
         }
+    }
+
+    /// <summary>
+    /// Die Einstellungszeile: (i) klappt die Erklaerung auf, Fussnote steht von selbst.
+    ///
+    /// Geprueft wird ueber die HOEHE und nicht ueber den Text. Die Textblöcke einer
+    /// Zeile bekommen in den Bedienungshilfen keinen eigenen Knoten - sie werden in
+    /// den Namen der Zeile eingefaltet. Wer nach ihnen sucht, findet nichts und haelt
+    /// eine funktionierende Zeile fuer kaputt. Die Hoehe luegt nicht.
+    /// </summary>
+    /// <summary>
+    /// Ein Element aus dem VORLAGENBAUM holen.
+    ///
+    /// FindName taugt dafuer nicht: Es sucht im Namensbereich des XAML, und ein
+    /// Vorlagenteil liegt in einem eigenen. Wer das verwechselt, bekommt null und
+    /// haelt eine funktionierende Vorlage fuer kaputt.
+    /// </summary>
+    private static T? InTree<T>(DependencyObject root) where T : DependencyObject
+    {
+        for (int i = 0; i < VisualTreeHelper.GetChildrenCount(root); i++)
+        {
+            var kind = VisualTreeHelper.GetChild(root, i);
+            if (kind is T treffer) return treffer;
+            if (InTree<T>(kind) is { } tiefer) return tiefer;
+        }
+        return null;
+    }
+
+    private static void TestSettingRow()
+    {
+        var zeile = new SettingRow
+        {
+            Style = (Style)Application.Current.FindResource("SettingRowStyle"),
+            Header = "Eine Einstellung",
+            Content = new CheckBox { Style = (Style)Application.Current.FindResource("DesktopCheckBox") },
+
+            // Sonst dehnt sie sich im Gitter auf dessen volle Hoehe, und jede
+            // Messung misst das Gitter statt die Zeile.
+            VerticalAlignment = VerticalAlignment.Top,
+        };
+
+        var holder = new Grid { Width = 460 };
+        holder.Children.Add(zeile);
+
+        Layout(holder, 460, 400);
+        double schlicht = zeile.ActualHeight;
+        Check(schlicht > 20 && schlicht < 90, $"eine Zeile ohne Beiwerk bleibt flach ({schlicht:0} px)");
+
+        zeile.Footnote = "Eine Fussnote, die immer sichtbar bleibt und ueber mehrere Zeilen laufen darf.";
+        Layout(holder, 460, 400);
+        double mitFuss = zeile.ActualHeight;
+        Check(mitFuss > schlicht, $"die Fussnote steht ohne Zutun da ({mitFuss:0} px)");
+
+        zeile.Explain = "Was die Einstellung tut, und wann man sie anfasst - der zweite Teil ist der Gewinn.";
+        Layout(holder, 460, 400);
+        // Nicht auf den Pixel genau: Mit gesetzter Erklaerung erscheint das (i),
+        // und das darf die Kopfzeile um seine eigene Hoehe wachsen lassen. Worauf es
+        // ankommt, ist der Unterschied zum AUFGEKLAPPTEN Zustand - der ist ein
+        // Vielfaches davon.
+        double mitInfo = zeile.ActualHeight;
+        Check(mitInfo - mitFuss < 10,
+            $"eine gesetzte Erklaerung allein klappt noch nichts auf ({mitInfo:0} px)");
+
+        var info = InTree<System.Windows.Controls.Primitives.ToggleButton>(zeile);
+        Check(info is not null && info.Visibility == Visibility.Visible,
+            "sie bringt aber ein (i) mit");
+
+        info!.IsChecked = true;
+        Layout(holder, 460, 400);
+        Check(zeile.ActualHeight > mitInfo + 15,
+            $"und das (i) klappt sie auf ({zeile.ActualHeight:0} px)");
+
+        info.IsChecked = false;
+        Layout(holder, 460, 400);
+        Check(Math.Abs(zeile.ActualHeight - mitInfo) < 1, "nochmal geklickt, wieder zu");
+
+        // Ohne Erklaerung kein (i) - sonst stuende ein Knopf da, der nichts zeigt.
+        var ohne = new SettingRow
+        {
+            Style = (Style)Application.Current.FindResource("SettingRowStyle"),
+            Header = "Ohne Erklaerung",
+            VerticalAlignment = VerticalAlignment.Top,
+        };
+        var holder2 = new Grid { Width = 460 };
+        holder2.Children.Add(ohne);
+        Layout(holder2, 460, 200);
+        Check(InTree<System.Windows.Controls.Primitives.ToggleButton>(ohne)?.Visibility == Visibility.Collapsed,
+            "ohne Erklaerung erscheint kein (i)");
+
+        Render(holder, 460, 400, "SettingRow.png");
     }
 
     private static void TestResourceMerge()
