@@ -21,6 +21,7 @@ public partial class AppearancePanel : UserControl
         _syncing = true;
         ScaleSlider.Value = _layout.Scale * 100; TileSlider.Value = _layout.TileSize;
         ShareSlider.Value = _layout.MonitorShare * 100; NavSlider.Value = _layout.NavigationWidth;
+        HeightSlider.Value = _layout.LowerPanelHeight;
         OrderBox.IsChecked = _layout.MonitorFirst; MotionBox.IsChecked = _layout.ReduceMotion;
         UpdateLabels(); _syncing = false;
     }
@@ -28,15 +29,20 @@ public partial class AppearancePanel : UserControl
     {
         ScaleValue.Text = $"{_layout.Scale * 100:0} %"; TileValue.Text = $"{_layout.TileSize:0} px";
         ShareValue.Text = $"{_layout.MonitorShare * 100:0} %"; NavValue.Text = $"{_layout.NavigationWidth:0} px";
-        double first = _layout.MonitorFirst ? _layout.MonitorShare : 1 - _layout.MonitorShare;
-        PreviewLeft.Width = new GridLength(first, GridUnitType.Star); PreviewRight.Width = new GridLength(1 - first, GridUnitType.Star);
-        Grid.SetColumn(PreviewRender, _layout.MonitorFirst ? 4 : 2); Grid.SetColumn(PreviewSystem, _layout.MonitorFirst ? 2 : 4);
+        HeightValue.Text = $"{_layout.LowerPanelHeight:0} px";
+        double sequence = _layout.NavigationWidth / 100;
+        double metrics = Math.Clamp(10 * _layout.MonitorShare, 2.05, 5.2);
+        PreviewLeft.Width = new GridLength(_layout.MonitorFirst ? metrics : sequence, GridUnitType.Star);
+        PreviewRight.Width = new GridLength(_layout.MonitorFirst ? sequence : metrics, GridUnitType.Star);
+        Grid.SetColumn(PreviewSequence, _layout.MonitorFirst ? 4 : 0);
+        Grid.SetColumn(PreviewSystem, _layout.MonitorFirst ? 0 : 4);
     }
     private void OnChanged(object sender, RoutedEventArgs e)
     {
         if (_syncing || !IsLoaded) return;
         _layout.Scale = ScaleSlider.Value / 100; _layout.TileSize = TileSlider.Value;
         _layout.MonitorShare = ShareSlider.Value / 100; _layout.NavigationWidth = NavSlider.Value;
+        _layout.LowerPanelHeight = HeightSlider.Value;
         _layout.MonitorFirst = OrderBox.IsChecked == true; _layout.ReduceMotion = MotionBox.IsChecked == true;
         UpdateLabels(); _saveTimer.Stop(); _saveTimer.Start();
     }

@@ -43,7 +43,10 @@ public partial class App : Application
         //
         // Waehrend des Umbaus war es umgekehrt: Die Kopie startete isoliert, damit
         // sie neben der laufenden Fassung nichts anfasst. Als Hauptfassung waere das
-        // genau falsch herum.
+        // genau falsch herum - ein Doppelklick auf FrameFlip.exe startete dann eine
+        // Attrappe mit eigener config.json, ohne Tastenkombination, ohne Bruecke und
+        // ohne Relay. In der Arbeitskopie stand es aus gutem Grund andersherum; beim
+        // Zurueckfuehren gehoert es zurueckgedreht.
         if (e.Args.Contains("--ui-preview", StringComparer.OrdinalIgnoreCase))
         {
             Views.DesktopPreview.Start();

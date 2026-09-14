@@ -1,4 +1,4 @@
-<ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+﻿<ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
                     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
                     xmlns:sys="clr-namespace:System;assembly=System.Runtime">
 
@@ -357,9 +357,9 @@
     <sys:String x:Key="D_AppearanceIntro">These adjustments apply and save immediately. Panels automatically stack when space is limited.</sys:String>
     <sys:String x:Key="D_UiScale">Interface scale</sys:String>
     <sys:String x:Key="D_TileSize">System tile size</sys:String>
-    <sys:String x:Key="D_MonitorShare">System panel width</sys:String>
-    <sys:String x:Key="D_NavigationWidth">Navigation width</sys:String>
-    <sys:String x:Key="D_MonitorFirst">Show system monitor first</sys:String>
+    <sys:String x:Key="D_MonitorShare">Metrics · share of remaining space</sys:String>
+    <sys:String x:Key="D_NavigationWidth">Sequence panel width</sys:String>
+    <sys:String x:Key="D_MonitorFirst">Show metrics on the left</sys:String>
     <sys:String x:Key="D_ReduceMotion">Reduce motion</sys:String>
     <sys:String x:Key="D_ResetLayout">Restore default layout</sys:String>
     <sys:String x:Key="D_SaveToPair">Enable remote control and apply to display the pairing code.</sys:String>
@@ -500,6 +500,13 @@
     <sys:String x:Key="D_Off">OFF</sys:String>
     <sys:String x:Key="D_LogWatchOn">Watch page turned on.</sys:String>
     <sys:String x:Key="D_LogWatchOff">Watch page turned off.</sys:String>
+<sys:String x:Key="D_StageWelcome">Frame by frame.</sys:String>
+<sys:String x:Key="D_StageStartHint">Open an image from your sequence. The remaining frames are found automatically.</sys:String>
+<sys:String x:Key="D_OpenSequenceAction">Open image sequence</sys:String>
+<sys:String x:Key="D_OpenShortcut">Ctrl + O</sys:String>
+<sys:String x:Key="D_LowerPanelHeight">Lower panels · height in narrow windows</sys:String>
+<sys:String x:Key="D_ResizeHeight">Drag to resize the lower panels · double-click to reset</sys:String>
+<sys:String x:Key="D_StageTitle">Preview</sys:String>
     <sys:String x:Key="D_TermsTitle">BEFORE ANYTHING LEAVES THIS MACHINE</sys:String>
     <sys:String x:Key="D_TermsBody">So far FrameFlip has worked on this computer alone. What you are about to switch on opens a connection through a server on the internet.  Everything sent across it is end-to-end encrypted – the server sees random bytes and stores nothing. It is offered free of charge with no promise of availability, and you use it at your own risk.</sys:String>
     <sys:String x:Key="D_TermsUse">Terms of use</sys:String>
