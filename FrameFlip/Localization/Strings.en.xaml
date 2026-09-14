@@ -421,6 +421,7 @@
 
     <!-- Dashboard: title bar, tabs -->
     <sys:String x:Key="D_NavDashboard">Overview</sys:String>
+    <sys:String x:Key="D_BackStep">One level up</sys:String>
     <sys:String x:Key="D_NavProjects">Projects</sys:String>
     <sys:String x:Key="D_NavSettings">Settings</sys:String>
     <sys:String x:Key="D_Idle">idle</sys:String>

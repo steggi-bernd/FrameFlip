@@ -96,10 +96,40 @@ static void LoadDictionaries()
                 // Application samt Ressourcen und Dispatcher beenden.
                 app.ShutdownMode = System.Windows.ShutdownMode.OnExplicitShutdown;
 
-                using var stream = System.IO.File.OpenRead(candidate);
-
-                app.Resources.MergedDictionaries.Add(
-                    (System.Windows.ResourceDictionary)System.Windows.Markup.XamlReader.Load(stream));
+                /* Dieselben Woerterbuecher wie die Anwendung, in derselben Reihenfolge.
+                 *
+                 * Frueher stand hier nur die Sprachdatei. Dass Theme.xaml trotzdem zur
+                 * Verfuegung stand, war eine NEBENWIRKUNG: ViewerPlaybackInvariants
+                 * haengt es ein, und es laeuft zufaellig vorher. Damit entschied die
+                 * Reihenfolge der Tests darueber, ob eine Ansicht ueberhaupt laedt -
+                 * und als die Projektseite von Theme- auf Desktop-Marken umzog, fiel
+                 * sie um, obwohl an ihr nichts falsch war.
+                 *
+                 * Die Reihenfolge zaehlt: DashboardTokens ueberschreibt Farben aus
+                 * DesktopTheme, genau wie in App.xaml. */
+                /* Ueber pack-Adressen, nicht als lose Datei.
+                 *
+                 * Einzeln eingelesen sieht ein Woerterbuch die vorher geladenen NICHT:
+                 * StaticResource loest beim Einlesen auf, und der Leser kennt nur das
+                 * eine Dokument. DashboardTokens greift aber auf DashFocus aus
+                 * Theme.xaml zu und faellt sofort um.
+                 *
+                 * Die pack-Adresse nennt die Assembly ausdruecklich ("/FrameFlip;
+                 * component/..."), damit sie auch aus einem Testlaeufer heraus
+                 * aufloest - der Weg, den TrayInvariants schon benutzt. */
+                foreach (string sheet in new[]
+                         {
+                             "Views/Theme.xaml",
+                             "Views/DesktopTheme.xaml",
+                             "Views/DashboardTokens.xaml",
+                             "Localization/Strings.de.xaml",
+                         })
+                {
+                    app.Resources.MergedDictionaries.Add(new System.Windows.ResourceDictionary
+                    {
+                        Source = new Uri("/FrameFlip;component/" + sheet, UriKind.Relative),
+                    });
+                }
 
                 return;
             }

@@ -421,6 +421,7 @@
 
     <!-- Dashboard: Titelzeile, Reiter -->
     <sys:String x:Key="D_NavDashboard">Übersicht</sys:String>
+    <sys:String x:Key="D_BackStep">Eine Stufe zurück</sys:String>
     <sys:String x:Key="D_NavProjects">Projekte</sys:String>
     <sys:String x:Key="D_NavSettings">Einstellungen</sys:String>
     <sys:String x:Key="D_Idle">bereit</sys:String>

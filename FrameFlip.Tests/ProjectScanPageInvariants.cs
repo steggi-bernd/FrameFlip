@@ -38,7 +38,7 @@ public static class ProjectScanPageInvariants
             PumpUntil(() => Field<int>(page, "_generation") > 0);
             Open(page, project);
             FinishContent(page);
-            var panels = ((Panel)page.FindName("Body")).Children.OfType<WrapPanel>().ToArray();
+            var panels = ((Panel)page.FindName("Body")).Children.OfType<FillWrap>().ToArray();
             Check.That(panels.Length == 2, "Ordner und Frames stehen in getrennten Kachelreihen");
             var folders = panels[0].Children.OfType<Border>().Select(b => (string)b.ToolTip).ToArray();
             Check.That(folders.SequenceEqual(new[] { render, Path.Combine(root, "empty") }),

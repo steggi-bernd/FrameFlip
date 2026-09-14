@@ -1,4 +1,4 @@
-using System.Diagnostics;
+﻿using System.Diagnostics;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
@@ -96,8 +96,8 @@ public partial class ProjectsPage : UserControl
         DragOver += (_, e) => e.Effects = Dropped(e).Count > 0 ? DragDropEffects.Copy : DragDropEffects.None;
         Drop += OnDropOnPage;
 
-        Click(AddFolder, PickFolder);
-        Click(Rescan, () => Reload());
+        AddFolder.Click += (_, _) => PickFolder();
+        Rescan.Click += (_, _) => Reload();
 
         // Zurueck gehoert an die Tasten und an die Maus, nicht nur an die Krumen.
         // Angehaengt wird es am Fenster, weil ein UserControl keine Tasten bekommt,
@@ -284,7 +284,7 @@ public partial class ProjectsPage : UserControl
         {
             Body.Children.Add(Section(T("S_BlenderProjects", scan.Projects.Count)));
 
-            var tiles = Wrap();
+            var tiles = Wrap(320);
 
             foreach (var project in scan.Projects) tiles.Children.Add(ProjectTile(project.Project, project.Thumbnail));
 
@@ -303,7 +303,7 @@ public partial class ProjectsPage : UserControl
                 Reload();
             }));
 
-            var tiles = Wrap();
+            var tiles = Wrap(320);
 
             foreach (var entry in recent) tiles.Children.Add(RecentTile(entry.Sequence, entry.Exists));
 
@@ -425,13 +425,37 @@ public partial class ProjectsPage : UserControl
 
         Heading.Text = project.Name.ToUpperInvariant();
 
-        Crumbs.Children.Add(Crumb("PROJEKTE", () => { _navigation.ShowOverview(); Render(); }));
-        Crumbs.Children.Add(Crumb(project.Name, () => { _navigation.OpenFolder(root); Render(); }));
+        /* Erst den ganzen Weg sammeln, dann zeichnen.
+         *
+         * Vorher wurde Stufe fuer Stufe angehaengt, und jede sah aus wie die andere:
+         * Schildchen neben Schildchen, ohne Trennzeichen und ohne Rueckweg. Das las
+         * sich als Schlagwortliste, nicht als Pfad - obwohl die Hierarchie in den
+         * Daten laengst steckt.
+         *
+         * Als Liste laesst sich beides: die letzte Stufe anders zeichnen, weil sie
+         * der aktuelle Ort ist und kein Ziel, und der Rueckweg kennt sein Ziel - die
+         * vorletzte. "PROJEKTE" stand hier uebrigens fest im Quelltext, auf Deutsch. */
+        var weg = new List<(string Name, Action Go)>
+        {
+            (T("S_ProjectsTitle"), () => { _navigation.ShowOverview(); Render(); }),
+            (project.Name, () => { _navigation.OpenFolder(root); Render(); }),
+        };
 
-        // Der Weg von der .blend-Datei bis hierher, Ordner fuer Ordner.
         foreach (var crumb in _navigation.Breadcrumbs())
         {
-            Crumbs.Children.Add(Crumb(crumb.Name, () => { _navigation.OpenFolder(crumb.Path); Render(); }));
+            string ziel = crumb.Path;
+            weg.Add((crumb.Name, () => { _navigation.OpenFolder(ziel); Render(); }));
+        }
+
+        // Eine Stufe zurueck. Ganz oben gibt es keine, dann fehlt der Knopf.
+        if (weg.Count > 1) Crumbs.Children.Add(BackStep(weg[^2].Go));
+
+        for (int i = 0; i < weg.Count; i++)
+        {
+            if (i > 0) Crumbs.Children.Add(CrumbSeparator());
+
+            // Die letzte Stufe ist der Ort, an dem man steht - kein Ziel, also kein Klick.
+            Crumbs.Children.Add(Crumb(weg[i].Name, i == weg.Count - 1 ? null : weg[i].Go));
         }
 
         // Die .blend-Dateien gehoeren in die Kopfzeile, nicht in den Inhalt: Sie sind
@@ -476,7 +500,7 @@ public partial class ProjectsPage : UserControl
         {
             Body.Children.Add(Section(T("S_FoldersTitle")));
 
-            var tiles = Wrap();
+            var tiles = Wrap(320);
 
             foreach (var tile in folders) tiles.Children.Add(FolderTileView(tile));
 
@@ -489,7 +513,7 @@ public partial class ProjectsPage : UserControl
         {
             Body.Children.Add(Section(T("S_FramesTitle", frames.Count)));
 
-            var tiles = Wrap();
+            var tiles = Wrap(224);
 
             foreach (string frame in frames.Take(FrameLimit)) tiles.Children.Add(FrameTile(frame, frames));
 
@@ -689,9 +713,15 @@ public partial class ProjectsPage : UserControl
                 Suppress = () => _dragging,
             };
 
-        card.Width = width;
+        /* Keine eigene Breite. Eine gesetzte Breite gewinnt gegen jede Zuteilung des
+         * Panels, und FillWrap koennte rechnen, was es will. Die uebergebene Breite
+         * ist jetzt der Zielwert, den der Aufrufer auch dem Panel gibt.
+         *
+         * Der Abstand kommt ebenfalls vom Panel - als Rand an der Kachel zaehlte er
+         * doppelt und risse rechts eine zweite Luecke auf. */
+        card.MinWidth = Math.Min(width, 160);
         card.Height = height;
-        card.Margin = new Thickness(0, 0, 12, 12);
+        card.Margin = new Thickness(0);
         card.CornerRadius = new CornerRadius(14);
         card.Background = (Brush)FindResource("AppSurface");
         card.BorderBrush = (Brush)FindResource("PanelBorder");
@@ -1080,44 +1110,93 @@ public partial class ProjectsPage : UserControl
         return holder;
     }
 
-    private static WrapPanel Wrap() => new() { Margin = new Thickness(0, 0, 0, 10) };
+    /// <summary>
+    /// Eine Reihe Kacheln, die die Breite ausfuellt.
+    ///
+    /// Vorher ein WrapPanel: Es legt Kacheln fester Breite von links nebeneinander,
+    /// und was rechts nicht mehr passt, bleibt leer - bei jeder Fensterbreite, und je
+    /// breiter das Fenster, desto auffaelliger. Der Bereich sah dadurch aus, als
+    /// haette man ihn in eine zu grosse Flaeche gelegt.
+    ///
+    /// <see cref="FillWrap"/> rechnet stattdessen, wie viele Kacheln der Zielbreite
+    /// nebeneinander passen, und verteilt den Rest auf die Spalten.
+    /// </summary>
+    private static FillWrap Wrap(double itemWidth)
+        => new() { ItemWidth = itemWidth, Gap = 12, Margin = new Thickness(0, 0, 0, 10) };
 
-    private Border Crumb(string text, Action click)
+    /// <summary>
+    /// Eine Stufe des Pfads. Ohne Handlung ist es der Ort, an dem man steht.
+    ///
+    /// Kein Schildchen mehr. Ein Kaestchen mit Rand und Flaeche sagt "hier ist ein
+    /// Ding"; eine Stufe eines Pfads soll aber sagen "hier geht es weiter nach
+    /// oben". Dafuer genuegt Text, und das Trennzeichen dazwischen macht aus den
+    /// Stufen eine Kette.
+    /// </summary>
+    private TextBlock Crumb(string text, Action? click)
     {
         var label = new TextBlock
         {
             Text = text,
+            Margin = new Thickness(0, 0, 0, 4),
+            VerticalAlignment = VerticalAlignment.Center,
             FontFamily = (FontFamily)FindResource("HeadFont"),
             FontWeight = FontWeights.Bold,
             FontSize = 10,
-            Foreground = (Brush)FindResource("MutedBrush"),
+            Foreground = (Brush)FindResource(click is null ? "DesktopInk" : "DesktopMuted"),
         };
 
-        var chip = new Border
-        {
-            Margin = new Thickness(0, 0, 6, 4),
-            Padding = new Thickness(10, 5, 10, 5),
-            CornerRadius = new CornerRadius(8),
-            Background = (Brush)FindResource("AppSurface"),
-            BorderBrush = (Brush)FindResource("PanelBorder"),
-            BorderThickness = new Thickness(1),
-            Cursor = Cursors.Hand,
-            Child = label,
-        };
+        if (click is null) return label;
 
-        chip.MouseLeftButtonUp += (_, _) => click();
-        chip.MouseEnter += (_, _) => label.Foreground = (Brush)FindResource("ForegroundBrush");
-        chip.MouseLeave += (_, _) => label.Foreground = (Brush)FindResource("MutedBrush");
+        label.Cursor = Cursors.Hand;
+        label.MouseLeftButtonUp += (_, _) => click();
+        label.MouseEnter += (_, _) => label.Foreground = (Brush)FindResource("DesktopAccent");
+        label.MouseLeave += (_, _) => label.Foreground = (Brush)FindResource("DesktopMuted");
 
-        return chip;
+        return label;
     }
 
-    private void Click(Border button, Action action)
+    /// <summary>Das Zeichen zwischen zwei Stufen. Es traegt die ganze Aussage "gehoert unter".</summary>
+    private TextBlock CrumbSeparator() => new()
     {
-        button.MouseLeftButtonUp += (_, _) => action();
-        button.MouseEnter += (_, _) => button.Background = (Brush)FindResource("SurfaceBrush");
-        button.MouseLeave += (_, _) => button.Background = (Brush)FindResource("AppSurface");
+        Text = "\u203a",
+        Margin = new Thickness(7, 0, 7, 4),
+        VerticalAlignment = VerticalAlignment.Center,
+        FontSize = 11,
+        Foreground = (Brush)FindResource("DesktopFaint"),
+    };
+
+    /// <summary>
+    /// Eine Stufe zurueck.
+    ///
+    /// Der Pfad selbst kann das auch - man klickt die vorletzte Stufe an. Aber das
+    /// setzt voraus, dass man ihn als Pfad LIEST, und genau das tat vorher niemand.
+    /// Ein Pfeil sagt es ohne Umweg.
+    /// </summary>
+    private ClickCard BackStep(Action click)
+    {
+        var pfeil = new TextBlock
+        {
+            Text = "\u2190",
+            HorizontalAlignment = HorizontalAlignment.Center,
+            VerticalAlignment = VerticalAlignment.Center,
+            FontSize = 13,
+            Foreground = (Brush)FindResource("DesktopMuted"),
+        };
+
+        return new ClickCard(T("D_BackStep"), click)
+        {
+            Width = 24,
+            Height = 22,
+            Margin = new Thickness(0, 0, 10, 4),
+            CornerRadius = new CornerRadius(6),
+            Background = (Brush)FindResource("DesktopSurface"),
+            BorderBrush = (Brush)FindResource("DesktopLine"),
+            BorderThickness = new Thickness(1),
+            VerticalAlignment = VerticalAlignment.Center,
+            Child = pfeil,
+        };
     }
+
 
     private static void Reveal(string path)
     {

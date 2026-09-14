@@ -1,10 +1,11 @@
-using System.Diagnostics;
+﻿using System.Diagnostics;
 using System.IO;
 using System.Reflection;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Threading;
+using FrameFlip.Localization;
 using FrameFlip.Projects;
 using FrameFlip.Views;
 
@@ -37,10 +38,21 @@ public static class ProjectNavigationInvariants
         string nested = Path.Combine(child, "camera");
         OpenFolder(page, nested);
         Check.That(Navigation(page).Folder == nested, "die Ordnerkachel oeffnet ihren Zielpfad");
+        /* Die Krumen sind jetzt ein Pfad und keine Schildchenreihe.
+         *
+         * Gezaehlt wird deshalb nicht mehr, was im Panel liegt - dort stehen auch
+         * Trennzeichen und der Rueckwegknopf. Gezaehlt werden die Stufen selbst, und
+         * geklickt wird die mit dem gesuchten Namen. Das ist ohnehin die Aussage, um
+         * die es geht: Eine Stufe fuehrt genau in ihren Ordner. */
         var crumbs = (Panel)page.FindName("Crumbs");
-        Check.That(crumbs.Children.Count == 4, "jeder Unterordner bekommt eine Brotkrume");
-        Click((Border)crumbs.Children[2]);
-        Check.That(Navigation(page).Folder == child, "die Brotkrume fuehrt genau in ihren Ordner");
+        var stufen = crumbs.Children.OfType<TextBlock>().Where(t => t.Text != "›").ToList();
+
+        Check.That(stufen.Count == 4, $"jeder Unterordner bekommt eine Stufe ({stufen.Count})");
+        Check.That(stufen[^1].Text == "camera" && stufen[^1].Cursor != Cursors.Hand,
+                   "die letzte Stufe ist der Ort, an dem man steht - und kein Ziel");
+
+        Click(stufen.Single(t => t.Text == "renders"));
+        Check.That(Navigation(page).Folder == child, "die Stufe fuehrt genau in ihren Ordner");
 
         OpenFolder(page, nested);
         Check.That(page.Back() && Navigation(page).Folder == child, "Zurueck geht genau eine Ordnerebene hoch");
@@ -70,8 +82,11 @@ public static class ProjectNavigationInvariants
                    "Zurueck schliesst zuerst die Vorschau und behaelt dabei den Ordner");
         Check.That(page.Back() && Navigation(page).Folder == child,
                    "erst das naechste Zurueck navigiert im Projekt");
-        Click((Border)((Panel)page.FindName("Crumbs")).Children[0]);
-        Check.That(Navigation(page).Project is null, "die Projekte-Brotkrume kehrt direkt zur Uebersicht zurueck");
+        // Children[0] ist jetzt der Rueckwegknopf, nicht die erste Stufe. Gesucht wird
+        // die Stufe mit dem Namen der Uebersicht.
+        Click(((Panel)page.FindName("Crumbs")).Children.OfType<TextBlock>()
+              .First(t => t.Text == Strings.T("S_ProjectsTitle")));
+        Check.That(Navigation(page).Project is null, "die Projekte-Stufe kehrt direkt zur Uebersicht zurueck");
         Open(page, project);
         Check.That(Navigation(page).VersionsOpen, "die Versionsansicht bleibt nach dem Zurueckkehren erhalten");
         PumpUntil(() => Read<Task>(page, "_contentTask").IsCompleted);
@@ -84,7 +99,7 @@ public static class ProjectNavigationInvariants
     private static void OpenFolder(ProjectsPage page, string path)
         => Click((Border)Call(page, "FolderTileView", new FolderTile(path, Path.GetFileName(path), 0, 0, null))!);
 
-    private static void Click(Border target)
+    private static void Click(UIElement target)
         => target.RaiseEvent(new MouseButtonEventArgs(Mouse.PrimaryDevice, 0, MouseButton.Left)
         { RoutedEvent = UIElement.MouseLeftButtonUpEvent });
 
