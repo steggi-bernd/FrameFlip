@@ -2,6 +2,7 @@ using System.IO;
 using System.Windows;
 using System.Windows.Controls;
 using FrameFlip.Decoding;
+using FrameFlip.Export;
 using FrameFlip.Imaging;
 using FrameFlip.Imaging.Grading;
 using FrameFlip.Localization;
@@ -33,22 +34,30 @@ public partial class AtelierPage
     private string? _target;
     private CancellationTokenSource? _running;
 
-    private static readonly (GradeOutputFormat Format, string Key)[] Formats =
+    /// <summary>
+    /// Was sich ausgeben laesst. Bildfolgen und Videos stehen in derselben Auswahl,
+    /// weil es aus Sicht des Anwenders dieselbe Frage ist - nur die Antwort landet
+    /// einmal in vielen Dateien und einmal in einer.
+    /// </summary>
+    private static readonly (GradeOutputFormat? Image, ExportPreset? Video, string Key)[] Formats =
     {
-        (GradeOutputFormat.Png16, "S_FormatPng16"),
-        (GradeOutputFormat.Png8, "S_FormatPng8"),
-        (GradeOutputFormat.Tiff16, "S_FormatTiff16"),
-        (GradeOutputFormat.Jpeg, "S_FormatJpeg"),
+        (GradeOutputFormat.Png16, null, "S_FormatPng16"),
+        (GradeOutputFormat.Png8, null, "S_FormatPng8"),
+        (GradeOutputFormat.Tiff16, null, "S_FormatTiff16"),
+        (GradeOutputFormat.Jpeg, null, "S_FormatJpeg"),
+        (null, ExportPreset.H264, "S_FormatH264"),
+        (null, ExportPreset.H265, "S_FormatH265"),
+        (null, ExportPreset.ProRes, "S_FormatProRes"),
     };
 
     private void SetUpBatch()
     {
-        foreach (var (_, key) in Formats) FormatBox.Items.Add(Strings.T(key));
+        foreach (var (_, _, key) in Formats) FormatBox.Items.Add(Strings.T(key));
         FormatBox.SelectedIndex = 0;
     }
 
-    private GradeOutputFormat SelectedFormat
-        => Formats[Math.Clamp(FormatBox.SelectedIndex, 0, Formats.Length - 1)].Format;
+    private (GradeOutputFormat? Image, ExportPreset? Video, string Key) Selected
+        => Formats[Math.Clamp(FormatBox.SelectedIndex, 0, Formats.Length - 1)];
 
     /// <summary>
     /// Sucht die Sequenz um das geoeffnete Bild - derselbe Weg, den auch die
@@ -117,40 +126,47 @@ public partial class AtelierPage
         if (_sequence is null || _target is null || _running is not null) return;
 
         var frames = _sequence.Frames.Select(f => f.Path).ToList();
+        var chosen = Selected;
 
-        var request = new GradeBatchRequest
+        // Fuer ein Video braucht es ffmpeg. Das erst beim Klick zu bemerken ist
+        // besser, als den Knopf stumm zu lassen - so steht wenigstens da, warum.
+        string? ffmpeg = null;
+        if (chosen.Video is not null)
         {
-            Frames = frames,
-            OutputDirectory = _target,
-            Format = SelectedFormat,
-            Adjustments = Tools.Adjustments,
-
-            // Kopiert: waehrend der Lauf laeuft, darf am Original weitergeregelt
-            // werden, ohne dass sich die Ausgabe auf halber Strecke aendert.
-            Grading = Tools.Stack.Clone(),
-
-            View = _frame is not null ? ViewFor(_frame) : new StandardViewTransform(),
-            MaxWorkers = Workers?.Invoke() ?? Math.Clamp(Environment.ProcessorCount / 2, 1, 8),
-        };
+            ffmpeg = FfmpegLocator.Locate(_settings.FfmpegPath);
+            if (ffmpeg is null)
+            {
+                BatchStatus.Text = Strings.T("S_NoFfmpeg");
+                return;
+            }
+        }
 
         _running = new CancellationTokenSource();
         var token = _running.Token;
 
         RunButton.IsEnabled = false;
         StopButton.Visibility = Visibility.Visible;
+        StopButton.IsEnabled = true;
         BatchProgress.Visibility = Visibility.Visible;
         BatchProgress.Value = 0;
         Tools.IsEnabled = false;
 
+        int seen = 0;
         var progress = new Progress<GradeProgress>(p =>
         {
-            BatchProgress.Value = p.Total > 0 ? p.Done / (double)p.Total : 0;
-            BatchStatus.Text = $"{p.Done} / {p.Total}";
+            // Beim Video zaehlt der Durchlauf selbst mit, weil die Bilder der Reihe
+            // nach in den Strom gehen und nicht einzeln fertig werden.
+            int done = p.Done > 0 ? p.Done : ++seen;
+            BatchProgress.Value = p.Total > 0 ? done / (double)p.Total : 0;
+            BatchStatus.Text = $"{done} / {p.Total}";
         });
 
         try
         {
-            var result = await Task.Run(() => GradeBatch.Run(request, progress, token), token);
+            var result = chosen.Video is not null
+                ? await RunVideo(frames, chosen.Video, ffmpeg!, progress, token)
+                : await RunImages(frames, chosen.Image!.Value, progress, token);
+
             Report(result);
         }
         catch (OperationCanceledException)
@@ -171,6 +187,61 @@ public partial class AtelierPage
             Tools.IsEnabled = true;
             UpdateBatchBar();
         }
+    }
+
+    private Task<GradeBatchResult> RunImages(IReadOnlyList<string> frames, GradeOutputFormat format,
+                                             IProgress<GradeProgress> progress, CancellationToken token)
+    {
+        var request = new GradeBatchRequest
+        {
+            Frames = frames,
+            OutputDirectory = _target!,
+            Format = format,
+            Adjustments = Tools.Adjustments,
+
+            // Kopiert: waehrend der Lauf laeuft, darf am Original weitergeregelt
+            // werden, ohne dass sich die Ausgabe auf halber Strecke aendert.
+            Grading = Tools.Stack.Clone(),
+
+            View = _frame is not null ? ViewFor(_frame) : new StandardViewTransform(),
+            MaxWorkers = Workers?.Invoke() ?? Math.Clamp(Environment.ProcessorCount / 2, 1, 8),
+        };
+
+        return Task.Run(() => GradeBatch.Run(request, progress, token), token);
+    }
+
+    private Task<GradeBatchResult> RunVideo(IReadOnlyList<string> frames, ExportPreset preset,
+                                            string ffmpeg, IProgress<GradeProgress> progress,
+                                            CancellationToken token)
+    {
+        var request = new GradeVideoRequest
+        {
+            Frames = frames,
+            OutputPath = VideoTarget(preset),
+            Preset = preset,
+            Fps = _settings.Fps > 0 ? _settings.Fps : 24,
+            Adjustments = Tools.Adjustments,
+            Grading = Tools.Stack.Clone(),
+            View = _frame is not null ? ViewFor(_frame) : new StandardViewTransform(),
+
+            // Dieselbe Zurueckhaltung wie beim Rechnen: der Encoder darf einen
+            // laufenden Render nicht verdraengen.
+            EncoderThreads = Workers?.Invoke() ?? 0,
+        };
+
+        return GradeVideo.RunAsync(ffmpeg, request, progress, token);
+    }
+
+    /// <summary>
+    /// Der Name der Videodatei: der Praefix der Sequenz ohne die Nummer, im
+    /// gewaehlten Ordner. Damit heisst das Video wie die Bilder, aus denen es kommt.
+    /// </summary>
+    private string VideoTarget(ExportPreset preset)
+    {
+        string name = _sequence?.Pattern.Prefix.TrimEnd('_', '-', '.', ' ') ?? "";
+        if (name.Length == 0) name = "atelier";
+
+        return Path.Combine(_target!, name + preset.Extension);
     }
 
     private void Report(GradeBatchResult result)
