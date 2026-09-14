@@ -24,6 +24,13 @@
 
     <SolidColorBrush x:Key="ForegroundBrush" Color="#FFF2F0F7" />
     <SolidColorBrush x:Key="MutedBrush" Color="#FFA09AB4" />
+
+    <!-- Die drei Kanaele, wo sie benannt werden muessen: an den Kurven und an den
+         neun Zonenreglern, die sonst nicht auseinanderzuhalten waeren. Gedaempft
+         genug, um neben einer Beschriftung nicht zu schreien. -->
+    <SolidColorBrush x:Key="ChannelRed" Color="#FFE06C6C" />
+    <SolidColorBrush x:Key="ChannelGreen" Color="#FF6CD086" />
+    <SolidColorBrush x:Key="ChannelBlue" Color="#FF6C9CE0" />
     <SolidColorBrush x:Key="FaintBrush" Color="#FF716C86" />
 
     <!-- Violett statt des frueheren Blender-Orange. Hell genug, dass er auf dem

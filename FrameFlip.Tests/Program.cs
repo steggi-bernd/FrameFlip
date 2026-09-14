@@ -31,6 +31,7 @@ static int RunAll()
     CurveEditingInvariants.Run();
     CurveRenderInvariants.Run();
     AtelierPageInvariants.Run();
+    PanelPolishInvariants.Run();
     GradeBatchInvariants.Run();
     GradeVideoInvariants.Run();
     ExrInvariants.Run();

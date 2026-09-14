@@ -214,7 +214,8 @@ public partial class GradingPanel : UserControl
             BlackSlider.Value = Math.Clamp(Adjustments.BlackPoint, BlackSlider.Minimum, BlackSlider.Maximum);
             WhiteSlider.Value = Math.Clamp(Adjustments.WhitePoint, WhiteSlider.Minimum, WhiteSlider.Maximum);
 
-            TemperatureSlider.Value = Math.Clamp(_whiteBalance.Kelvin, TemperatureSlider.Minimum, TemperatureSlider.Maximum);
+            TemperatureSlider.Value = Math.Clamp(ToMired(_whiteBalance.Kelvin),
+                                                 TemperatureSlider.Minimum, TemperatureSlider.Maximum);
             TintSlider.Value = _whiteBalance.Tint;
             VibranceSlider.Value = _vibrance.Amount;
 
@@ -263,7 +264,18 @@ public partial class GradingPanel : UserControl
             Channel = Adjustments.Channel,
         }.Clamped();
 
-        _whiteBalance.Kelvin = (float)TemperatureSlider.Value;
+        // Der Schwarzpunkt kann den Weisspunkt nicht ueberholen - das faengt
+        // Clamped() ab. Damit der Regler nicht weiterlaeuft, waehrend der Wert
+        // stehenbleibt, wird er zurueckgesetzt: Sonst zieht man ins Leere und
+        // merkt es erst, wenn man loslaesst.
+        if (Math.Abs(BlackSlider.Value - Adjustments.BlackPoint) > 0.0005)
+        {
+            _filling = true;
+            try { BlackSlider.Value = Adjustments.BlackPoint; }
+            finally { _filling = false; }
+        }
+
+        _whiteBalance.Kelvin = ToKelvin(TemperatureSlider.Value);
         _whiteBalance.Tint = (float)TintSlider.Value;
         _vibrance.Amount = (float)VibranceSlider.Value;
 
@@ -313,11 +325,26 @@ public partial class GradingPanel : UserControl
         BlackValue.Text = $"{Adjustments.BlackPoint:0.00}";
         WhiteValue.Text = $"{Adjustments.WhitePoint:0.00}";
 
-        TemperatureValue.Text = $"{TemperatureSlider.Value:0} K";
+        TemperatureValue.Text = $"{ToKelvin(TemperatureSlider.Value):0} K";
         TintValue.Text = $"{TintSlider.Value:+0;-0;0}";
         VibranceValue.Text = $"{VibranceSlider.Value:+0.00;-0.00;0.00}";
         LutStrengthValue.Text = $"{LutStrengthSlider.Value:0.00}";
     }
+
+    /// <summary>
+    /// Mired nach Kelvin und zurueck.
+    ///
+    /// Der Regler laeuft in Mired, weil ein Kelvin-Regler ueber seine Laenge
+    /// ungleich wirkt: Ein Schritt von 1000 K bewirkt bei 2000 K das Dreissigfache
+    /// dessen, was er bei 14000 K bewirkt. In Mired sind die Schritte gleich gross,
+    /// und das entspricht auch dem, was das Auge als gleichen Unterschied sieht.
+    ///
+    /// Angezeigt wird trotzdem Kelvin - danach fragt jeder, der eine Lichtquelle
+    /// beschreiben will.
+    /// </summary>
+    private static float ToKelvin(double mired) => (float)(1e6 / Math.Max(1.0, mired));
+
+    private static double ToMired(float kelvin) => 1e6 / Math.Max(1f, kelvin);
 
     private static float BandValue(HslBand band, int mode) => mode switch
     {
