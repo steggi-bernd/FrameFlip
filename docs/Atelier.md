@@ -474,7 +474,7 @@ The existing export, plus an image-sequence target:
 
 | | Notes |
 |---|---|
-| **Video** | as today — `ExportQuality`, `ExportSpeed`, codecs, in/out points, scaling |
+| **Video** | H.264, H.265, ProRes — the frames go into ffmpeg **raw**, not as file paths |
 | **Image sequence** | PNG 8/16, TIFF 8/16, EXR (graded, still linear, passes flattened), JPEG |
 | **Bit depth** | 16-bit output where the target allows — a graded sequence going on to another program should not be narrowed on the way out |
 | **Colour space** | which view transform was baked in, recorded in the file where the format has a place for it |
@@ -500,7 +500,7 @@ next one landing.
    histogram become real. Reveals what the time budget actually looks like.
 3. ~~**Adjustment layers with the ★ tools.**~~ **Done** except Clarity, which needs a pixel's neighbourhood and does not fit the point-wise form. Curves, white balance, LGG, HSL, vibrance,
    clarity, LUT. Single layer, no masks. Already a genuine grading tool.
-4. ~~**The batch run and sequence export.**~~ **Done** for image sequences; video through ffmpeg is still open. At this point the workflow closes, and Atelier
+4. ~~**The batch run and sequence export.**~~ **Done**, images and video. At this point the workflow closes, and Atelier
    is finished as a product even if nothing further is built.
 5. **Layer stack, blend modes, luminance and gradient masks.**
 6. **Passes and light mixing.**
