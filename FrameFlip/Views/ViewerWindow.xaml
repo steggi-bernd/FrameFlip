@@ -75,6 +75,12 @@
                            Visibility="Collapsed"
                            ToolTip="{DynamicResource S_FloatPath}" />
 
+                <!-- Ausser den Reglern wirken Werkzeuge. -->
+                <TextBlock x:Name="CurveBadge" Text="&#x223F;" VerticalAlignment="Center" Margin="0,0,12,0"
+                           Foreground="{StaticResource AccentBrush}" FontSize="13"
+                           Visibility="Collapsed"
+                           ToolTip="{DynamicResource S_Curves}" />
+
                 <!-- Aufloesung, Farbtiefe und Dateigroesse. Ein Klick blendet die
                      Angaben aus; der Zustand wird in der Konfiguration gehalten. -->
                 <Button x:Name="MetaButton" Style="{StaticResource LinkButton}"
@@ -552,6 +558,41 @@
                     <ComboBox x:Name="ChannelBox" Style="{StaticResource OverlayCombo}"
                               SelectionChanged="OnChannelChanged"
                               ToolTip="{DynamicResource S_ChannelHint}" />
+
+                    <!-- Kurven -->
+                    <Grid Margin="0,16,0,6">
+                        <TextBlock Text="{DynamicResource S_Curves}" Style="{StaticResource PanelHeading}" />
+                        <Button x:Name="ResetCurveButton" Style="{StaticResource LinkButton}"
+                                HorizontalAlignment="Right" Content="{DynamicResource S_Reset}"
+                                Click="OnResetCurveClicked" />
+                    </Grid>
+
+                    <Grid Margin="0,0,0,6">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="*" />
+                        </Grid.ColumnDefinitions>
+                        <ToggleButton x:Name="CurveMasterButton" Grid.Column="0" Style="{StaticResource OverlayToggle}"
+                                      Margin="0,0,2,0" Content="RGB" IsChecked="True" Tag="0"
+                                      Checked="OnCurveChannelPicked" />
+                        <ToggleButton x:Name="CurveRedButton" Grid.Column="1" Style="{StaticResource OverlayToggle}"
+                                      Margin="2,0,2,0" Content="R" Tag="1"
+                                      Checked="OnCurveChannelPicked" />
+                        <ToggleButton x:Name="CurveGreenButton" Grid.Column="2" Style="{StaticResource OverlayToggle}"
+                                      Margin="2,0,2,0" Content="G" Tag="2"
+                                      Checked="OnCurveChannelPicked" />
+                        <ToggleButton x:Name="CurveBlueButton" Grid.Column="3" Style="{StaticResource OverlayToggle}"
+                                      Margin="2,0,0,0" Content="B" Tag="3"
+                                      Checked="OnCurveChannelPicked" />
+                    </Grid>
+
+                    <local:CurveEditor x:Name="CurveField" />
+
+                    <TextBlock x:Name="CurveHint" Margin="0,6,0,0" FontSize="10"
+                               Foreground="{StaticResource MutedBrush}" TextWrapping="Wrap"
+                               Text="{DynamicResource S_CurveHint}" />
 
                     <!-- A/B -->
                     <TextBlock Text="{DynamicResource S_Compare}" Style="{StaticResource PanelHeading}" Margin="0,16,0,6" />

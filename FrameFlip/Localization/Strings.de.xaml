@@ -11,6 +11,8 @@
     <sys:String x:Key="S_BufferAhead">Wie weit der Ringpuffer vorausreicht. Wird die Zahl klein, stockt die Wiedergabe gleich – dann hilft eine kleinere Dekodiergröße.</sys:String>
     <sys:String x:Key="S_Adjusted">Die Anzeige ist korrigiert – die Dateien bleiben unverändert</sys:String>
     <sys:String x:Key="S_FloatPath">Die Korrektur rechnet auf den Gleitkommawerten der Datei – Belichtung holt Zeichnung aus den Lichtern zurück</sys:String>
+    <sys:String x:Key="S_Curves">Kurven</sys:String>
+    <sys:String x:Key="S_CurveHint">Klicken setzt einen Punkt, Ziehen verschiebt ihn, rechte Maustaste entfernt ihn.</sys:String>
     <sys:String x:Key="S_ToggleMeta">Bilddaten ein- oder ausblenden (D)</sys:String>
     <sys:String x:Key="S_ZoomHint">Klick setzt auf 100 %, erneut auf Einpassung</sys:String>
 

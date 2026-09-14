@@ -363,6 +363,16 @@ public sealed class AppSettings
     /// </summary>
     public Imaging.ImageAdjustments? Adjustments { get; set; }
 
+    /// <summary>
+    /// Die Werkzeuge der Farbkorrektur - Kurven und was noch dazukommt.
+    ///
+    /// Getrennt von <see cref="Adjustments"/>, obwohl beides zusammen das Bild
+    /// ergibt: Die Regler dort sind der schnelle Griff beim Beurteilen und sollen
+    /// auch ohne Gleitkommamaterial wirken. Der Stapel hier greift nur auf dem
+    /// angehaltenen Bild und faellt sonst nicht ins Gewicht.
+    /// </summary>
+    public Imaging.Grading.GradingStack? Grading { get; set; }
+
     /// <summary>Gespeicherte Korrektureinstellungen, im Panel auswaehlbar.</summary>
     public List<AdjustmentPreset> AdjustmentPresets { get; set; } = new();
 
