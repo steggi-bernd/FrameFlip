@@ -2304,6 +2304,17 @@ public partial class MainWindow : Window
     /// <summary>Den Kopplungscode zeigen - im Dashboard, nicht anderswo.</summary>
     private void OnShowPairing(object sender, RoutedEventArgs e)
     {
+        // Ohne Zustimmung erst die Frage, nicht den Code.
+        //
+        // Ein Kopplungscode, solange nichts nach draussen geht, ist eine huebsche
+        // Grafik und sonst nichts - niemand kann ihn einloesen. Wer zustimmt, sieht
+        // ihn eine Wimper spaeter.
+        if (!_getSettings().TermsOk)
+        {
+            AskTerms(() => OnShowPairing(sender, e));
+            return;
+        }
+
         PairHost.Visibility = Visibility.Visible;
         RefreshPairing();
         RefreshWatch();
@@ -2566,6 +2577,35 @@ public partial class MainWindow : Window
 
         _afterTerms = dann;
 
+        /* Der Wortlaut richtet sich danach, wessen Server eingetragen ist.
+         *
+         * Meine Rechtstexte gelten fuer meinen Server - die Seite sagt das im
+         * Untertitel selbst. Wer einen eigenen eingetragen hat, soll ihnen nicht
+         * zustimmen muessen: Was dort gilt, macht er mit dessen Betreiber aus, und
+         * bei einem selbst betriebenen Server ist das er selbst.
+         *
+         * Die Zustimmung bleibt trotzdem noetig. Worum es hier geht, ist der Schritt
+         * nach draussen und dass FrameFlip ohne Gewaehr kommt - und das haengt nicht
+         * daran, wem der Server gehoert. */
+        bool eigener = !string.Equals(_getSettings().RelayHost, AppSettings.DefaultRelayHost,
+                                      StringComparison.OrdinalIgnoreCase);
+
+        TermsBody.Text = Strings.T(eigener ? "D_TermsBodyOwn" : "D_TermsBody");
+        TermsAgreeText.Text = Strings.T(eigener ? "D_TermsAgreeOwn" : "D_TermsAgree");
+        TermsNote.Text = Strings.T(eigener ? "D_TermsNoteOwn" : "D_TermsOwnRelay");
+
+        // Keine Links auf meine Texte, wenn sie nicht gelten.
+        TermsLinks.Visibility = eigener ? Visibility.Collapsed : Visibility.Visible;
+
+        /* Die Kopplungstafel weicht.
+         *
+         * Sie liegt jetzt zwar unter der Frage und nicht mehr darueber, aber ein
+         * Kopplungscode hinter der Frage ist trotzdem falsch: Er laesst sich nicht
+         * einloesen, solange nichts nach draussen geht. Wer zustimmt, bekommt ihn
+         * zurueck - wer nicht, hat ihn nie gebraucht. */
+        _pairWasOpen = PairHost.Visibility == Visibility.Visible;
+        PairHost.Visibility = Visibility.Collapsed;
+
         TermsAgree.IsChecked = false;
         TermsGo.IsEnabled = false;
         TermsHost.Visibility = Visibility.Visible;
@@ -2573,6 +2613,9 @@ public partial class MainWindow : Window
         // Den Tastaturschein auf die Tafel holen, damit Esc und Tab dort wirken.
         TermsAgree.Focus();
     }
+
+    /// <summary>Stand die Kopplungstafel offen, als die Frage kam?</summary>
+    private bool _pairWasOpen;
 
     private void OnTermsChecked(object sender, RoutedEventArgs e)
     {
@@ -2584,6 +2627,7 @@ public partial class MainWindow : Window
     private void OnTermsLater(object sender, RoutedEventArgs e)
     {
         _afterTerms = null;
+        _pairWasOpen = false;
         TermsHost.Visibility = Visibility.Collapsed;
 
         Note(Strings.T("D_TermsDeclined"));
@@ -2604,6 +2648,11 @@ public partial class MainWindow : Window
 
         TermsHost.Visibility = Visibility.Collapsed;
         Note(Strings.T("D_TermsAccepted"));
+
+        // Wer den Kopplungscode sehen wollte, bekommt ihn jetzt - diesmal einen,
+        // der sich auch einloesen laesst.
+        if (_pairWasOpen) PairHost.Visibility = Visibility.Visible;
+        _pairWasOpen = false;
 
         var dann = _afterTerms;
         _afterTerms = null;
