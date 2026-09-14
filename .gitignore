@@ -17,3 +17,6 @@ publish/
 # Betriebssystem
 Thumbs.db
 desktop.ini
+
+# Ausgabe der Oberflaechenreihe: gerenderte Bilder zum Nachsehen, keine Quelle.
+review/

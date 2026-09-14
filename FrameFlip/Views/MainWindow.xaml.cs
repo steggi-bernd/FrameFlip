@@ -222,6 +222,7 @@ public partial class MainWindow : Window
         InitializeComponent();
 
         ApplyScale();
+        InitializeDashboardLayout();
 
         if (settings is not null)
         {
@@ -276,6 +277,7 @@ public partial class MainWindow : Window
         {
             Strings.Changed -= OnLanguageChanged;
             _layout.Changed -= OnLayoutChanged;
+            _settingsPage?.Dispose();
             _ticker.Stop();
             _player.Stop();
             _settle?.Stop();
@@ -384,7 +386,7 @@ public partial class MainWindow : Window
         if (width > 0 && height > 0 && !double.IsNaN(width) && !double.IsNaN(height))
             elastic = ElasticFor(width, height);
 
-        double scale = _layout.Scale * elastic;
+        double scale = Math.Min(_layout.Scale * elastic, Math.Min(width / NeededWidth, height / NeededHeight));
 
         // Unter einem Promille sieht niemand etwas, aber jede Zuweisung stoesst ein
         // neues Layout an - und SizeChanged feuert waehrend des Ziehens dauernd.
@@ -457,13 +459,17 @@ public partial class MainWindow : Window
         if (dashboard)
         {
             PageContent.Content = null;
+            // Die eingeklappte Dashboard-Fläche hat während der Einstellungen
+            // keine nutzbaren Maße. Erst nach dem Einblenden neu aufteilen.
+            Dispatcher.BeginInvoke(new Action(ApplyDashboardLayout), DispatcherPriority.Loaded);
             return;
         }
 
+        AnimatePageChange();
         PageContent.Content = key switch
         {
             "projects" => new ProjectsPage(OpenFromProjects),
-            _ => new SettingsPage(_getSettings, _apply, _remoteState, _layout),
+            _ => _settingsPage ??= new SettingsPage(_getSettings, _apply, _remoteState, _layout),
         };
     }
 
@@ -1136,10 +1142,12 @@ public partial class MainWindow : Window
 
         StageImage.Source = null;
         StageEmpty.Visibility = Visibility.Visible;
+        StageEmpty.SetResourceReference(TextBlock.TextProperty, "D_StageStartHint");
 
-        SequenceName.Text = string.Empty;
+        SequenceName.SetResourceReference(TextBlock.TextProperty, "D_StageTitle");
         SequenceFile.Text = string.Empty;
         StageHead.Text = string.Empty;
+        StageZoom.Text = string.Empty;
         StageDecode.Text = string.Empty;
 
         FilmStrip.Children.Clear();
@@ -1984,7 +1992,32 @@ public partial class MainWindow : Window
 
     private void OnWindowKeyDown(object sender, KeyEventArgs e)
     {
-        if (_page != "dashboard") return;
+        if (Keyboard.Modifiers == ModifierKeys.Control)
+        {
+            if (e.Key == Key.O)
+            {
+                NavDashboard.IsChecked = true;
+                ShowOpenDialog();
+                e.Handled = true;
+                return;
+            }
+            double? scale = e.Key switch
+            {
+                Key.Add or Key.OemPlus => _layout.Scale + .05,
+                Key.Subtract or Key.OemMinus => _layout.Scale - .05,
+                Key.D0 or Key.NumPad0 => 1,
+                _ => null,
+            };
+            if (scale is { } requested)
+            {
+                _layout.Scale = requested;
+                _layout.Save();
+                e.Handled = true;
+            }
+            return;
+        }
+        if (_page != "dashboard" || Keyboard.Modifiers != ModifierKeys.None
+            || OwnsNavigationKeys(e.OriginalSource as DependencyObject)) return;
 
         switch (e.Key)
         {
@@ -2932,6 +2965,9 @@ public partial class MainWindow : Window
         // leuchtet mit, solange der Kopf wirklich auf dem letzten Bild steht -
         // sonst waere "Neueste" eine Behauptung statt einer Anzeige.
         FollowToggle.Visibility = _sequence is { Count: > 0 } ? Visibility.Visible : Visibility.Collapsed;
+        bool hasFrames = _sequence is { Count: > 0 };
+        TransportControls.IsEnabled = ViewChips.IsEnabled = hasFrames;
+        StageAnnotations.Visibility = hasFrames ? Visibility.Visible : Visibility.Collapsed;
         NewestDot.Opacity = _sequence is { } shown && _head == shown.EndNumber ? 1 : 0.35;
 
         // ---------------------------------------------------------- Protokoll
@@ -3166,6 +3202,8 @@ public partial class MainWindow : Window
     private void OnLayoutChanged()
     {
         ApplyScale();
+        ApplyDashboardLayout();
+        PairCode.LightModules = WatchCode.LightModules = _layout.LightQr;
 
         // Der Streifen misst in geraetunabhaengigen Punkten; nach einer neuen
         // Skalierung passen andere Zellenzahlen ins selbe Fenster.

@@ -67,13 +67,13 @@
                     <TextBlock Grid.Row="1" Grid.Column="0" Text="{DynamicResource S_Playback}"
                                Style="{StaticResource DialogLabel}" />
                     <StackPanel Grid.Row="1" Grid.Column="1">
-                        <CheckBox x:Name="LoopBox" Style="{StaticResource DialogCheckBox}"
+                        <CheckBox x:Name="LoopBox" Style="{StaticResource DesktopCheckBox}"
                                   Content="{DynamicResource S_LoopSeamless}" />
-                        <CheckBox x:Name="LockToDisplayBox" Style="{StaticResource DialogCheckBox}"
+                        <CheckBox x:Name="LockToDisplayBox" Style="{StaticResource DesktopCheckBox}"
                                   Margin="0,6,0,0"
                                   Content="{DynamicResource S_LockToDisplay}"
                                   ToolTip="{DynamicResource S_LockToDisplayHint}" />
-                        <CheckBox x:Name="CloseOnFocusLossBox" Style="{StaticResource DialogCheckBox}"
+                        <CheckBox x:Name="CloseOnFocusLossBox" Style="{StaticResource DesktopCheckBox}"
                                   Margin="0,6,0,0"
                                   Content="{DynamicResource S_CloseOnFocusLoss}"
                                   ToolTip="{DynamicResource S_CloseOnFocusLossHint}" />
@@ -117,7 +117,7 @@
 
                     <TextBlock Grid.Row="4" Grid.Column="0" Text="{DynamicResource S_AdaptiveLoad}"
                                Style="{StaticResource DialogLabel}" />
-                    <CheckBox x:Name="AdaptiveBox" Grid.Row="4" Grid.Column="1" Style="{StaticResource DialogCheckBox}"
+                    <CheckBox x:Name="AdaptiveBox" Grid.Row="4" Grid.Column="1" Style="{StaticResource DesktopCheckBox}"
                               Content="{DynamicResource S_AdaptiveLoadHint}" Margin="0,0,0,12" />
 
                     <TextBlock Grid.Row="5" Grid.Column="0" Text="{DynamicResource S_LoadInterval}"
@@ -162,7 +162,7 @@
                     </StackPanel>
 
                     <CheckBox x:Name="RemoteBox" Grid.Row="1" Grid.Column="1" Margin="0,14,0,0"
-                              Style="{StaticResource DialogCheckBox}"
+                              Style="{StaticResource DesktopCheckBox}"
                               Content="{DynamicResource S_RemoteEnable}" />
 
                     <TextBlock Grid.Row="2" Grid.Column="1" Margin="0,6,0,0" TextWrapping="Wrap"
@@ -173,7 +173,7 @@
                          Er gehört zur Fernsteuerung, hängt an ihr, und wer ihn sucht,
                          sucht ihn dort, wo er das Handy eingerichtet hat. -->
                     <StackPanel Grid.Row="3" Grid.Column="1" Margin="0,14,0,0">
-                        <CheckBox x:Name="LibraryBox" Style="{StaticResource DialogCheckBox}"
+                        <CheckBox x:Name="LibraryBox" Style="{StaticResource DesktopCheckBox}"
                                   Content="{DynamicResource S_LibraryEnable}" />
 
                         <TextBlock Margin="0,6,0,0" TextWrapping="Wrap"
@@ -205,7 +205,7 @@
                                    Foreground="{StaticResource MutedBrush}" FontSize="11"
                                    Text="{DynamicResource S_ScanHint}" />
 
-                        <CheckBox x:Name="ClassicQr" Content="{DynamicResource D_ClassicQr}" Style="{StaticResource DialogCheckBox}" Margin="0,12,0,0" Checked="OnQrStyle" Unchecked="OnQrStyle" /><WrapPanel Margin="0,12,0,0">
+                        <CheckBox x:Name="ClassicQr" Content="{DynamicResource D_ClassicQr}" Style="{StaticResource DesktopCheckBox}" Margin="0,12,0,0" Checked="OnQrStyle" Unchecked="OnQrStyle" /><WrapPanel Margin="0,12,0,0">
                             <Button x:Name="CopyLinkButton" Style="{StaticResource DesktopButton}"
                                     Content="{DynamicResource S_CopyLink}" MinWidth="120"
                                     Click="OnCopyLinkClicked" />
@@ -220,16 +220,16 @@
         <TabItem Style="{StaticResource DialogTab}" Header="{DynamicResource D_Permissions}">
  <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" Padding="0,8,12,18"><StackPanel>
  <TextBlock Text="{DynamicResource D_PermissionsIntro}" TextWrapping="Wrap" Foreground="{StaticResource DesktopMuted}" Margin="0,0,0,22" />
- <CheckBox x:Name="BridgeBox" Content="{DynamicResource D_BlenderBridge}" Style="{StaticResource DialogCheckBox}" Margin="0,0,0,20" />
+ <CheckBox x:Name="BridgeBox" Content="{DynamicResource D_BlenderBridge}" Style="{StaticResource DesktopCheckBox}" Margin="0,0,0,20" />
  <TextBlock Text="{DynamicResource S_BlenderLabel}" Style="{StaticResource DesktopLabel}" Margin="0,0,0,8" />
  <DockPanel><Button DockPanel.Dock="Right" Content="…" Style="{StaticResource DesktopButton}" Click="OnBrowseBlender" Margin="8,0,0,0" /><TextBox x:Name="BlenderPathBox" Style="{StaticResource DialogTextBox}" /></DockPanel>
- <CheckBox x:Name="RenderBox" Content="{DynamicResource S_RenderEnable}" Style="{StaticResource DialogCheckBox}" Margin="0,14,0,8" />
+ <CheckBox x:Name="RenderBox" Content="{DynamicResource S_RenderEnable}" Style="{StaticResource DesktopCheckBox}" Margin="0,14,0,8" />
  <TextBlock Text="{DynamicResource S_RenderHint}" TextWrapping="Wrap" Foreground="{StaticResource DesktopMuted}" FontSize="11" />
  <Separator Margin="0,22" Background="{StaticResource DesktopLine}" />
  <TextBlock Text="{DynamicResource S_ExchangeFolder}" Style="{StaticResource DesktopLabel}" Margin="0,0,0,8" />
  <DockPanel><Button DockPanel.Dock="Right" Content="…" Style="{StaticResource DesktopButton}" Click="OnBrowseFolder" Margin="8,0,0,0" /><TextBox x:Name="FolderBox" Style="{StaticResource DialogTextBox}" /></DockPanel>
- <CheckBox x:Name="FileAccessBox" Content="{DynamicResource D_FileRead}" Style="{StaticResource DialogCheckBox}" Margin="0,14,0,12" />
- <CheckBox x:Name="PushBox" Content="{DynamicResource S_PushEnable}" Style="{StaticResource DialogCheckBox}" />
+ <CheckBox x:Name="FileAccessBox" Content="{DynamicResource D_FileRead}" Style="{StaticResource DesktopCheckBox}" Margin="0,14,0,12" />
+ <CheckBox x:Name="PushBox" Content="{DynamicResource S_PushEnable}" Style="{StaticResource DesktopCheckBox}" />
  <TextBlock Text="{DynamicResource S_PushHint}" TextWrapping="Wrap" Foreground="{StaticResource DesktopMuted}" FontSize="11" Margin="0,8,0,0" />
  </StackPanel></ScrollViewer>
  </TabItem>
@@ -240,7 +240,7 @@
                    Foreground="{StaticResource AccentBrush}" FontSize="11" TextWrapping="Wrap"
                    Visibility="Collapsed" />
 
-        <StackPanel Grid.Row="2" Orientation="Horizontal"
+        <WrapPanel Grid.Row="2" Orientation="Horizontal"
                     HorizontalAlignment="Right" Margin="0,20,0,0">
             <Button x:Name="RevealButton" Style="{StaticResource DesktopButton}"
                     Content="{DynamicResource S_ShowConfig}"
@@ -251,6 +251,6 @@
             <Button x:Name="SaveButton" Style="{StaticResource DesktopButton}"
                     Content="{DynamicResource D_Apply}"
                      Click="OnSaveClicked" />
-        </StackPanel>
+        </WrapPanel>
     </Grid>
 </UserControl>
