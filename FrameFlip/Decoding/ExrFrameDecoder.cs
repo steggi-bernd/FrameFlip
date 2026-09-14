@@ -124,13 +124,10 @@ public sealed class ExrFrameDecoder : IFrameDecoder
 
             // Ganzzahlige Verkleinerung, wie sie der Puffer verlangt. Anders als WIC
             // kann EXR nicht schon beim Dekodieren kleiner werden - die Zeilen liegen
-            // gepackt in Bloecken.
-            int step = 1;
-            while (image.Width / (step + 1) >= 1 && image.Height / (step + 1) >= 1 &&
-                   (image.Width / step > maxWidth || image.Height / step > maxHeight))
-            {
-                step++;
-            }
+            // gepackt in Bloecken. Gemittelt wird hier gleich mit in den Zielpuffer,
+            // statt ueber einen verkleinerten Gleitkommaframe zu gehen: der laege bei
+            // 4K im zweistelligen Megabytebereich, und zwar bei jedem Bild.
+            int step = FloatFrame.StepFor(image.Width, image.Height, maxWidth, maxHeight);
 
             int width = Math.Max(1, image.Width / step);
             int height = Math.Max(1, image.Height / step);

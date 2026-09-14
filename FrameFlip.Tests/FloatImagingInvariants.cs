@@ -419,6 +419,20 @@ public static class FloatImagingInvariants
         var larger = frame.Reduced(99, 99);
         Check.That(ReferenceEquals(larger, frame), "und vergroessert wird nie");
 
+        // Die Schrittberechnung wird vom Decoder mitbenutzt - dort entscheidet
+        // derselbe Faktor ueber die Groesse des Puffers.
+        Check.That(FloatFrame.StepFor(1920, 1080, 1920, 1080) == 1, "passt es, ist der Schritt 1");
+        Check.That(FloatFrame.StepFor(3840, 2160, 1920, 1080) == 2, "4K auf 1080p ist Schritt 2");
+        Check.That(FloatFrame.StepFor(3840, 2160, 960, 540) == 4, "und auf 540p Schritt 4");
+        Check.That(FloatFrame.StepFor(100, 100, 999, 999) == 1, "kleiner als die Grenze bleibt kleiner");
+
+        // Die Falle: ein sehr schmales Bild darf nicht auf null Pixel schrumpfen.
+        int narrow = FloatFrame.StepFor(1000, 3, 10, 10);
+        Check.That(1000 / narrow >= 1 && 3 / narrow >= 1, "ein schmales Bild behaelt beide Seiten",
+                   $"Schritt {narrow} bei 1000x3");
+
+        Check.That(FloatFrame.StepFor(1, 1, 1, 1) == 1, "ein Pixel bleibt ein Pixel");
+
         // Ein Alphakanal wird mitverkleinert, keiner bleibt keiner.
         var withAlpha = new FloatFrame
         {

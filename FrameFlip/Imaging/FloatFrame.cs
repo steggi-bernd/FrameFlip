@@ -95,6 +95,34 @@ public sealed class FloatFrame
     }
 
     /// <summary>
+    /// Um welchen ganzzahligen Faktor verkleinert werden muss, damit das Bild in die
+    /// Grenzen passt. 1 heisst: es passt schon.
+    ///
+    /// Die Rechnung steht hier und nicht zweimal, weil sie zwei Fallen hat: Die
+    /// Abbruchbedingung muss VOR dem Erhoehen pruefen, ob dabei noch ein Bild
+    /// uebrigbliebe - sonst laeuft sie bei einem sehr schmalen Bild auf null Pixel
+    /// hinaus. Und verkleinert wird nur, nie vergroessert: ein Bild, das ohnehin
+    /// kleiner ist als die Grenze, bleibt wie es ist.
+    ///
+    /// Benutzt wird sie an zwei Stellen mit verschiedenem Ziel - der Decoder
+    /// mittelt direkt nach Bgra32, <see cref="Reduced"/> in einen kleineren
+    /// Gleitkommaframe. Die Schleifen zusammenzulegen haette den Decoder einen
+    /// Zwischenpuffer gekostet, der bei 4K im zweistelligen Megabytebereich liegt
+    /// und bei jedem Bild durch den Speicher ginge.
+    /// </summary>
+    public static int StepFor(int width, int height, int maxWidth, int maxHeight)
+    {
+        int step = 1;
+        while (width / (step + 1) >= 1 && height / (step + 1) >= 1 &&
+               (width / step > maxWidth || height / step > maxHeight))
+        {
+            step++;
+        }
+
+        return step;
+    }
+
+    /// <summary>
     /// Verkleinert ganzzahlig, durch Mittelung im linearen Licht.
     ///
     /// Gemittelt wird hier noch vor jeder Sichtumwandlung - das ist der Grund, warum
@@ -103,13 +131,7 @@ public sealed class FloatFrame
     /// </summary>
     public FloatFrame Reduced(int maxWidth, int maxHeight)
     {
-        int step = 1;
-        while (Width / (step + 1) >= 1 && Height / (step + 1) >= 1 &&
-               (Width / step > maxWidth || Height / step > maxHeight))
-        {
-            step++;
-        }
-
+        int step = StepFor(Width, Height, maxWidth, maxHeight);
         if (step == 1) return this;
 
         int width = Math.Max(1, Width / step);
