@@ -710,8 +710,8 @@ public partial class ViewerWindow : Window, IViewerOpenTarget
             // solange nichts geladen ist, zeigt er das Bild.
             if (HasFloatFor(index, buffer.Width, buffer.Height))
             {
-                FloatFrameProcessor.Apply(_floatFrame!, _adjustments, FloatView, _preparedGrading,
-                                          _surface.BackBuffer, _surface.BackBufferStride, CurrentStep);
+                FloatFrameProcessor.Apply(_floatFrame!, _adjustments, FloatView,
+                                          _surface.BackBuffer, _surface.BackBufferStride);
             }
             else
             {

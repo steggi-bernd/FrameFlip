@@ -123,24 +123,5 @@ public sealed partial class ViewerWindow
         FloatBadge.Visibility = _floatAvailable
             ? System.Windows.Visibility.Visible
             : System.Windows.Visibility.Collapsed;
-
-        UpdateToolAvailability();
-    }
-
-    /// <summary>
-    /// Die Werkzeuge abschalten, solange sie nichts ausrichten koennen.
-    ///
-    /// Sie rechnen auf den Gleitkommawerten und wirken damit nur auf einem
-    /// angehaltenen EXR. Ohne diesen Schalter staenden dreissig Regler da, die sich
-    /// bedienen lassen und nichts tun - und der Anwender suchte den Fehler bei sich.
-    /// </summary>
-    private void UpdateToolAvailability()
-    {
-        if (ToolsBody is null) return;
-
-        ToolsBody.IsEnabled = _floatAvailable;
-        ToolsHint.Visibility = _floatAvailable
-            ? System.Windows.Visibility.Collapsed
-            : System.Windows.Visibility.Visible;
     }
 }

@@ -50,7 +50,6 @@ public partial class ViewerWindow
         _adjustments = _settings.Adjustments?.Clamped() ?? ImageAdjustments.Neutral;
         PushAdjustmentsToControls();
         RefreshPresetList();
-        SetUpCurves();
 
         if (_settings.PanelOpen) SetPanelOpen(true, resizeWindow: false);
     }
@@ -330,7 +329,7 @@ public partial class ViewerWindow
             if (HasFloatFor(index, frame.Width, frame.Height))
             {
                 FloatFrameProcessor.Measure(_floatFrame!, _adjustments, FloatView,
-                                            _preparedGrading, _histogram, HistogramStep);
+                                            _histogram, HistogramStep);
             }
             else
             {
@@ -340,8 +339,6 @@ public partial class ViewerWindow
         });
 
         HistogramView.Update(_histogram);
-        UpdateCurveBackground();
-        CurveField?.InvalidateVisual();
         UpdateClipText();
     }
 
