@@ -182,6 +182,27 @@ public partial class MainWindow : Window
 
         _apply = next =>
         {
+            /* Ohne Zustimmung nach draussen: nicht nur melden, sondern auch fragen.
+             *
+             * Der Riegel selbst sitzt in AppSettings.Normalize und ist dicht. Hier geht
+             * es um den Weg dorthin. Die Tafel ist der einzige Ort, an dem die
+             * Bedingungen ueberhaupt verlinkt sind - und sie hing an genau einem
+             * Schalter. Wer die Kopplung benutzte oder den Haken in den Einstellungen,
+             * las "ohne Zustimmung geht das nicht" und fand die Bedingungen nirgends.
+             *
+             * Deshalb steht das hier und nicht an den Aufrufstellen: Jede einzeln zu
+             * versorgen hiesse, die naechste zu vergessen. Alles, was Einstellungen
+             * uebernimmt - Schalter, Kopplung, Einstellungsseite - geht durch diese
+             * eine Tuer.
+             *
+             * TermsHost kann noch fehlen: Der Aufruf hier steht vor InitializeComponent. */
+            if ((next.RemoteEnabled || next.WatchEnabled)
+                && !_getSettings().TermsOk
+                && TermsHost is { Visibility: not Visibility.Visible })
+            {
+                AskTerms(Wiederholung(next));
+            }
+
             var error = applySettings?.Invoke(next);
             if (error is not null) return error;
 
@@ -2502,6 +2523,38 @@ public partial class MainWindow : Window
        Diese Tafel holt die Zustimmung nur ein. */
 
     private Action? _afterTerms;
+
+    /// <summary>
+    /// Was nach der Zustimmung noch einmal versucht werden soll.
+    ///
+    /// Die Auffrischung von TermsAccepted ist der ganze Witz daran: Die Kopie
+    /// entstand VOR der Zustimmung und traegt darin noch die Null. Wer sie
+    /// unveraendert uebernimmt, schaltet mit ihr genau das wieder ab, was sie
+    /// einschalten wollte - Normalize sieht die fehlende Zustimmung und zieht
+    /// RemoteEnabled und WatchEnabled zurueck. Der Benutzer haette zugestimmt und
+    /// stuende vor demselben ausgeschalteten Schalter.
+    ///
+    /// Alles andere bleibt, wie es war: Ein frisch erzeugtes Kopplungsgeheimnis etwa
+    /// steckt in dieser Kopie und nirgends sonst.
+    /// </summary>
+    private Action Wiederholung(AppSettings wunsch)
+    {
+        var kopie = wunsch.Clone();
+
+        return () =>
+        {
+            kopie.TermsAccepted = _getSettings().TermsAccepted;
+
+            if (_apply(kopie) is not null) return;
+
+            // Der Aufrufer ist laengst zurueckgekehrt - seine Nacharbeit lief damals
+            // ins Leere, weil das Uebernehmen fehlschlug. Ohne das hier stuende die
+            // Kopplung eingeschaltet da und zeigte trotzdem keinen Code.
+            RefreshPairing();
+            RefreshLink();
+            RefreshWatch();
+        };
+    }
 
     /// <summary>
     /// Zeigt die Tafel und fuehrt <paramref name="dann"/> aus, wenn zugestimmt wurde.
