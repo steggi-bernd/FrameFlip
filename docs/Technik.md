@@ -424,9 +424,55 @@ compaction the memory would stay put even when nothing managed points at it any 
 PNG, JPG/JPEG, TIFF, BMP through WIC. WebP works if Microsoft's *WebP Image
 Extension* is installed — without it, that one format drops out cleanly.
 
-EXR is **not** implemented; the architecture keeps the place free: another
-`IFrameDecoder` implementation, registered in `FrameDecoderRegistry.CreateDefault()`.
-Cache, playback and UI are unaffected.
+EXR through a reader of its own, registered like any other `IFrameDecoder` — cache,
+playback and UI are unaffected by it.
+
+**Compression.** Uncompressed, RLE and ZIP/ZIPS. The last two are Deflate, which the
+framework provides, and ZIP is what Blender writes by default, so the normal case is
+covered without a third-party package. Both carry the format's two preparatory steps,
+which have to be undone in reverse: the predictor (each byte stored as a difference
+from its neighbour) and the interleave (high and low halves of each half-float sorted
+apart, which is the only reason Deflate achieves anything on them). PIZ and DWA are
+recognised in the header and declined there — better than failing halfway through the
+offset table.
+
+A block whose compressed form would not have been smaller is stored raw; without
+checking for that, a flat background is enough to send such a block into the
+decompressor, where it fails on a header it does not have.
+
+**Channels.** A plain file has `R`, `G`, `B`. A Blender multilayer render has
+`ViewLayer.Combined.R` and twenty more, and how that name is built depends on the
+Blender version and on the view layer's name, which the user assigns freely. So no
+spelling is tested for: plain names first, then a layer ending in `Combined`, then any
+layer with a complete triple. Only the channels needed are read — with twenty channels
+at 4K that is the difference between thirty megabytes and three hundred.
+
+**The view transform.** Blender applies it when writing a PNG, not when writing an
+EXR, which holds raw scene-linear values. Shown without it, a render looks washed out
+and dark — nothing like the viewport it came from.
+
+It is therefore not reimplemented but assembled from Blender's own `config.ocio`,
+which defines AgX as a chain of five steps: a matrix from Rec.709 to FilmLight
+E-Gamut, a log2 allocation across 25 stops, the table `AgX_Base_sRGB.cube` with
+tetrahedral interpolation, an exponent of 2.4, and sRGB encoding. The table comes from
+the installation that `BlenderFinder` locates anyway; only colour-space mathematics
+sits in the source. Blender 4.5 and 5.1 write the last two steps differently and mean
+the same thing — the chain has not changed since 4.0.
+
+Tetrahedral, not trilinear, because the configuration says so and because it matters:
+trilinear averages across eight corners and pulls colours toward the cube diagonal,
+which on AgX shows up as a tint in the highlights. Tetrahedral uses the four corners
+of the tetrahedron the point actually lies in, and leaves the grey axis exactly where
+it is.
+
+The table is read on the first EXR, not at startup — 185 193 lines of text is not
+something a tray icon should cost. Without Blender the transform falls back to
+*Standard*.
+
+**Verified against Blender, not against itself.** An image from 0.00001 to 10 — close
+to 21 stops, neutral and saturated — written once as EXR and once as PNG through AgX:
+across all 1024 pixels, not a single deviation. On 24 frames of a rendered sequence,
+at most one step out of 255.
 
 ## Sequence detection
 
@@ -504,6 +550,42 @@ needed for that: **integer arithmetic** instead of `double` per pixel (the first
 version took 72 ms and would have cost frames) and **spreading the rows across the
 cores**. With no correction set it is a plain memory copy, so that an unused feature
 does not cost playback a single beat.
+
+### On a held EXR, the correction uses the file's values
+
+Eight bits are right for playback and wrong for judging an EXR. A highlight at 4.0
+is clipped to 255 there, and pulling the exposure down afterwards only makes the
+whole picture darker — the colour is gone. On the float values the same slider
+brings it back, because the numbers are still there.
+
+So when playback stops on an EXR, the float channels are loaded in the background
+and the correction is computed on them instead. Playback keeps running on eight bits;
+a small **float** marker in the bar says which path is active.
+
+**The order differs, and not by taste.** Exposure is a quantity of light, so it acts
+*before* the view transform — the same place Blender puts it. Black point, gamma and
+contrast are display quantities and act *after* it; before, they would have no defined
+white to refer to. Applying exposure behind AgX brightens a finished picture and
+recovers nothing.
+
+| Case | Time per image, 1080p |
+|---|---|
+| eight bits, full correction | 9.5 ms |
+| float, view transform *Standard* | 46.9 ms |
+| float, view transform *AgX* | 91.7 ms |
+| float, AgX, 4K | ~367 ms |
+
+That is why it is the held frame only. Ten times the cost does not fit between two
+images at 24 fps, and while the picture stands it does not matter.
+
+Two further consequences. Reducing for a smaller decode size averages **before** the
+view transform, in linear light — averaging encoded values gives a picture that is
+visibly too dark. And the float frame is discarded on playback: otherwise every image
+in the sequence would show the values of whichever one was last held.
+
+The histogram gains a figure that only exists here: how many pixels lie above white
+**in the file**. That is not the same as clipping in the display — a picture can look
+blown out and still be full of detail.
 
 ## Video export
 
