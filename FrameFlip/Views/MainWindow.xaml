@@ -763,15 +763,17 @@
                         <TextBlock x:Name="TermsLinks" Margin="0,14,0,0" TextWrapping="Wrap"
                                    FontSize="11" LineHeight="18"
                                    Foreground="{StaticResource DesktopMuted}">
-                            <Hyperlink RequestNavigate="OnTermsLink"
-                                       AutomationProperties.Name="{DynamicResource D_TermsUse}"
-                                       NavigateUri="https://relay.steggi-matrix.work/recht/nutzungsbedingungen.html">
+                            <!-- Die Adressen kommen aus dem Code, nicht aus dem Markup.
+                                 Ein fest eingetragener Wirtsname waere die eine Stelle,
+                                 an der FrameFlip einen BESTIMMTEN Server voraussetzt -
+                                 und genau das soll es nirgends. -->
+                            <Hyperlink x:Name="TermsUseLink" RequestNavigate="OnTermsLink"
+                                       AutomationProperties.Name="{DynamicResource D_TermsUse}">
                                 <Run Text="{DynamicResource D_TermsUse}" />
                             </Hyperlink>
                             <Run Text="  &#183;  " />
-                            <Hyperlink RequestNavigate="OnTermsLink"
-                                       AutomationProperties.Name="{DynamicResource D_TermsPrivacy}"
-                                       NavigateUri="https://relay.steggi-matrix.work/recht/datenschutz.html">
+                            <Hyperlink x:Name="TermsPrivacyLink" RequestNavigate="OnTermsLink"
+                                       AutomationProperties.Name="{DynamicResource D_TermsPrivacy}">
                                 <Run Text="{DynamicResource D_TermsPrivacy}" />
                             </Hyperlink>
                         </TextBlock>

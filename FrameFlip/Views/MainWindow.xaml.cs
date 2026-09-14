@@ -2659,6 +2659,21 @@ public partial class MainWindow : Window
         // Keine Links auf meine Texte, wenn sie nicht gelten.
         TermsLinks.Visibility = eigener ? Visibility.Collapsed : Visibility.Visible;
 
+        /* Die Ziele der beiden Links entstehen hier, nicht im Markup.
+         *
+         * Sie zeigen auf die Rechtstexte des VOREINGESTELLTEN Relays, und das ist
+         * richtig so - sie gelten fuer ihn und fuer keinen anderen. Falsch waere nur,
+         * den Namen ins Markup zu schreiben: dann stuende an einer zweiten Stelle, wo
+         * FrameFlip hinzeigt, und ein Umzug des Servers braeuchte eine Suche statt
+         * einer Konstanten.
+         *
+         * Wer einen eigenen Wirt eingetragen hat, sieht die Zeile ohnehin nicht. */
+        if (!eigener)
+        {
+            TermsUseLink.NavigateUri = Recht("nutzungsbedingungen");
+            TermsPrivacyLink.NavigateUri = Recht("datenschutz");
+        }
+
         /* Die Kopplungstafel weicht.
          *
          * Sie liegt jetzt zwar unter der Frage und nicht mehr darueber, aber ein
@@ -2679,6 +2694,17 @@ public partial class MainWindow : Window
 
     /// <summary>Stand die Kopplungstafel offen, als die Frage kam?</summary>
     private bool _pairWasOpen;
+
+    /// <summary>
+    /// Die Adresse eines Rechtstextes beim voreingestellten Relay.
+    ///
+    /// Die einzige Stelle im ganzen Programm, die einen bestimmten Wirtsnamen nennt -
+    /// und sie nennt ihn nicht selbst, sondern holt ihn aus
+    /// <see cref="AppSettings.DefaultRelayHost"/>. Zieht der Server um, aendert sich
+    /// eine Konstante und nicht eine unbekannte Zahl von Zeichenketten.
+    /// </summary>
+    private static Uri Recht(string seite)
+        => new($"https://{AppSettings.DefaultRelayHost}/recht/{seite}.html");
 
     private void OnTermsChecked(object sender, RoutedEventArgs e)
     {
