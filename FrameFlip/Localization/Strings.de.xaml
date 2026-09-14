@@ -13,6 +13,7 @@
     <sys:String x:Key="S_FloatPath">Die Korrektur rechnet auf den Gleitkommawerten der Datei – Belichtung holt Zeichnung aus den Lichtern zurück</sys:String>
     <sys:String x:Key="S_Curves">Kurven</sys:String>
     <sys:String x:Key="S_CurveHint">Klicken setzt einen Punkt, Ziehen verschiebt ihn, rechte Maustaste entfernt ihn.</sys:String>
+    <sys:String x:Key="S_ToolsNeedFloat">Diese Werkzeuge rechnen auf den Gleitkommawerten einer EXR. Halte die Wiedergabe an, um sie zu benutzen.</sys:String>
     <sys:String x:Key="S_WhiteBalance">Weissabgleich</sys:String>
     <sys:String x:Key="S_Temperature">Temperatur</sys:String>
     <sys:String x:Key="S_Tint">Tendenz</sys:String>

@@ -494,10 +494,16 @@
                     <!-- Korrektur -->
                     <Grid Margin="0,0,0,6">
                         <TextBlock Text="{DynamicResource S_Correction}" Style="{StaticResource PanelHeading}" />
-                        <Button x:Name="ResetAdjustButton" Style="{StaticResource LinkButton}"
-                                HorizontalAlignment="Right" Content="{DynamicResource S_Reset}"
-                                Click="OnResetAdjustClicked" />
+                        <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+                            <Button x:Name="ResetAdjustButton" Style="{StaticResource LinkButton}"
+                                    Margin="0,0,10,0" Content="{DynamicResource S_Reset}"
+                                    Click="OnResetAdjustClicked" />
+                            <Button Style="{StaticResource LinkButton}" Content="−"
+                                    Tag="BasicBody" Click="OnSectionToggled" />
+                        </StackPanel>
                     </Grid>
+
+                    <StackPanel x:Name="BasicBody">
 
                     <Grid Margin="0,0,0,2">
                         <TextBlock Text="{DynamicResource S_Exposure}" Style="{StaticResource PanelLabel}" />
@@ -559,13 +565,28 @@
                               SelectionChanged="OnChannelChanged"
                               ToolTip="{DynamicResource S_ChannelHint}" />
 
+                    </StackPanel>
+
+                    <StackPanel x:Name="ToolsBody">
+
+                    <TextBlock x:Name="ToolsHint" Margin="0,16,0,0" FontSize="10"
+                               Foreground="{StaticResource MutedBrush}" TextWrapping="Wrap"
+                               Visibility="Collapsed"
+                               Text="{DynamicResource S_ToolsNeedFloat}" />
+
                     <!-- Kurven -->
                     <Grid Margin="0,16,0,6">
                         <TextBlock Text="{DynamicResource S_Curves}" Style="{StaticResource PanelHeading}" />
-                        <Button x:Name="ResetCurveButton" Style="{StaticResource LinkButton}"
-                                HorizontalAlignment="Right" Content="{DynamicResource S_Reset}"
-                                Click="OnResetCurveClicked" />
+                        <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+                            <Button x:Name="ResetCurveButton" Style="{StaticResource LinkButton}"
+                                    Margin="0,0,10,0" Content="{DynamicResource S_Reset}"
+                                    Click="OnResetCurveClicked" />
+                            <Button Style="{StaticResource LinkButton}" Content="+"
+                                    Tag="CurveBody" Click="OnSectionToggled" />
+                        </StackPanel>
                     </Grid>
+
+                    <StackPanel x:Name="CurveBody" Visibility="Collapsed">
 
                     <Grid Margin="0,0,0,6">
                         <Grid.ColumnDefinitions>
@@ -593,6 +614,7 @@
                     <TextBlock x:Name="CurveHint" Margin="0,6,0,0" FontSize="10"
                                Foreground="{StaticResource MutedBrush}" TextWrapping="Wrap"
                                Text="{DynamicResource S_CurveHint}" />
+                    </StackPanel>
 
                     <!-- Weissabgleich -->
                     <Grid Margin="0,16,0,0">
@@ -738,6 +760,8 @@
                         <Slider x:Name="LutStrengthSlider" Style="{StaticResource PanelSlider}"
                                 Minimum="0" Maximum="1" Value="1" SmallChange="0.02" LargeChange="0.1"
                                 ValueChanged="OnToolChanged" MouseDoubleClick="OnSliderReset" Tag="1" />
+                    </StackPanel>
+
                     </StackPanel>
 
                     <!-- A/B -->

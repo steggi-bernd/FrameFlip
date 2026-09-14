@@ -46,6 +46,7 @@ public sealed partial class ViewerWindow
 
         BuildBandSliders();
         PushToolsToControls();
+        UpdateToolAvailability();
 
         _preparedGrading = _grading.Prepare();
 
