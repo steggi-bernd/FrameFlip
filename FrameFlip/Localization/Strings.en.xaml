@@ -506,6 +506,9 @@
     <sys:String x:Key="D_TermsPrivacy">Privacy</sys:String>
     <sys:String x:Key="D_TermsAgree">I have read the terms of use and the privacy notice, and I use the service at my own risk.</sys:String>
     <sys:String x:Key="D_TermsOwnRelay">The server is an offer, not a requirement: you can enter a different one in the settings, and the source is open – run your own if you prefer.</sys:String>
+    <sys:String x:Key="D_TermsBodyOwn">So far FrameFlip has worked on this computer alone. What you are about to switch on opens a connection through a server on the internet – the one you entered yourself. Everything it carries is end to end encrypted; the server sees random bytes and stores nothing.</sys:String>
+    <sys:String x:Key="D_TermsAgreeOwn">I understand that FrameFlip will make outbound connections from here on, and I use it at my own risk.</sys:String>
+    <sys:String x:Key="D_TermsNoteOwn">You have entered a server of your own. Whatever applies there is between you and its operator – my terms of use and my privacy notice do not cover it. FrameFlip itself is MIT licensed and therefore comes without warranty.</sys:String>
     <sys:String x:Key="D_TermsLater">Not now</sys:String>
     <sys:String x:Key="D_TermsGo">Agree and switch on</sys:String>
     <sys:String x:Key="D_TermsAccepted">Agreed – outbound connections are now allowed.</sys:String>

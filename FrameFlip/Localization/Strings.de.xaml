@@ -506,6 +506,9 @@
     <sys:String x:Key="D_TermsPrivacy">Datenschutz</sys:String>
     <sys:String x:Key="D_TermsAgree">Ich habe die Nutzungsbedingungen und die Datenschutzerklärung gelesen und nutze den Dienst auf eigene Gefahr.</sys:String>
     <sys:String x:Key="D_TermsOwnRelay">Der Server ist ein Angebot, keine Voraussetzung: In den Einstellungen lässt sich ein anderer eintragen, und der Quelltext liegt offen – wer möchte, betreibt seinen eigenen.</sys:String>
+    <sys:String x:Key="D_TermsBodyOwn">FrameFlip hat bisher ausschließlich auf diesem Rechner gearbeitet. Was du gleich einschaltest, baut eine Verbindung über einen Server im Internet auf – über den, den du selbst eingetragen hast. Alles, was dabei übertragen wird, ist Ende zu Ende verschlüsselt; der Server sieht Zufallsbytes und speichert nichts.</sys:String>
+    <sys:String x:Key="D_TermsAgreeOwn">Mir ist klar, dass FrameFlip von hier an Verbindungen ins Internet aufbaut, und ich nutze das auf eigene Gefahr.</sys:String>
+    <sys:String x:Key="D_TermsNoteOwn">Du hast einen eigenen Server eingetragen. Was dort gilt, machst du mit dessen Betreiber aus – meine Nutzungsbedingungen und meine Datenschutzerklärung gelten dafür nicht. FrameFlip selbst steht unter der MIT-Lizenz und kommt damit ohne Gewähr.</sys:String>
     <sys:String x:Key="D_TermsLater">Nicht jetzt</sys:String>
     <sys:String x:Key="D_TermsGo">Zustimmen und einschalten</sys:String>
     <sys:String x:Key="D_TermsAccepted">Zugestimmt – Verbindungen nach draußen sind jetzt erlaubt.</sys:String>
