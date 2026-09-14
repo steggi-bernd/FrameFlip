@@ -112,7 +112,10 @@
                     <TextBox x:Name="BehindBox" Grid.Row="2" Grid.Column="1" Style="{StaticResource DialogTextBox}"
                              HorizontalAlignment="Left" Width="140" Margin="0,0,0,4" />
 
-                    <Separator Grid.Row="4" Grid.ColumnSpan="2" Margin="0,8,0,14"
+                    <!-- Zeile 3, nicht 4. Auf 4 sitzen Beschriftung und Ankreuzfeld,
+                         und WPF stapelt, was sich eine Zelle teilt - die Trennlinie
+                         lief quer durch den Text. Zeile 3 stand derweil leer. -->
+                    <Separator Grid.Row="3" Grid.ColumnSpan="2" Margin="0,8,0,14"
                                Background="{StaticResource PanelBorder}" />
 
                     <TextBlock Grid.Row="4" Grid.Column="0" Text="{DynamicResource S_AdaptiveLoad}"
