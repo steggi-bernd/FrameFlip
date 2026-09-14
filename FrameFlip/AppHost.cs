@@ -53,6 +53,11 @@ public sealed class AppHost : IDisposable
             () =>
             {
                 LivePage.Load = () => _load.LastSnapshot;
+
+                // Der Stapellauf im Atelier nimmt sich so viele Kerne, wie die
+                // Lastregelung auch dem Dekodieren zugesteht - laeuft nebenher ein
+                // Render, wird der Export langsamer statt um die Kerne zu kaempfen.
+                Views.AtelierPage.Workers = () => Math.Clamp(_load.ViewerDecoderThreads, 1, 16);
                 return createMain?.Invoke() ?? new MainWindow(_renderMonitor, () => _remote.State,
                     ShowSettings, OpenFile, ShowPairing, _settings, settings => SettingsStore.Save(settings),
                     ApplySettings, () => _settings, () => _watch, RenewWatchLink, SetWatchCode);

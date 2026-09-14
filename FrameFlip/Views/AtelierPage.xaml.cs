@@ -24,7 +24,7 @@ namespace FrameFlip.Views;
 /// PNG nicht mitbringt, ist die Zeichnung oberhalb von Weiss, und das steht in der
 /// Kopfzeile.
 /// </summary>
-public partial class AtelierPage : UserControl
+public sealed partial class AtelierPage : UserControl
 {
     private readonly FrameDecoderRegistry _decoders;
     private readonly AppSettings _settings;
@@ -61,6 +61,8 @@ public partial class AtelierPage : UserControl
             Interval = TimeSpan.FromMilliseconds(180),
         };
 
+        SetUpBatch();
+
         _settle.Tick += (_, _) =>
         {
             _settle.Stop();
@@ -95,6 +97,8 @@ public partial class AtelierPage : UserControl
                     FileText.Text = Path.GetFileName(path) + " — " + Strings.T("S_CannotRead");
                     EmptyHint.Visibility = Visibility.Visible;
                     Tools.ToolsEnabled = false;
+                    _frame = null;
+                    UpdateBatchBar();
                     return;
                 }
 
@@ -103,6 +107,7 @@ public partial class AtelierPage : UserControl
                 Tools.ToolsEnabled = true;
 
                 UpdateSourceText();
+                FindSequence(path);
                 Render();
                 Measure();
             });

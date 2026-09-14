@@ -22,6 +22,7 @@ internal static class DesktopPreview
         MainWindow? main = null;
         var load = new SystemLoadMonitor(2, TimeSpan.FromSeconds(2));
         LivePage.Load = () => load.LastSnapshot;
+        AtelierPage.Workers = () => Math.Clamp(load.MaxDecoderThreads, 1, 16);
         load.Start();
         async void Open(string path)
         {

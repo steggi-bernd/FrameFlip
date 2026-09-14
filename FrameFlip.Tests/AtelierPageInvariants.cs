@@ -184,6 +184,23 @@ public static class AtelierPageInvariants
             {
                 Check.That(false, "eine fehlende Datei ebenso", $"{ex.GetType().Name}: {ex.Message}");
             }
+
+            // Die Arbeiterzahl kommt von aussen und darf fehlen - ohne Zuweisung
+            // nimmt der Lauf die Haelfte der Kerne.
+            var before = AtelierPage.Workers;
+
+            try
+            {
+                AtelierPage.Workers = null;
+                Check.That(true, "ohne Lastregelung laeuft es trotzdem");
+
+                AtelierPage.Workers = () => 3;
+                Check.That(AtelierPage.Workers() == 3, "und laesst sich setzen");
+            }
+            finally
+            {
+                AtelierPage.Workers = before;
+            }
         }
         finally
         {
