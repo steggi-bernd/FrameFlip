@@ -61,6 +61,8 @@ public sealed class GradingStack
         LiftGammaGainTool lgg => lgg.Clone(),
         WhiteBalanceTool wb => new WhiteBalanceTool { Kelvin = wb.Kelvin, Tint = wb.Tint },
         VibranceTool vibrance => new VibranceTool { Amount = vibrance.Amount },
+        HslTool hsl => hsl.Clone(),
+        LutTool lut => lut.Clone(),
 
         // Ein Werkzeug, das hier fehlt, wuerde geteilt statt kopiert - und der
         // Fehler faellt erst auf, wenn eine festgehaltene Einstellung sich

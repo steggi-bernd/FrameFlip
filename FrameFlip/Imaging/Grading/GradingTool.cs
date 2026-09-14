@@ -50,6 +50,8 @@ public enum GradingStage
 [JsonDerivedType(typeof(WhiteBalanceTool), WhiteBalanceTool.KindName)]
 [JsonDerivedType(typeof(LiftGammaGainTool), LiftGammaGainTool.KindName)]
 [JsonDerivedType(typeof(VibranceTool), VibranceTool.KindName)]
+[JsonDerivedType(typeof(HslTool), HslTool.KindName)]
+[JsonDerivedType(typeof(LutTool), LutTool.KindName)]
 public interface IGradingTool
 {
     /// <summary>Kennung fuer die Speicherung. Bleibt stabil, auch wenn der Anzeigename wechselt.</summary>

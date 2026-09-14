@@ -27,6 +27,7 @@ static int RunAll()
     FloatImagingInvariants.Run();
     GradingInvariants.Run();
     GradingColourInvariants.Run();
+    GradingBandInvariants.Run();
     ExrInvariants.Run();
     RawCacheInvariants.Run();
     CadenceInvariants.Run();
