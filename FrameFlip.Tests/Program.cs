@@ -23,6 +23,8 @@ static int RunAll()
     PlacementInvariants.Run();
     GovernorInvariants.Run();
     ImagingInvariants.Run();
+    ViewTransformInvariants.Run();
+    ExrInvariants.Run();
     RawCacheInvariants.Run();
     CadenceInvariants.Run();
     RangeInvariants.Run();
@@ -106,17 +108,15 @@ static void LoadDictionaries()
                  * sie um, obwohl an ihr nichts falsch war.
                  *
                  * Die Reihenfolge zaehlt: DashboardTokens ueberschreibt Farben aus
-                 * DesktopTheme, genau wie in App.xaml. */
-                /* Ueber pack-Adressen, nicht als lose Datei.
+                 * DesktopTheme, genau wie in App.xaml.
                  *
-                 * Einzeln eingelesen sieht ein Woerterbuch die vorher geladenen NICHT:
-                 * StaticResource loest beim Einlesen auf, und der Leser kennt nur das
-                 * eine Dokument. DashboardTokens greift aber auf DashFocus aus
-                 * Theme.xaml zu und faellt sofort um.
-                 *
-                 * Die pack-Adresse nennt die Assembly ausdruecklich ("/FrameFlip;
-                 * component/..."), damit sie auch aus einem Testlaeufer heraus
-                 * aufloest - der Weg, den TrayInvariants schon benutzt. */
+                 * Ueber pack-Adressen, nicht als lose Datei: Einzeln eingelesen sieht
+                 * ein Woerterbuch die vorher geladenen NICHT, weil StaticResource beim
+                 * Einlesen aufloest und der Leser nur das eine Dokument kennt.
+                 * DashboardTokens greift aber auf DashFocus aus Theme.xaml zu und
+                 * faellt sofort um. Die pack-Adresse nennt die Assembly ausdruecklich,
+                 * damit sie auch aus einem Testlaeufer heraus aufloest - der Weg, den
+                 * TrayInvariants schon benutzt. */
                 foreach (string sheet in new[]
                          {
                              "Views/Theme.xaml",

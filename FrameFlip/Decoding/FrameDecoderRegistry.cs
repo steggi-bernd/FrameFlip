@@ -5,14 +5,17 @@ public sealed class FrameDecoderRegistry
     private readonly List<IFrameDecoder> _decoders = new();
     private readonly Dictionary<string, IFrameDecoder> _byExtension = new(StringComparer.OrdinalIgnoreCase);
 
-    public static FrameDecoderRegistry CreateDefault()
+    /// <param name="blenderExecutable">
+    /// Woher die Sichtumwandlung kommt. Blender legt in einem EXR die rohen
+    /// Szenenwerte ab, ohne AgX - ohne diese Angabe zeigt FrameFlip das Bild flacher,
+    /// als Blender es tut. Gefragt wird die Funktion erst beim ersten EXR, weil die
+    /// Einstellungen beim Anlegen der Decoder noch nicht gelesen sind.
+    /// </param>
+    public static FrameDecoderRegistry CreateDefault(Func<string?>? blenderExecutable = null)
     {
         var registry = new FrameDecoderRegistry();
         registry.Register(new WicFrameDecoder());
-
-        // Hier kaeme ein ExrFrameDecoder hinzu. Bewusst nicht Teil dieser Version:
-        // EXR braucht einen eigenen Reader (half-float, Tiles, Kompression) und
-        // waere die einzige externe Abhaengigkeit im Projekt.
+        registry.Register(ExrFrameDecoder.Create(blenderExecutable));
 
         return registry;
     }

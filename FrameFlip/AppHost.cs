@@ -87,6 +87,10 @@ public sealed class AppHost : IDisposable
         // erscheinen, nicht erst nach dem ersten Fensterwechsel.
         Localization.Strings.Apply(Localization.Strings.Parse(_settings.Language));
 
+        // Woher die Sichtumwandlung fuer EXR kommt. Als Funktion, damit ein spaeter
+        // geaenderter Pfad ankommt - gefragt wird ohnehin erst beim ersten EXR.
+        Decoding.ExrViewSettings.BlenderPath = () => _settings.BlenderPath;
+
         _tray = new AppTrayController(ShowMain, Toggle, ShowSettings, Exit);
 
         _hotkeys.Pressed += Toggle;
