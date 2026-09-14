@@ -13,6 +13,9 @@
     <sys:String x:Key="S_FloatPath">Die Korrektur rechnet auf den Gleitkommawerten der Datei – Belichtung holt Zeichnung aus den Lichtern zurück</sys:String>
     <sys:String x:Key="S_Curves">Kurven</sys:String>
     <sys:String x:Key="S_CurveHint">Klicken setzt einen Punkt, Ziehen verschiebt ihn, rechte Maustaste entfernt ihn.</sys:String>
+    <sys:String x:Key="S_ShowOriginal">Original</sys:String>
+    <sys:String x:Key="S_ShowOriginalHint">Gedrückt halten, um das Bild ohne jede Korrektur zu sehen</sys:String>
+    <sys:String x:Key="S_ZoomFit">Fit</sys:String>
     <sys:String x:Key="S_FormatH264">Video · H.264</sys:String>
     <sys:String x:Key="S_FormatH265">Video · H.265</sys:String>
     <sys:String x:Key="S_FormatProRes">Video · ProRes</sys:String>

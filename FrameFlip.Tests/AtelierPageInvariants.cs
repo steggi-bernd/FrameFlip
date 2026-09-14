@@ -185,6 +185,49 @@ public static class AtelierPageInvariants
                 Check.That(false, "eine fehlende Datei ebenso", $"{ex.GetType().Name}: {ex.Message}");
             }
 
+            // Vergleich und Massstab: beides muss sich bedienen lassen, ohne dass
+            // ein Bild offen ist - ein Klick auf einer leeren Seite darf nicht
+            // werfen, und genau das passiert beim Ausprobieren als erstes.
+            var compare = page.FindName("CompareButton") as System.Windows.Controls.Button;
+            var zoom = page.FindName("ZoomButton") as System.Windows.Controls.Button;
+
+            Check.That(compare is not null && zoom is not null, "Vergleich und Massstab sind da");
+
+            if (compare is not null)
+            {
+                Check.That(!compare.IsEnabled, "ohne Bild ist der Vergleich aus");
+
+                try
+                {
+                    compare.RaiseEvent(new System.Windows.RoutedEventArgs(
+                        System.Windows.Controls.Primitives.ButtonBase.ClickEvent));
+                    Check.That(true, "und ein Klick darauf wirft nicht");
+                }
+                catch (Exception ex)
+                {
+                    Check.That(false, "und ein Klick darauf wirft nicht", ex.GetType().Name);
+                }
+            }
+
+            if (zoom is not null)
+            {
+                try
+                {
+                    // Zweimal: hin zur vollen Groesse und wieder zurueck. Ohne Bild
+                    // gibt es nichts zu skalieren, und auch das muss halten.
+                    zoom.RaiseEvent(new System.Windows.RoutedEventArgs(
+                        System.Windows.Controls.Primitives.ButtonBase.ClickEvent));
+                    zoom.RaiseEvent(new System.Windows.RoutedEventArgs(
+                        System.Windows.Controls.Primitives.ButtonBase.ClickEvent));
+
+                    Check.That(true, "der Massstab laesst sich ohne Bild umschalten");
+                }
+                catch (Exception ex)
+                {
+                    Check.That(false, "der Massstab laesst sich ohne Bild umschalten", ex.GetType().Name);
+                }
+            }
+
             // Die Arbeiterzahl kommt von aussen und darf fehlen - ohne Zuweisung
             // nimmt der Lauf die Haelfte der Kerne.
             var before = AtelierPage.Workers;

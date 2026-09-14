@@ -97,6 +97,7 @@ public sealed partial class AtelierPage : UserControl
                     FileText.Text = Path.GetFileName(path) + " — " + Strings.T("S_CannotRead");
                     EmptyHint.Visibility = Visibility.Visible;
                     Tools.ToolsEnabled = false;
+                    CompareButton.IsEnabled = false;
                     _frame = null;
                     UpdateBatchBar();
                     return;
@@ -108,6 +109,8 @@ public sealed partial class AtelierPage : UserControl
 
                 UpdateSourceText();
                 FindSequence(path);
+                CompareButton.IsEnabled = true;
+                ApplyZoom();
                 Render();
                 Measure();
             });
@@ -178,7 +181,9 @@ public sealed partial class AtelierPage : UserControl
 
         try
         {
-            FloatFrameProcessor.Apply(frame, Tools.Adjustments, ViewFor(frame), Tools.Prepared,
+            var (adjustments, grading) = Current();
+
+            FloatFrameProcessor.Apply(frame, adjustments, ViewFor(frame), grading,
                                       _surface.BackBuffer, _surface.BackBufferStride,
                                       _coarse ? CoarseStep : 1);
 

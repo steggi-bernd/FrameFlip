@@ -27,6 +27,26 @@
             </StackPanel>
 
             <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center">
+                <!--
+                    Gedrueckt halten zeigt das Original. Als Knopf und nicht als
+                    Schalter, weil der Vergleich ein Blick ist und kein Zustand -
+                    wer umschaltet, vergisst zurueckzuschalten und beurteilt dann
+                    minutenlang das falsche Bild.
+                -->
+                <Button x:Name="CompareButton" Style="{StaticResource OverlayButton}"
+                        Content="{DynamicResource S_ShowOriginal}" Margin="0,0,10,0"
+                        PreviewMouseLeftButtonDown="OnCompareDown"
+                        PreviewMouseLeftButtonUp="OnCompareUp"
+                        MouseLeave="OnCompareUp"
+                        IsEnabled="False"
+                        ToolTip="{DynamicResource S_ShowOriginalHint}" />
+
+                <Button x:Name="ZoomButton" Style="{StaticResource LinkButton}"
+                        Margin="0,0,14,0" MinWidth="52" Click="OnZoomClicked"
+                        ToolTip="{DynamicResource S_ZoomHint}">
+                    <TextBlock x:Name="ZoomText" FontSize="9" TextAlignment="Right" Text="Fit" />
+                </Button>
+
                 <TextBlock x:Name="SourceText" VerticalAlignment="Center" Margin="0,0,14,0"
                            Style="{StaticResource DashLabel}" FontSize="9" />
                 <TextBlock x:Name="ViewText" VerticalAlignment="Center"
@@ -38,8 +58,12 @@
         <Border Grid.Row="1" Grid.Column="0" Background="#FF101010" CornerRadius="4"
                 ClipToBounds="True">
             <Grid>
-                <Image x:Name="Display" Stretch="Uniform"
-                       RenderOptions.BitmapScalingMode="HighQuality" />
+                <ScrollViewer x:Name="ImageScroll"
+                              HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Auto"
+                              PanningMode="Both">
+                    <Image x:Name="Display" Stretch="Uniform"
+                           RenderOptions.BitmapScalingMode="HighQuality" />
+                </ScrollViewer>
 
                 <TextBlock x:Name="EmptyHint" HorizontalAlignment="Center" VerticalAlignment="Center"
                            Style="{StaticResource DashLabel}" TextWrapping="Wrap" MaxWidth="360"
