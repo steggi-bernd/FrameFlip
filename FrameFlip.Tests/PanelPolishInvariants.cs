@@ -18,7 +18,6 @@ public static class PanelPolishInvariants
     {
         CoupledPoints();
         TemperatureIsEven();
-        ChannelsAreDistinguishable();
     }
 
     /// <summary>
@@ -137,51 +136,10 @@ public static class PanelPolishInvariants
         }
     }
 
-    /// <summary>
-    /// Die neun Zonenregler sehen einander gleich. Ohne eine sichtbare Kennzeichnung
-    /// weiss niemand, welcher Rot ist - ein Hinweis, der nur beim Verweilen mit der
-    /// Maus erscheint, hilft dabei nicht.
-    /// </summary>
-    private static void ChannelsAreDistinguishable()
-    {
-        Check.Group("Zonenregler sind unterscheidbar");
-
-        var panel = new GradingPanel();
-        panel.Measure(new Size(300, 1400));
-        panel.Arrange(new Rect(0, 0, 300, 1400));
-        panel.UpdateLayout();
-
-        // Zu jedem der neun Regler muss eine Beschriftung in der Kanalfarbe gehoeren.
-        foreach (string zone in new[] { "Lift", "Gamma", "Gain" })
-        {
-            foreach (string channel in new[] { "R", "G", "B" })
-            {
-                var slider = panel.FindName($"{zone}{channel}Slider") as Slider;
-                if (slider is null)
-                {
-                    Check.That(false, $"{zone}{channel}Slider ist da");
-                    continue;
-                }
-
-                var label = Sibling(slider, channel);
-                Check.That(label is not null, $"{zone} {channel} traegt seinen Buchstaben");
-
-                if (label is not null)
-                {
-                    Check.That(!ReferenceEquals(label.Foreground, panel.Foreground),
-                               $"{zone} {channel} in eigener Farbe");
-                }
-            }
-        }
-
-        static TextBlock? Sibling(Slider slider, string text)
-        {
-            if (slider.Parent is not Grid grid) return null;
-
-            foreach (var child in grid.Children)
-                if (child is TextBlock block && block.Text == text) return block;
-
-            return null;
-        }
-    }
+    // Die Pruefung, dass die neun Zonenregler auseinanderzuhalten sind, stand hier
+    // einmal. Sie ist ueberholt: Die Regler sind durch drei Farbraeder abgeloest, und
+    // ein Rad zeigt die Richtung, ohne dass sie jemand beschriften muesste. Was von
+    // ihr uebrig ist, steht in ColourWheelInvariants - dort wird geprueft, dass die
+    // alten Namen wirklich fort sind und nicht als zweiter Weg zu denselben Werten
+    // stehenbleiben.
 }

@@ -59,7 +59,8 @@
                     <TextBlock Text="{DynamicResource S_Saturation}" Style="{StaticResource PanelLabel}" />
                     <TextBlock x:Name="SaturationValue" Style="{StaticResource PanelValue}" />
                 </Grid>
-                <Slider x:Name="SaturationSlider" Style="{StaticResource PanelSlider}"
+                <Slider x:Name="SaturationSlider" Style="{StaticResource PanelSliderTinted}"
+                        Background="{StaticResource TrackSaturation}"
                         Minimum="0" Maximum="3" Value="1" SmallChange="0.02" LargeChange="0.1"
                         ValueChanged="OnChanged" MouseDoubleClick="OnSliderReset" Tag="1" />
 
@@ -137,7 +138,8 @@
                     Umgekehrte Richtung, weil weniger Mired mehr Kelvin heisst und der
                     Regler nach rechts waermer werden soll.
                 -->
-                <Slider x:Name="TemperatureSlider" Style="{StaticResource PanelSlider}"
+                <Slider x:Name="TemperatureSlider" Style="{StaticResource PanelSliderTinted}"
+                        Background="{StaticResource TrackTemperature}"
                         Minimum="66.7" Maximum="500" Value="153.8"
                         SmallChange="2" LargeChange="10" IsDirectionReversed="True"
                         ValueChanged="OnChanged" MouseDoubleClick="OnSliderReset" Tag="153.8" />
@@ -146,7 +148,8 @@
                     <TextBlock Text="{DynamicResource S_Tint}" Style="{StaticResource PanelLabel}" />
                     <TextBlock x:Name="TintValue" Style="{StaticResource PanelValue}" />
                 </Grid>
-                <Slider x:Name="TintSlider" Style="{StaticResource PanelSlider}"
+                <Slider x:Name="TintSlider" Style="{StaticResource PanelSliderTinted}"
+                        Background="{StaticResource TrackTint}"
                         Minimum="-100" Maximum="100" Value="0" SmallChange="1" LargeChange="5"
                         ValueChanged="OnChanged" MouseDoubleClick="OnSliderReset" Tag="0" />
             </StackPanel>
@@ -156,7 +159,8 @@
                 <TextBlock Text="{DynamicResource S_Vibrance}" Style="{StaticResource PanelLabel}" />
                 <TextBlock x:Name="VibranceValue" Style="{StaticResource PanelValue}" />
             </Grid>
-            <Slider x:Name="VibranceSlider" Style="{StaticResource PanelSlider}"
+            <Slider x:Name="VibranceSlider" Style="{StaticResource PanelSliderTinted}"
+                        Background="{StaticResource TrackVibrance}"
                     Minimum="-1" Maximum="1" Value="0" SmallChange="0.02" LargeChange="0.1"
                     ValueChanged="OnChanged" MouseDoubleClick="OnSliderReset" Tag="0" />
 
@@ -167,121 +171,59 @@
                         Content="+" Tag="ZonesBody" Click="OnSectionToggled" />
             </Grid>
             <StackPanel x:Name="ZonesBody" Visibility="Collapsed" Margin="0,6,0,0">
-                <TextBlock Text="{DynamicResource S_Shadows}" Style="{StaticResource PanelLabel}" Margin="0,0,0,4" />
-                <Grid Margin="0,0,0,3">
+                <!--
+                    Drei Raeder nebeneinander, darunter je ein Regler fuer die
+                    Helligkeit. Ein Rad hat zwei Freiheitsgrade, eine Zone hat drei -
+                    die Aufteilung entspricht dem, wonach man greift: "waermer" ist
+                    eine Richtung, "heller" ist es nicht.
+
+                    Das Rad verschiebt die Kanaele so gegeneinander, dass ihre Summe
+                    null bleibt. Es aendert also nie die Helligkeit, auch nicht ein
+                    bisschen - sonst zoege jeder Griff ins Farbige den
+                    Helligkeitsregler hinter sich her.
+                -->
+                <Grid>
                     <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="14" />
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="*" />
                         <ColumnDefinition Width="*" />
                     </Grid.ColumnDefinitions>
-                    <TextBlock Grid.Column="0" Text="R" VerticalAlignment="Center"
-                               FontSize="9" FontWeight="SemiBold"
-                               Foreground="{StaticResource ChannelRed}" />
-                    <Slider x:Name="LiftRSlider" Style="{StaticResource PanelSlider}" Margin="0,0,0,3" ToolTip="R"
-                            Minimum="-0.3" Maximum="0.3" Value="0" SmallChange="0.005" LargeChange="0.02"
-                            ValueChanged="OnChanged" MouseDoubleClick="OnSliderReset" Tag="0" />
-                </Grid>
-                <Grid Margin="0,0,0,3">
-                    <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="14" />
-                        <ColumnDefinition Width="*" />
-                    </Grid.ColumnDefinitions>
-                    <TextBlock Grid.Column="0" Text="G" VerticalAlignment="Center"
-                               FontSize="9" FontWeight="SemiBold"
-                               Foreground="{StaticResource ChannelGreen}" />
-                    <Slider x:Name="LiftGSlider" Style="{StaticResource PanelSlider}" Margin="0,0,0,3" ToolTip="G"
-                            Minimum="-0.3" Maximum="0.3" Value="0" SmallChange="0.005" LargeChange="0.02"
-                            ValueChanged="OnChanged" MouseDoubleClick="OnSliderReset" Tag="0" />
-                </Grid>
-                <Grid Margin="0,0,0,3">
-                    <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="14" />
-                        <ColumnDefinition Width="*" />
-                    </Grid.ColumnDefinitions>
-                    <TextBlock Grid.Column="0" Text="B" VerticalAlignment="Center"
-                               FontSize="9" FontWeight="SemiBold"
-                               Foreground="{StaticResource ChannelBlue}" />
-                    <Slider x:Name="LiftBSlider" Style="{StaticResource PanelSlider}" ToolTip="B"
-                            Minimum="-0.3" Maximum="0.3" Value="0" SmallChange="0.005" LargeChange="0.02"
-                            ValueChanged="OnChanged" MouseDoubleClick="OnSliderReset" Tag="0" />
+
+                    <StackPanel Grid.Column="0">
+                        <TextBlock Text="{DynamicResource S_Shadows}" Style="{StaticResource PanelLabel}"
+                                   HorizontalAlignment="Center" Margin="0,0,0,4" />
+                        <local:ColourWheel x:Name="LiftWheel" Width="82" Height="82" />
+                        <Slider x:Name="LiftBrightSlider" Style="{StaticResource PanelSlider}"
+                                Margin="4,4,4,0" Minimum="-0.25" Maximum="0.25" Value="0"
+                                SmallChange="0.005" LargeChange="0.02"
+                                ValueChanged="OnChanged" MouseDoubleClick="OnSliderReset" Tag="0" />
+                    </StackPanel>
+
+                    <StackPanel Grid.Column="1">
+                        <TextBlock Text="{DynamicResource S_Midtones}" Style="{StaticResource PanelLabel}"
+                                   HorizontalAlignment="Center" Margin="0,0,0,4" />
+                        <local:ColourWheel x:Name="GammaWheel" Width="82" Height="82" />
+                        <Slider x:Name="GammaBrightSlider" Style="{StaticResource PanelSlider}"
+                                Margin="4,4,4,0" Minimum="-0.6" Maximum="1.0" Value="0"
+                                SmallChange="0.02" LargeChange="0.1"
+                                ValueChanged="OnChanged" MouseDoubleClick="OnSliderReset" Tag="0" />
+                    </StackPanel>
+
+                    <StackPanel Grid.Column="2">
+                        <TextBlock Text="{DynamicResource S_Highlights}" Style="{StaticResource PanelLabel}"
+                                   HorizontalAlignment="Center" Margin="0,0,0,4" />
+                        <local:ColourWheel x:Name="GainWheel" Width="82" Height="82" />
+                        <Slider x:Name="GainBrightSlider" Style="{StaticResource PanelSlider}"
+                                Margin="4,4,4,0" Minimum="-0.5" Maximum="0.8" Value="0"
+                                SmallChange="0.01" LargeChange="0.05"
+                                ValueChanged="OnChanged" MouseDoubleClick="OnSliderReset" Tag="0" />
+                    </StackPanel>
                 </Grid>
 
-                <TextBlock Text="{DynamicResource S_Midtones}" Style="{StaticResource PanelLabel}" Margin="0,12,0,4" />
-                <Grid Margin="0,0,0,3">
-                    <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="14" />
-                        <ColumnDefinition Width="*" />
-                    </Grid.ColumnDefinitions>
-                    <TextBlock Grid.Column="0" Text="R" VerticalAlignment="Center"
-                               FontSize="9" FontWeight="SemiBold"
-                               Foreground="{StaticResource ChannelRed}" />
-                    <Slider x:Name="GammaRSlider" Style="{StaticResource PanelSlider}" Margin="0,0,0,3" ToolTip="R"
-                            Minimum="0.4" Maximum="2.5" Value="1" SmallChange="0.02" LargeChange="0.1"
-                            ValueChanged="OnChanged" MouseDoubleClick="OnSliderReset" Tag="1" />
-                </Grid>
-                <Grid Margin="0,0,0,3">
-                    <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="14" />
-                        <ColumnDefinition Width="*" />
-                    </Grid.ColumnDefinitions>
-                    <TextBlock Grid.Column="0" Text="G" VerticalAlignment="Center"
-                               FontSize="9" FontWeight="SemiBold"
-                               Foreground="{StaticResource ChannelGreen}" />
-                    <Slider x:Name="GammaGSlider" Style="{StaticResource PanelSlider}" Margin="0,0,0,3" ToolTip="G"
-                            Minimum="0.4" Maximum="2.5" Value="1" SmallChange="0.02" LargeChange="0.1"
-                            ValueChanged="OnChanged" MouseDoubleClick="OnSliderReset" Tag="1" />
-                </Grid>
-                <Grid Margin="0,0,0,3">
-                    <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="14" />
-                        <ColumnDefinition Width="*" />
-                    </Grid.ColumnDefinitions>
-                    <TextBlock Grid.Column="0" Text="B" VerticalAlignment="Center"
-                               FontSize="9" FontWeight="SemiBold"
-                               Foreground="{StaticResource ChannelBlue}" />
-                    <Slider x:Name="GammaBSlider" Style="{StaticResource PanelSlider}" ToolTip="B"
-                            Minimum="0.4" Maximum="2.5" Value="1" SmallChange="0.02" LargeChange="0.1"
-                            ValueChanged="OnChanged" MouseDoubleClick="OnSliderReset" Tag="1" />
-                </Grid>
+                <TextBlock x:Name="ZonesValues" Margin="0,8,0,0" FontSize="9"
+                           Foreground="{StaticResource MutedBrush}" TextAlignment="Center" />
 
-                <TextBlock Text="{DynamicResource S_Highlights}" Style="{StaticResource PanelLabel}" Margin="0,12,0,4" />
-                <Grid Margin="0,0,0,3">
-                    <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="14" />
-                        <ColumnDefinition Width="*" />
-                    </Grid.ColumnDefinitions>
-                    <TextBlock Grid.Column="0" Text="R" VerticalAlignment="Center"
-                               FontSize="9" FontWeight="SemiBold"
-                               Foreground="{StaticResource ChannelRed}" />
-                    <Slider x:Name="GainRSlider" Style="{StaticResource PanelSlider}" Margin="0,0,0,3" ToolTip="R"
-                            Minimum="0.5" Maximum="1.8" Value="1" SmallChange="0.01" LargeChange="0.05"
-                            ValueChanged="OnChanged" MouseDoubleClick="OnSliderReset" Tag="1" />
-                </Grid>
-                <Grid Margin="0,0,0,3">
-                    <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="14" />
-                        <ColumnDefinition Width="*" />
-                    </Grid.ColumnDefinitions>
-                    <TextBlock Grid.Column="0" Text="G" VerticalAlignment="Center"
-                               FontSize="9" FontWeight="SemiBold"
-                               Foreground="{StaticResource ChannelGreen}" />
-                    <Slider x:Name="GainGSlider" Style="{StaticResource PanelSlider}" Margin="0,0,0,3" ToolTip="G"
-                            Minimum="0.5" Maximum="1.8" Value="1" SmallChange="0.01" LargeChange="0.05"
-                            ValueChanged="OnChanged" MouseDoubleClick="OnSliderReset" Tag="1" />
-                </Grid>
-                <Grid Margin="0,0,0,3">
-                    <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="14" />
-                        <ColumnDefinition Width="*" />
-                    </Grid.ColumnDefinitions>
-                    <TextBlock Grid.Column="0" Text="B" VerticalAlignment="Center"
-                               FontSize="9" FontWeight="SemiBold"
-                               Foreground="{StaticResource ChannelBlue}" />
-                    <Slider x:Name="GainBSlider" Style="{StaticResource PanelSlider}" ToolTip="B"
-                            Minimum="0.5" Maximum="1.8" Value="1" SmallChange="0.01" LargeChange="0.05"
-                            ValueChanged="OnChanged" MouseDoubleClick="OnSliderReset" Tag="1" />
-                </Grid>
-
-                <TextBlock Margin="0,8,0,0" FontSize="10" Foreground="{StaticResource MutedBrush}"
+                <TextBlock Margin="0,6,0,0" FontSize="10" Foreground="{StaticResource MutedBrush}"
                            TextWrapping="Wrap" Text="{DynamicResource S_ZonesHint}" />
             </StackPanel>
 

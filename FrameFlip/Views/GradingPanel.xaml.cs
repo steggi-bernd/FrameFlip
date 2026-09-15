@@ -52,6 +52,12 @@ public partial class GradingPanel : UserControl
         CurveField.Changed += () => Raise(interim: true);
         CurveField.Released += () => Raise(interim: false);
 
+        foreach (var wheel in new[] { LiftWheel, GammaWheel, GainWheel })
+        {
+            wheel.Changed += OnWheelChanged;
+            wheel.Released += () => Raise(interim: false);
+        }
+
         Loaded += (_, _) => PushToControls();
     }
 
@@ -219,15 +225,9 @@ public partial class GradingPanel : UserControl
             TintSlider.Value = _whiteBalance.Tint;
             VibranceSlider.Value = _vibrance.Amount;
 
-            LiftRSlider.Value = _zones.Lift.R;
-            LiftGSlider.Value = _zones.Lift.G;
-            LiftBSlider.Value = _zones.Lift.B;
-            GammaRSlider.Value = _zones.Gamma.R;
-            GammaGSlider.Value = _zones.Gamma.G;
-            GammaBSlider.Value = _zones.Gamma.B;
-            GainRSlider.Value = _zones.Gain.R;
-            GainGSlider.Value = _zones.Gain.G;
-            GainBSlider.Value = _zones.Gain.B;
+            PushZone(LiftWheel, LiftBrightSlider, _zones.Lift, neutral: 0f);
+            PushZone(GammaWheel, GammaBrightSlider, _zones.Gamma, neutral: 1f);
+            PushZone(GainWheel, GainBrightSlider, _zones.Gain, neutral: 1f);
 
             _bands.Prepare();
             for (int i = 0; i < _bandSliders.Count && i < _bands.Bands.Count; i++)
@@ -279,15 +279,9 @@ public partial class GradingPanel : UserControl
         _whiteBalance.Tint = (float)TintSlider.Value;
         _vibrance.Amount = (float)VibranceSlider.Value;
 
-        _zones.Lift.R = (float)LiftRSlider.Value;
-        _zones.Lift.G = (float)LiftGSlider.Value;
-        _zones.Lift.B = (float)LiftBSlider.Value;
-        _zones.Gamma.R = (float)GammaRSlider.Value;
-        _zones.Gamma.G = (float)GammaGSlider.Value;
-        _zones.Gamma.B = (float)GammaBSlider.Value;
-        _zones.Gain.R = (float)GainRSlider.Value;
-        _zones.Gain.G = (float)GainGSlider.Value;
-        _zones.Gain.B = (float)GainBSlider.Value;
+        PullZone(LiftWheel, LiftBrightSlider, _zones.Lift, neutral: 0f, scale: LiftScale);
+        PullZone(GammaWheel, GammaBrightSlider, _zones.Gamma, neutral: 1f, scale: GammaScale);
+        PullZone(GainWheel, GainBrightSlider, _zones.Gain, neutral: 1f, scale: GainScale);
 
         _bands.Prepare();
         for (int i = 0; i < _bandSliders.Count && i < _bands.Bands.Count; i++)
@@ -329,6 +323,7 @@ public partial class GradingPanel : UserControl
         TintValue.Text = $"{TintSlider.Value:+0;-0;0}";
         VibranceValue.Text = $"{VibranceSlider.Value:+0.00;-0.00;0.00}";
         LutStrengthValue.Text = $"{LutStrengthSlider.Value:0.00}";
+        UpdateZoneValues();
     }
 
     /// <summary>
@@ -345,6 +340,56 @@ public partial class GradingPanel : UserControl
     private static float ToKelvin(double mired) => (float)(1e6 / Math.Max(1.0, mired));
 
     private static double ToMired(float kelvin) => 1e6 / Math.Max(1f, kelvin);
+
+    /// <summary>
+    /// Wie weit der Rand eines Rades traegt. Je Zone verschieden, weil ein Lift von
+    /// 0,2 viel und ein Gain von 0,2 wenig waere - Lift verschiebt, Gain skaliert.
+    /// </summary>
+    private const float LiftScale = 0.12f;
+    private const float GammaScale = 0.35f;
+    private const float GainScale = 0.25f;
+
+    private void OnWheelChanged()
+    {
+        if (_filling) return;
+
+        PullZone(LiftWheel, LiftBrightSlider, _zones.Lift, 0f, LiftScale);
+        PullZone(GammaWheel, GammaBrightSlider, _zones.Gamma, 1f, GammaScale);
+        PullZone(GainWheel, GainBrightSlider, _zones.Gain, 1f, GainScale);
+
+        UpdateZoneValues();
+        Raise(interim: true);
+    }
+
+    private static void PullZone(ColourWheel wheel, Slider brightness, ColourTriplet target,
+                                 float neutral, float scale)
+    {
+        var (r, g, b) = ColourWheelMath.ToChannels(wheel.Value, (float)brightness.Value, neutral, scale);
+        target.R = r;
+        target.G = g;
+        target.B = b;
+    }
+
+    private static void PushZone(ColourWheel wheel, Slider brightness, ColourTriplet source, float neutral)
+    {
+        wheel.Value = ColourWheelMath.ToPoint(source.R, source.G, source.B);
+        brightness.Value = Math.Clamp(ColourWheelMath.ToBrightness(source.R, source.G, source.B, neutral),
+                                      brightness.Minimum, brightness.Maximum);
+    }
+
+    /// <summary>
+    /// Die Zahlen unter den Raedern. Ein Rad zeigt die Richtung, aber nicht, wie
+    /// weit - und wer eine Einstellung wiederherstellen oder beschreiben will,
+    /// braucht die Werte.
+    /// </summary>
+    private void UpdateZoneValues()
+    {
+        if (ZonesValues is null) return;
+
+        ZonesValues.Text = $"{_zones.Lift.R:0.00} {_zones.Lift.G:0.00} {_zones.Lift.B:0.00}   ·   " +
+                           $"{_zones.Gamma.R:0.00} {_zones.Gamma.G:0.00} {_zones.Gamma.B:0.00}   ·   " +
+                           $"{_zones.Gain.R:0.00} {_zones.Gain.G:0.00} {_zones.Gain.B:0.00}";
+    }
 
     private static float BandValue(HslBand band, int mode) => mode switch
     {

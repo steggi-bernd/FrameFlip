@@ -812,6 +812,87 @@
         </Setter>
     </Style>
 
+    <!--
+        Ein Regler, dessen Bahn zeigt, wohin er fuehrt.
+
+        Die Bahn traegt den Verlauf aus Background - blau nach orange bei der
+        Temperatur, gruen nach magenta bei der Tendenz, grau nach bunt bei der
+        Saettigung. Das spart die Beschriftung "links kuehler, rechts waermer" und
+        sagt dasselbe schneller.
+
+        Getrennt vom gewoehnlichen PanelSlider und nicht als dessen Erweiterung: Wo
+        es nichts zu zeigen gibt - Belichtung, Gamma - waere ein Verlauf eine
+        Behauptung ueber eine Richtung, die es nicht gibt.
+    -->
+    <Style x:Key="PanelSliderTinted" TargetType="Slider">
+        <Setter Property="Focusable" Value="False" />
+        <Setter Property="IsMoveToPointEnabled" Value="True" />
+        <Setter Property="Height" Value="18" />
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="Slider">
+                    <Grid Background="Transparent">
+                        <!-- Background und nicht Tag: dort steht schon der Wert, auf
+                             den ein Doppelklick zuruecksetzt. -->
+                        <Border Background="{TemplateBinding Background}" Height="5" CornerRadius="3"
+                                VerticalAlignment="Center" Margin="5,0" Opacity="0.85" />
+                        <Track x:Name="PART_Track">
+                            <Track.DecreaseRepeatButton>
+                                <RepeatButton Command="Slider.DecreaseLarge" Focusable="False" Opacity="0" />
+                            </Track.DecreaseRepeatButton>
+                            <Track.IncreaseRepeatButton>
+                                <RepeatButton Command="Slider.IncreaseLarge" Focusable="False" Opacity="0" />
+                            </Track.IncreaseRepeatButton>
+                            <Track.Thumb>
+                                <Thumb Style="{StaticResource PanelSliderThumb}" />
+                            </Track.Thumb>
+                        </Track>
+                    </Grid>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <!-- Die Verlaeufe dazu. Gedaempft, damit die Bahn den Griff nicht ueberstrahlt. -->
+    <LinearGradientBrush x:Key="TrackTemperature" StartPoint="0,0" EndPoint="1,0">
+        <GradientStop Color="#FF5B8CC8" Offset="0" />
+        <GradientStop Color="#FF9AA0A8" Offset="0.5" />
+        <GradientStop Color="#FFD79A4E" Offset="1" />
+    </LinearGradientBrush>
+
+    <LinearGradientBrush x:Key="TrackTint" StartPoint="0,0" EndPoint="1,0">
+        <GradientStop Color="#FF5FB37A" Offset="0" />
+        <GradientStop Color="#FF9AA0A8" Offset="0.5" />
+        <GradientStop Color="#FFC072B8" Offset="1" />
+    </LinearGradientBrush>
+
+    <LinearGradientBrush x:Key="TrackSaturation" StartPoint="0,0" EndPoint="1,0">
+        <GradientStop Color="#FF6E6E76" Offset="0" />
+        <GradientStop Color="#FF8E8E96" Offset="0.33" />
+        <GradientStop Color="#FFC8794E" Offset="1" />
+    </LinearGradientBrush>
+
+    <LinearGradientBrush x:Key="TrackVibrance" StartPoint="0,0" EndPoint="1,0">
+        <GradientStop Color="#FF6E6E76" Offset="0" />
+        <GradientStop Color="#FF8E8E96" Offset="0.5" />
+        <GradientStop Color="#FF66A8C0" Offset="1" />
+    </LinearGradientBrush>
+
+    <LinearGradientBrush x:Key="TrackRed" StartPoint="0,0" EndPoint="1,0">
+        <GradientStop Color="#FF4A3236" Offset="0" />
+        <GradientStop Color="#FFE06C6C" Offset="1" />
+    </LinearGradientBrush>
+
+    <LinearGradientBrush x:Key="TrackGreen" StartPoint="0,0" EndPoint="1,0">
+        <GradientStop Color="#FF2F4436" Offset="0" />
+        <GradientStop Color="#FF6CD086" Offset="1" />
+    </LinearGradientBrush>
+
+    <LinearGradientBrush x:Key="TrackBlue" StartPoint="0,0" EndPoint="1,0">
+        <GradientStop Color="#FF303C4E" Offset="0" />
+        <GradientStop Color="#FF6C9CE0" Offset="1" />
+    </LinearGradientBrush>
+
     <Style x:Key="PanelSlider" TargetType="Slider">
         <Setter Property="Focusable" Value="False" />
         <Setter Property="IsMoveToPointEnabled" Value="True" />
