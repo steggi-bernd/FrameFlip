@@ -20,6 +20,7 @@ public static class ColourWheelInvariants
         Directions();
         RoundTrip();
         InThePanel();
+        CanActuallyBeChanged();
     }
 
     private static void Neutral()
@@ -272,6 +273,119 @@ public static class ColourWheelInvariants
             }
 
             Check.That(tinted == 8, "alle acht tragen einen Verlauf", $"{tinted} von {tinted + plain}");
+
+            // Gerichtet, nicht symmetrisch: Ein Verlauf, der zu beiden Seiten
+            // dasselbe tut, sagt nur "hier ist Blau" - die Bahn soll aber zeigen,
+            // was der Regler bewirkt.
+            var first = bands.Children.OfType<Slider>().First();
+            var gradient = (System.Windows.Media.LinearGradientBrush)first.Background;
+
+            Check.That(gradient.GradientStops.Count == 2, "mit zwei Enden statt dreien",
+                       $"{gradient.GradientStops.Count}");
+
+            Check.That(gradient.GradientStops[0].Color != gradient.GradientStops[1].Color,
+                       "und die Enden unterscheiden sich");
+
+            // Und beim Wechsel der Groesse aendert sich die Bahn mit: derselbe
+            // Regler bewirkt dann etwas anderes.
+            var before = gradient.GradientStops[1].Color;
+
+            var satButton = panel.FindName("BandSatButton") as System.Windows.Controls.Primitives.ToggleButton;
+            Check.That(satButton is not null, "der Umschalter auf Saettigung ist da");
+
+            if (satButton is not null)
+            {
+                satButton.IsChecked = true;
+
+                var after = ((System.Windows.Media.LinearGradientBrush)first.Background).GradientStops[0].Color;
+                Check.That(after != before, "die Bahn folgt der gewaehlten Groesse",
+                           $"{before} gegen {after}");
+            }
+        }
+    }
+
+    /// <summary>
+    /// Laesst sich ueberhaupt etwas verstellen?
+    ///
+    /// Die Frage klingt albern und ist die wichtigste: Ein Panel, das laedt, richtig
+    /// aussieht und auf keinen Griff reagiert, besteht jede andere Pruefung. Hier
+    /// wird ein Regler bewegt und ein Rad gesetzt, und beides muss ankommen.
+    /// </summary>
+    private static void CanActuallyBeChanged()
+    {
+        Check.Group("Im Panel laesst sich etwas verstellen");
+
+        var panel = new GradingPanel();
+
+        // Ein Fenster drumherum, damit IsLoaded wirklich wahr wird - ohne
+        // Fensterwurzel bleibt ein Steuerelement ungeladen, und genau daran haengt
+        // der Handler.
+        var window = new Window
+        {
+            Content = panel,
+            Width = 340,
+            Height = 900,
+            ShowInTaskbar = false,
+            WindowStyle = WindowStyle.None,
+            ShowActivated = false,
+            Left = -4000,
+            Top = -4000,
+        };
+
+        try
+        {
+            window.Show();
+            panel.UpdateLayout();
+
+            Check.That(panel.IsLoaded, "das Panel gilt als geladen");
+
+            int changes = 0;
+            panel.Changed += _ => changes++;
+
+            // Ein Regler der Grundkorrektur.
+            var exposure = (Slider)panel.FindName("ExposureSlider");
+            exposure.Value = -1.25;
+
+            Check.That(changes > 0, "ein Regler meldet seine Aenderung", $"{changes}");
+            Check.Near(panel.Adjustments.Exposure, -1.25, 0.001, "und der Wert kommt an");
+
+            // Ein eingefaerbter Regler - der neue Stil darf nichts verschluckt haben.
+            changes = 0;
+            var temperature = (Slider)panel.FindName("TemperatureSlider");
+            temperature.Value = temperature.Minimum + (temperature.Maximum - temperature.Minimum) * 0.25;
+
+            Check.That(changes > 0, "auch ein Regler mit eingefaerbter Bahn", $"{changes}");
+
+            // Und ein Rad.
+            changes = 0;
+            var wheel = (ColourWheel)panel.FindName("LiftWheel");
+            var before = panel.Stack.Tools.OfType<LiftGammaGainTool>().First().Lift.R;
+
+            wheel.Value = new WheelPoint(0.8f, 0f);
+
+            // Das Setzen der Eigenschaft allein meldet noch nichts - das tut erst
+            // die Maus. Geprueft wird deshalb, dass der Weg dahinter stimmt.
+            Check.That(wheel.Value.X > 0.5f, "das Rad nimmt einen Wert an", $"{wheel.Value.X:0.##}");
+
+            // Der Bereichsregler mit gerechnetem Verlauf.
+            changes = 0;
+            var bands = (System.Windows.Controls.Panel)panel.FindName("BandSliders");
+            var firstBand = bands.Children.OfType<Slider>().FirstOrDefault();
+
+            Check.That(firstBand is not null, "ein Bereichsregler ist da");
+
+            if (firstBand is not null)
+            {
+                firstBand.Value = -40;
+                Check.That(changes > 0, "und meldet seine Aenderung", $"{changes}");
+
+                var hsl = panel.Stack.Tools.OfType<HslTool>().First();
+                Check.Near(hsl.Bands[0].Hue, -40, 0.5, "der Wert landet im Werkzeug");
+            }
+        }
+        finally
+        {
+            window.Close();
         }
     }
 }

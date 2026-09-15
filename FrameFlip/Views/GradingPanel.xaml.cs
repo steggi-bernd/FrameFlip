@@ -46,6 +46,15 @@ public partial class GradingPanel : UserControl
     {
         InitializeComponent();
 
+        // Die Werkzeuge gehoeren in den Stapel, bevor der erste Griff kommt.
+        //
+        // Vorher entstanden sie hier als Felder und wanderten erst in Load() in den
+        // Stapel. Wer ein Panel benutzte, ohne vorher zu laden, bewegte damit
+        // Werkzeuge, die nirgends standen: Die Regler liefen, die Werte aenderten
+        // sich, und im Bild geschah nichts. Ein Fehler, der sich nicht als Fehler
+        // meldet, sondern als "geht nicht".
+        Load(null, null);
+
         BuildBandSliders();
         CurveField.Curve = _curves.Master;
         CurveField.LineColour = CurveColours[0];
@@ -194,7 +203,7 @@ public partial class GradingPanel : UserControl
             var slider = new Slider
             {
                 Style = (Style)FindResource("PanelSliderTinted"),
-                Background = BandTrack(HslTool.Centres[i]),
+                Background = BandTrack(HslTool.Centres[i], _bandMode),
                 Minimum = -100,
                 Maximum = 100,
                 Value = 0,
@@ -212,16 +221,46 @@ public partial class GradingPanel : UserControl
     }
 
     /// <summary>
-    /// Die Bahn eines Bereichsreglers: von gedaempft nach voll in der Farbe des
-    /// Bereichs. Gerechnet statt aufgeschrieben, weil die acht Mitten ohnehin im
-    /// Werkzeug stehen und zwei Listen derselben Farben einmal auseinanderlaufen.
+    /// Die Bahn eines Bereichsreglers - gerichtet, und je nach Groesse verschieden.
+    ///
+    /// Ein Verlauf, der zu beiden Seiten dasselbe tut, sagt nur "hier ist Blau". Die
+    /// Bahn soll aber zeigen, was der Regler BEWIRKT, und das ist in jeder der drei
+    /// Groessen etwas anderes:
+    ///
+    ///   Ton        von der einen Nachbarfarbe zur anderen - der Regler verschiebt
+    ///              den Farbton um bis zu dreissig Grad in beide Richtungen
+    ///   Saettigung von grau zur vollen Farbe
+    ///   Helligkeit von dunkel nach hell
+    ///
+    /// So steht links wirklich, was links passiert.
     /// </summary>
-    private static System.Windows.Media.Brush BandTrack(float hueDegrees)
+    private static System.Windows.Media.Brush BandTrack(float hueDegrees, int mode)
     {
-        HslTool.HslToRgb(hueDegrees, 0.65f, 0.55f, out float r, out float g, out float b);
+        Color from, to;
 
-        var full = Color.FromRgb(Byte(r), Byte(g), Byte(b));
-        var faint = Color.FromRgb((byte)(full.R * 0.32), (byte)(full.G * 0.32), (byte)(full.B * 0.32));
+        switch (mode)
+        {
+            case 1:
+                // Saettigung: links entsaettigt, rechts voll.
+                from = Hsl(hueDegrees, 0.05f, 0.5f);
+                to = Hsl(hueDegrees, 0.85f, 0.55f);
+                break;
+
+            case 2:
+                // Helligkeit: links dunkel, rechts hell - in der Farbe des Bereichs,
+                // damit man sieht, welcher gemeint ist.
+                from = Hsl(hueDegrees, 0.5f, 0.16f);
+                to = Hsl(hueDegrees, 0.5f, 0.82f);
+                break;
+
+            default:
+                // Ton: der Regler zieht um bis zu dreissig Grad. Die Bahn zeigt
+                // genau diesen Weg - links die Farbe, bei der man landet, wenn man
+                // ganz nach links zieht, rechts die andere.
+                from = Hsl(hueDegrees - 30f, 0.7f, 0.55f);
+                to = Hsl(hueDegrees + 30f, 0.7f, 0.55f);
+                break;
+        }
 
         var brush = new System.Windows.Media.LinearGradientBrush
         {
@@ -229,16 +268,32 @@ public partial class GradingPanel : UserControl
             EndPoint = new System.Windows.Point(1, 0),
         };
 
-        // Die Mitte ist "unveraendert" und bleibt gedaempft; nach beiden Seiten
-        // nimmt die Farbe zu, weil ein Regler hier in beide Richtungen wirkt.
-        brush.GradientStops.Add(new System.Windows.Media.GradientStop(full, 0));
-        brush.GradientStops.Add(new System.Windows.Media.GradientStop(faint, 0.5));
-        brush.GradientStops.Add(new System.Windows.Media.GradientStop(full, 1));
+        brush.GradientStops.Add(new System.Windows.Media.GradientStop(from, 0));
+        brush.GradientStops.Add(new System.Windows.Media.GradientStop(to, 1));
         brush.Freeze();
 
         return brush;
 
+        static Color Hsl(float hue, float saturation, float lightness)
+        {
+            while (hue < 0f) hue += 360f;
+            while (hue >= 360f) hue -= 360f;
+
+            HslTool.HslToRgb(hue, saturation, lightness, out float r, out float g, out float b);
+            return Color.FromRgb(Byte(r), Byte(g), Byte(b));
+        }
+
         static byte Byte(float value) => (byte)Math.Clamp(value * 255f, 0f, 255f);
+    }
+
+    /// <summary>
+    /// Die Bahnen nachziehen. Noetig beim Wechsel der Groesse, weil derselbe Regler
+    /// dann etwas anderes bewirkt und seine Bahn das zeigen soll.
+    /// </summary>
+    private void UpdateBandTracks()
+    {
+        for (int i = 0; i < _bandSliders.Count && i < HslTool.Centres.Length; i++)
+            _bandSliders[i].Background = BandTrack(HslTool.Centres[i], _bandMode);
     }
 
     private void PushToControls()
@@ -263,6 +318,9 @@ public partial class GradingPanel : UserControl
             PushZone(GammaWheel, GammaBrightSlider, _zones.Gamma, neutral: 1f);
             PushZone(GainWheel, GainBrightSlider, _zones.Gain, neutral: 1f);
 
+            // Beim ersten Aufruf aus dem Konstruktor gibt es die Bereichsregler noch
+            // nicht; die Schleife laeuft dann ueber nichts und wird nachgeholt,
+            // sobald sie stehen.
             _bands.Prepare();
             for (int i = 0; i < _bandSliders.Count && i < _bands.Bands.Count; i++)
                 _bandSliders[i].Value = BandValue(_bands.Bands[i], _bandMode);
@@ -475,6 +533,7 @@ public partial class GradingPanel : UserControl
             if (!ReferenceEquals(button, picked)) button.IsChecked = false;
 
         _bandMode = mode;
+        UpdateBandTracks();
         _filling = true;
 
         try
