@@ -33,6 +33,11 @@ static int RunAll()
     AtelierPageInvariants.Run();
     PanelPolishInvariants.Run();
     ColourWheelInvariants.Run();
+    BlendInvariants.Run();
+    LayerInvariants.Run();
+    LayerPanelInvariants.Run();
+    PassRebuildInvariants.Run();
+    AtelierLayerInvariants.Run();
     GradeBatchInvariants.Run();
     GradeVideoInvariants.Run();
     ExrInvariants.Run();

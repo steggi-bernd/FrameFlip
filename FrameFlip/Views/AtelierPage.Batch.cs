@@ -150,6 +150,7 @@ public partial class AtelierPage
         BatchProgress.Visibility = Visibility.Visible;
         BatchProgress.Value = 0;
         Tools.IsEnabled = false;
+        Layers.IsEnabled = false;
 
         int seen = 0;
         var progress = new Progress<GradeProgress>(p =>
@@ -185,6 +186,7 @@ public partial class AtelierPage
             StopButton.Visibility = Visibility.Collapsed;
             BatchProgress.Visibility = Visibility.Collapsed;
             Tools.IsEnabled = true;
+            Layers.IsEnabled = true;
             UpdateBatchBar();
         }
     }
@@ -202,6 +204,11 @@ public partial class AtelierPage
             // Kopiert: waehrend der Lauf laeuft, darf am Original weitergeregelt
             // werden, ohne dass sich die Ausgabe auf halber Strecke aendert.
             Grading = Tools.Stack.Clone(),
+
+            // Derselbe Stapel auf jedem Bild: Er nennt Passe mit Namen, und die
+            // heissen im dreihundertsten Bild genauso wie im ersten. Genau das ist
+            // der Weg, den das Atelier meint - ein Bild einrichten, alle rechnen.
+            Layers = Layers.Stack.Clone(),
 
             View = _frame is not null ? ViewFor(_frame) : new StandardViewTransform(),
             MaxWorkers = Workers?.Invoke() ?? Math.Clamp(Environment.ProcessorCount / 2, 1, 8),
@@ -222,6 +229,7 @@ public partial class AtelierPage
             Fps = _settings.Fps > 0 ? _settings.Fps : 24,
             Adjustments = Tools.Adjustments,
             Grading = Tools.Stack.Clone(),
+            Layers = Layers.Stack.Clone(),
             View = _frame is not null ? ViewFor(_frame) : new StandardViewTransform(),
 
             // Dieselbe Zurueckhaltung wie beim Rechnen: der Encoder darf einen

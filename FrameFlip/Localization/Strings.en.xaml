@@ -60,6 +60,34 @@
     <sys:String x:Key="S_NoLut">No table selected</sys:String>
     <sys:String x:Key="S_Strength">Strength</sys:String>
     <sys:String x:Key="S_PickLut">Choose a table</sys:String>
+
+    <!-- ================================================================ Layers -->
+    <sys:String x:Key="S_Layers">Layers</sys:String>
+    <sys:String x:Key="S_LayersHint">Blender does not split the image into summands but into light times colour. “All passes” builds the stack so it rebuilds exactly the rendered image – any other mode is an intervention.</sys:String>
+    <sys:String x:Key="S_AddLayer">Add a pass as a layer</sys:String>
+    <sys:String x:Key="S_AddAllPasses">All passes – rebuild the image</sys:String>
+    <sys:String x:Key="S_ClipLayer">Affect only the layer below (clipping mask)</sys:String>
+    <sys:String x:Key="S_DuplicateLayer">Duplicate</sys:String>
+    <sys:String x:Key="S_RemoveLayer">Remove</sys:String>
+    <sys:String x:Key="S_MoveLayerUp">Move up</sys:String>
+    <sys:String x:Key="S_MoveLayerDown">Move down</sys:String>
+    <sys:String x:Key="S_BlendMode">Blend mode</sys:String>
+    <sys:String x:Key="S_Opacity">Opacity</sys:String>
+    <sys:String x:Key="S_LayerTint">Colour</sys:String>
+    <sys:String x:Key="S_LayerColour">Image</sys:String>
+    <sys:String x:Key="S_SinglePass">This file carries a single pass.</sys:String>
+    <sys:String x:Key="S_PassMissing">missing from this file</sys:String>
+    <sys:String x:Key="S_ResetLayers">reset</sys:String>
+    <sys:String x:Key="S_BlendNormal">Normal</sys:String>
+    <sys:String x:Key="S_BlendAdd">Add</sys:String>
+    <sys:String x:Key="S_BlendMultiply">Multiply</sys:String>
+    <sys:String x:Key="S_BlendScreen">Screen</sys:String>
+    <sys:String x:Key="S_BlendDarken">Darken</sys:String>
+    <sys:String x:Key="S_BlendLighten">Lighten</sys:String>
+    <sys:String x:Key="S_BlendDifference">Difference</sys:String>
+    <sys:String x:Key="S_BlendOverlay">Overlay</sys:String>
+    <sys:String x:Key="S_BlendSoftLight">Soft light</sys:String>
+    <sys:String x:Key="S_BlendHardLight">Hard light</sys:String>
     <sys:String x:Key="S_BandRed">Red</sys:String>
     <sys:String x:Key="S_BandOrange">Orange</sys:String>
     <sys:String x:Key="S_BandYellow">Yellow</sys:String>

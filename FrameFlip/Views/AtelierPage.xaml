@@ -78,11 +78,32 @@
             </Grid>
         </Border>
 
-        <!-- Die Werkzeuge -->
+        <!--
+            Die Werkzeuge. Oben der Stapel, darunter die Farbe.
+
+            Die Reihenfolge ist die des Rechenwegs: Erst entsteht aus den Passen ein
+            Bild, dann wird dieses Bild korrigiert. Wer von oben nach unten liest,
+            liest damit dieselbe Kette, die auch gerechnet wird - und die Frage
+            "worauf wirkt der Regler?" beantwortet sich, ohne dass sie gestellt
+            werden muss: auf das, was oben herauskommt.
+        -->
         <Border Grid.Row="1" Grid.Column="1" Width="300" Margin="12,0,0,0"
                 Background="{StaticResource PanelBackground}"
                 BorderBrush="{StaticResource PanelBorder}" BorderThickness="1" CornerRadius="4">
-            <local:GradingPanel x:Name="Tools" />
+            <Grid>
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="*" />
+                </Grid.RowDefinitions>
+
+                <local:LayerPanel x:Name="Layers" Grid.Row="0" Visibility="Collapsed" />
+
+                <Border x:Name="LayerSeparator" Grid.Row="1" Height="1" Margin="14,12,14,0"
+                        Background="{StaticResource PanelBorder}" Visibility="Collapsed" />
+
+                <local:GradingPanel x:Name="Tools" Grid.Row="2" />
+            </Grid>
         </Border>
 
         <!-- Die Sequenz ausgeben -->

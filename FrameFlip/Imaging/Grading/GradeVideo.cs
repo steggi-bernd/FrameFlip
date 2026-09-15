@@ -27,6 +27,12 @@ public sealed record GradeVideoRequest
     /// <summary>Kopiert uebergeben - waehrend des Laufs darf niemand mehr daran drehen.</summary>
     public required GradingStack Grading { get; init; }
 
+    /// <summary>
+    /// Der Ebenenstapel, ebenfalls kopiert. Null heisst: das Bild so, wie die Datei
+    /// es hergibt.
+    /// </summary>
+    public LayerStack? Layers { get; init; }
+
     public required IViewTransform View { get; init; }
 
     /// <summary>
@@ -69,7 +75,7 @@ public static class GradeVideo
 
         // Die Masse des ersten Bildes bestimmen den Datenstrom - ffmpeg muss sie
         // vorher wissen, weil Rohdaten keinen Kopf haben.
-        var first = Load(request.Frames[0]);
+        var first = LayeredFrameLoader.Load(request.Frames[0], request.Layers);
         if (first is null)
             return new GradeBatchResult(0, new[] { $"{Path.GetFileName(request.Frames[0])}: nicht lesbar" },
                                         false, watch.Elapsed);
@@ -229,7 +235,7 @@ public static class GradeVideo
     private static byte[]? Render(string path, GradeVideoRequest request, PreparedGrading grading,
                                   int width, int height)
     {
-        var frame = Load(path);
+        var frame = LayeredFrameLoader.Load(path, request.Layers);
         if (frame is null) return null;
 
         // Ein Bild mit anderen Massen kann nicht in einen laufenden Rohstrom -
@@ -248,17 +254,6 @@ public static class GradeVideo
         }
 
         return pixels;
-    }
-
-    private static FloatFrame? Load(string path)
-    {
-        if (Path.GetExtension(path).Equals(".exr", StringComparison.OrdinalIgnoreCase))
-            return FloatFrame.FromExr(path);
-
-        var decoder = new Decoding.WicFrameDecoder();
-        return decoder.TryDecode(path, 16384, 16384, n => new byte[n], out var decoded)
-            ? FloatFrame.FromBgra32(decoded.Pixels, decoded.Width, decoded.Height, decoded.Stride)
-            : null;
     }
 
     /// <summary>

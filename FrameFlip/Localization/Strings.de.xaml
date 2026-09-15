@@ -60,6 +60,34 @@
     <sys:String x:Key="S_NoLut">Keine Tabelle gewaehlt</sys:String>
     <sys:String x:Key="S_Strength">Staerke</sys:String>
     <sys:String x:Key="S_PickLut">Tabelle waehlen</sys:String>
+
+    <!-- ================================================================ Ebenen -->
+    <sys:String x:Key="S_Layers">Ebenen</sys:String>
+    <sys:String x:Key="S_LayersHint">Blender zerlegt nicht in Summanden, sondern in Licht mal Farbe. „Alle Passe“ baut den Stapel so, dass wieder genau das gerenderte Bild herauskommt – jede andere Mischung ist ein Eingriff.</sys:String>
+    <sys:String x:Key="S_AddLayer">Pass als Ebene hinzufuegen</sys:String>
+    <sys:String x:Key="S_AddAllPasses">Alle Passe – Bild nachbauen</sys:String>
+    <sys:String x:Key="S_ClipLayer">Nur auf die Ebene darunter wirken (Schnittmaske)</sys:String>
+    <sys:String x:Key="S_DuplicateLayer">Verdoppeln</sys:String>
+    <sys:String x:Key="S_RemoveLayer">Entfernen</sys:String>
+    <sys:String x:Key="S_MoveLayerUp">Nach oben</sys:String>
+    <sys:String x:Key="S_MoveLayerDown">Nach unten</sys:String>
+    <sys:String x:Key="S_BlendMode">Mischung</sys:String>
+    <sys:String x:Key="S_Opacity">Deckkraft</sys:String>
+    <sys:String x:Key="S_LayerTint">Farbe</sys:String>
+    <sys:String x:Key="S_LayerColour">Bild</sys:String>
+    <sys:String x:Key="S_SinglePass">Diese Datei fuehrt nur einen Pass.</sys:String>
+    <sys:String x:Key="S_PassMissing">fehlt in dieser Datei</sys:String>
+    <sys:String x:Key="S_ResetLayers">zuruecksetzen</sys:String>
+    <sys:String x:Key="S_BlendNormal">Normal</sys:String>
+    <sys:String x:Key="S_BlendAdd">Addieren</sys:String>
+    <sys:String x:Key="S_BlendMultiply">Multiplizieren</sys:String>
+    <sys:String x:Key="S_BlendScreen">Negativ multiplizieren</sys:String>
+    <sys:String x:Key="S_BlendDarken">Abdunkeln</sys:String>
+    <sys:String x:Key="S_BlendLighten">Aufhellen</sys:String>
+    <sys:String x:Key="S_BlendDifference">Differenz</sys:String>
+    <sys:String x:Key="S_BlendOverlay">Ineinanderkopieren</sys:String>
+    <sys:String x:Key="S_BlendSoftLight">Weiches Licht</sys:String>
+    <sys:String x:Key="S_BlendHardLight">Hartes Licht</sys:String>
     <sys:String x:Key="S_BandRed">Rot</sys:String>
     <sys:String x:Key="S_BandOrange">Orange</sys:String>
     <sys:String x:Key="S_BandYellow">Gelb</sys:String>

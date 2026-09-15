@@ -40,6 +40,16 @@ public sealed record GradeBatchRequest
     public required GradingStack Grading { get; init; }
 
     /// <summary>
+    /// Der Ebenenstapel, ebenfalls KOPIERT uebergeben. Null heisst: das Bild so, wie
+    /// die Datei es hergibt.
+    ///
+    /// Er nennt nur Passe, keine Bilddaten - und genau deshalb laesst sich derselbe
+    /// Stapel auf jedes Bild der Sequenz anwenden. Bei einem Bild eingerichtet,
+    /// dreihundert gerechnet.
+    /// </summary>
+    public LayerStack? Layers { get; init; }
+
+    /// <summary>
     /// Die Sichtumwandlung fuer Szenenlicht. Material, das aus acht Bit
     /// zurueckgerechnet wurde, bekommt unabhaengig davon die einfache.
     /// </summary>
@@ -123,7 +133,7 @@ public static class GradeBatch
                         return;
                     }
 
-                    var frame = Load(path);
+                    var frame = LayeredFrameLoader.Load(path, request.Layers);
                     if (frame is null)
                     {
                         lock (failures) failures.Add($"{Path.GetFileName(path)}: nicht lesbar");
@@ -172,20 +182,6 @@ public static class GradeBatch
         GradeOutputFormat.Jpeg => ".jpg",
         _ => ".png",
     };
-
-    private static FloatFrame? Load(string path)
-    {
-        if (Path.GetExtension(path).Equals(".exr", StringComparison.OrdinalIgnoreCase))
-            return FloatFrame.FromExr(path);
-
-        // Alles andere ueber die Windows-Bildverarbeitung und zurueck in lineare
-        // Werte. Der Weg ist derselbe wie auf der Atelierseite, damit das Ergebnis
-        // dem entspricht, was dort zu sehen war.
-        var decoder = new Decoding.WicFrameDecoder();
-        return decoder.TryDecode(path, 16384, 16384, n => new byte[n], out var decoded)
-            ? FloatFrame.FromBgra32(decoded.Pixels, decoded.Width, decoded.Height, decoded.Stride)
-            : null;
-    }
 
     private static void Write(FloatFrame frame, GradeBatchRequest request, IViewTransform view,
                               PreparedGrading grading, string target)

@@ -373,6 +373,15 @@ public sealed class AppSettings
     /// </summary>
     public Imaging.Grading.GradingStack? Grading { get; set; }
 
+    /// <summary>
+    /// Der Ebenenstapel des Ateliers.
+    ///
+    /// Er nennt Passe mit Namen, nicht mit Inhalt. Beim Oeffnen einer Datei, die
+    /// diese Passe nicht fuehrt, faellt er deshalb auf die eine Grundebene zurueck -
+    /// zwanzig ausgegraute Zeilen waeren keine Hilfe, sondern ein Raetsel.
+    /// </summary>
+    public Imaging.Grading.LayerStack? Layers { get; set; }
+
     /// <summary>Gespeicherte Korrektureinstellungen, im Panel auswaehlbar.</summary>
     public List<AdjustmentPreset> AdjustmentPresets { get; set; } = new();
 

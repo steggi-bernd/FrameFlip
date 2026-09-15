@@ -108,6 +108,57 @@ public sealed class FloatFrame
     }
 
     /// <summary>
+    /// Liest einen bestimmten Pass aus einer Multilayer-EXR.
+    ///
+    /// Gelesen werden nur dessen Kanaele. Das ist bei einer Datei mit zwanzig Passen
+    /// der Unterschied zwischen drei Kanaelen und sechzig - und der Grund, warum der
+    /// Leser ueberhaupt auswaehlen kann, welche er auspackt.
+    /// </summary>
+    /// <param name="pass">
+    /// Der Gruppenname, etwa "ViewLayer.GlossDir". Leer heisst: die Farbkanaele, die
+    /// das Bild ohnehin ergeben - dann ist es <see cref="FromExr"/>.
+    /// </param>
+    public static FloatFrame? FromExrPass(string path, string pass, int maxWidth = 0, int maxHeight = 0)
+    {
+        if (pass.Length == 0) return FromExr(path, maxWidth, maxHeight);
+
+        try
+        {
+            using var stream = ExrReader.Open(path);
+            var header = ExrHeaderReader.Read(stream);
+
+            var found = ExrPasses.Find(ExrPasses.List(header), pass);
+            if (found is not { } picked) return null;
+
+            // Ein Graustufenpass nennt denselben Kanal dreimal; doppelt angefordert
+            // liest der Leser ihn auch doppelt aus.
+            var wanted = new List<string> { picked.Red };
+            if (!wanted.Contains(picked.Green)) wanted.Add(picked.Green);
+            if (!wanted.Contains(picked.Blue)) wanted.Add(picked.Blue);
+            if (picked.Alpha is not null) wanted.Add(picked.Alpha);
+
+            var image = ExrReader.Read(stream, header, wanted);
+
+            var frame = new FloatFrame
+            {
+                Width = image.Width,
+                Height = image.Height,
+                R = image.Channel(picked.Red)!,
+                G = image.Channel(picked.Green)!,
+                B = image.Channel(picked.Blue)!,
+                A = picked.Alpha is null ? null : image.Channel(picked.Alpha),
+                Layer = picked.Name,
+            };
+
+            return maxWidth > 0 && maxHeight > 0 ? frame.Reduced(maxWidth, maxHeight) : frame;
+        }
+        catch (Exception)
+        {
+            return null;
+        }
+    }
+
+    /// <summary>
     /// Ein fertiges Bild zurueck in lineare Werte rechnen.
     ///
     /// Damit laesst sich auch ein PNG mit denselben Werkzeugen behandeln wie eine

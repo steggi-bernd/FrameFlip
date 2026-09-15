@@ -5,7 +5,9 @@ using System.Windows.Media.Imaging;
 using System.Windows.Threading;
 using FrameFlip.Configuration;
 using FrameFlip.Decoding;
+using FrameFlip.Decoding.Exr;
 using FrameFlip.Imaging;
+using FrameFlip.Imaging.Grading;
 using FrameFlip.Localization;
 using PixelFormats = System.Windows.Media.PixelFormats;
 
@@ -30,7 +32,24 @@ public sealed partial class AtelierPage : UserControl
     private readonly AppSettings _settings;
     private readonly Action<AppSettings> _persist;
 
+    /// <summary>Das zusammengesetzte Bild - das, worauf alle Werkzeuge wirken.</summary>
     private FloatFrame? _frame;
+
+    /// <summary>
+    /// Das Bild, wie die Datei es hergibt, ohne Ebenen.
+    ///
+    /// Es wird zweimal gebraucht: als unterste Quelle des Stapels, und fuer den
+    /// Vergleich - "Original" heisst auch ohne die Schichtung, sonst beantwortete
+    /// der Knopf eine Frage, die niemand gestellt hat.
+    /// </summary>
+    private FloatFrame? _base;
+
+    /// <summary>Die gelesenen Passe, nach Quellnamen. Leerer Name ist das Bild selbst.</summary>
+    private readonly Dictionary<string, FloatFrame> _sources = new(StringComparer.Ordinal);
+
+    /// <summary>Was die Datei anbietet - die Auswahl im Plusknopf.</summary>
+    private IReadOnlyList<ExrPass> _passes = Array.Empty<ExrPass>();
+
     private WriteableBitmap? _surface;
     private string? _path;
 
@@ -55,6 +74,8 @@ public sealed partial class AtelierPage : UserControl
         Tools.Load(settings.Adjustments, settings.Grading);
         Tools.Changed += OnToolsChanged;
         Tools.ToolsEnabled = false;
+
+        Layers.Changed += OnLayersChanged;
 
         _settle = new DispatcherTimer(DispatcherPriority.Background)
         {
@@ -86,50 +107,73 @@ public sealed partial class AtelierPage : UserControl
         // staende dabei das ganze Fenster.
         Task.Run(() => Load(path)).ContinueWith(task =>
         {
-            var loaded = task.IsCompletedSuccessfully ? task.Result : null;
+            var loaded = task.IsCompletedSuccessfully ? task.Result : (null, Array.Empty<ExrPass>());
 
-            Dispatcher.Invoke(() =>
-            {
-                BusyBadge.Visibility = Visibility.Collapsed;
-
-                if (loaded is null)
-                {
-                    FileText.Text = Path.GetFileName(path) + " — " + Strings.T("S_CannotRead");
-                    EmptyHint.Visibility = Visibility.Visible;
-                    Tools.ToolsEnabled = false;
-                    CompareButton.IsEnabled = false;
-                    _frame = null;
-                    UpdateBatchBar();
-                    return;
-                }
-
-                _frame = loaded;
-                _surface = null;
-                Tools.ToolsEnabled = true;
-
-                UpdateSourceText();
-                FindSequence(path);
-                CompareButton.IsEnabled = true;
-                ApplyZoom();
-                Render();
-                Measure();
-            });
+            Dispatcher.Invoke(() => Show(path, loaded.Frame, loaded.Passes));
         });
     }
 
-    private FloatFrame? Load(string path)
+    private void Show(string path, FloatFrame? loaded, IReadOnlyList<ExrPass> passes)
+    {
+        BusyBadge.Visibility = Visibility.Collapsed;
+
+        _sources.Clear();
+        _passes = passes;
+
+        if (loaded is null)
+        {
+            FileText.Text = Path.GetFileName(path) + " — " + Strings.T("S_CannotRead");
+            EmptyHint.Visibility = Visibility.Visible;
+            Tools.ToolsEnabled = false;
+            CompareButton.IsEnabled = false;
+            _frame = null;
+            _base = null;
+            ShowLayers(false);
+            UpdateBatchBar();
+            return;
+        }
+
+        _base = loaded;
+        _sources[""] = loaded;
+        _surface = null;
+        Tools.ToolsEnabled = true;
+
+        // Der gespeicherte Stapel gilt nur, soweit diese Datei die Passe auch
+        // fuehrt. Zwanzig ausgegraute Zeilen nach dem Wechsel auf ein PNG waeren
+        // kein Hinweis, sondern ein Raetsel.
+        Layers.Load(passes, Prune(_settings.Layers, passes));
+        ShowLayers(Layers.HasChoice);
+        _settings.Layers = Layers.Stack;
+
+        _frame = loaded;
+
+        UpdateSourceText();
+        FindSequence(path);
+        CompareButton.IsEnabled = true;
+        ApplyZoom();
+        Render();
+        Measure();
+
+        // Braucht der Stapel Passe, die noch nicht gelesen sind, kommen sie
+        // nachtraeglich - das Bild steht schon, waehrend sie eintreffen.
+        if (!Layers.Stack.IsPassThrough) OnLayersChanged(interim: false);
+    }
+
+    private (FloatFrame? Frame, IReadOnlyList<ExrPass> Passes) Load(string path)
     {
         // EXR bringt die Werte selbst mit. Alles andere geht ueber den vorhandenen
         // Decoder und wird aus den acht Bit zurueckgerechnet.
         if (Path.GetExtension(path).Equals(".exr", StringComparison.OrdinalIgnoreCase))
-            return FloatFrame.FromExr(path);
+            return (FloatFrame.FromExr(path), ExrPasses.Of(path));
 
         var decoder = _decoders.For(Path.GetExtension(path));
-        if (decoder is null) return null;
+        if (decoder is null) return (null, Array.Empty<ExrPass>());
 
-        return decoder.TryDecode(path, 16384, 16384, n => new byte[n], out var decoded)
+        var frame = decoder.TryDecode(path, 16384, 16384, n => new byte[n], out var decoded)
             ? FloatFrame.FromBgra32(decoded.Pixels, decoded.Width, decoded.Height, decoded.Stride)
             : null;
+
+        return (frame, Array.Empty<ExrPass>());
     }
 
     /// <summary>
@@ -168,7 +212,7 @@ public sealed partial class AtelierPage : UserControl
 
     private void Render()
     {
-        var frame = _frame;
+        var frame = Shown();
         if (frame is null) return;
 
         if (_surface is null || _surface.PixelWidth != frame.Width || _surface.PixelHeight != frame.Height)

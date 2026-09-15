@@ -6,9 +6,11 @@ A second mode inside FrameFlip: grade one frame, then apply that grade to the wh
 sequence and write it out. Layers, masks driven by render data, and a colour toolset
 aimed at Photoshop and Lightroom rather than at a node graph.
 
-**Status:** steps 1 to 4 are built and running; 5 to 8 are still design. Where an
-earlier estimate turned out wrong, the measurement replaced it and the error is
-named — those passages are worth more than the numbers.
+**Status:** steps 1 to 5 are built and running; 6 to 8 are still design. Of step 5,
+the pass stack works — order, duplication, opacity, colour, blend mode and clipping
+masks; adjustment, image and group layers are not built yet. Where an earlier
+estimate or assumption turned out wrong, the measurement replaced it and the error
+is named — those passages are worth more than the numbers.
 
 ---
 
@@ -190,49 +192,120 @@ for two purposes.
 
 Four kinds of layer, one stack:
 
-| Kind | Source | Typical use |
-|---|---|---|
-| **Pass** | a pass from the multilayer EXR | light mixing: glossy down, emission up |
-| **Adjustment** | nothing — it is a tool | the colour tools of section 7 |
-| **Image** | a still, or a second sequence | logo, overlay, gradient, version compare |
-| **Group** | other layers | one mask over several operations |
+| Kind | Source | Typical use | State |
+|---|---|---|---|
+| **Pass** | a pass from the multilayer EXR | light mixing: glossy down, emission up | **built** |
+| **Adjustment** | nothing — it is a tool | the colour tools of section 7 | designed |
+| **Image** | a still, or a second sequence | logo, overlay, gradient, version compare | designed |
+| **Group** | other layers | one mask over several operations | designed |
 
-Making colour correction a *layer* rather than a panel is what keeps this one system
-instead of two. An adjustment layer has opacity, a blend mode and a mask like any
-other, which means every tool in section 7 can be masked to a Cryptomatte selection
-without any tool knowing that masks exist.
+Only the first is built, and that ordering is deliberate rather than convenient: the
+pass layer is the one that decides whether the arithmetic is right, and it turned out
+the arithmetic in this section was not (see below). The other three ride on the same
+composer once it is correct.
 
-### Two kinds of mixing, and they are not the same
+Making colour correction a *layer* rather than a panel is what will keep this one
+system instead of two. An adjustment layer has opacity, a blend mode and a mask like
+any other, which means every tool in section 7 can be masked to a Cryptomatte
+selection without any tool knowing that masks exist.
 
-This matters more than it looks.
+Until that exists, the colour tools sit **below** the stack in the panel and act on
+its result. That is not a placeholder arrangement but the correct reading order: the
+stack makes an image, the tools change that image, and the panel is read top to
+bottom in the same order the pixels travel.
 
-**Passes are summed, linearly.** Diffuse + Glossy + Transmission + Emission +
-Volume = Combined. That is not a blend mode; it is how Blender took the image apart,
-and putting it back together is addition. Anything else produces a result Blender
-would never have rendered.
+### Two kinds of mixing — and the reason there is only one
 
-**Creative layers blend display-referred**, in gamma, the way Photoshop does.
-Multiply, Overlay and Soft Light are defined on gamma-encoded values. The same formula
-on linear light gives a visibly different picture — usually darker and harsher — and
-someone coming from Photoshop will file it as a bug.
+This section used to say something confident and wrong. It is left here corrected,
+because the error is the most useful thing in this document.
 
-These are two different operations that happen to share the word "layer". Kept apart,
-both are right. Mixed together, neither is, and no one can explain why.
+**What it said:** passes are summed linearly — Diffuse + Glossy + Transmission +
+Emission + Volume = Combined — while creative layers blend display-referred, in
+gamma, the way Photoshop does. Two mixing systems, kept apart.
+
+**What a real render says.** A 16×12 Cycles frame carrying all ten light passes,
+the three colour passes and the finished image (it is now a test fixture) settles
+the question:
+
+```
+Combined = (DiffDir  + DiffInd ) · DiffCol
+         + (GlossDir + GlossInd) · GlossCol
+         + (TransDir + TransInd) · TransCol
+         + (VolumeDir + VolumeInd)
+         + Emit + Env
+```
+
+Cycles does not split the image into summands. It splits it into **light times
+colour**. The colour passes are factors, and adding them gives a picture that is too
+bright while looking entirely plausible — which is the kind of wrong that survives
+a review. Measured against Blender's own Combined, the corrected arithmetic lands
+within **0.09 %**, which is the precision of half-float storage rather than of the
+calculation.
+
+A factor needs to be confined to its own light pass, not applied to the whole stack
+beneath it. Photoshop already has that idea and calls it a **clipping mask**. So the
+pass reconstruction is not a special mode: it is an ordinary stack in which the
+colour passes are clipped Multiply layers.
+
+**And the second claim fell with the first.** Blending display-referred would mean
+tone-mapping every pass before compositing, which destroys exactly the values above
+white that EXR is read for — a glossy pass reaches 40. Everything therefore composites
+in **linear light**, and there is one blend system rather than two.
+
+What that costs, stated plainly:
+
+- **Multiply, Screen, Darken, Lighten, Difference, Add** are *more* correct in linear
+  than in gamma, and identical to Photoshop's below white. Screen deviates only above
+  white, where its usual formula `a + b − ab` turns negative: two passes at 3 would
+  give −3, a black image. The product term is capped at 1, so the result keeps rising
+  instead of collapsing.
+- **Overlay, Soft Light and Hard Light** genuinely need a white point to pivot around,
+  and linear light has none. They borrow one: `x / (x + 0.18)` maps black to 0, middle
+  grey to exactly 0.5 and infinity to 1, the Photoshop formula runs there unchanged,
+  and the result is mapped back. Nothing is clipped, and a layer of middle grey leaves
+  the image untouched — which is the invariant the whole construction rests on and the
+  test that guards it.
+
+The only visible difference from Photoshop is on two images that both stay below
+white, where Multiply in linear looks a little different from Multiply in gamma. In
+exchange, everything works on values above white — and those are the reason EXR is
+read at all.
 
 ### Blend modes
 
+Ten, not the full Photoshop set. These are the ones that mean something in linear
+light; the rest (Colour Burn, Vivid Light, Hard Mix and the component modes) are
+defined against a white point that does not exist here and would each need the same
+borrowed-domain treatment to be more than decoration.
+
 | Group | Modes |
 |---|---|
-| Normal | Normal, Dissolve |
-| Darken | Darken, Multiply, Colour Burn, Linear Burn, Darker Colour |
-| Lighten | Lighten, Screen, Colour Dodge, Linear Dodge (Add), Lighter Colour |
-| Contrast | Overlay, Soft Light, Hard Light, Vivid Light, Linear Light, Pin Light, Hard Mix |
-| Inversion | Difference, Exclusion, Subtract, Divide |
-| Component | Hue, Saturation, Colour, Luminosity |
+| Normal | Normal |
+| Additive | Add — the natural mode for a render pass |
+| Darken | Multiply, Darken |
+| Lighten | Screen, Lighten |
+| Contrast | Overlay, Soft Light, Hard Light |
+| Inversion | Difference |
 
 Difference deserves a specific mention: dropping a second render version in as an
 image layer and setting Difference is the fastest way to see what actually changed
 between two renders. That alone earns the image layer its place.
+
+### What a layer carries
+
+| | |
+|---|---|
+| **Source** | a pass named in the file, or the image itself |
+| **Visible** | on or off |
+| **Blend mode** | one of the ten above |
+| **Opacity** | 0 to 1, mixing toward the blended result — not toward the layer |
+| **Exposure** | f-stops on this layer alone; "more glossy" in one grip |
+| **Colour** | a per-channel factor, set on a wheel, multiplicative so black stays black |
+| **Clipped** | acts on the layer below only |
+
+A layer holds no pixels. It names a pass — which is what makes the same stack apply
+to every frame of the sequence, and is the whole point of the Atelier: set up one
+frame, compute three hundred.
 
 ---
 
@@ -502,8 +575,13 @@ next one landing.
    clarity, LUT. Single layer, no masks. Already a genuine grading tool.
 4. ~~**The batch run and sequence export.**~~ **Done**, images and video. At this point the workflow closes, and Atelier
    is finished as a product even if nothing further is built.
-5. **Layer stack, blend modes, luminance and gradient masks.**
-6. **Passes and light mixing.**
+5. ~~**Layer stack, blend modes.**~~ **Done** for pass layers: order, duplication,
+   opacity, colour, ten blend modes and clipping masks, all in linear light, with the
+   stack applied unchanged by the batch run. Luminance and gradient masks are not built.
+   This step is also where the pass arithmetic in section 5 turned out to be wrong and
+   was corrected against a real render.
+6. **Passes and light mixing.** — largely arrived with step 5; what remains is the
+   per-layer colour tools, which need adjustment layers.
 7. **Cryptomatte.** The distinguishing feature, and last, because it needs the stack and
    the masks in place to be worth anything.
 8. **The remaining tools from section 7**, in the order people ask for them.

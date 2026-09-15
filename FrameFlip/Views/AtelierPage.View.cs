@@ -103,4 +103,14 @@ public partial class AtelierPage
         => _showingOriginal
             ? (ImageAdjustments.Neutral, PreparedGrading.None)
             : (Tools.Adjustments, Tools.Prepared);
+
+    /// <summary>
+    /// Welches Bild gezeichnet wird: das zusammengesetzte, oder beim Vergleich das
+    /// der Datei.
+    ///
+    /// Auch die Schichtung faellt beim Vergleich weg. Sie ist ein Eingriff wie jeder
+    /// andere - ein "Original", das eine selbstgebaute Mischung aus acht Passen
+    /// zeigt, waere keines.
+    /// </summary>
+    private FloatFrame? Shown() => _showingOriginal ? _base ?? _frame : _frame;
 }
