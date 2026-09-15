@@ -197,6 +197,9 @@
                                 Margin="4,4,4,0" Minimum="-0.25" Maximum="0.25" Value="0"
                                 SmallChange="0.005" LargeChange="0.02"
                                 ValueChanged="OnChanged" MouseDoubleClick="OnSliderReset" Tag="0" />
+                        <TextBlock x:Name="LiftValues" FontSize="9" Margin="0,4,0,0"
+                                   HorizontalAlignment="Center" TextAlignment="Center"
+                                   Foreground="{StaticResource MutedBrush}" />
                     </StackPanel>
 
                     <StackPanel Grid.Column="1">
@@ -207,6 +210,9 @@
                                 Margin="4,4,4,0" Minimum="-0.6" Maximum="1.0" Value="0"
                                 SmallChange="0.02" LargeChange="0.1"
                                 ValueChanged="OnChanged" MouseDoubleClick="OnSliderReset" Tag="0" />
+                        <TextBlock x:Name="GammaValues" FontSize="9" Margin="0,4,0,0"
+                                   HorizontalAlignment="Center" TextAlignment="Center"
+                                   Foreground="{StaticResource MutedBrush}" />
                     </StackPanel>
 
                     <StackPanel Grid.Column="2">
@@ -217,11 +223,11 @@
                                 Margin="4,4,4,0" Minimum="-0.5" Maximum="0.8" Value="0"
                                 SmallChange="0.01" LargeChange="0.05"
                                 ValueChanged="OnChanged" MouseDoubleClick="OnSliderReset" Tag="0" />
+                        <TextBlock x:Name="GainValues" FontSize="9" Margin="0,4,0,0"
+                                   HorizontalAlignment="Center" TextAlignment="Center"
+                                   Foreground="{StaticResource MutedBrush}" />
                     </StackPanel>
                 </Grid>
-
-                <TextBlock x:Name="ZonesValues" Margin="0,8,0,0" FontSize="9"
-                           Foreground="{StaticResource MutedBrush}" TextAlignment="Center" />
 
                 <TextBlock Margin="0,6,0,0" FontSize="10" Foreground="{StaticResource MutedBrush}"
                            TextWrapping="Wrap" Text="{DynamicResource S_ZonesHint}" />

@@ -179,6 +179,9 @@ public partial class GradingPanel : UserControl
             "S_BandAqua", "S_BandBlue", "S_BandViolet", "S_BandMagenta",
         };
 
+        // Die Mitten der acht Bereiche in Grad - dieselben, nach denen das Werkzeug
+        // gewichtet. Die Bahn eines Reglers zeigt damit den Bereich, den er meint,
+        // und die Beschriftung daneben muss man nicht mehr lesen.
         for (int i = 0; i < keys.Length; i++)
         {
             BandSliders.Children.Add(new TextBlock
@@ -190,7 +193,8 @@ public partial class GradingPanel : UserControl
 
             var slider = new Slider
             {
-                Style = (Style)FindResource("PanelSlider"),
+                Style = (Style)FindResource("PanelSliderTinted"),
+                Background = BandTrack(HslTool.Centres[i]),
                 Minimum = -100,
                 Maximum = 100,
                 Value = 0,
@@ -205,6 +209,36 @@ public partial class GradingPanel : UserControl
             BandSliders.Children.Add(slider);
             _bandSliders.Add(slider);
         }
+    }
+
+    /// <summary>
+    /// Die Bahn eines Bereichsreglers: von gedaempft nach voll in der Farbe des
+    /// Bereichs. Gerechnet statt aufgeschrieben, weil die acht Mitten ohnehin im
+    /// Werkzeug stehen und zwei Listen derselben Farben einmal auseinanderlaufen.
+    /// </summary>
+    private static System.Windows.Media.Brush BandTrack(float hueDegrees)
+    {
+        HslTool.HslToRgb(hueDegrees, 0.65f, 0.55f, out float r, out float g, out float b);
+
+        var full = Color.FromRgb(Byte(r), Byte(g), Byte(b));
+        var faint = Color.FromRgb((byte)(full.R * 0.32), (byte)(full.G * 0.32), (byte)(full.B * 0.32));
+
+        var brush = new System.Windows.Media.LinearGradientBrush
+        {
+            StartPoint = new System.Windows.Point(0, 0),
+            EndPoint = new System.Windows.Point(1, 0),
+        };
+
+        // Die Mitte ist "unveraendert" und bleibt gedaempft; nach beiden Seiten
+        // nimmt die Farbe zu, weil ein Regler hier in beide Richtungen wirkt.
+        brush.GradientStops.Add(new System.Windows.Media.GradientStop(full, 0));
+        brush.GradientStops.Add(new System.Windows.Media.GradientStop(faint, 0.5));
+        brush.GradientStops.Add(new System.Windows.Media.GradientStop(full, 1));
+        brush.Freeze();
+
+        return brush;
+
+        static byte Byte(float value) => (byte)Math.Clamp(value * 255f, 0f, 255f);
     }
 
     private void PushToControls()
@@ -384,11 +418,13 @@ public partial class GradingPanel : UserControl
     /// </summary>
     private void UpdateZoneValues()
     {
-        if (ZonesValues is null) return;
+        if (LiftValues is null) return;
 
-        ZonesValues.Text = $"{_zones.Lift.R:0.00} {_zones.Lift.G:0.00} {_zones.Lift.B:0.00}   ·   " +
-                           $"{_zones.Gamma.R:0.00} {_zones.Gamma.G:0.00} {_zones.Gamma.B:0.00}   ·   " +
-                           $"{_zones.Gain.R:0.00} {_zones.Gain.G:0.00} {_zones.Gain.B:0.00}";
+        LiftValues.Text = Triplet(_zones.Lift);
+        GammaValues.Text = Triplet(_zones.Gamma);
+        GainValues.Text = Triplet(_zones.Gain);
+
+        static string Triplet(ColourTriplet t) => $"{t.R:0.00}  {t.G:0.00}  {t.B:0.00}";
     }
 
     private static float BandValue(HslBand band, int mode) => mode switch

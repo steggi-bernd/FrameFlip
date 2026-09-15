@@ -5,7 +5,9 @@ using FrameFlip.Imaging.Grading;
 using Brush = System.Windows.Media.Brush;
 using Color = System.Windows.Media.Color;
 using Pen = System.Windows.Media.Pen;
+using PixelFormats = System.Windows.Media.PixelFormats;
 using Point = System.Windows.Point;
+using Rect = System.Windows.Rect;
 using Size = System.Windows.Size;
 
 namespace FrameFlip.Views;
@@ -72,7 +74,7 @@ public sealed class ColourWheel : FrameworkElement
         double radius = size / 2 - 2;
         var centre = new Point(ActualWidth / 2, ActualHeight / 2);
 
-        DrawWheel(context, centre, radius);
+        context.DrawImage(Disc, new Rect(centre.X - radius, centre.Y - radius, radius * 2, radius * 2));
 
         // Fadenkreuz: ohne es ist die Mitte - also "nichts tun" - nicht zu treffen.
         context.DrawLine(new Pen(CrossBrush, 1),
@@ -91,66 +93,71 @@ public sealed class ColourWheel : FrameworkElement
     }
 
     /// <summary>
-    /// Die Scheibe: Farbton umlaufend, zur Mitte hin ausgewaschen.
+    /// Die Scheibe, einmal gerechnet und danach nur noch gezeichnet.
     ///
-    /// Gezeichnet als Kranz aus Segmenten mit je einem radialen Verlauf. Ein echter
-    /// winkelabhaengiger Verlauf fehlt WPF, und ein Bild je Rad waere fuer drei
-    /// Raeder dreimal derselbe Aufwand - bei dieser Groesse sind sechzig Segmente
-    /// nicht von einem Verlauf zu unterscheiden.
+    /// Erste Fassung war ein Kranz aus sechzig Tortenstuecken mit je einem radialen
+    /// Verlauf - und sah fleckig aus statt wie ein Farbkreis. Der Grund: Ein
+    /// RadialGradientBrush bezieht sich auf die Huellbox der Form, die er fuellt,
+    /// und die Huellbox eines Tortenstuecks ist nicht der Kreis. Jedes Stueck bekam
+    /// damit seinen eigenen kleinen Verlauf aus seiner eigenen Mitte.
+    ///
+    /// Ein Bild hat das Problem nicht: Jeder Bildpunkt bekommt die Farbe, die an
+    /// seiner Stelle wirklich entsteht - dieselbe Rechnung, die auch das Bild
+    /// verschiebt. Damit zeigt das Rad nicht irgendeinen Farbkreis, sondern seinen
+    /// eigenen.
     /// </summary>
-    private static void DrawWheel(DrawingContext context, Point centre, double radius)
-    {
-        const int segments = 60;
-        double step = 2 * Math.PI / segments;
+    private static readonly System.Windows.Media.Imaging.BitmapSource Disc = BuildDisc(160);
 
-        for (int i = 0; i < segments; i++)
+    private static System.Windows.Media.Imaging.BitmapSource BuildDisc(int size)
+    {
+        int stride = size * 4;
+        var pixels = new byte[stride * size];
+        double half = size / 2.0;
+
+        for (int y = 0; y < size; y++)
         {
-            double from = i * step;
-            double to = from + step * 1.05;      // leichte Ueberlappung gegen Haarrisse
-
-            var geometry = new StreamGeometry();
-            using (var draw = geometry.Open())
+            for (int x = 0; x < size; x++)
             {
-                draw.BeginFigure(centre, isFilled: true, isClosed: true);
-                draw.LineTo(new Point(centre.X + Math.Cos(from) * radius,
-                                      centre.Y - Math.Sin(from) * radius), false, false);
-                draw.ArcTo(new Point(centre.X + Math.Cos(to) * radius, centre.Y - Math.Sin(to) * radius),
-                           new Size(radius, radius), 0, false, SweepDirection.Counterclockwise, false, false);
+                // Von der Bildmitte aus, und Y auf dem Schirm nach unten.
+                double dx = (x + 0.5 - half) / half;
+                double dy = (half - y - 0.5) / half;
+                double radius = Math.Sqrt(dx * dx + dy * dy);
+
+                int at = y * stride + x * 4;
+                if (radius > 1.0)
+                {
+                    // Ausserhalb bleibt es durchsichtig; die Kante wird ueber ein
+                    // schmales Band weich, sonst franst der Rand aus.
+                    continue;
+                }
+
+                var (r, g, b) = ColourWheelMath.Offset(new WheelPoint((float)dx, (float)dy));
+
+                // Auf mittleres Grau gelegt: So sieht man an jeder Stelle die Farbe,
+                // die dort tatsaechlich dazukommt.
+                byte red = Component(r);
+                byte green = Component(g);
+                byte blue = Component(b);
+
+                // Weiche Aussenkante ueber die letzten drei Prozent des Radius.
+                double edge = Math.Clamp((1.0 - radius) / 0.03, 0, 1);
+                byte alpha = (byte)(edge * 190);
+
+                // Vormultipliziert, weil Pbgra32 das erwartet.
+                pixels[at] = (byte)(blue * alpha / 255);
+                pixels[at + 1] = (byte)(green * alpha / 255);
+                pixels[at + 2] = (byte)(red * alpha / 255);
+                pixels[at + 3] = alpha;
             }
-
-            geometry.Freeze();
-
-            var hue = HueAt(from + step / 2);
-            var brush = new RadialGradientBrush
-            {
-                GradientOrigin = new Point(0.5, 0.5),
-                Center = new Point(0.5, 0.5),
-                RadiusX = 0.5,
-                RadiusY = 0.5,
-            };
-
-            // Innen fast neutral, aussen die volle Farbe - so sieht man, dass zur
-            // Mitte hin weniger passiert.
-            brush.GradientStops.Add(new GradientStop(Color.FromArgb(0x18, 0x80, 0x80, 0x80), 0.0));
-            brush.GradientStops.Add(new GradientStop(Color.FromArgb(0x70, hue.R, hue.G, hue.B), 1.0));
-            brush.Freeze();
-
-            context.DrawGeometry(brush, null, geometry);
         }
-    }
 
-    /// <summary>
-    /// Welche Farbe an diesem Winkel steht - dieselbe Zuordnung, die die Rechnung
-    /// benutzt: Rot rechts, Gruen und Blau um je 120 Grad versetzt.
-    /// </summary>
-    private static Color HueAt(double angle)
-    {
-        var (r, g, b) = ColourWheelMath.Offset(new WheelPoint((float)Math.Cos(angle), (float)Math.Sin(angle)));
+        var source = System.Windows.Media.Imaging.BitmapSource.Create(
+            size, size, 96, 96, PixelFormats.Pbgra32, null, pixels, stride);
 
-        // Von -1..1 auf einen darstellbaren Bereich heben.
-        return Color.FromRgb(Component(r), Component(g), Component(b));
+        source.Freeze();
+        return source;
 
-        static byte Component(float value) => (byte)Math.Clamp((value + 0.55) * 255 / 1.1, 0, 255);
+        static byte Component(float value) => (byte)Math.Clamp((value * 0.5 + 0.5) * 255, 0, 255);
     }
 
     // ------------------------------------------------------------------- Maus

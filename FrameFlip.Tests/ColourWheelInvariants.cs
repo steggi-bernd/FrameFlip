@@ -241,5 +241,37 @@ public static class ColourWheelInvariants
 
         foreach (string kept in new[] { "LiftBrightSlider", "GammaBrightSlider", "GainBrightSlider" })
             Check.That(panel.FindName(kept) is Slider, $"{kept} steht an seiner Stelle");
+
+        // Die Zahlen stehen je Rad, nicht in einer gemeinsamen Zeile - sonst sind
+        // sie unter keinem der drei Raeder zentriert und gehoeren optisch zu keinem.
+        foreach (string values in new[] { "LiftValues", "GammaValues", "GainValues" })
+        {
+            var block = panel.FindName(values) as System.Windows.Controls.TextBlock;
+            Check.That(block is not null, $"{values} steht unter seinem Rad");
+
+            if (block is not null)
+                Check.That(block.TextAlignment == System.Windows.TextAlignment.Center,
+                           $"{values} ist zentriert");
+        }
+
+        // Die acht Bereichsregler tragen die Farbe ihres Bereichs auf der Bahn.
+        var bands = panel.FindName("BandSliders") as System.Windows.Controls.Panel;
+        Check.That(bands is not null, "die Bereichsregler sind da");
+
+        if (bands is not null)
+        {
+            int tinted = 0;
+            int plain = 0;
+
+            foreach (var child in bands.Children)
+            {
+                if (child is not Slider slider) continue;
+
+                if (slider.Background is System.Windows.Media.LinearGradientBrush) tinted++;
+                else plain++;
+            }
+
+            Check.That(tinted == 8, "alle acht tragen einen Verlauf", $"{tinted} von {tinted + plain}");
+        }
     }
 }
