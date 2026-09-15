@@ -100,63 +100,159 @@ public static class FloatFrameProcessor
                                  needsTone, view, linearTools, displayTools);
 
         int height = frame.Height;
-        int rowBlocks = (height + step - 1) / step;
 
-        Parallel.For(0, rowBlocks, new ParallelOptions
+        if (step == 1)
         {
-            MaxDegreeOfParallelism = Math.Clamp(Environment.ProcessorCount, 1, 8),
-        },
-        block =>
-        {
-            int y = block * step;
-            byte* row = target + (long)y * destinationStride;
-
-            // Wie viele Zeilen und Spalten dieser Block noch abdeckt - am rechten
-            // und unteren Rand weniger als step.
-            int blockHeight = Math.Min(step, height - y);
-
-            for (int x = 0; x < width; x += step)
+            Parallel.For(0, height, new ParallelOptions
             {
-                int i = y * width + x;
+                MaxDegreeOfParallelism = Math.Clamp(Environment.ProcessorCount, 1, 8),
+            },
+            y =>
+            {
+                byte* row = target + (long)y * destinationStride;
 
-                float vr = r[i], vg = g[i], vb = b[i];
-                float alpha = a is null ? 1f : a[i];
-
-                Shade(in plan, ref vr, ref vg, ref vb, alpha);
-
-                byte blue = ToByte(vb);
-                byte green = ToByte(vg);
-                byte red = ToByte(vr);
-                byte opacity = ToByte(Math.Clamp(alpha, 0f, 1f));
-
-                if (step == 1)
+                for (int x = 0; x < width; x++)
                 {
+                    int i = y * width + x;
+
+                    float vr = r[i], vg = g[i], vb = b[i];
+                    float alpha = a is null ? 1f : a[i];
+
+                    Shade(in plan, ref vr, ref vg, ref vb, alpha);
+
                     byte* pixel = row + x * 4;
-                    pixel[0] = blue;
-                    pixel[1] = green;
-                    pixel[2] = red;
-                    pixel[3] = opacity;
-                    continue;
+                    pixel[0] = ToByte(vb);
+                    pixel[1] = ToByte(vg);
+                    pixel[2] = ToByte(vr);
+                    pixel[3] = ToByte(Math.Clamp(alpha, 0f, 1f));
                 }
+            });
 
-                // Den ganzen Block mit dem einen gerechneten Wert fuellen.
-                int blockWidth = Math.Min(step, width - x);
+            return;
+        }
 
-                for (int dy = 0; dy < blockHeight; dy++)
+        // --- Der grobe Weg: rechnen auf einem Gitter, dazwischen interpolieren ---
+        //
+        // Erste Fassung fuellte jeden Block mit dem einen gerechneten Wert. Das ist
+        // schnell und sieht aus wie ein Defekt: harte Quadrate, die man fuer einen
+        // Fehler haelt statt fuer eine Zwischenstufe. Zwischen den Gitterpunkten zu
+        // interpolieren kostet fast nichts mehr - es ist Speicherzugriff, keine
+        // Rechnung - und ergibt eine Unschaerfe, die sich als "wird noch gerechnet"
+        // liest.
+
+        int gridWidth = (width + step - 1) / step + 1;
+        int gridHeight = (height + step - 1) / step + 1;
+
+        // Das Gitter selbst: bei 4K und Schrittweite vier sind das rund 2 MB, also
+        // ein Fuenfzigstel des Bildes.
+        var grid = new byte[gridWidth * gridHeight * 4];
+
+        fixed (byte* gridBase = grid)
+        {
+            byte* gridPtr = gridBase;
+
+            Parallel.For(0, gridHeight, new ParallelOptions
+            {
+                MaxDegreeOfParallelism = Math.Clamp(Environment.ProcessorCount, 1, 8),
+            },
+            gy =>
+            {
+                // Die letzte Gitterzeile liegt auf dem Rand, nicht darueber hinaus.
+                int y = Math.Min(gy * step, height - 1);
+                byte* row = gridPtr + (long)gy * gridWidth * 4;
+
+                for (int gx = 0; gx < gridWidth; gx++)
                 {
-                    byte* line = target + (long)(y + dy) * destinationStride + x * 4;
+                    int x = Math.Min(gx * step, width - 1);
+                    int i = y * width + x;
 
-                    for (int dx = 0; dx < blockWidth; dx++)
-                    {
-                        line[0] = blue;
-                        line[1] = green;
-                        line[2] = red;
-                        line[3] = opacity;
-                        line += 4;
-                    }
+                    float vr = r[i], vg = g[i], vb = b[i];
+                    float alpha = a is null ? 1f : a[i];
+
+                    Shade(in plan, ref vr, ref vg, ref vb, alpha);
+
+                    byte* cell = row + gx * 4;
+                    cell[0] = ToByte(vb);
+                    cell[1] = ToByte(vg);
+                    cell[2] = ToByte(vr);
+                    cell[3] = ToByte(Math.Clamp(alpha, 0f, 1f));
                 }
+            });
+
+            // Die Gewichte als Festkomma, einmal vorberechnet.
+            //
+            // Die erste Fassung rechnete je Bildpunkt eine Division fuer den
+            // Gitterplatz und vier Vergleiche fuer die Raender - und war damit
+            // genauso teuer wie der volle Durchgang, also fuer nichts. Ueber die
+            // Bloecke zu laufen statt ueber die Bildpunkte macht beides ueberfluessig:
+            // Der Gitterplatz steht je Block fest, und die Gewichte kommen aus einer
+            // Tabelle mit step Eintraegen.
+            var weights = new int[step];
+            for (int i = 0; i < step; i++) weights[i] = i * 256 / step;
+
+            fixed (int* weightBase = weights)
+            {
+                int* weight = weightBase;
+
+                Parallel.For(0, gridHeight - 1, new ParallelOptions
+                {
+                    MaxDegreeOfParallelism = Math.Clamp(Environment.ProcessorCount, 1, 8),
+                },
+                gy =>
+                {
+                    int y0 = gy * step;
+                    int rows = Math.Min(step, height - y0);
+                    if (rows <= 0) return;
+
+                    byte* upperRow = gridPtr + (long)gy * gridWidth * 4;
+                    byte* lowerRow = gridPtr + (long)(gy + 1) * gridWidth * 4;
+
+                    for (int gx = 0; gx < gridWidth - 1; gx++)
+                    {
+                        int x0 = gx * step;
+                        int columns = Math.Min(step, width - x0);
+                        if (columns <= 0) break;
+
+                        // Die vier Ecken des Blocks - einmal je Block gelesen, nicht
+                        // einmal je Bildpunkt.
+                        byte* c00 = upperRow + gx * 4;
+                        byte* c10 = c00 + 4;
+                        byte* c01 = lowerRow + gx * 4;
+                        byte* c11 = c01 + 4;
+
+                        for (int dy = 0; dy < rows; dy++)
+                        {
+                            int wy = weight[dy];
+                            byte* pixel = target + (long)(y0 + dy) * destinationStride + x0 * 4;
+
+                            // Die beiden waagerechten Kanten des Blocks, auf dieser
+                            // Zeile schon zusammengezogen.
+                            int l0 = c00[0] + ((c01[0] - c00[0]) * wy >> 8);
+                            int l1 = c00[1] + ((c01[1] - c00[1]) * wy >> 8);
+                            int l2 = c00[2] + ((c01[2] - c00[2]) * wy >> 8);
+                            int l3 = c00[3] + ((c01[3] - c00[3]) * wy >> 8);
+
+                            int r0 = c10[0] + ((c11[0] - c10[0]) * wy >> 8);
+                            int r1 = c10[1] + ((c11[1] - c10[1]) * wy >> 8);
+                            int r2 = c10[2] + ((c11[2] - c10[2]) * wy >> 8);
+                            int r3 = c10[3] + ((c11[3] - c10[3]) * wy >> 8);
+
+                            for (int dx = 0; dx < columns; dx++)
+                            {
+                                int wx = weight[dx];
+
+                                pixel[0] = (byte)(l0 + ((r0 - l0) * wx >> 8));
+                                pixel[1] = (byte)(l1 + ((r1 - l1) * wx >> 8));
+                                pixel[2] = (byte)(l2 + ((r2 - l2) * wx >> 8));
+                                pixel[3] = (byte)(l3 + ((r3 - l3) * wx >> 8));
+
+                                pixel += 4;
+                            }
+                        }
+                    }
+                });
             }
-        });
+        }
     }
 
     /// <summary>
