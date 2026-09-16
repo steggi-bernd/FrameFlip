@@ -123,7 +123,7 @@
     <sys:String x:Key="S_MaskCentre">Centre</sys:String>
     <sys:String x:Key="S_MaskWidth">Width</sys:String>
     <sys:String x:Key="S_MaskHintLuma">From and To limit where the layer acts. Middle grey sits at 0.50 – so “highlights” start around 0.65.</sys:String>
-    <sys:String x:Key="S_MaskHintPass">The pass is the mask – its value goes in unchanged. Black and white point pull it tighter, as on any matte. Meant for mist, shadow and index masks; a depth in metres lies above that and saturates.</sys:String>
+    <sys:String x:Key="S_MaskHintPass">The pass is the mask – if it lies between 0 and 1 its value goes in unchanged. A pass in its own units, a depth in metres say, is mapped onto its own range: black and white point then mean near and far.</sys:String>
     <sys:String x:Key="S_MaskHintGradient">0° runs left to right, 90° top to bottom. Width 0 is a hard edge.</sys:String>
     <sys:String x:Key="S_DuplicateLayer">Duplicate</sys:String>
     <sys:String x:Key="S_RemoveLayer">Remove</sys:String>

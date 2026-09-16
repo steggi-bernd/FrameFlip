@@ -22,6 +22,7 @@ public static class MaskInvariants
         TheGradientPointsWhereItSays();
         AMaskLimitsTheLayer();
         AMaskReadsAPass();
+        ADepthPassGetsItsOwnRange();
         AMissingMaskPassDropsTheMask();
         MaskSourcesAreRead();
         Persistence();
@@ -262,6 +263,89 @@ public static class MaskInvariants
 
         Check.Near(tightened.R[1], 1.0, 1e-4, "unter dem Schwarzpunkt wirkt nichts");
         Check.Near(tightened.R[2], 2.0, 1e-4, "ab dem Weisspunkt alles");
+    }
+
+    /// <summary>
+    /// Ein Pass in eigenen Einheiten wird auf seine eigene Spanne bezogen.
+    ///
+    /// Ein Nebelpass liegt zwischen 0 und 1 und IST die Maske - sein Wert geht
+    /// unveraendert ein, und das bleibt so. Ein Tiefenpass steht in Metern; ohne
+    /// Spanne waere alles ueber einem Meter voll gedeckt, also praktisch das ganze
+    /// Bild, und der Regler taete nichts.
+    ///
+    /// Der Hintergrund zaehlt dabei NICHT mit: Blender schreibt dort eine sehr
+    /// grosse Zahl, und die ist keine Entfernung, sondern "hier steht nichts". Wer
+    /// sie mitzaehlt, hat eine Spanne von zehn Milliarden, und alles Sichtbare liegt
+    /// in ihrem ersten Milliardstel.
+    /// </summary>
+    private static void ADepthPassGetsItsOwnRange()
+    {
+        Check.Group("Ein Pass in eigenen Einheiten bekommt seine Spanne");
+
+        // Eine Tiefe von 2 bis 10 Metern, und dahinter der leere Hintergrund.
+        var depth = Ramp(8, 1);
+        for (int i = 0; i < depth.PixelCount; i++)
+        {
+            float metres = 2f + depth.R[i] * 8f;
+            depth.R[i] = depth.G[i] = depth.B[i] = metres;
+        }
+
+        depth.R[7] = depth.G[7] = depth.B[7] = 1e10f;      // nichts getroffen
+
+        var (low, high) = depth.MaskRange;
+        Check.Near(low, 2.0, 0.01, "die Spanne faengt beim naechsten Punkt an");
+        Check.That(high < 100f, "und hoert vor dem Hintergrund auf", $"{high:0.#}");
+
+        var sources = new Dictionary<string, FloatFrame>(StringComparer.Ordinal)
+        {
+            ["grund"] = Frame(8, 1, 1f),
+            ["dazu"] = Frame(8, 1, 1f),
+            ["tiefe"] = depth,
+        };
+
+        var stack = new LayerStack
+        {
+            Layers =
+            {
+                new ImageLayer { Source = "grund", Mode = BlendMode.Normal },
+                new ImageLayer
+                {
+                    Source = "dazu",
+                    Mode = BlendMode.Add,
+                    Mask = new LayerMask { Kind = MaskKind.Pass, Source = "tiefe" },
+                },
+            },
+        };
+
+        var built = LayerComposer.Compose(stack, sources)!;
+
+        // Nah wirkt die Ebene nicht, fern voll - und dazwischen steigt es an.
+        Check.Near(built.R[0], 1.0, 1e-3, "am naechsten Punkt wirkt sie nicht");
+        Check.That(built.R[6] > 1.8f, "am fernsten fast ganz", $"{built.R[6]:0.###}");
+        Check.That(built.R[3] > built.R[1] && built.R[5] > built.R[3],
+                   "und dazwischen steigt es an");
+
+        // Umgekehrt herum: "nur der Vordergrund".
+        stack.Layers[1].Mask.Invert = true;
+        var near = LayerComposer.Compose(stack, sources)!;
+
+        Check.That(near.R[0] > near.R[6], "umgekehrt wirkt sie vorn statt hinten",
+                   $"{near.R[0]:0.##} gegen {near.R[6]:0.##}");
+
+        // Und die Gegenprobe: Ein Pass, der schon zwischen 0 und 1 liegt, wird NICHT
+        // gestreckt - sonst aenderte sich das Verhalten jeder Nebelmaske.
+        var mist = Ramp(8, 1);
+        for (int i = 0; i < mist.PixelCount; i++)
+        {
+            // Nur die halbe Spanne: 0 bis 0,5. Gestreckt kaeme am Ende 1 heraus.
+            mist.R[i] = mist.G[i] = mist.B[i] = mist.R[i] * 0.5f;
+        }
+
+        sources["tiefe"] = mist;
+        stack.Layers[1].Mask.Invert = false;
+
+        var unchanged = LayerComposer.Compose(stack, sources)!;
+        Check.Near(unchanged.R[7], 1.5, 1e-3, "ein Anteilspass geht unveraendert ein");
     }
 
     /// <summary>

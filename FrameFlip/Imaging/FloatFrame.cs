@@ -53,6 +53,62 @@ public sealed class FloatFrame
     /// </summary>
     internal FloatFrame? Display { get; set; }
 
+    /// <summary>Gemerkte Spanne, siehe <see cref="MaskRange"/>.</summary>
+    private (float Low, float High)? _range;
+
+    /// <summary>
+    /// Die Spanne der Werte dieses Passes - gebraucht, wenn er als Maske dient.
+    ///
+    /// Ein Nebel- oder Verschattungspass liegt bereits zwischen 0 und 1; er IST die
+    /// Maske und braucht keine Spanne. Ein Tiefenpass steht in Metern, und ohne
+    /// Spanne laeuft er sofort an: Alles ueber eins waere voll gedeckt, also
+    /// praktisch das ganze Bild.
+    ///
+    /// Werte oberhalb von <see cref="NotHit"/> zaehlen NICHT mit. Blender schreibt
+    /// in den Hintergrund des Tiefenpasses eine sehr grosse Zahl, und die ist keine
+    /// Entfernung, sondern "hier steht nichts" - sie mitzuzaehlen machte die Spanne
+    /// zunichte, und alles Sichtbare laege danach in ihrem ersten Milliardstel.
+    /// </summary>
+    public (float Low, float High) MaskRange
+    {
+        get
+        {
+            if (_range is { } known) return known;
+
+            float low = float.MaxValue, high = float.MinValue;
+
+            // Jeder vierte Bildpunkt in beiden Richtungen: ein Sechzehntel der
+            // Arbeit, und fuer eine Spanne genau genug.
+            for (int y = 0; y < Height; y += 4)
+            {
+                int row = y * Width;
+
+                for (int x = 0; x < Width; x += 4)
+                {
+                    float value = R[row + x];
+
+                    if (!float.IsFinite(value) || value >= NotHit) continue;
+
+                    if (value < low) low = value;
+                    if (value > high) high = value;
+                }
+            }
+
+            if (low > high) (low, high) = (0f, 1f);
+
+            _range = (low, high);
+            return _range.Value;
+        }
+    }
+
+    /// <summary>
+    /// Ab hier gilt ein Wert als "nichts getroffen" und nicht als Entfernung.
+    ///
+    /// Blender schreibt dort 1e10. Die Grenze liegt deutlich darunter und immer noch
+    /// weit ueber jeder Entfernung, die in einer Szene vorkommt.
+    /// </summary>
+    public const float NotHit = 1e9f;
+
     /// <summary>
     /// Der groesste Farbwert im Bild. Sagt, wieviel Reserve oberhalb von Weiss
     /// ueberhaupt vorhanden ist - bei einer aus 8 Bit erzeugten Datei ist er 1.

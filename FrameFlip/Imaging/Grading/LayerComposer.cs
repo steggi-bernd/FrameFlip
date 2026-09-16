@@ -115,12 +115,27 @@ public static class LayerComposer
             float[]? maskIds = null;
             var maskKind = layer.Mask.Kind;
 
+            float maskFloor = 0f, maskSpan = 1f;
+
             if (maskKind == MaskKind.Pass)
             {
                 if (sources.TryGetValue(layer.Mask.Source, out var found) &&
                     found.Width == width && found.Height == height)
                 {
                     maskFrame = found;
+
+                    // Ein Pass, der ohnehin zwischen 0 und 1 liegt, geht unveraendert
+                    // ein - er IST die Maske. Einer, der darueber hinausgeht, ist
+                    // eine Groesse in eigenen Einheiten: eine Tiefe in Metern. Der
+                    // wird auf seine eigene Spanne bezogen, sonst waere alles ueber
+                    // eins voll gedeckt und der Regler ohne Wirkung.
+                    var (low, high) = found.MaskRange;
+
+                    if (high > 1.0001f || low < -0.0001f)
+                    {
+                        maskFloor = low;
+                        maskSpan = MathF.Max(1e-6f, high - low);
+                    }
                 }
                 else
                 {
@@ -172,7 +187,8 @@ public static class LayerComposer
             plans[i] = new Plan(used[i].Frame, layer.Mode, Math.Clamp(layer.Opacity, 0f, 1f),
                                 gain * layer.Tint.R, gain * layer.Tint.G, gain * layer.Tint.B, clipped,
                                 layer.Mask, maskKind, maskFrame, maskLevels, maskIds,
-                                layer.Content, grade, used[i].Kind, placed, placement);
+                                layer.Content, grade, used[i].Kind, placed, placement,
+                                maskFloor, maskSpan);
         }
 
         // Die Gitterpunkte einmal aufschreiben, statt sie je Bildpunkt auszurechnen.
@@ -574,6 +590,11 @@ public static class LayerComposer
                 var m = plan.MaskFrame!;
                 float raw = LumaR * m.R[i] + LumaG * m.G[i] + LumaB * m.B[i];
 
+                // Auf die eigene Spanne bezogen, wenn der Pass keine ist. Bei einem
+                // Nebelpass ist der Boden null und die Spanne eins - dann steht hier
+                // derselbe Wert wie vorher.
+                raw = (raw - plan.MaskFloor) / plan.MaskSpan;
+
                 return Fit(Masking.Levels(raw, plan.MaskLow, plan.MaskHigh), plan.MaskInvert);
 
             case MaskKind.Cryptomatte:
@@ -607,8 +628,11 @@ public static class LayerComposer
                     LayerMask mask, MaskKind kind, FloatFrame? maskFrame,
                     FloatFrame[]? maskLevels, float[]? maskIds,
                     LayerContent content, LayerGrade grade, StepKind step,
-                    bool placed, LayerPlacement placement)
+                    bool placed, LayerPlacement placement,
+                    float maskFloor, float maskSpan)
         {
+            MaskFloor = maskFloor;
+            MaskSpan = maskSpan;
             Content = content;
             Grade = grade;
             Kind = step;
@@ -658,6 +682,7 @@ public static class LayerComposer
         public readonly float[]? MaskIds;
         public readonly bool MaskInvert;
         public readonly float MaskLow, MaskHigh, MaskSoftness;
+        public readonly float MaskFloor, MaskSpan;
         public readonly float GradientCos, GradientSin, GradientFrom, GradientTo;
     }
 }

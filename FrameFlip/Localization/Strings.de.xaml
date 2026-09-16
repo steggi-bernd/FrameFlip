@@ -123,7 +123,7 @@
     <sys:String x:Key="S_MaskCentre">Mitte</sys:String>
     <sys:String x:Key="S_MaskWidth">Breite</sys:String>
     <sys:String x:Key="S_MaskHintLuma">Von und Bis grenzen ein, wo die Ebene wirkt. Mittleres Grau liegt bei 0,50 – „Lichter“ fängt also etwa bei 0,65 an.</sys:String>
-    <sys:String x:Key="S_MaskHintPass">Der Pass ist die Maske – sein Wert geht unverändert ein. Schwarz- und Weißpunkt ziehen sie an, wie bei jeder Maske. Gedacht für Nebel, Verschattung und Indexmasken; eine Tiefe in Metern liegt darüber und läuft an.</sys:String>
+    <sys:String x:Key="S_MaskHintPass">Der Pass ist die Maske – liegt er zwischen 0 und 1, geht sein Wert unverändert ein. Ein Pass in eigenen Einheiten, etwa eine Tiefe in Metern, wird auf seine eigene Spanne bezogen: Schwarz- und Weißpunkt sind dann nah und fern.</sys:String>
     <sys:String x:Key="S_MaskHintGradient">0° läuft von links nach rechts, 90° von oben nach unten. Breite 0 ist eine Kante.</sys:String>
     <sys:String x:Key="S_DuplicateLayer">Verdoppeln</sys:String>
     <sys:String x:Key="S_RemoveLayer">Entfernen</sys:String>
