@@ -75,7 +75,7 @@
     <sys:String x:Key="S_Opacity">Opacity</sys:String>
     <sys:String x:Key="S_LayerTint">Colour</sys:String>
     <sys:String x:Key="S_LayerColour">Image</sys:String>
-    <sys:String x:Key="S_SinglePass">This file carries a single pass.</sys:String>
+    <sys:String x:Key="S_SinglePass">This format carries a single image – passes need a multilayer EXR. Layering still works: duplicate the image and set it to Multiply.</sys:String>
     <sys:String x:Key="S_PassMissing">missing from this file</sys:String>
     <sys:String x:Key="S_ResetLayers">reset</sys:String>
     <sys:String x:Key="S_BlendNormal">Normal</sys:String>

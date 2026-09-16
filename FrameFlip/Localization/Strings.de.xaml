@@ -75,7 +75,7 @@
     <sys:String x:Key="S_Opacity">Deckkraft</sys:String>
     <sys:String x:Key="S_LayerTint">Farbe</sys:String>
     <sys:String x:Key="S_LayerColour">Bild</sys:String>
-    <sys:String x:Key="S_SinglePass">Diese Datei fuehrt nur einen Pass.</sys:String>
+    <sys:String x:Key="S_SinglePass">Dieses Format führt nur ein Bild – Passe gibt es nur in einer Multilayer-EXR. Schichten geht trotzdem: dasselbe Bild verdoppeln und auf Multiplizieren stellen.</sys:String>
     <sys:String x:Key="S_PassMissing">fehlt in dieser Datei</sys:String>
     <sys:String x:Key="S_ResetLayers">zuruecksetzen</sys:String>
     <sys:String x:Key="S_BlendNormal">Normal</sys:String>

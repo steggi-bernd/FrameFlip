@@ -142,7 +142,12 @@ public sealed partial class AtelierPage : UserControl
         // fuehrt. Zwanzig ausgegraute Zeilen nach dem Wechsel auf ein PNG waeren
         // kein Hinweis, sondern ein Raetsel.
         Layers.Load(passes, Prune(_settings.Layers, passes));
-        ShowLayers(Layers.HasChoice);
+
+        // Der Streifen gilt fuer jedes Bild, nicht nur fuer eine Multilayer-EXR.
+        // Passe braucht das Format, Ebenen nicht: Dasselbe Bild ein zweites Mal und
+        // auf Multiplizieren gestellt rechnet auf einem PNG genauso. Ob er
+        // aufgeklappt beginnt, entscheidet der Streifen selbst.
+        ShowLayers(true);
         _settings.Layers = Layers.Stack;
 
         _frame = loaded;

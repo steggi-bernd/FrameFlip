@@ -74,13 +74,29 @@ public partial class LayerPanel : UserControl
 
         _selected = Stack.Layers[^1];
         Rebuild();
+
+        // Eingeklappt, wenn es nichts zu waehlen und nichts zu sehen gibt: Bei einem
+        // PNG ist die Liste eine Zeile lang, und zweihundert Punkte Hoehe dafuer
+        // waeren im schmalen Streifen der teuerste Platz, den es gibt. Die
+        // Ueberschrift bleibt stehen - wer schichten will, findet sie.
+        Fold(open: HasChoice || Stack.Layers.Count > 1);
+    }
+
+    private void Fold(bool open)
+    {
+        Body.Visibility = open ? Visibility.Visible : Visibility.Collapsed;
+        FoldButton.Content = open ? "−" : "+";
     }
 
     /// <summary>
-    /// Ob es ueberhaupt etwas zu schichten gibt. Eine Datei mit einem einzigen Pass
-    /// kann trotzdem Ebenen tragen - zweimal dasselbe Bild multipliziert ist ein
-    /// gewoehnlicher Griff -, aber die Liste ist dann eine Zeile lang und steht dem
-    /// Rest im Weg.
+    /// Ob die Datei mehrere Passe zur Wahl stellt.
+    ///
+    /// Das ist NICHT die Frage, ob sich schichten laesst - die stellt sich nicht.
+    /// Ein PNG fuehrt genau ein Bild, aber dasselbe Bild ein zweites Mal und auf
+    /// Multiplizieren gestellt ist der Griff, mit dem in Photoshop jeder Kontrast
+    /// anfaengt, und der rechnet hier genauso.
+    ///
+    /// Die Antwort entscheidet nur darueber, ob der Streifen aufgeklappt beginnt.
     /// </summary>
     public bool HasChoice => _passes.Count > 1;
 
@@ -214,6 +230,15 @@ public partial class LayerPanel : UserControl
 
     private void OnAddClicked(object sender, RoutedEventArgs e)
     {
+        // Ohne Passe zur Wahl gibt es nichts auszuwaehlen. Ein Menue mit einem
+        // einzigen Eintrag ist eine Ruecktrage: Der Knopf legt dann gleich die
+        // Ebene an.
+        if (_passes.Count == 0)
+        {
+            Add(null);
+            return;
+        }
+
         var menu = new ContextMenu { PlacementTarget = AddButton, Placement = PlacementMode.Bottom };
 
         if (_passes.Count > 1)
@@ -464,7 +489,9 @@ public partial class LayerPanel : UserControl
         ClipButton.IsEnabled = at > 0;
         ClipButton.Opacity = at > 0 && _selected!.Clipped ? 1.0 : 0.55;
 
-        HintText.Visibility = _passes.Count > 1 ? Visibility.Visible : Visibility.Collapsed;
+        // Der Hinweis sagt in beiden Faellen etwas anderes: bei Passen, wie sie
+        // zusammengehoeren; bei einem Einzelbild, dass Schichten trotzdem geht.
+        HintText.Text = Strings.T(HasChoice ? "S_LayersHint" : "S_SinglePass");
     }
 
     private void Raise(bool interim) => Changed?.Invoke(interim);

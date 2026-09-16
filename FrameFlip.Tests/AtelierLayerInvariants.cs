@@ -33,7 +33,7 @@ public static class AtelierLayerInvariants
         {
             TheStripAppears(path);
             TheSharedLoaderRebuilds(path);
-            APlainImageHidesTheStrip(folder);
+            APlainImageLayersToo(folder);
         }
         finally
         {
@@ -164,23 +164,24 @@ public static class AtelierLayerInvariants
     }
 
     /// <summary>
-    /// Ein gewoehnliches Bild hat nichts zu schichten. Der Streifen bleibt weg -
-    /// zweihundert Punkte Hoehe fuer eine einzige Zeile waeren im schmalen Streifen
-    /// der teuerste Platz, den es gibt.
+    /// Ein PNG hat keine Passe - schichten laesst es sich trotzdem.
+    ///
+    /// Das ist die Unterscheidung, die anfangs falsch getroffen war: PASSE braucht
+    /// das Format, EBENEN nicht. Ein PNG fuehrt genau ein Bild, aber dasselbe Bild
+    /// ein zweites Mal und auf Multiplizieren gestellt ist der Griff, mit dem in
+    /// Photoshop jeder Kontrast anfaengt - und die Rechnung dahinter ist dieselbe.
+    ///
+    /// Der Streifen zeigt sich deshalb bei jedem Bild. Nur beginnt er eingeklappt,
+    /// wenn es nichts zu waehlen gibt: eine einzeilige Liste waere im schmalen
+    /// Streifen der teuerste Platz, den es gibt.
     /// </summary>
-    private static void APlainImageHidesTheStrip(string folder)
+    private static void APlainImageLayersToo(string folder)
     {
-        Check.Group("Ohne Passe bleibt der Streifen weg");
+        Check.Group("Auch ein Einzelbild laesst sich schichten");
 
-        // Ein PNG, ueber denselben Weg geschrieben, den auch der Export nimmt.
+        // Ein graues PNG - hell genug, dass Multiplizieren sichtbar abdunkelt.
         string png = Path.Combine(folder, "einzel.png");
-        var bitmap = new System.Windows.Media.Imaging.WriteableBitmap(
-            4, 4, 96, 96, System.Windows.Media.PixelFormats.Bgra32, null);
-
-        var encoder = new System.Windows.Media.Imaging.PngBitmapEncoder();
-        encoder.Frames.Add(System.Windows.Media.Imaging.BitmapFrame.Create(bitmap));
-
-        using (var file = File.Create(png)) encoder.Save(file);
+        Write(png, 160);
 
         var settings = new AppSettings();
         var page = new AtelierPage(FrameDecoderRegistry.CreateDefault(() => null), settings, _ => { });
@@ -204,18 +205,87 @@ public static class AtelierLayerInvariants
             page.Open(png);
 
             var strip = (LayerPanel)page.FindName("Layers");
-            var file = (System.Windows.Controls.TextBlock)page.FindName("FileText");
 
-            bool loaded = Pump(TimeSpan.FromSeconds(10), () => file.Text.Contains("einzel"));
+            // Gewartet wird auf die Masse in der Kopfzeile und NICHT auf den
+            // Dateinamen: Den setzt die Seite schon beim Aufruf, die Masse erst,
+            // wenn die Datei wirklich gelesen ist. Auf das falsche Zeichen zu warten
+            // heisst, gar nicht zu warten - und der Test misst dann nichts.
+            var size = (System.Windows.Controls.TextBlock)page.FindName("SourceText");
+
+            bool loaded = Pump(TimeSpan.FromSeconds(10), () => size.Text.Length > 0);
             Check.That(loaded, "das Bild wird geladen");
+            if (!loaded) return;
 
-            Check.That(strip.Visibility != Visibility.Visible,
-                       "und der Streifen bleibt weg");
+            Check.That(strip.Visibility == Visibility.Visible,
+                       "der Streifen zeigt sich auch hier");
+            Check.That(!strip.HasChoice, "aber es gibt keine Passe zu waehlen");
+
+            var body = (FrameworkElement)strip.FindName("Body");
+            Check.That(body.Visibility != Visibility.Visible,
+                       "und er beginnt eingeklappt, statt Platz zu nehmen");
         }
         finally
         {
             window.Close();
         }
+
+        // Und die Rechnung dahinter: verdoppeln und multiplizieren dunkelt ab.
+        var plain = LayeredFrameLoader.Load(png, null);
+        Check.That(plain is not null, "das PNG laesst sich lesen");
+        if (plain is null) return;
+
+        var doubled = new LayerStack
+        {
+            Layers =
+            {
+                new ImageLayer { Source = "", Mode = BlendMode.Normal },
+                new ImageLayer { Source = "", Mode = BlendMode.Multiply },
+            },
+        };
+
+        var darker = LayeredFrameLoader.Load(png, doubled);
+        Check.That(darker is not null, "und mit zwei Ebenen zusammensetzen");
+        if (darker is null) return;
+
+        Check.Near(darker.R[0], plain.R[0] * plain.R[0], 1e-4,
+                   "multiplizieren quadriert den Wert");
+        Check.That(darker.R[0] < plain.R[0], "das Bild wird also dunkler",
+                   $"{darker.R[0]:0.####} statt {plain.R[0]:0.####}");
+
+        // Dasselbe auf Negativ multiplizieren hellt auf - die Gegenprobe, dass hier
+        // wirklich gemischt und nicht nur skaliert wird.
+        var lifted = new LayerStack
+        {
+            Layers =
+            {
+                new ImageLayer { Source = "", Mode = BlendMode.Normal },
+                new ImageLayer { Source = "", Mode = BlendMode.Screen },
+            },
+        };
+
+        var brighter = LayeredFrameLoader.Load(png, lifted)!;
+        Check.That(brighter.R[0] > plain.R[0], "und negativ multiplizieren hellt auf",
+                   $"{brighter.R[0]:0.####} statt {plain.R[0]:0.####}");
+    }
+
+    /// <summary>Ein einfarbiges PNG mit dem gegebenen Grauwert.</summary>
+    private static void Write(string path, byte grey)
+    {
+        var pixels = new byte[4 * 4 * 4];
+        for (int i = 0; i < pixels.Length; i += 4)
+        {
+            pixels[i] = pixels[i + 1] = pixels[i + 2] = grey;
+            pixels[i + 3] = 255;
+        }
+
+        var bitmap = System.Windows.Media.Imaging.BitmapSource.Create(
+            4, 4, 96, 96, System.Windows.Media.PixelFormats.Bgra32, null, pixels, 16);
+
+        var encoder = new System.Windows.Media.Imaging.PngBitmapEncoder();
+        encoder.Frames.Add(System.Windows.Media.Imaging.BitmapFrame.Create(bitmap));
+
+        using var file = File.Create(path);
+        encoder.Save(file);
     }
 
     /// <summary>
