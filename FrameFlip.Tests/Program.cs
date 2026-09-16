@@ -39,6 +39,7 @@ static int RunAll()
     LayerPanelInvariants.Run();
     PassRebuildInvariants.Run();
     CryptomatteInvariants.Run();
+    ImageHitInvariants.Run();
     AtelierLayerInvariants.Run();
     GradeBatchInvariants.Run();
     GradeVideoInvariants.Run();

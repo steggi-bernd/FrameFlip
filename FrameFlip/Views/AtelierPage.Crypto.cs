@@ -71,37 +71,21 @@ public partial class AtelierPage
     /// <summary>
     /// Rechnet einen Punkt auf dem Bildelement in einen Bildpunkt um.
     ///
-    /// Zwei Faelle, und beide muessen stimmen: Eingepasst wird das Bild verkleinert
-    /// und mittig gesetzt - es liegen also Raender daneben, die nicht zum Bild
-    /// gehoeren. Bei 100 Prozent steht ein Bildpunkt auf einem Punkt. Einen der
-    /// beiden Faelle zu vergessen hiesse, dass die Auswahl um einen halben
-    /// Bildschirm danebenliegt, und man suchte den Fehler bei der Kryptomatte.
+    /// Die Rechnung selbst steht in <see cref="ImageHit"/> - sie hat zwei Faelle, die
+    /// beide stimmen muessen, und sie laesst sich dort pruefen, ohne ein Fenster
+    /// aufzumachen.
     /// </summary>
     private bool PixelAt(Point point, out int x, out int y)
     {
         x = y = 0;
 
         var frame = _frame;
-        if (frame is null || frame.Width == 0 || frame.Height == 0) return false;
-        if (Display.ActualWidth <= 0 || Display.ActualHeight <= 0) return false;
+        if (frame is null) return false;
 
-        double scale = 1.0;
-
-        if (Display.Stretch == Stretch.Uniform)
-        {
-            scale = Math.Min(Display.ActualWidth / frame.Width, Display.ActualHeight / frame.Height);
-            if (scale <= 0) return false;
-        }
-
-        double drawnWidth = frame.Width * scale;
-        double drawnHeight = frame.Height * scale;
-
-        double left = (Display.ActualWidth - drawnWidth) / 2;
-        double top = (Display.ActualHeight - drawnHeight) / 2;
-
-        x = (int)Math.Floor((point.X - left) / scale);
-        y = (int)Math.Floor((point.Y - top) / scale);
-
-        return x >= 0 && y >= 0 && x < frame.Width && y < frame.Height;
+        return ImageHit.PixelAt(point.X, point.Y,
+                                Display.ActualWidth, Display.ActualHeight,
+                                frame.Width, frame.Height,
+                                Display.Stretch == Stretch.Uniform,
+                                out x, out y);
     }
 }
