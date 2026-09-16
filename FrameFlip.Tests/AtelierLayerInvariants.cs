@@ -35,6 +35,7 @@ public static class AtelierLayerInvariants
             TheSharedLoaderRebuilds(path);
             APlainImageLayersToo(folder);
             EachLayerKeepsItsOwnTools(path);
+            TheFrameOnlyGrabsWhenItShould(path);
         }
         finally
         {
@@ -397,6 +398,79 @@ public static class AtelierLayerInvariants
             Check.Near(first.Adjustments!.Exposure, -2.0, 0.001,
                        "die Ebenen bleiben davon unberuehrt");
             Check.Near(second.Adjustments!.Exposure, 1.5, 0.001, "beide");
+        }
+        finally
+        {
+            window.Close();
+        }
+    }
+
+    /// <summary>
+    /// Der Greifrahmen darf nur dann Klicks annehmen, wenn er auch etwas zeigt.
+    ///
+    /// Er liegt ueber dem Bild. Ein unsichtbarer Rahmen, der trotzdem Klicks
+    /// schluckt, waere der unangenehmste Zustand von allen: Das Auswaehlen einer
+    /// Kryptomatte ginge nicht mehr, und man saehe keinen Grund dafuer.
+    /// </summary>
+    private static void TheFrameOnlyGrabsWhenItShould(string path)
+    {
+        Check.Group("Der Greifrahmen faengt nur, wenn er etwas zeigt");
+
+        var settings = new AppSettings();
+        var page = new AtelierPage(FrameDecoderRegistry.CreateDefault(() => null), settings, _ => { });
+
+        var window = new Window
+        {
+            Content = page,
+            Width = 1000,
+            Height = 800,
+            ShowInTaskbar = false,
+            WindowStyle = WindowStyle.None,
+            ShowActivated = false,
+            Left = -4000,
+            Top = -4000,
+        };
+
+        try
+        {
+            window.Show();
+            page.UpdateLayout();
+
+            var frame = (PlacementAdorner)page.FindName("Placement");
+            Check.That(frame is not null, "der Rahmen ist Teil der Seite");
+            if (frame is null) return;
+
+            Check.That(!frame.IsHitTestVisible, "ohne Bild faengt er nichts");
+
+            page.Open(path);
+
+            var size = (System.Windows.Controls.TextBlock)page.FindName("SourceText");
+            if (!Pump(TimeSpan.FromSeconds(10), () => size.Text.Length > 0))
+            {
+                Check.That(false, "das Bild wird geladen");
+                return;
+            }
+
+            page.UpdateLayout();
+
+            // Nach dem Oeffnen ist eine Passebene gewaehlt - sie hat eine Flaeche,
+            // also zeigt der Rahmen sie.
+            Check.That(frame.IsHitTestVisible, "bei einer Passebene faengt er");
+
+            // Eine Einstellungsebene hat keine Flaeche. Ein Rahmen um sie waere ein
+            // Rahmen um etwas, das es nicht gibt.
+            var strip = (LayerPanel)page.FindName("Layers");
+            strip.AddAdjustment();
+            page.UpdateLayout();
+
+            Check.That(!frame.IsHitTestVisible, "bei einer Korrektur nicht");
+
+            // Und zurueck.
+            var pass = strip.Stack.Layers.First(l => l.Content == LayerContent.Pass);
+            Select(strip, pass);
+            page.UpdateLayout();
+
+            Check.That(frame.IsHitTestVisible, "zurueck auf einem Pass wieder");
         }
         finally
         {

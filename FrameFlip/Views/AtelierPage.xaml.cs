@@ -108,6 +108,8 @@ public sealed partial class AtelierPage : UserControl
         Layers.Editing += Bind;
         Layers.Thumbnail = Thumbnail;
 
+        Placement.Changed += OnPlacementDragged;
+
         Bind(null);
 
         _settle = new DispatcherTimer(DispatcherPriority.Background)
@@ -261,6 +263,7 @@ public sealed partial class AtelierPage : UserControl
     private void Bind(ImageLayer? layer)
     {
         _editing = layer;
+        ShowPlacement();
 
         if (layer is null)
         {
@@ -342,6 +345,8 @@ public sealed partial class AtelierPage : UserControl
         if (recompose) Recompose();
 
         Render();
+        ShowPlacement();
+
         if (!interim) Measure();
     }
 

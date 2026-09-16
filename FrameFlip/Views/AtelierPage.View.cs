@@ -73,6 +73,8 @@ public partial class AtelierPage
             // Eingepasst gibt es nichts zu schieben; die Balken verschwinden.
             ImageScroll.HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled;
             ImageScroll.VerticalScrollBarVisibility = ScrollBarVisibility.Disabled;
+
+            ShowPlacement();
             return;
         }
 
@@ -90,6 +92,10 @@ public partial class AtelierPage
             Display, _zoom >= 1.0
                 ? System.Windows.Media.BitmapScalingMode.NearestNeighbor
                 : System.Windows.Media.BitmapScalingMode.HighQuality);
+
+        // Der Greifrahmen rechnet in Punkten auf dem Element - beim Massstabwechsel
+        // stimmt seine Umrechnung nicht mehr.
+        ShowPlacement();
     }
 
     /// <summary>

@@ -62,9 +62,20 @@
                 <ScrollViewer x:Name="ImageScroll"
                               HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Auto"
                               PanningMode="Both">
-                    <Image x:Name="Display" Stretch="Uniform"
-                           RenderOptions.BitmapScalingMode="HighQuality"
-                           MouseLeftButtonDown="OnImageClicked" />
+                    <!--
+                        Bild und Greifrahmen im selben Feld: Sie bekommen damit
+                        dieselben Masse, und der Rahmen muss die Lage des Bildes
+                        nicht nachrechnen. Ein Rahmen, der einen Bildpunkt daneben
+                        liegt, laesst einen an einer Ecke ziehen, die nicht dort ist,
+                        wo sie aussieht.
+                    -->
+                    <Grid>
+                        <Image x:Name="Display" Stretch="Uniform"
+                               RenderOptions.BitmapScalingMode="HighQuality"
+                               MouseLeftButtonDown="OnImageClicked" />
+
+                        <local:PlacementAdorner x:Name="Placement" />
+                    </Grid>
                 </ScrollViewer>
 
                 <TextBlock x:Name="EmptyHint" HorizontalAlignment="Center" VerticalAlignment="Center"

@@ -51,4 +51,36 @@ public static class ImageHit
 
         return x >= 0 && y >= 0 && x < pixelWidth && y < pixelHeight;
     }
+
+    /// <summary>
+    /// Der Rueckweg: von einem Ort im Bild zu einem Punkt auf dem Bildelement.
+    ///
+    /// Gebraucht zum Zeichnen. Beide Richtungen muessen genau zueinander passen -
+    /// sonst liegt der Rahmen um eine Ebene woanders als die Ebene, und man zieht an
+    /// einer Ecke, die nicht da ist, wo sie aussieht.
+    /// </summary>
+    public static bool PointAt(double imageX, double imageY,
+                               double elementWidth, double elementHeight,
+                               int pixelWidth, int pixelHeight,
+                               bool uniform,
+                               out double x, out double y)
+    {
+        x = y = 0;
+
+        if (pixelWidth <= 0 || pixelHeight <= 0) return false;
+        if (elementWidth <= 0 || elementHeight <= 0) return false;
+
+        double scale = 1.0;
+
+        if (uniform)
+        {
+            scale = Math.Min(elementWidth / pixelWidth, elementHeight / pixelHeight);
+            if (scale <= 0) return false;
+        }
+
+        x = (elementWidth - pixelWidth * scale) / 2 + imageX * scale;
+        y = (elementHeight - pixelHeight * scale) / 2 + imageY * scale;
+
+        return true;
+    }
 }

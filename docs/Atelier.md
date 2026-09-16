@@ -197,7 +197,7 @@ Four kinds of layer, one stack:
 |---|---|---|---|
 | **Pass** | a pass from the multilayer EXR | light mixing: glossy down, emission up | **built** |
 | **Adjustment** | nothing — it is a tool | the colour tools of section 7 | **built** |
-| **Image** | a still, or a second sequence | overlay, version compare | **built** |
+| **Image** | a still, or a second sequence | watermark, overlay, version compare | **built** |
 | **Group** | other layers | one mask over several operations | **built** |
 
 Making colour correction a *layer* rather than a panel is what keeps this one system
@@ -242,11 +242,44 @@ visible only in motion. A name without a counter is a still and stays put; a cou
 you want pinned has a toggle.
 
 The case that earns the image layer its place is not the logo. It is: drop the previous
-render version in, set **Difference**, and see in one glance what changed.
+render version in, set **Difference**, and see in one glance what changed. Files can be
+dragged onto the layer list or onto the picture; the menu and the file dialog are three
+clicks for something that is a gesture.
 
-What is **not** built: placement and scaling. An image of a different size is marked in
-the list and skipped rather than stretched — resampling with position, scale and
-anchor is its own feature, and half of it would be worse than none.
+### Watermarks sit above everything
+
+An image layer can be marked **on top**, and that means more than last in the stack: it
+is applied *after* the view transform and after the grade. An ordinary image layer goes
+through AgX with the picture and is graded along with it — pure white would come out
+grey, and lifting a curve would lift the watermark too. On top, it looks the same in
+every frame, exactly as it is in the file.
+
+The test therefore does not check that it is *there*. It checks that it does not change
+when the picture underneath is pulled up by four stops — and, as a counter-check, that
+the same grade does change the picture.
+
+### Placing a layer
+
+Offset, size and crop, per layer, **in fractions of the image rather than in pixels**.
+A recipe set up at 1080p then holds at 4K; in pixels the watermark would sit in a
+corner nobody meant. The resting state is the placement with nothing set: same size
+means pixel for pixel, a different size is fitted and centred, and scale and offset
+count from there.
+
+That changed an earlier rule. A layer of a different size used to be dropped, because
+scaling was a different job from mixing. It is not a different job any more — it is a
+logo, and dropping a logo because it is smaller than the picture would be the wrong
+answer. The test that pinned the old behaviour was rewritten rather than deleted.
+
+Placement is also editable **directly in the picture**: grab the layer and drag, pull a
+corner to resize. The arithmetic lives apart from the control, in `PlacementDrag`,
+because it holds the kind of mistake you cannot see — a corner that drifts instead of
+staying put feels like a bad mouse, not a bad formula. The invariant the tests hold it
+to is that **dragging one corner leaves the opposite one exactly where it was**, which
+is why both scale *and* offset change during a corner drag: the placement counts from
+the centre, and the centre moves when a corner stays.
+
+Not built: rotation.
 
 ### Groups pass through
 

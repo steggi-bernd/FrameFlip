@@ -121,6 +121,30 @@ public partial class LayerPanel : UserControl
         => _selected?.Content == LayerContent.Adjustment ? _selected : null;
 
     /// <summary>
+    /// Die gewaehlte Ebene, gleich welcher Art. Null, wenn keine gewaehlt ist.
+    ///
+    /// Gebraucht vom Greifrahmen im Bild: Er zeigt, was hier ausgewaehlt ist, und
+    /// eine zweite Auswahl daneben waere eine, die auseinanderlaufen kann.
+    /// </summary>
+    public ImageLayer? Selection => _selected;
+
+    /// <summary>
+    /// Die Platzierung wurde von aussen veraendert - vom Greifrahmen im Bild.
+    ///
+    /// Die Regler muessen dann nachziehen: Wer im Bild schiebt und danach am Regler
+    /// weiterdreht, spraenge sonst zurueck auf den Wert, der dort noch steht.
+    /// </summary>
+    public void PlaceMovedOutside(bool interim)
+    {
+        _filling = true;
+
+        try { PushPlaceToControls(); }
+        finally { _filling = false; }
+
+        Raise(interim);
+    }
+
+    /// <summary>
     /// Nimmt eine Datei entgegen: welche Passe sie fuehrt, und welcher Stapel
     /// darauf gelten soll.
     ///
