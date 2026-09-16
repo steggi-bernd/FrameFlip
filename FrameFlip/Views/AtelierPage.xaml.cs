@@ -292,7 +292,11 @@ public sealed partial class AtelierPage : UserControl
     /// zieht, aendert sie fuer beide. Genau das ist gewollt; nur der Behaelter darf
     /// nicht geteilt sein.
     /// </summary>
-    private GradingStack Snapshot() => new() { Tools = Tools.Stack.Tools.ToList() };
+    private GradingStack Snapshot() => new()
+    {
+        Tools = Tools.Stack.Tools.ToList(),
+        Local = Tools.Stack.Local.ToList(),
+    };
 
     private void OnToolsChanged(bool interim)
     {

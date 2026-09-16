@@ -57,6 +57,10 @@
     <sys:String x:Key="S_Saturation">Saett.</sys:String>
     <sys:String x:Key="S_Luminance">Hell.</sys:String>
     <sys:String x:Key="S_Lut">Tabelle</sys:String>
+    <sys:String x:Key="S_Clarity">Klarheit</sys:String>
+    <sys:String x:Key="S_ClarityAmount">Stärke</sys:String>
+    <sys:String x:Key="S_ClarityReach">Radius</sys:String>
+    <sys:String x:Key="S_ClarityHint">Örtlicher Kontrast: Er verstärkt, was ein Punkt gegenüber seiner Umgebung ist, und lässt gleichmäßige Flächen in Ruhe. Großer Radius gibt Plastizität, kleiner gibt Schärfe. Negativ nimmt Kontrast weg.</sys:String>
     <sys:String x:Key="S_NoLut">Keine Tabelle gewaehlt</sys:String>
     <sys:String x:Key="S_Strength">Staerke</sys:String>
     <sys:String x:Key="S_PickLut">Tabelle waehlen</sys:String>

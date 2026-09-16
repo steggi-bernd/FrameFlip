@@ -6,7 +6,8 @@ A second mode inside FrameFlip: grade one frame, then apply that grade to the wh
 sequence and write it out. Layers, masks driven by render data, and a colour toolset
 aimed at Photoshop and Lightroom rather than at a node graph.
 
-**Status:** steps 1 to 7 are built and running; 8 is still design. Step 5 is complete —
+**Status:** steps 1 to 7 are built and running; of step 8 the local path exists, with
+Clarity on it. Step 5 is complete —
 pass, adjustment, image and group layers, with order, duplication, opacity, colour,
 blend modes and clipping masks. Of step 6, masks are data-driven: cryptomatte, any
 pass, luminance and gradient; painted masks are not built. Where an earlier estimate or
@@ -563,13 +564,62 @@ at all; the rest is what makes it worth staying in.
 
 | Tool | Parameters | Notes |
 |---|---|---|
-| **Clarity** ★ | amount | midtone local contrast — unsharp mask at a large radius |
-| **Texture** | amount | the same at a small radius: surface detail without the halo |
+| ~~**Clarity**~~ ★ **built** | amount, radius | midtone local contrast — unsharp mask at a large radius |
+| **Texture** | amount | the same at a small radius: surface detail without the halo — which is Clarity's radius slider turned down, not a second tool |
 | **Dehaze** | amount | dark-channel prior. Also runs backwards, to add atmosphere |
 | **Sharpen** | amount, radius, threshold | unsharp mask; the threshold keeps noise out of it |
 | **Noise reduction** | luminance, colour, detail | for renders with the sample count cut short. The EXR's albedo and normal passes make this markedly better than it can be on a PNG |
 | **Bloom / Glare** ★ | threshold, radius, intensity | on HDR data this is finally correct, because the overbrights are real rather than clipped to white. On an 8-bit PNG the same filter is guesswork |
 | **Halation** | threshold, radius, tint | red-orange bleed around highlights; most of what reads as "filmic" |
+
+**The second path — built.** Everything else in section 7 is *point-wise*: a pixel goes
+in, a pixel comes out, and tools chain without a buffer and without an ordering problem.
+The tools in this table cannot be said that way. They ask what it looks like *around* a
+pixel, and `IGradingTool` has promised them their own path since it was written. That
+path now exists, and Clarity runs on it:
+
+1. the whole chain into a scratch buffer, up to and including the display tools;
+2. that buffer blurred — once, for all local tools together;
+3. value and blur together through the tools, then out.
+
+**Both values come from the same stage.** That is the correctness condition, and it is
+the whole reason the buffer is a buffer rather than a second read of something earlier.
+A blur taken from a different stage is not local contrast but an offset: on a flat area
+the two values would differ and the area would tip, although there is nothing there to
+boost. The test says exactly that — clarity at full strength leaves a flat field
+byte-for-byte unchanged, and an ordinary contrast slider on the same field does not.
+
+**It costs three float buffers** — values, blur, and the field the box filter runs
+over — three channels each: 75 MB at 1080p, 300 MB at 4K, *per thread*, because the
+batch run grades several frames at once and a shared buffer would be a race. At four
+workers and 4K that is a gigabyte. Hence the path is only taken when a local tool is
+actually set to something; a tool sitting at zero does not count, or every frame in the
+program would be dragged through a buffer for nothing.
+
+The blur is three box passes rather than one Gaussian. Not a shortcut: three boxes are
+already closer to a bell than the noise floor, and a box runs on a running sum in the
+same time whatever the radius — at radius forty a real Gaussian would cost eighty times
+as much.
+
+| 1080p, clarity at full strength | |
+|---|---|
+| no local tool — the straight path | **29.2 ms** |
+| clarity, every pixel | **66.9 ms** |
+| clarity, while a slider is moving | **9.7 ms** |
+
+The third row is the one that decides whether this is usable, and it is the same trick
+as the compositor's: while a slider moves, only the grid the coarse preview reads is
+computed, and the blur runs on that grid with a correspondingly smaller radius. That is
+not an approximation — a reduced image blurred by a reduced radius is the large one
+blurred by the large. The grid formula is now shared by the composer, the image path and
+this one, and so is the interpolation back up; two copies would drift, and the drift
+would look like a preview artefact rather than a bug.
+
+Two details that are easy to get wrong. The radius is given **relative to 1080p** and
+converted where the frame size is known, so the same number means the same thing on 4K
+instead of a quarter of it. And clarity's weighting runs to zero at black and at white
+(`4b(1-b)`): without it the highlights blow and the shadows block up, precisely where
+there is no room left.
 
 ### 7.4 Optics
 
@@ -606,6 +656,17 @@ already written into `ImageAdjustments`:
 
 Anyone who wants a different order uses a second adjustment layer. That is what the
 stack is for, and it is a better answer than a configurable pipeline.
+
+**One correction to this order, from building it.** The local tools do not sit in the
+middle of that line; they run at the end, after the view transform and the display
+tools, on values between 0 and 1. Two reasons, and the first only became clear with the
+code in front of me: local contrast means *this pixel against its neighbours*, and in
+scene-linear the neighbourhood of a bright pixel is dominated by whatever overbright
+sits next to it — a value of 60 in a neighbourhood of 0.2 is a difference of 59.8, and
+multiplying that by an amount is not a look, it is an explosion. The second is the
+correctness condition above: value and blur must come from the same stage, and the stage
+where "flat" means flat to the eye is the display stage. The line above still describes
+the point-wise chain correctly; the local tools hang off its end.
 
 ---
 
@@ -742,7 +803,7 @@ next one landing.
    surfaces how much a hand-written reader hurts before anything else depends on it.
 2. ~~**Float frames as a second path**~~ **Done**, for the held frame only. Exposure, curves and the
    histogram become real. Reveals what the time budget actually looks like.
-3. ~~**Adjustment layers with the ★ tools.**~~ **Done** except Clarity, which needs a pixel's neighbourhood and does not fit the point-wise form. Curves, white balance, LGG, HSL, vibrance,
+3. ~~**Adjustment layers with the ★ tools.**~~ **Done.** Clarity was held back here — it needs a pixel's neighbourhood and does not fit the point-wise form — and arrived with step 8, on a path of its own. Curves, white balance, LGG, HSL, vibrance,
    clarity, LUT. Single layer, no masks. Already a genuine grading tool.
 4. ~~**The batch run and sequence export.**~~ **Done**, images and video. At this point the workflow closes, and Atelier
    is finished as a product even if nothing further is built.
@@ -758,7 +819,10 @@ next one landing.
    and the mask slot in place first, exactly as this list assumed. Click an object in
    the picture, and the selection holds for the whole sequence — the file names
    objects, and a name does not move.
-8. **The remaining tools from section 7**, in the order people ask for them.
+8. **The remaining tools from section 7**, in the order people ask for them. The
+   **local path is built** — the second pass the neighbourhood tools need — with Clarity
+   as the first tool on it. Sharpening, texture, noise reduction and glow are further
+   tools on that path rather than further mechanism, which is what the step was for.
 
 Steps 1–4 are the product. 5–8 are what makes it uncontested.
 

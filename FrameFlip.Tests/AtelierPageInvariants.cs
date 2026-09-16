@@ -98,6 +98,44 @@ public static class AtelierPageInvariants
         Check.That(panel.Stack.Tools.Count == 6, "nochmal laden doppelt nichts",
                    $"{panel.Stack.Tools.Count}");
 
+        // Und den eigenen Stapel hereinzureichen darf ihn nicht leeren. Vorher wurde
+        // erst geleert und dann aus derselben Liste gelesen - die Werkzeuge kamen
+        // frisch und neutral zurueck, und der Weissabgleich war still weg.
+        Check.Near(panel.Stack.Tools.OfType<WhiteBalanceTool>().Single().Kelvin, 4000, 1,
+                   "und wirft die Einstellungen nicht weg");
+
+        // Klarheit steht in der eigenen Liste - und muss denselben Weg nehmen.
+        Check.That(panel.Stack.Local.OfType<ClarityTool>().Count() == 1,
+                   "Klarheit steht genau einmal in der oertlichen Liste",
+                   $"{panel.Stack.Local.Count}");
+
+        // Ein gespeicherter Wert muss ankommen. Wuerde die oertliche Liste beim Laden
+        // uebergangen, behielte der Bereich sein eigenes Werkzeug: Eingestellt an
+        // einer Ebene, wirksam an allen, und beim naechsten Start weg.
+        var local = new GradingStack();
+        local.Local.Add(new ClarityTool { Amount = 0.6f, Reach = 80 });
+
+        panel.Load(null, local);
+
+        var clarity = panel.Stack.Local.OfType<ClarityTool>().Single();
+        Check.Near(clarity.Amount, 0.6, 0.001, "die gespeicherte Klarheit kommt an");
+        Check.That(clarity.Reach == 80, "mitsamt Radius", $"{clarity.Reach}");
+
+        // Und sie steht auch am Regler - sonst zeigt der Bereich etwas anderes an,
+        // als das Bild bekommt.
+        var amountSlider = (System.Windows.Controls.Slider)panel.FindName("ClaritySlider");
+        var reachSlider = (System.Windows.Controls.Slider)panel.FindName("ClarityReachSlider");
+
+        Check.That(amountSlider is not null && reachSlider is not null, "die Regler sind da");
+
+        if (amountSlider is not null) Check.Near(amountSlider.Value, 0.6, 0.001, "der Staerkeregler zeigt sie");
+        if (reachSlider is not null) Check.Near(reachSlider.Value, 80, 0.001, "der Radiusregler auch");
+
+        // Zurueck auf einen Stapel ohne Klarheit: Dann darf nichts haengenbleiben.
+        panel.Load(null, new GradingStack());
+        Check.That(panel.Stack.Local.OfType<ClarityTool>().Single().IsNeutral,
+                   "ein Stapel ohne Klarheit laesst keine stehen");
+
         // Abschalten und wieder an.
         panel.ToolsEnabled = false;
         Check.That(!panel.ToolsEnabled, "die Werkzeuge lassen sich abschalten");

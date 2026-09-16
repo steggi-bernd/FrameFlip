@@ -33,6 +33,7 @@ public partial class GradingPanel : UserControl
     private HslTool _bands = new();
     private VibranceTool _vibrance = new();
     private LutTool _lut = new();
+    private ClarityTool _clarity = new();
 
     private static readonly Color[] CurveColours =
     {
@@ -115,8 +116,21 @@ public partial class GradingPanel : UserControl
     {
         Adjustments = adjustments?.Clamped() ?? ImageAdjustments.Neutral;
 
+        // Erst abschreiben, dann leeren. Wer den eigenen Stapel hereinreicht - das
+        // tut, wer nur die Regler neu fuellen will -, leerte sonst die Quelle, aus
+        // der gleich gelesen wird, und stuende mit frisch angelegten, neutralen
+        // Werkzeugen da.
+        var tools = stack?.Tools.ToList();
+        var local = stack?.Local.ToList();
+
         Stack.Tools.Clear();
-        if (stack is not null) Stack.Tools.AddRange(stack.Tools);
+        if (tools is not null) Stack.Tools.AddRange(tools);
+
+        // Die oertliche Liste genauso. Sie zu vergessen hiess: Klarheit bliebe beim
+        // Umschalten zwischen Ebenen einfach stehen, weil der Bereich sein eigenes
+        // Werkzeug behielte - eingestellt an der einen Ebene, wirksam an allen.
+        Stack.Local.Clear();
+        if (local is not null) Stack.Local.AddRange(local);
 
         _curves = Take<CurvesTool>();
         _whiteBalance = Take<WhiteBalanceTool>();
@@ -124,6 +138,18 @@ public partial class GradingPanel : UserControl
         _bands = Take<HslTool>();
         _vibrance = Take<VibranceTool>();
         _lut = Take<LutTool>();
+
+        // Die oertlichen Werkzeuge stehen in ihrer eigenen Liste - sie nehmen einen
+        // anderen Weg durch den Bildprozessor.
+        _clarity = Stack.Local.OfType<ClarityTool>().FirstOrDefault() ?? Add();
+
+        ClarityTool Add()
+        {
+            var created = new ClarityTool();
+            Stack.Local.Add(created);
+
+            return created;
+        }
 
         CurveField.Curve = _curves.Master;
         PushToControls();
@@ -168,6 +194,7 @@ public partial class GradingPanel : UserControl
             ZonesBody.IsEnabled = value;
             BandsBody.IsEnabled = value;
             LutBody.IsEnabled = value;
+            ClarityBody.IsEnabled = value;
             VibranceSlider.IsEnabled = value;
         }
     }
@@ -348,6 +375,10 @@ public partial class GradingPanel : UserControl
 
             LutStrengthSlider.Value = _lut.Strength;
             UpdateLutText();
+
+            ClaritySlider.Value = Math.Clamp(_clarity.Amount, ClaritySlider.Minimum, ClaritySlider.Maximum);
+            ClarityReachSlider.Value = Math.Clamp(_clarity.Reach,
+                                                  ClarityReachSlider.Minimum, ClarityReachSlider.Maximum);
         }
         finally
         {
@@ -402,6 +433,9 @@ public partial class GradingPanel : UserControl
 
         _lut.Strength = (float)LutStrengthSlider.Value;
 
+        _clarity.Amount = (float)ClaritySlider.Value;
+        _clarity.Reach = (int)Math.Round(ClarityReachSlider.Value);
+
         UpdateValues();
 
         // Beim Ziehen eines Reglers reicht die grobe Vorschau; das Loslassen meldet
@@ -436,6 +470,8 @@ public partial class GradingPanel : UserControl
         TintValue.Text = $"{TintSlider.Value:+0;-0;0}";
         VibranceValue.Text = $"{VibranceSlider.Value:+0.00;-0.00;0.00}";
         LutStrengthValue.Text = $"{LutStrengthSlider.Value:0.00}";
+        ClarityValue.Text = $"{ClaritySlider.Value:+0.00;-0.00;0.00}";
+        ClarityReachValue.Text = $"{ClarityReachSlider.Value:0}";
         UpdateZoneValues();
     }
 

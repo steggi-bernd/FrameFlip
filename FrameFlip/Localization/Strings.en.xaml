@@ -57,6 +57,10 @@
     <sys:String x:Key="S_Saturation">Sat.</sys:String>
     <sys:String x:Key="S_Luminance">Lum.</sys:String>
     <sys:String x:Key="S_Lut">Lookup table</sys:String>
+    <sys:String x:Key="S_Clarity">Clarity</sys:String>
+    <sys:String x:Key="S_ClarityAmount">Amount</sys:String>
+    <sys:String x:Key="S_ClarityReach">Radius</sys:String>
+    <sys:String x:Key="S_ClarityHint">Local contrast: it boosts what a pixel is against its surroundings and leaves flat areas alone. A large radius gives modelling, a small one gives sharpness. Negative takes contrast away.</sys:String>
     <sys:String x:Key="S_NoLut">No table selected</sys:String>
     <sys:String x:Key="S_Strength">Strength</sys:String>
     <sys:String x:Key="S_PickLut">Choose a table</sys:String>

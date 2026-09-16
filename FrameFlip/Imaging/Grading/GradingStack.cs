@@ -16,8 +16,20 @@ public sealed class GradingStack
 {
     public List<IGradingTool> Tools { get; set; } = new();
 
+    /// <summary>
+    /// Die Werkzeuge mit oertlicher Wirkung - Klarheit und was noch dazukommt.
+    ///
+    /// Eine eigene Liste und nicht dieselbe, weil sie einen anderen Weg nehmen: Sie
+    /// brauchen einen Zwischenpuffer und einen zweiten Durchgang. Sie in dieselbe
+    /// Kette zu haengen hiesse, jedes Bild durch diesen Puffer zu zwaengen, auch
+    /// wenn gar keines von ihnen benutzt wird.
+    /// </summary>
+    public List<ILocalTool> Local { get; set; } = new();
+
     /// <summary>True, wenn kein Werkzeug etwas zu tun hat.</summary>
-    public bool IsNeutral => Tools.Count == 0 || Tools.All(t => t.IsNeutral);
+    public bool IsNeutral
+        => (Tools.Count == 0 || Tools.All(t => t.IsNeutral)) &&
+           (Local.Count == 0 || Local.All(t => t.IsNeutral));
 
     /// <summary>
     /// Bereitet alle Werkzeuge vor und sammelt die ein, die tatsaechlich etwas tun.
@@ -31,6 +43,7 @@ public sealed class GradingStack
     {
         var linear = new List<IGradingTool>();
         var display = new List<IGradingTool>();
+        var local = new List<ILocalTool>();
 
         foreach (var tool in Tools)
         {
@@ -40,7 +53,15 @@ public sealed class GradingStack
             (tool.Stage == GradingStage.SceneLinear ? linear : display).Add(tool);
         }
 
-        return new PreparedGrading(linear.ToArray(), display.ToArray());
+        foreach (var tool in Local)
+        {
+            if (tool.IsNeutral) continue;
+
+            tool.Prepare();
+            local.Add(tool);
+        }
+
+        return new PreparedGrading(linear.ToArray(), display.ToArray(), local.ToArray());
     }
 
     /// <summary>
@@ -53,6 +74,15 @@ public sealed class GradingStack
     public GradingStack Clone() => new()
     {
         Tools = Tools.Select(Copy).ToList(),
+        Local = Local.Select(CopyLocal).ToList(),
+    };
+
+    private static ILocalTool CopyLocal(ILocalTool tool) => tool switch
+    {
+        ClarityTool clarity => new ClarityTool { Amount = clarity.Amount, Reach = clarity.Reach },
+
+        // Wie oben: Ein Werkzeug, das hier fehlt, wuerde geteilt statt kopiert.
+        _ => throw new NotSupportedException($"Kein Kopierweg fuer {tool.GetType().Name}."),
     };
 
     private static IGradingTool Copy(IGradingTool tool) => tool switch
@@ -79,18 +109,37 @@ public sealed class GradingStack
 /// </summary>
 public readonly struct PreparedGrading
 {
-    public PreparedGrading(IGradingTool[] sceneLinear, IGradingTool[] display)
+    public PreparedGrading(IGradingTool[] sceneLinear, IGradingTool[] display, ILocalTool[] local)
     {
         SceneLinear = sceneLinear;
         Display = display;
+        Local = local;
     }
 
     public IGradingTool[] SceneLinear { get; }
 
     public IGradingTool[] Display { get; }
 
-    public bool IsEmpty => SceneLinear.Length == 0 && Display.Length == 0;
+    /// <summary>
+    /// Die oertlichen Werkzeuge. Leer heisst: kein Zwischenpuffer, kein zweiter
+    /// Durchgang - und das ist der Normalfall.
+    /// </summary>
+    public ILocalTool[] Local { get; } = Array.Empty<ILocalTool>();
+
+    /// <summary>Der groesste Radius, den eines der Werkzeuge verlangt.</summary>
+    public int Reach
+    {
+        get
+        {
+            int reach = 0;
+            foreach (var tool in Local) reach = Math.Max(reach, tool.Radius);
+
+            return reach;
+        }
+    }
+
+    public bool IsEmpty => SceneLinear.Length == 0 && Display.Length == 0 && Local.Length == 0;
 
     public static readonly PreparedGrading None =
-        new(Array.Empty<IGradingTool>(), Array.Empty<IGradingTool>());
+        new(Array.Empty<IGradingTool>(), Array.Empty<IGradingTool>(), Array.Empty<ILocalTool>());
 }

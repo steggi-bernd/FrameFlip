@@ -282,6 +282,39 @@
                 <StackPanel x:Name="BandSliders" />
             </StackPanel>
 
+            <!--
+                Klarheit. Steht fuer sich und nicht bei den uebrigen Reglern, weil
+                sie einen anderen Weg nimmt: Sie braucht die Nachbarschaft eines
+                Punktes und damit einen zweiten Durchgang. Wer sie anfasst, soll
+                wissen, dass hier etwas anderes geschieht.
+            -->
+            <Grid Margin="0,16,0,0">
+                <TextBlock Text="{DynamicResource S_Clarity}" Style="{StaticResource PanelHeading}" />
+                <Button Style="{StaticResource LinkButton}" HorizontalAlignment="Right"
+                        Content="+" Tag="ClarityBody" Click="OnSectionToggled" />
+            </Grid>
+            <StackPanel x:Name="ClarityBody" Visibility="Collapsed" Margin="0,6,0,0">
+                <Grid Margin="0,0,0,2">
+                    <TextBlock Text="{DynamicResource S_ClarityAmount}" Style="{StaticResource PanelLabel}" />
+                    <TextBlock x:Name="ClarityValue" Style="{StaticResource PanelValue}" />
+                </Grid>
+                <Slider x:Name="ClaritySlider" Style="{StaticResource PanelSlider}"
+                        Minimum="-1" Maximum="1" Value="0" SmallChange="0.02" LargeChange="0.1"
+                        ValueChanged="OnChanged" MouseDoubleClick="OnSliderReset" Tag="0" />
+
+                <Grid Margin="0,10,0,2">
+                    <TextBlock Text="{DynamicResource S_ClarityReach}" Style="{StaticResource PanelLabel}" />
+                    <TextBlock x:Name="ClarityReachValue" Style="{StaticResource PanelValue}" />
+                </Grid>
+                <Slider x:Name="ClarityReachSlider" Style="{StaticResource PanelSlider}"
+                        Minimum="2" Maximum="200" Value="40" SmallChange="1" LargeChange="10"
+                        ValueChanged="OnChanged" MouseDoubleClick="OnSliderReset" Tag="40" />
+
+                <TextBlock Margin="0,8,0,0" FontSize="10" TextWrapping="Wrap"
+                           Foreground="{StaticResource MutedBrush}"
+                           Text="{DynamicResource S_ClarityHint}" />
+            </StackPanel>
+
             <!-- Tabelle -->
             <Grid Margin="0,16,0,0">
                 <TextBlock Text="{DynamicResource S_Lut}" Style="{StaticResource PanelHeading}" />

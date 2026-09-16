@@ -71,6 +71,17 @@ public static class FloatFrameProcessor
     {
         overlays ??= Overlays.None;
 
+        // Ein oertliches Werkzeug braucht die Nachbarschaft und damit einen zweiten
+        // Durchgang. Ohne eines geht es den geraden Weg - und das ist der Normalfall.
+        var localTools = grading.Local ?? Array.Empty<ILocalTool>();
+
+        if (localTools.Length > 0)
+        {
+            ApplyLocal(frame, adjustments, view, grading, destination, destinationStride,
+                       step, overlays, localTools);
+            return;
+        }
+
         var linearTools = grading.SceneLinear ?? Array.Empty<IGradingTool>();
         var displayTools = grading.Display ?? Array.Empty<IGradingTool>();
 
@@ -188,79 +199,250 @@ public static class FloatFrameProcessor
                 }
             });
 
-            // Die Gewichte als Festkomma, einmal vorberechnet.
-            //
-            // Die erste Fassung rechnete je Bildpunkt eine Division fuer den
-            // Gitterplatz und vier Vergleiche fuer die Raender - und war damit
-            // genauso teuer wie der volle Durchgang, also fuer nichts. Ueber die
-            // Bloecke zu laufen statt ueber die Bildpunkte macht beides ueberfluessig:
-            // Der Gitterplatz steht je Block fest, und die Gewichte kommen aus einer
-            // Tabelle mit step Eintraegen.
-            var weights = new int[step];
-            for (int i = 0; i < step; i++) weights[i] = i * 256 / step;
+            Expand(gridPtr, gridWidth, gridHeight, target, destinationStride, width, height, step);
+        }
+    }
 
-            fixed (int* weightBase = weights)
+    /// <summary>
+    /// Blaest ein Bytegitter auf die volle Bildgroesse auf - bilinear zwischen den
+    /// Gitterpunkten.
+    ///
+    /// Steht an einer Stelle, weil zwei Wege sie brauchen: der gerade und der mit
+    /// oertlichen Werkzeugen. Zweimal abgeschrieben liefe sie beim naechsten Griff
+    /// auseinander, und der Unterschied waere genau die Art Streifen, den man fuer
+    /// ein Artefakt der Vorschau haelt.
+    ///
+    /// Die Gewichte stehen als Festkomma in einer Tabelle mit step Eintraegen. Die
+    /// erste Fassung rechnete je Bildpunkt eine Division fuer den Gitterplatz und
+    /// vier Vergleiche fuer die Raender - und war damit genauso teuer wie der volle
+    /// Durchgang, also fuer nichts. Ueber die Bloecke zu laufen statt ueber die
+    /// Bildpunkte macht beides ueberfluessig.
+    /// </summary>
+    private static unsafe void Expand(byte* gridPtr, int gridWidth, int gridHeight,
+                                      byte* target, int destinationStride,
+                                      int width, int height, int step)
+    {
+        var weights = new int[step];
+        for (int i = 0; i < step; i++) weights[i] = i * 256 / step;
+
+        fixed (int* weightBase = weights)
+        {
+            int* weight = weightBase;
+
+            Parallel.For(0, gridHeight - 1, new ParallelOptions
             {
-                int* weight = weightBase;
+                MaxDegreeOfParallelism = Math.Clamp(Environment.ProcessorCount, 1, 8),
+            },
+            gy =>
+            {
+                int y0 = gy * step;
+                int rows = Math.Min(step, height - y0);
+                if (rows <= 0) return;
 
-                Parallel.For(0, gridHeight - 1, new ParallelOptions
+                byte* upperRow = gridPtr + (long)gy * gridWidth * 4;
+                byte* lowerRow = gridPtr + (long)(gy + 1) * gridWidth * 4;
+
+                for (int gx = 0; gx < gridWidth - 1; gx++)
                 {
-                    MaxDegreeOfParallelism = Math.Clamp(Environment.ProcessorCount, 1, 8),
-                },
-                gy =>
-                {
-                    int y0 = gy * step;
-                    int rows = Math.Min(step, height - y0);
-                    if (rows <= 0) return;
+                    int x0 = gx * step;
+                    int columns = Math.Min(step, width - x0);
+                    if (columns <= 0) break;
 
-                    byte* upperRow = gridPtr + (long)gy * gridWidth * 4;
-                    byte* lowerRow = gridPtr + (long)(gy + 1) * gridWidth * 4;
+                    // Die vier Ecken des Blocks - einmal je Block gelesen, nicht
+                    // einmal je Bildpunkt.
+                    byte* c00 = upperRow + gx * 4;
+                    byte* c10 = c00 + 4;
+                    byte* c01 = lowerRow + gx * 4;
+                    byte* c11 = c01 + 4;
 
-                    for (int gx = 0; gx < gridWidth - 1; gx++)
+                    for (int dy = 0; dy < rows; dy++)
                     {
-                        int x0 = gx * step;
-                        int columns = Math.Min(step, width - x0);
-                        if (columns <= 0) break;
+                        int wy = weight[dy];
+                        byte* pixel = target + (long)(y0 + dy) * destinationStride + x0 * 4;
 
-                        // Die vier Ecken des Blocks - einmal je Block gelesen, nicht
-                        // einmal je Bildpunkt.
-                        byte* c00 = upperRow + gx * 4;
-                        byte* c10 = c00 + 4;
-                        byte* c01 = lowerRow + gx * 4;
-                        byte* c11 = c01 + 4;
+                        // Die beiden waagerechten Kanten des Blocks, auf dieser
+                        // Zeile schon zusammengezogen.
+                        int l0 = c00[0] + ((c01[0] - c00[0]) * wy >> 8);
+                        int l1 = c00[1] + ((c01[1] - c00[1]) * wy >> 8);
+                        int l2 = c00[2] + ((c01[2] - c00[2]) * wy >> 8);
+                        int l3 = c00[3] + ((c01[3] - c00[3]) * wy >> 8);
 
-                        for (int dy = 0; dy < rows; dy++)
+                        int r0 = c10[0] + ((c11[0] - c10[0]) * wy >> 8);
+                        int r1 = c10[1] + ((c11[1] - c10[1]) * wy >> 8);
+                        int r2 = c10[2] + ((c11[2] - c10[2]) * wy >> 8);
+                        int r3 = c10[3] + ((c11[3] - c10[3]) * wy >> 8);
+
+                        for (int dx = 0; dx < columns; dx++)
                         {
-                            int wy = weight[dy];
-                            byte* pixel = target + (long)(y0 + dy) * destinationStride + x0 * 4;
+                            int wx = weight[dx];
 
-                            // Die beiden waagerechten Kanten des Blocks, auf dieser
-                            // Zeile schon zusammengezogen.
-                            int l0 = c00[0] + ((c01[0] - c00[0]) * wy >> 8);
-                            int l1 = c00[1] + ((c01[1] - c00[1]) * wy >> 8);
-                            int l2 = c00[2] + ((c01[2] - c00[2]) * wy >> 8);
-                            int l3 = c00[3] + ((c01[3] - c00[3]) * wy >> 8);
+                            pixel[0] = (byte)(l0 + ((r0 - l0) * wx >> 8));
+                            pixel[1] = (byte)(l1 + ((r1 - l1) * wx >> 8));
+                            pixel[2] = (byte)(l2 + ((r2 - l2) * wx >> 8));
+                            pixel[3] = (byte)(l3 + ((r3 - l3) * wx >> 8));
 
-                            int r0 = c10[0] + ((c11[0] - c10[0]) * wy >> 8);
-                            int r1 = c10[1] + ((c11[1] - c10[1]) * wy >> 8);
-                            int r2 = c10[2] + ((c11[2] - c10[2]) * wy >> 8);
-                            int r3 = c10[3] + ((c11[3] - c10[3]) * wy >> 8);
-
-                            for (int dx = 0; dx < columns; dx++)
-                            {
-                                int wx = weight[dx];
-
-                                pixel[0] = (byte)(l0 + ((r0 - l0) * wx >> 8));
-                                pixel[1] = (byte)(l1 + ((r1 - l1) * wx >> 8));
-                                pixel[2] = (byte)(l2 + ((r2 - l2) * wx >> 8));
-                                pixel[3] = (byte)(l3 + ((r3 - l3) * wx >> 8));
-
-                                pixel += 4;
-                            }
+                            pixel += 4;
                         }
                     }
-                });
+                }
+            });
+        }
+    }
+
+    /// <summary>
+    /// Der Puffer des oertlichen Wegs - einer je Faden.
+    ///
+    /// Je Faden und nicht je Programm, weil der Stapellauf mehrere Bilder zugleich
+    /// rechnet; ein geteilter Puffer waere ein Wettlauf. Und einmal statt je Bild,
+    /// weil er gross ist: bei 4K rund dreihundert Megabyte, und dreihundertmal neu
+    /// angelegt waere das der teuerste Teil des ganzen Laufs.
+    ///
+    /// Der Preis steht damit fest: So viele Puffer, wie der Lauf Faeden hat. Bei vier
+    /// Arbeitern und 4K ist das gut ein Gigabyte - der Grund, warum dieser Weg nur
+    /// genommen wird, wenn wirklich ein oertliches Werkzeug eingestellt ist.
+    /// </summary>
+    [ThreadStatic]
+    private static LocalPass.Scratch? _scratch;
+
+    /// <summary>
+    /// Der Weg mit oertlichen Werkzeugen: erst alles in einen Puffer, dann
+    /// weichzeichnen, dann hinausschreiben.
+    ///
+    /// Gerechnet wird immer auf einem Gitter - bei voller Aufloesung ist es das ganze
+    /// Bild, beim Reglerzug jeder n-te Punkt. Ein Weg statt zwei: Die Verdopplung
+    /// waere hier besonders teuer, weil die Fehler in der zweiten Fassung erst
+    /// auffielen, wenn jemand waehrend eines Zugs genau hinsieht.
+    /// </summary>
+    private static unsafe void ApplyLocal(FloatFrame frame, ImageAdjustments adjustments,
+                                          IViewTransform view, PreparedGrading grading,
+                                          IntPtr destination, int destinationStride,
+                                          int step, OverlayPlan[] overlays, ILocalTool[] tools)
+    {
+        var plan = BuildPlan(adjustments, view, grading);
+
+        int width = frame.Width;
+        int height = frame.Height;
+
+        int[] columns = LocalPass.Grid(width, step);
+        int[] rows = LocalPass.Grid(height, step);
+
+        var scratch = _scratch ??= new LocalPass.Scratch();
+        scratch.Hold(columns.Length * rows.Length);
+
+        var values = scratch.Values;
+        var alpha = scratch.Alpha;
+
+        var r = frame.R;
+        var g = frame.G;
+        var b = frame.B;
+        var a = frame.A;
+
+        int gridWidth = columns.Length;
+
+        // --- erster Durchgang: die Kette bis hinter die Anzeigewerkzeuge ---
+        Parallel.For(0, rows.Length, new ParallelOptions
+        {
+            MaxDegreeOfParallelism = Math.Clamp(Environment.ProcessorCount, 1, 8),
+        },
+        gy =>
+        {
+            int y = rows[gy];
+            int line = y * width;
+            int row = gy * gridWidth;
+
+            for (int gx = 0; gx < gridWidth; gx++)
+            {
+                int i = line + columns[gx];
+
+                float vr = r[i], vg = g[i], vb = b[i];
+                float va = a is null ? 1f : a[i];
+
+                Shade(in plan, ref vr, ref vg, ref vb, va);
+
+                int at = (row + gx) * 3;
+                values[at] = vr;
+                values[at + 1] = vg;
+                values[at + 2] = vb;
+
+                alpha[row + gx] = ToByte(Math.Clamp(va, 0f, 1f));
             }
+        });
+
+        // --- weichzeichnen und durch die Werkzeuge ---
+        LocalPass.Run(scratch, tools, grading.Reach, gridWidth, rows.Length, width, step);
+
+        // --- zweiter Durchgang: hinausschreiben ---
+        byte* target = (byte*)destination.ToPointer();
+
+        if (step == 1)
+        {
+            Parallel.For(0, rows.Length, new ParallelOptions
+            {
+                MaxDegreeOfParallelism = Math.Clamp(Environment.ProcessorCount, 1, 8),
+            },
+            gy =>
+            {
+                byte* line = target + (long)gy * destinationStride;
+                int row = gy * gridWidth;
+
+                for (int gx = 0; gx < gridWidth; gx++)
+                {
+                    int at = (row + gx) * 3;
+
+                    float vr = values[at], vg = values[at + 1], vb = values[at + 2];
+
+                    // Das Wasserzeichen zuletzt - auch hier. Es soll von einem
+                    // oertlichen Werkzeug so wenig beruehrt werden wie von einer
+                    // Kurve.
+                    if (overlays.Length > 0)
+                        Overlays.Apply(overlays, columns[gx], rows[gy], ref vr, ref vg, ref vb);
+
+                    byte* pixel = line + gx * 4;
+                    pixel[0] = ToByte(vb);
+                    pixel[1] = ToByte(vg);
+                    pixel[2] = ToByte(vr);
+                    pixel[3] = alpha[row + gx];
+                }
+            });
+
+            return;
+        }
+
+        // Grob: erst in ein Bytegitter, dann dazwischen interpolieren - genau wie im
+        // geraden Weg, und mit demselben Gitter.
+        var grid = new byte[gridWidth * rows.Length * 4];
+
+        fixed (byte* gridBase = grid)
+        {
+            byte* gridPtr = gridBase;
+
+            Parallel.For(0, rows.Length, new ParallelOptions
+            {
+                MaxDegreeOfParallelism = Math.Clamp(Environment.ProcessorCount, 1, 8),
+            },
+            gy =>
+            {
+                byte* line = gridPtr + (long)gy * gridWidth * 4;
+                int row = gy * gridWidth;
+
+                for (int gx = 0; gx < gridWidth; gx++)
+                {
+                    int at = (row + gx) * 3;
+
+                    float vr = values[at], vg = values[at + 1], vb = values[at + 2];
+
+                    if (overlays.Length > 0)
+                        Overlays.Apply(overlays, columns[gx], rows[gy], ref vr, ref vg, ref vb);
+
+                    byte* cell = line + gx * 4;
+                    cell[0] = ToByte(vb);
+                    cell[1] = ToByte(vg);
+                    cell[2] = ToByte(vr);
+                    cell[3] = alpha[row + gx];
+                }
+            });
+
+            Expand(gridPtr, gridWidth, rows.Length, target, destinationStride, width, height, step);
         }
     }
 
@@ -380,12 +562,52 @@ public static class FloatFrameProcessor
         ushort* target = (ushort*)destination.ToPointer();
 
         int width = frame.Width;
+        int height = frame.Height;
+
         var r = frame.R;
         var g = frame.G;
         var b = frame.B;
         var a = frame.A;
 
-        Parallel.For(0, frame.Height, new ParallelOptions
+        // Die oertlichen Werkzeuge brauchen auch hier ihren Puffer. Ohne sie bleibt
+        // der Weg, der er war - ein Durchgang, kein Zwischenspeicher.
+        var localTools = grading.Local ?? Array.Empty<ILocalTool>();
+
+        LocalPass.Scratch? scratch = null;
+
+        if (localTools.Length > 0)
+        {
+            scratch = new LocalPass.Scratch();
+            scratch.Hold(width * height);
+
+            var values = scratch.Values;
+
+            Parallel.For(0, height, new ParallelOptions
+            {
+                MaxDegreeOfParallelism = Math.Clamp(Environment.ProcessorCount, 1, 8),
+            },
+            y =>
+            {
+                for (int x = 0; x < width; x++)
+                {
+                    int i = y * width + x;
+
+                    float vr = r[i], vg = g[i], vb = b[i];
+                    Shade(in plan, ref vr, ref vg, ref vb, a is null ? 1f : a[i]);
+
+                    int at = i * 3;
+                    values[at] = vr;
+                    values[at + 1] = vg;
+                    values[at + 2] = vb;
+                }
+            });
+
+            LocalPass.Run(scratch, localTools, grading.Reach, width, height, width, step: 1);
+        }
+
+        var shaded = scratch?.Values;
+
+        Parallel.For(0, height, new ParallelOptions
         {
             MaxDegreeOfParallelism = Math.Clamp(Environment.ProcessorCount, 1, 8),
         },
@@ -396,11 +618,25 @@ public static class FloatFrameProcessor
             for (int x = 0; x < width; x++)
             {
                 int i = y * width + x;
-
-                float vr = r[i], vg = g[i], vb = b[i];
                 float alpha = a is null ? 1f : a[i];
 
-                Shade(in plan, ref vr, ref vg, ref vb, alpha);
+                float vr, vg, vb;
+
+                if (shaded is not null)
+                {
+                    int at = i * 3;
+                    vr = shaded[at];
+                    vg = shaded[at + 1];
+                    vb = shaded[at + 2];
+                }
+                else
+                {
+                    vr = r[i];
+                    vg = g[i];
+                    vb = b[i];
+
+                    Shade(in plan, ref vr, ref vg, ref vb, alpha);
+                }
 
                 if (overlays.Length > 0) Overlays.Apply(overlays, x, y, ref vr, ref vg, ref vb);
 

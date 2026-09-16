@@ -40,6 +40,7 @@ static int RunAll()
     ImageAndGroupInvariants.Run();
     LayerPlacementInvariants.Run();
     PlacementDragInvariants.Run();
+    LocalToolInvariants.Run();
     LayerPanelInvariants.Run();
     PassRebuildInvariants.Run();
     CryptomatteInvariants.Run();
