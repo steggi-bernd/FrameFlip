@@ -72,6 +72,15 @@ public sealed class ImageLayer
     public bool Clipped { get; set; }
 
     /// <summary>
+    /// Wo die Ebene wirkt. Immer vorhanden, in Grundstellung ohne Wirkung.
+    ///
+    /// Als Objekt und nicht als Nullwert, weil die Oberflaeche sonst bei jedem
+    /// Reglerzug erst eines anlegen muesste - und weil "keine Maske" eine Einstellung
+    /// ist und kein Fehlen.
+    /// </summary>
+    public LayerMask Mask { get; set; } = new();
+
+    /// <summary>
     /// True, wenn an der Ebene selbst nichts eingestellt ist. Die Mischung zaehlt
     /// hier NICHT mit: Sie sagt, wie die Ebene auf die darunter wirkt, und das ist
     /// eine Aussage ueber den Stapel, nicht ueber die Ebene. Auf der untersten
@@ -79,7 +88,7 @@ public sealed class ImageLayer
     /// </summary>
     [JsonIgnore]
     public bool IsNeutral
-        => Opacity >= 0.999f && MathF.Abs(Exposure) < 0.001f && Tint.Near(1f);
+        => Opacity >= 0.999f && MathF.Abs(Exposure) < 0.001f && Tint.Near(1f) && Mask.IsNeutral;
 
     /// <summary>True, wenn die Mischung auf Schwarz nichts anderes ergibt als die Ebene selbst.</summary>
     [JsonIgnore]
@@ -94,6 +103,7 @@ public sealed class ImageLayer
         Opacity = Opacity,
         Exposure = Exposure,
         Clipped = Clipped,
+        Mask = Mask.Clone(),
         Tint = Tint.Clone(),
     };
 }
@@ -125,9 +135,33 @@ public sealed class LayerStack
            (Layers.Count == 1 && Layers[0].Visible && Layers[0].Source.Length == 0 &&
             Layers[0].IsNeutral && Layers[0].LiesOnBlack);
 
-    /// <summary>Die Passe, die tatsaechlich gelesen werden muessen.</summary>
+    /// <summary>
+    /// Die Passe, die tatsaechlich gelesen werden muessen.
+    ///
+    /// Auch die der Masken: Eine Ebene, die ihre Maske aus dem Nebelpass zieht,
+    /// braucht diesen Pass genauso wie ihren eigenen. Ihn zu vergessen ergaebe eine
+    /// Maske, die still nichts tut - der unangenehmste Fehler, weil das Bild
+    /// aussieht, als waere die Maske falsch eingestellt.
+    /// </summary>
     public IReadOnlyList<string> NeededSources()
-        => Layers.Where(l => l.Visible).Select(l => l.Source).Distinct(StringComparer.Ordinal).ToList();
+    {
+        var names = new List<string>();
+
+        foreach (var layer in Layers)
+        {
+            if (!layer.Visible) continue;
+
+            if (!names.Contains(layer.Source, StringComparer.Ordinal)) names.Add(layer.Source);
+
+            if (layer.Mask.NeedsSource &&
+                !names.Contains(layer.Mask.Source, StringComparer.Ordinal))
+            {
+                names.Add(layer.Mask.Source);
+            }
+        }
+
+        return names;
+    }
 
     public LayerStack Clone() => new()
     {

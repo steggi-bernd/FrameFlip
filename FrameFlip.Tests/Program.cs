@@ -35,6 +35,7 @@ static int RunAll()
     ColourWheelInvariants.Run();
     BlendInvariants.Run();
     LayerInvariants.Run();
+    MaskInvariants.Run();
     LayerPanelInvariants.Run();
     PassRebuildInvariants.Run();
     AtelierLayerInvariants.Run();

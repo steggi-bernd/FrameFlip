@@ -27,6 +27,31 @@ public partial class LayerPanel : UserControl
     private bool _filling;
 
     /// <summary>
+    /// Die vollen Passnamen hinter den Eintraegen in <c>MaskSourceBox</c>.
+    ///
+    /// Angezeigt wird der Kurzname, gespeichert der volle - in einer 300 Punkte
+    /// breiten Spalte stuende sonst vierzehnmal "ViewLayer." davor.
+    /// </summary>
+    private readonly List<string> _maskSources = new();
+
+    /// <summary>
+    /// Die Maskenarten in der Reihenfolge der Auswahl.
+    ///
+    /// Eine Tabelle statt der blossen Aufzaehlung, weil nicht jede Art schon
+    /// bedienbar ist: Die Kryptomatte steht im Modell, hat aber noch keine Auswahl
+    /// von Objekten - sie hier anzubieten hiesse, einen Eintrag zu zeigen, der nichts
+    /// tut.
+    /// </summary>
+    private static readonly (MaskKind Kind, string Key)[] MaskKinds =
+    {
+        (MaskKind.None, "S_MaskNone"),
+        (MaskKind.Luminance, "S_MaskLuminance"),
+        (MaskKind.Underlying, "S_MaskUnderlying"),
+        (MaskKind.Pass, "S_MaskPass"),
+        (MaskKind.Gradient, "S_MaskGradient"),
+    };
+
+    /// <summary>
     /// Wie weit der Rand des Farbrades traegt. 0,5 heisst: ein Kanal reicht von der
     /// Haelfte bis zum Anderthalbfachen - genug fuer eine deutliche Einfaerbung und
     /// wenig genug, dass ein Kanal nie auf null faellt.
@@ -39,6 +64,9 @@ public partial class LayerPanel : UserControl
 
         foreach (var (_, key) in Blending.All) ModeBox.Items.Add(Strings.T(key));
         ModeBox.SelectedIndex = 0;
+
+        foreach (var (_, key) in MaskKinds) MaskBox.Items.Add(Strings.T(key));
+        MaskBox.SelectedIndex = 0;
 
         TintWheel.Changed += OnTintChanged;
         TintWheel.Released += () => Raise(interim: false);
@@ -66,6 +94,7 @@ public partial class LayerPanel : UserControl
     public void Load(IReadOnlyList<ExrPass> passes, LayerStack? stack)
     {
         _passes = passes;
+        FillMaskSources();
 
         Stack.Layers.Clear();
         if (stack is not null) Stack.Layers.AddRange(stack.Layers.Select(l => l.Clone()));
@@ -188,9 +217,13 @@ public partial class LayerPanel : UserControl
         // Die Mischung steht in der Zeile, nicht nur im Auswahlfeld darunter: Ein
         // Stapel, in dem eine Ebene multipliziert und der Rest addiert, erklaert
         // sich damit auf einen Blick.
+        // Ein Punkt vor der Mischung, wenn die Ebene maskiert ist. Ohne ihn waere
+        // eine Ebene, die nur an einer Stelle wirkt, in der Liste nicht von einer zu
+        // unterscheiden, die ueberall wirkt - und man suchte den Grund woanders.
         var mode = new TextBlock
         {
-            Text = Strings.T(Blending.All.First(m => m.Mode == layer.Mode).Key),
+            Text = (layer.Mask.IsNeutral ? "" : "\u25D0 ") +
+                   Strings.T(Blending.All.First(m => m.Mode == layer.Mode).Key),
             FontSize = 9,
             Margin = new Thickness(6, 0, 0, 0),
             VerticalAlignment = VerticalAlignment.Center,
@@ -461,6 +494,8 @@ public partial class LayerPanel : UserControl
             TintWheel.Value = ColourWheelMath.ToPoint(_selected.Tint.R / TintScale,
                                                       _selected.Tint.G / TintScale,
                                                       _selected.Tint.B / TintScale);
+
+            PushMaskToControls();
         }
         finally
         {
@@ -468,6 +503,7 @@ public partial class LayerPanel : UserControl
         }
 
         UpdateValues();
+        ShowMaskControls();
     }
 
     private void UpdateValues()
@@ -495,4 +531,183 @@ public partial class LayerPanel : UserControl
     }
 
     private void Raise(bool interim) => Changed?.Invoke(interim);
+
+    // --------------------------------------------------------------------- Masken
+
+    private void FillMaskSources()
+    {
+        _filling = true;
+
+        try
+        {
+            MaskSourceBox.Items.Clear();
+            _maskSources.Clear();
+
+            foreach (var pass in _passes)
+            {
+                MaskSourceBox.Items.Add(pass.ShortName);
+                _maskSources.Add(pass.Name);
+            }
+        }
+        finally
+        {
+            _filling = false;
+        }
+    }
+
+    private void OnMaskFoldClicked(object sender, RoutedEventArgs e)
+    {
+        bool open = MaskBody.Visibility != Visibility.Visible;
+        MaskBody.Visibility = open ? Visibility.Visible : Visibility.Collapsed;
+        MaskFoldButton.Content = open ? "\u2212" : "+";
+    }
+
+    private void OnMaskKindChanged(object sender, SelectionChangedEventArgs e)
+    {
+        if (_filling || _selected is null) return;
+
+        var mask = _selected.Mask;
+        mask.Kind = MaskKinds[Math.Clamp(MaskBox.SelectedIndex, 0, MaskKinds.Length - 1)].Kind;
+
+        // Beim Umschalten auf einen Pass gleich den ersten nehmen. Eine Maskenart
+        // ohne Quelle waere eine Einstellung, die stillschweigend nichts tut.
+        if (mask.NeedsSource || mask.Kind is MaskKind.Pass or MaskKind.Cryptomatte)
+        {
+            if (mask.Source.Length == 0 && _maskSources.Count > 0) mask.Source = _maskSources[0];
+        }
+
+        ShowMaskControls();
+        Rebuild();
+        Raise(interim: false);
+    }
+
+    private void OnMaskSourceChanged(object sender, SelectionChangedEventArgs e)
+    {
+        if (_filling || _selected is null) return;
+
+        int at = MaskSourceBox.SelectedIndex;
+        if (at < 0 || at >= _maskSources.Count) return;
+
+        _selected.Mask.Source = _maskSources[at];
+
+        // Ein neuer Pass muss gelesen werden - deshalb die vollstaendige Meldung.
+        Raise(interim: false);
+    }
+
+    private void OnMaskInvertChanged(object sender, RoutedEventArgs e)
+    {
+        if (_filling || _selected is null) return;
+
+        _selected.Mask.Invert = MaskInvertButton.IsChecked == true;
+        Raise(interim: false);
+    }
+
+    private void OnMaskSliderChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
+    {
+        if (_filling || !IsLoaded || _selected is null) return;
+
+        var mask = _selected.Mask;
+
+        mask.Low = (float)MaskLowSlider.Value;
+        mask.High = (float)MaskHighSlider.Value;
+        mask.Softness = (float)MaskSoftSlider.Value;
+        mask.Angle = (float)MaskAngleSlider.Value;
+        mask.Centre = (float)MaskCentreSlider.Value;
+        mask.Width = (float)MaskWidthSlider.Value;
+
+        // Von darf Bis nicht ueberholen - sonst laesst die Maske nichts mehr durch,
+        // und das sieht aus, als waere die Ebene verschwunden.
+        if (mask.Low > mask.High)
+        {
+            _filling = true;
+
+            try
+            {
+                if (ReferenceEquals(sender, MaskLowSlider)) MaskHighSlider.Value = mask.Low;
+                else MaskLowSlider.Value = mask.High;
+            }
+            finally
+            {
+                _filling = false;
+            }
+
+            mask.Low = (float)MaskLowSlider.Value;
+            mask.High = (float)MaskHighSlider.Value;
+        }
+
+        UpdateMaskValues();
+        Raise(interim: true);
+    }
+
+    /// <summary>Zeigt die Regler, die zur gewaehlten Art gehoeren - und nur die.</summary>
+    private void ShowMaskControls()
+    {
+        var kind = _selected?.Mask.Kind ?? MaskKind.None;
+
+        bool range = kind is MaskKind.Luminance or MaskKind.Underlying or MaskKind.Pass;
+        bool gradient = kind == MaskKind.Gradient;
+        bool source = kind is MaskKind.Pass or MaskKind.Cryptomatte;
+
+        MaskRangeBody.Visibility = range ? Visibility.Visible : Visibility.Collapsed;
+        MaskGradientBody.Visibility = gradient ? Visibility.Visible : Visibility.Collapsed;
+        MaskSourceBox.Visibility = source ? Visibility.Visible : Visibility.Collapsed;
+        MaskInvertButton.IsEnabled = kind != MaskKind.None;
+
+        // Dieselben zwei Regler, aber nicht dieselbe Rechnung - und deshalb auch
+        // nicht dieselbe Beschriftung. Bei der Helligkeit sind sie ein Fenster: was
+        // dazwischen liegt, wirkt. Auf einem Maskenpass sind sie Schwarz- und
+        // Weisspunkt: was darunter liegt, faellt weg, was darueber liegt, wirkt voll.
+        // Gleich beschriftet waere das eine Falle.
+        bool levels = kind == MaskKind.Pass;
+
+        MaskLowLabel.Text = Strings.T(levels ? "S_MaskBlack" : "S_MaskFrom");
+        MaskHighLabel.Text = Strings.T(levels ? "S_MaskWhite" : "S_MaskTo");
+
+        // Die Weichheit gehoert zum Fenster. Ein Schwarz- und ein Weisspunkt haben
+        // ihre Kante schon im Abstand zueinander.
+        MaskSoftRow.Visibility = levels ? Visibility.Collapsed : Visibility.Visible;
+        MaskSoftSlider.Visibility = levels ? Visibility.Collapsed : Visibility.Visible;
+
+        MaskHint.Text = kind switch
+        {
+            MaskKind.Pass => Strings.T("S_MaskHintPass"),
+            MaskKind.Gradient => Strings.T("S_MaskHintGradient"),
+            MaskKind.Luminance or MaskKind.Underlying => Strings.T("S_MaskHintLuma"),
+            _ => "",
+        };
+
+        MaskHint.Visibility = MaskHint.Text.Length == 0 ? Visibility.Collapsed : Visibility.Visible;
+    }
+
+    private void PushMaskToControls()
+    {
+        var mask = _selected?.Mask ?? new LayerMask();
+
+        int kind = Array.FindIndex(MaskKinds, m => m.Kind == mask.Kind);
+        MaskBox.SelectedIndex = Math.Max(0, kind);
+
+        MaskInvertButton.IsChecked = mask.Invert;
+
+        MaskLowSlider.Value = Math.Clamp(mask.Low, MaskLowSlider.Minimum, MaskLowSlider.Maximum);
+        MaskHighSlider.Value = Math.Clamp(mask.High, MaskHighSlider.Minimum, MaskHighSlider.Maximum);
+        MaskSoftSlider.Value = Math.Clamp(mask.Softness, MaskSoftSlider.Minimum, MaskSoftSlider.Maximum);
+        MaskAngleSlider.Value = Math.Clamp(mask.Angle, MaskAngleSlider.Minimum, MaskAngleSlider.Maximum);
+        MaskCentreSlider.Value = Math.Clamp(mask.Centre, MaskCentreSlider.Minimum, MaskCentreSlider.Maximum);
+        MaskWidthSlider.Value = Math.Clamp(mask.Width, MaskWidthSlider.Minimum, MaskWidthSlider.Maximum);
+
+        int source = _maskSources.FindIndex(s => s.Equals(mask.Source, StringComparison.Ordinal));
+        MaskSourceBox.SelectedIndex = source;
+
+        UpdateMaskValues();
+    }
+
+    private void UpdateMaskValues()
+    {
+        MaskLowValue.Text = $"{MaskLowSlider.Value:0.00}";
+        MaskHighValue.Text = $"{MaskHighSlider.Value:0.00}";
+        MaskSoftValue.Text = $"{MaskSoftSlider.Value:0.00}";
+        MaskAngleValue.Text = $"{MaskAngleSlider.Value:0} \u00B0";
+        MaskCentreValue.Text = $"{MaskCentreSlider.Value:0.00}";
+        MaskWidthValue.Text = $"{MaskWidthSlider.Value:0.00}";
+    }
 }

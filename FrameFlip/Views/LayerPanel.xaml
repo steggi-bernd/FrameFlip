@@ -188,7 +188,102 @@
                     </StackPanel>
                 </Grid>
 
-                <TextBlock x:Name="HintText" Margin="0,8,0,0" FontSize="10"
+                <!--
+                    Die Maske. Ein Wert je Bildpunkt, der sagt, wie stark die Ebene
+                    dort wirkt - sie multipliziert die Deckkraft und sonst nichts.
+                    Deshalb steht sie hier, gleich unter ihr: Es ist dieselbe
+                    Groesse, nur oertlich statt ueberall.
+                -->
+                <Grid Margin="0,12,0,0">
+                    <TextBlock Text="{DynamicResource S_Mask}" Style="{StaticResource PanelHeading}" />
+                    <Button x:Name="MaskFoldButton" Style="{StaticResource LinkButton}"
+                            HorizontalAlignment="Right" Content="+"
+                            Click="OnMaskFoldClicked" />
+                </Grid>
+
+                <StackPanel x:Name="MaskBody" Visibility="Collapsed" Margin="0,6,0,0">
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+
+                        <ComboBox x:Name="MaskBox" Grid.Column="0" Style="{StaticResource OverlayCombo}"
+                                  SelectionChanged="OnMaskKindChanged" />
+
+                        <ToggleButton x:Name="MaskInvertButton" Grid.Column="1"
+                                      Style="{StaticResource OverlayToggle}" Margin="6,0,0,0"
+                                      MinWidth="34" Content="±"
+                                      Checked="OnMaskInvertChanged" Unchecked="OnMaskInvertChanged"
+                                      ToolTip="{DynamicResource S_MaskInvert}" />
+                    </Grid>
+
+                    <!-- Welcher Pass die Maske traegt -->
+                    <ComboBox x:Name="MaskSourceBox" Style="{StaticResource OverlayCombo}"
+                              Margin="0,6,0,0" Visibility="Collapsed"
+                              SelectionChanged="OnMaskSourceChanged" />
+
+                    <!-- Helligkeit, Untergrund, Pass: ein Bereich mit weichen Kanten -->
+                    <StackPanel x:Name="MaskRangeBody" Visibility="Collapsed">
+                        <Grid Margin="0,10,0,2">
+                            <TextBlock x:Name="MaskLowLabel" Text="{DynamicResource S_MaskFrom}"
+                                       Style="{StaticResource PanelLabel}" />
+                            <TextBlock x:Name="MaskLowValue" Style="{StaticResource PanelValue}" />
+                        </Grid>
+                        <Slider x:Name="MaskLowSlider" Style="{StaticResource PanelSlider}"
+                                Minimum="0" Maximum="1" Value="0" SmallChange="0.01" LargeChange="0.05"
+                                ValueChanged="OnMaskSliderChanged" MouseDoubleClick="OnSliderReset" Tag="0" />
+
+                        <Grid Margin="0,8,0,2">
+                            <TextBlock x:Name="MaskHighLabel" Text="{DynamicResource S_MaskTo}"
+                                       Style="{StaticResource PanelLabel}" />
+                            <TextBlock x:Name="MaskHighValue" Style="{StaticResource PanelValue}" />
+                        </Grid>
+                        <Slider x:Name="MaskHighSlider" Style="{StaticResource PanelSlider}"
+                                Minimum="0" Maximum="1" Value="1" SmallChange="0.01" LargeChange="0.05"
+                                ValueChanged="OnMaskSliderChanged" MouseDoubleClick="OnSliderReset" Tag="1" />
+
+                        <Grid x:Name="MaskSoftRow" Margin="0,8,0,2">
+                            <TextBlock Text="{DynamicResource S_MaskSoft}" Style="{StaticResource PanelLabel}" />
+                            <TextBlock x:Name="MaskSoftValue" Style="{StaticResource PanelValue}" />
+                        </Grid>
+                        <Slider x:Name="MaskSoftSlider" Style="{StaticResource PanelSlider}"
+                                Minimum="0" Maximum="0.5" Value="0.1" SmallChange="0.01" LargeChange="0.05"
+                                ValueChanged="OnMaskSliderChanged" MouseDoubleClick="OnSliderReset" Tag="0.1" />
+                    </StackPanel>
+
+                    <!-- Verlauf: Richtung, Mitte, Breite -->
+                    <StackPanel x:Name="MaskGradientBody" Visibility="Collapsed">
+                        <Grid Margin="0,10,0,2">
+                            <TextBlock Text="{DynamicResource S_MaskAngle}" Style="{StaticResource PanelLabel}" />
+                            <TextBlock x:Name="MaskAngleValue" Style="{StaticResource PanelValue}" />
+                        </Grid>
+                        <Slider x:Name="MaskAngleSlider" Style="{StaticResource PanelSlider}"
+                                Minimum="0" Maximum="360" Value="90" SmallChange="1" LargeChange="15"
+                                ValueChanged="OnMaskSliderChanged" MouseDoubleClick="OnSliderReset" Tag="90" />
+
+                        <Grid Margin="0,8,0,2">
+                            <TextBlock Text="{DynamicResource S_MaskCentre}" Style="{StaticResource PanelLabel}" />
+                            <TextBlock x:Name="MaskCentreValue" Style="{StaticResource PanelValue}" />
+                        </Grid>
+                        <Slider x:Name="MaskCentreSlider" Style="{StaticResource PanelSlider}"
+                                Minimum="0" Maximum="1" Value="0.5" SmallChange="0.01" LargeChange="0.05"
+                                ValueChanged="OnMaskSliderChanged" MouseDoubleClick="OnSliderReset" Tag="0.5" />
+
+                        <Grid Margin="0,8,0,2">
+                            <TextBlock Text="{DynamicResource S_MaskWidth}" Style="{StaticResource PanelLabel}" />
+                            <TextBlock x:Name="MaskWidthValue" Style="{StaticResource PanelValue}" />
+                        </Grid>
+                        <Slider x:Name="MaskWidthSlider" Style="{StaticResource PanelSlider}"
+                                Minimum="0" Maximum="1.5" Value="0.5" SmallChange="0.02" LargeChange="0.1"
+                                ValueChanged="OnMaskSliderChanged" MouseDoubleClick="OnSliderReset" Tag="0.5" />
+                    </StackPanel>
+
+                    <TextBlock x:Name="MaskHint" Margin="0,8,0,0" FontSize="10"
+                               Foreground="{StaticResource MutedBrush}" TextWrapping="Wrap" />
+                </StackPanel>
+
+                <TextBlock x:Name="HintText" Margin="0,10,0,0" FontSize="10"
                            Foreground="{StaticResource MutedBrush}" TextWrapping="Wrap"
                            Text="{DynamicResource S_LayersHint}" />
             </StackPanel>

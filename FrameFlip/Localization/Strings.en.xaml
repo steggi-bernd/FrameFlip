@@ -67,6 +67,27 @@
     <sys:String x:Key="S_AddLayer">Add a pass as a layer</sys:String>
     <sys:String x:Key="S_AddAllPasses">All passes – rebuild the image</sys:String>
     <sys:String x:Key="S_ClipLayer">Affect only the layer below (clipping mask)</sys:String>
+
+    <!-- ================================================================ Masks -->
+    <sys:String x:Key="S_Mask">Mask</sys:String>
+    <sys:String x:Key="S_MaskNone">None</sys:String>
+    <sys:String x:Key="S_MaskLuminance">Brightness of the layer</sys:String>
+    <sys:String x:Key="S_MaskUnderlying">Brightness below</sys:String>
+    <sys:String x:Key="S_MaskPass">Pass</sys:String>
+    <sys:String x:Key="S_MaskGradient">Gradient</sys:String>
+    <sys:String x:Key="S_MaskCryptomatte">Cryptomatte</sys:String>
+    <sys:String x:Key="S_MaskFrom">From</sys:String>
+    <sys:String x:Key="S_MaskBlack">Black point</sys:String>
+    <sys:String x:Key="S_MaskWhite">White point</sys:String>
+    <sys:String x:Key="S_MaskTo">To</sys:String>
+    <sys:String x:Key="S_MaskSoft">Softness</sys:String>
+    <sys:String x:Key="S_MaskInvert">Invert the mask</sys:String>
+    <sys:String x:Key="S_MaskAngle">Direction</sys:String>
+    <sys:String x:Key="S_MaskCentre">Centre</sys:String>
+    <sys:String x:Key="S_MaskWidth">Width</sys:String>
+    <sys:String x:Key="S_MaskHintLuma">From and To limit where the layer acts. Middle grey sits at 0.50 – so “highlights” start around 0.65.</sys:String>
+    <sys:String x:Key="S_MaskHintPass">The pass is the mask – its value goes in unchanged. Black and white point pull it tighter, as on any matte. Meant for mist, shadow and index masks; a depth in metres lies above that and saturates.</sys:String>
+    <sys:String x:Key="S_MaskHintGradient">0° runs left to right, 90° top to bottom. Width 0 is a hard edge.</sys:String>
     <sys:String x:Key="S_DuplicateLayer">Duplicate</sys:String>
     <sys:String x:Key="S_RemoveLayer">Remove</sys:String>
     <sys:String x:Key="S_MoveLayerUp">Move up</sys:String>

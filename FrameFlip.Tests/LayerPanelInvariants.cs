@@ -25,6 +25,7 @@ public static class LayerPanelInvariants
             AddDuplicateRemove(panel);
             OrderMovesInTheStack(panel);
             ClipTogglesOnTheSelection(panel);
+            MaskControlsReachTheLayer(panel);
             ListReadsTopDown(panel);
         });
     }
@@ -246,6 +247,107 @@ public static class LayerPanelInvariants
         // Nach ganz unten geschoben kann sie sich an nichts mehr anschneiden.
         Click(panel, "DownButton");
         Check.That(!clip.IsEnabled, "auf der untersten Ebene ist der Knopf gesperrt");
+    }
+
+    /// <summary>
+    /// Die Maskenregler - dieselbe Frage wie bei allen anderen: kommt es an?
+    ///
+    /// Und eine zweite dazu: Zeigt der Streifen nur die Regler, die zur gewaehlten
+    /// Art gehoeren? Ein Schwarzpunkt neben einem Verlauf waere kein Schaden, aber
+    /// eine Einladung, an etwas zu drehen, das nichts tut.
+    /// </summary>
+    private static void MaskControlsReachTheLayer(LayerPanel panel)
+    {
+        Check.Group("Die Maskenregler erreichen die Ebene");
+
+        panel.Load(Passes(), new LayerStack
+        {
+            Layers = { new ImageLayer { Source = "ViewLayer.GlossDir", Name = "Glanz" } },
+        });
+
+        var layer = panel.Stack.Layers[0];
+        Check.That(layer.Mask.Kind == MaskKind.None, "ohne Zutun ist keine Maske gesetzt");
+
+        int changes = 0;
+        panel.Changed += _ => changes++;
+
+        var box = (ComboBox)panel.FindName("MaskBox");
+        var range = (FrameworkElement)panel.FindName("MaskRangeBody");
+        var gradient = (FrameworkElement)panel.FindName("MaskGradientBody");
+        var source = (FrameworkElement)panel.FindName("MaskSourceBox");
+        var soft = (FrameworkElement)panel.FindName("MaskSoftSlider");
+
+        // Helligkeit: Bereich mit Weichheit, keine Quelle.
+        box.SelectedIndex = IndexOf(box, "S_MaskLuminance");
+
+        Check.That(changes > 0, "die Auswahl meldet", $"{changes}");
+        Check.That(layer.Mask.Kind == MaskKind.Luminance, "und steht in der Ebene");
+        Check.That(range.Visibility == Visibility.Visible, "der Bereich zeigt sich");
+        Check.That(soft.Visibility == Visibility.Visible, "samt Weichheit");
+        Check.That(source.Visibility != Visibility.Visible, "eine Quelle braucht es nicht");
+        Check.That(gradient.Visibility != Visibility.Visible, "und den Verlauf auch nicht");
+
+        changes = 0;
+        var low = (Slider)panel.FindName("MaskLowSlider");
+        low.Value = 0.6;
+
+        Check.That(changes > 0, "ein Maskenregler meldet", $"{changes}");
+        Check.Near(layer.Mask.Low, 0.6, 0.001, "und kommt an");
+
+        // Von darf Bis nicht ueberholen - sonst laesst die Maske nichts mehr durch,
+        // und die Ebene sieht aus, als waere sie verschwunden.
+        var high = (Slider)panel.FindName("MaskHighSlider");
+        high.Value = 0.3;
+
+        Check.That(layer.Mask.Low <= layer.Mask.High, "Von bleibt unter Bis",
+                   $"{layer.Mask.Low:0.##} / {layer.Mask.High:0.##}");
+
+        // Pass: Quelle statt Weichheit, und die Quelle wird gleich mitgesetzt.
+        box.SelectedIndex = IndexOf(box, "S_MaskPass");
+
+        Check.That(layer.Mask.Kind == MaskKind.Pass, "die Passmaske laesst sich waehlen");
+        Check.That(layer.Mask.Source.Length > 0, "und bekommt gleich eine Quelle",
+                   layer.Mask.Source);
+        Check.That(source.Visibility == Visibility.Visible, "die Quelle zeigt sich");
+        Check.That(soft.Visibility != Visibility.Visible,
+                   "die Weichheit nicht - dort sind es Schwarz- und Weisspunkt");
+
+        // Verlauf: nur Richtung, Mitte, Breite.
+        box.SelectedIndex = IndexOf(box, "S_MaskGradient");
+
+        Check.That(layer.Mask.Kind == MaskKind.Gradient, "der Verlauf ebenso");
+        Check.That(gradient.Visibility == Visibility.Visible, "seine Regler zeigen sich");
+        Check.That(range.Visibility != Visibility.Visible, "der Bereich verschwindet");
+
+        changes = 0;
+        var angle = (Slider)panel.FindName("MaskAngleSlider");
+        angle.Value = 215;
+
+        Check.That(changes > 0, "die Richtung meldet", $"{changes}");
+        Check.Near(layer.Mask.Angle, 215, 0.5, "und kommt an");
+
+        // Umkehren.
+        changes = 0;
+        var invert = (System.Windows.Controls.Primitives.ToggleButton)panel.FindName("MaskInvertButton");
+        invert.IsChecked = true;
+
+        Check.That(changes > 0, "das Umkehren meldet", $"{changes}");
+        Check.That(layer.Mask.Invert, "und steht in der Maske");
+
+        // Und zurueck auf keine.
+        box.SelectedIndex = IndexOf(box, "S_MaskNone");
+        Check.That(layer.Mask.IsNeutral, "ohne Maske ist die Ebene wieder neutral");
+    }
+
+    /// <summary>Der Platz eines Eintrags in der Auswahl, ueber seinen uebersetzten Namen.</summary>
+    private static int IndexOf(ComboBox box, string key)
+    {
+        string wanted = FrameFlip.Localization.Strings.T(key);
+
+        for (int i = 0; i < box.Items.Count; i++)
+            if (Equals(box.Items[i], wanted)) return i;
+
+        return 0;
     }
 
     /// <summary>

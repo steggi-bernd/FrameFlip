@@ -67,6 +67,27 @@
     <sys:String x:Key="S_AddLayer">Pass als Ebene hinzufuegen</sys:String>
     <sys:String x:Key="S_AddAllPasses">Alle Passe – Bild nachbauen</sys:String>
     <sys:String x:Key="S_ClipLayer">Nur auf die Ebene darunter wirken (Schnittmaske)</sys:String>
+
+    <!-- ================================================================ Masken -->
+    <sys:String x:Key="S_Mask">Maske</sys:String>
+    <sys:String x:Key="S_MaskNone">Keine</sys:String>
+    <sys:String x:Key="S_MaskLuminance">Helligkeit der Ebene</sys:String>
+    <sys:String x:Key="S_MaskUnderlying">Helligkeit darunter</sys:String>
+    <sys:String x:Key="S_MaskPass">Pass</sys:String>
+    <sys:String x:Key="S_MaskGradient">Verlauf</sys:String>
+    <sys:String x:Key="S_MaskCryptomatte">Kryptomatte</sys:String>
+    <sys:String x:Key="S_MaskFrom">Von</sys:String>
+    <sys:String x:Key="S_MaskBlack">Schwarzpunkt</sys:String>
+    <sys:String x:Key="S_MaskWhite">Weißpunkt</sys:String>
+    <sys:String x:Key="S_MaskTo">Bis</sys:String>
+    <sys:String x:Key="S_MaskSoft">Weichheit</sys:String>
+    <sys:String x:Key="S_MaskInvert">Maske umkehren</sys:String>
+    <sys:String x:Key="S_MaskAngle">Richtung</sys:String>
+    <sys:String x:Key="S_MaskCentre">Mitte</sys:String>
+    <sys:String x:Key="S_MaskWidth">Breite</sys:String>
+    <sys:String x:Key="S_MaskHintLuma">Von und Bis grenzen ein, wo die Ebene wirkt. Mittleres Grau liegt bei 0,50 – „Lichter“ fängt also etwa bei 0,65 an.</sys:String>
+    <sys:String x:Key="S_MaskHintPass">Der Pass ist die Maske – sein Wert geht unverändert ein. Schwarz- und Weißpunkt ziehen sie an, wie bei jeder Maske. Gedacht für Nebel, Verschattung und Indexmasken; eine Tiefe in Metern liegt darüber und läuft an.</sys:String>
+    <sys:String x:Key="S_MaskHintGradient">0° läuft von links nach rechts, 90° von oben nach unten. Breite 0 ist eine Kante.</sys:String>
     <sys:String x:Key="S_DuplicateLayer">Verdoppeln</sys:String>
     <sys:String x:Key="S_RemoveLayer">Entfernen</sys:String>
     <sys:String x:Key="S_MoveLayerUp">Nach oben</sys:String>

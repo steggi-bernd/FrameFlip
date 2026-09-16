@@ -80,8 +80,28 @@ public static class LayerComposer
             // lassen - sie wird stattdessen zur gewoehnlichen Ebene.
             bool clipped = layer.Clipped && i > 0;
 
+            // Der Pass, aus dem die Maske liest. Fehlt er, faellt die Maske weg -
+            // eine Ebene ganz verschwinden zu lassen, weil ihre Maske nicht gelesen
+            // werden konnte, waere die falsche Antwort auf eine fehlende Datei.
+            FloatFrame? maskFrame = null;
+            var maskKind = layer.Mask.Kind;
+
+            if (layer.Mask.NeedsSource)
+            {
+                if (sources.TryGetValue(layer.Mask.Source, out var found) &&
+                    found.Width == width && found.Height == height)
+                {
+                    maskFrame = found;
+                }
+                else
+                {
+                    maskKind = MaskKind.None;
+                }
+            }
+
             plans[i] = new Plan(used[i].Frame, layer.Mode, Math.Clamp(layer.Opacity, 0f, 1f),
-                                gain * layer.Tint.R, gain * layer.Tint.G, gain * layer.Tint.B, clipped);
+                                gain * layer.Tint.R, gain * layer.Tint.G, gain * layer.Tint.B, clipped,
+                                layer.Mask, maskKind, maskFrame);
         }
 
         Parallel.For(0, height, new ParallelOptions
@@ -121,9 +141,23 @@ public static class LayerComposer
                     float lg = frame.G[i] * plan.ScaleG;
                     float lb = frame.B[i] * plan.ScaleB;
 
-                    if (plan.Clipped && open)
+                    bool inGroup = plan.Clipped && open;
+
+                    // Die Maske greift an genau einer Stelle an: Sie macht die
+                    // Deckkraft oertlich. Damit gilt fuer jede Mischung und jede
+                    // Schnittmaske dieselbe Regel, und es gibt keinen Fall, in dem
+                    // eine Maske etwas anderes bedeutet als sonst.
+                    float opacity = plan.Mask == MaskKind.None
+                        ? plan.Opacity
+                        : plan.Opacity * Factor(in plan, x, y, width, height, i,
+                                                lr, lg, lb,
+                                                inGroup ? gr : vr,
+                                                inGroup ? gg : vg,
+                                                inGroup ? gb : vb);
+
+                    if (inGroup)
                     {
-                        Blending.Mix(plan.Mode, plan.Opacity, gr, gg, gb, lr, lg, lb,
+                        Blending.Mix(plan.Mode, opacity, gr, gg, gb, lr, lg, lb,
                                      out gr, out gg, out gb);
                     }
                     else
@@ -136,7 +170,12 @@ public static class LayerComposer
                         gg = lg;
                         gb = lb;
                         groupMode = plan.Mode;
-                        groupOpacity = plan.Opacity;
+
+                        // Die Gruppe fuehrt die Deckkraft ihres Traegers mit, und
+                        // damit auch dessen Maske: Erst wenn die Gruppe geschlossen
+                        // wird, mischt sie sich auf das Ergebnis, und bis dahin muss
+                        // der oertliche Wert erhalten bleiben.
+                        groupOpacity = opacity;
                         open = true;
                     }
 
@@ -144,7 +183,7 @@ public static class LayerComposer
                     // irgendeine Ebene deckt, deckt das Ergebnis. Sie durch dieselbe
                     // Formel zu schicken wie die Farbe hiesse, Alpha auf Add zu
                     // summieren - drei Passe ergaeben Deckung 3.
-                    float la = (frame.A is null ? 1f : frame.A[i]) * plan.Opacity;
+                    float la = (frame.A is null ? 1f : frame.A[i]) * opacity;
                     if (la > va) va = la;
                 }
 
@@ -172,11 +211,71 @@ public static class LayerComposer
         };
     }
 
+    // Rec.-709-Luminanz, dieselben Gewichte wie im uebrigen Bildweg.
+    private const float LumaR = 0.2126f;
+    private const float LumaG = 0.7152f;
+    private const float LumaB = 0.0722f;
+
+    /// <summary>
+    /// Der Maskenwert eines Bildpunkts, zwischen 0 und 1.
+    /// </summary>
+    /// <param name="lr">Die Ebene selbst, bereits mit Belichtung und Farbe.</param>
+    /// <param name="ur">Was an dieser Stelle schon darunter liegt.</param>
+    private static float Factor(in Plan plan, int x, int y, int width, int height, int i,
+                                float lr, float lg, float lb,
+                                float ur, float ug, float ub)
+    {
+        float value;
+
+        switch (plan.Mask)
+        {
+            case MaskKind.Luminance:
+                value = Masking.Perceptual(LumaR * lr + LumaG * lg + LumaB * lb);
+                break;
+
+            case MaskKind.Underlying:
+                value = Masking.Perceptual(LumaR * ur + LumaG * ug + LumaB * ub);
+                break;
+
+            case MaskKind.Pass:
+                // Ein anderer Weg als bei der Helligkeit, und das mit Absicht.
+                //
+                // Nebel, Verschattung und Indexmasken sind bereits Masken: Ihr Wert
+                // IST der Anteil. Er wird durchgereicht und bekommt nur einen
+                // Schwarz- und einen Weisspunkt, wie jede Maske, die man anzieht.
+                // Durch das Bereichsfenster der Helligkeitsmaske geschickt taete er
+                // in Grundstellung nichts - jeder Wert zwischen 0 und 1 liegt im
+                // Fenster 0 bis 1.
+                //
+                // Ueber die Luminanz und nicht ueber Rot allein: Bei einem
+                // Graustufenpass sind beide identisch, bei einem farbigen waere Rot
+                // eine willkuerliche Wahl.
+                var m = plan.MaskFrame!;
+                float raw = LumaR * m.R[i] + LumaG * m.G[i] + LumaB * m.B[i];
+
+                return Fit(Masking.Levels(raw, plan.MaskLow, plan.MaskHigh), plan.MaskInvert);
+
+            case MaskKind.Gradient:
+                return Fit(Masking.Gradient(x, y, width, height,
+                                            plan.GradientCos, plan.GradientSin,
+                                            plan.GradientFrom, plan.GradientTo), plan.MaskInvert);
+
+            default:
+                return 1f;
+        }
+
+        return Fit(Masking.Band(value, plan.MaskLow, plan.MaskHigh, plan.MaskSoftness),
+                   plan.MaskInvert);
+    }
+
+    private static float Fit(float factor, bool invert) => invert ? 1f - factor : factor;
+
     /// <summary>Was je Ebene einmal feststeht.</summary>
     private readonly struct Plan
     {
         public Plan(FloatFrame frame, BlendMode mode, float opacity,
-                    float sr, float sg, float sb, bool clipped)
+                    float sr, float sg, float sb, bool clipped,
+                    LayerMask mask, MaskKind kind, FloatFrame? maskFrame)
         {
             Frame = frame;
             Mode = mode;
@@ -185,11 +284,34 @@ public static class LayerComposer
             ScaleG = sg;
             ScaleB = sb;
             Clipped = clipped;
+
+            Mask = kind;
+            MaskFrame = maskFrame;
+            MaskInvert = mask.Invert;
+            MaskLow = mask.Low;
+            MaskHigh = mask.High;
+            MaskSoftness = mask.Softness;
+
+            // Winkel und Breite einmal je Bild in das umrechnen, was die innere
+            // Schleife braucht - bei 4K waeren es sonst 25 Millionen Sinusse.
+            float radians = mask.Angle * MathF.PI / 180f;
+            GradientCos = MathF.Cos(radians);
+            GradientSin = MathF.Sin(radians);
+
+            float half = MathF.Max(0f, mask.Width) / 2f;
+            GradientFrom = mask.Centre - half;
+            GradientTo = mask.Centre + half;
         }
 
         public readonly FloatFrame Frame;
         public readonly BlendMode Mode;
         public readonly bool Clipped;
         public readonly float Opacity, ScaleR, ScaleG, ScaleB;
+
+        public readonly MaskKind Mask;
+        public readonly FloatFrame? MaskFrame;
+        public readonly bool MaskInvert;
+        public readonly float MaskLow, MaskHigh, MaskSoftness;
+        public readonly float GradientCos, GradientSin, GradientFrom, GradientTo;
     }
 }
