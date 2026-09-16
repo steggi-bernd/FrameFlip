@@ -76,6 +76,12 @@
     <sys:String x:Key="S_MaskPass">Pass</sys:String>
     <sys:String x:Key="S_MaskGradient">Gradient</sys:String>
     <sys:String x:Key="S_MaskCryptomatte">Cryptomatte</sys:String>
+    <sys:String x:Key="S_CryptoPick">Click the image to choose</sys:String>
+    <sys:String x:Key="S_CryptoPickOn">Stop choosing</sys:String>
+    <sys:String x:Key="S_CryptoEmpty">Nothing chosen</sys:String>
+    <sys:String x:Key="S_CryptoUnknown">unnamed</sys:String>
+    <sys:String x:Key="S_CryptoHint">The selection holds for the whole sequence: Blender writes the cryptomatte afresh into every frame, and it knows the object – even once it has moved across the picture.</sys:String>
+    <sys:String x:Key="S_CryptoNone">This file carries no cryptomattes. Enable them in Blender under View Layer → Passes → Cryptomatte.</sys:String>
     <sys:String x:Key="S_MaskFrom">From</sys:String>
     <sys:String x:Key="S_MaskBlack">Black point</sys:String>
     <sys:String x:Key="S_MaskWhite">White point</sys:String>

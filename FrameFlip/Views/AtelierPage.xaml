@@ -62,7 +62,8 @@
                               HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Auto"
                               PanningMode="Both">
                     <Image x:Name="Display" Stretch="Uniform"
-                           RenderOptions.BitmapScalingMode="HighQuality" />
+                           RenderOptions.BitmapScalingMode="HighQuality"
+                           MouseLeftButtonDown="OnImageClicked" />
                 </ScrollViewer>
 
                 <TextBlock x:Name="EmptyHint" HorizontalAlignment="Center" VerticalAlignment="Center"

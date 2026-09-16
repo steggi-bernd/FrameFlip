@@ -1,0 +1,107 @@
+using System.Windows.Input;
+using System.Windows.Media;
+using FrameFlip.Decoding.Exr;
+
+// WinForms ist mit im Haus, und dort gibt es Point noch einmal. Der Alias sagt,
+// welcher gemeint ist, statt es dem naechsten Leser zu ueberlassen.
+using Point = System.Windows.Point;
+
+namespace FrameFlip.Views;
+
+/// <summary>
+/// Kryptomatten auf der Atelierseite: das Auswaehlen durch Klicken ins Bild.
+///
+/// Der Ebenenstreifen kann das nicht selbst - er hat kein Bild. Er meldet nur, dass
+/// jemand waehlen moechte; hier wird der Klick in einen Bildpunkt umgerechnet, die
+/// Kennung aus der untersten Stufe gelesen und der Name dazu im Manifest gesucht.
+///
+/// Das ist der ganze Trick an der Kryptomatte, und er ist der Grund, warum sie eine
+/// Sequenz ueberdauert: Gewaehlt wird kein Bereich, sondern ein OBJEKT. In Bild 300
+/// steht dieselbe Kennung an einer anderen Stelle, und die Maske sitzt dort, wo das
+/// Objekt inzwischen ist.
+/// </summary>
+public partial class AtelierPage
+{
+    /// <summary>Was die Datei an Kryptomatten fuehrt - meist Objekt und Material.</summary>
+    private IReadOnlyList<CryptomatteSet> _cryptomattes = Array.Empty<CryptomatteSet>();
+
+    /// <summary>True, solange ein Klick ins Bild eine Auswahl bedeutet.</summary>
+    private bool _picking;
+
+    private void OnPickModeChanged(bool on)
+    {
+        _picking = on;
+
+        // Ein Fadenkreuz statt des Pfeils: Ohne es ist nicht zu sehen, dass ein
+        // Klick ins Bild jetzt etwas anderes bedeutet als sonst.
+        Display.Cursor = on ? Cursors.Cross : null;
+    }
+
+    private void OnImageClicked(object sender, MouseButtonEventArgs e)
+    {
+        if (!_picking) return;
+
+        string? level = Layers.PickLevel;
+        if (level is null) return;
+
+        if (!_sources.TryGetValue(level, out var frame)) return;
+        if (!PixelAt(e.GetPosition(Display), out int x, out int y)) return;
+
+        float id = frame.R[y * frame.Width + x];
+
+        // Null heisst: hier steht nichts. Der Hintergrund traegt keine Kennung, und
+        // ihn auszuwaehlen ergaebe eine Maske, die nirgends greift.
+        if (id == 0f) return;
+
+        e.Handled = true;
+
+        string name = NameOf(id) ?? "";
+        Layers.AddPick(name, id);
+    }
+
+    /// <summary>Der Name zu einer Kennung, aus dem Manifest der Datei.</summary>
+    private string? NameOf(float id)
+    {
+        foreach (var set in _cryptomattes)
+            if (set.NameOf(id) is { } name) return name;
+
+        return null;
+    }
+
+    /// <summary>
+    /// Rechnet einen Punkt auf dem Bildelement in einen Bildpunkt um.
+    ///
+    /// Zwei Faelle, und beide muessen stimmen: Eingepasst wird das Bild verkleinert
+    /// und mittig gesetzt - es liegen also Raender daneben, die nicht zum Bild
+    /// gehoeren. Bei 100 Prozent steht ein Bildpunkt auf einem Punkt. Einen der
+    /// beiden Faelle zu vergessen hiesse, dass die Auswahl um einen halben
+    /// Bildschirm danebenliegt, und man suchte den Fehler bei der Kryptomatte.
+    /// </summary>
+    private bool PixelAt(Point point, out int x, out int y)
+    {
+        x = y = 0;
+
+        var frame = _frame;
+        if (frame is null || frame.Width == 0 || frame.Height == 0) return false;
+        if (Display.ActualWidth <= 0 || Display.ActualHeight <= 0) return false;
+
+        double scale = 1.0;
+
+        if (Display.Stretch == Stretch.Uniform)
+        {
+            scale = Math.Min(Display.ActualWidth / frame.Width, Display.ActualHeight / frame.Height);
+            if (scale <= 0) return false;
+        }
+
+        double drawnWidth = frame.Width * scale;
+        double drawnHeight = frame.Height * scale;
+
+        double left = (Display.ActualWidth - drawnWidth) / 2;
+        double top = (Display.ActualHeight - drawnHeight) / 2;
+
+        x = (int)Math.Floor((point.X - left) / scale);
+        y = (int)Math.Floor((point.Y - top) / scale);
+
+        return x >= 0 && y >= 0 && x < frame.Width && y < frame.Height;
+    }
+}

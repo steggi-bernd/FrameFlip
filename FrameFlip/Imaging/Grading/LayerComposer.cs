@@ -84,9 +84,11 @@ public static class LayerComposer
             // eine Ebene ganz verschwinden zu lassen, weil ihre Maske nicht gelesen
             // werden konnte, waere die falsche Antwort auf eine fehlende Datei.
             FloatFrame? maskFrame = null;
+            FloatFrame[]? maskLevels = null;
+            float[]? maskIds = null;
             var maskKind = layer.Mask.Kind;
 
-            if (layer.Mask.NeedsSource)
+            if (maskKind == MaskKind.Pass)
             {
                 if (sources.TryGetValue(layer.Mask.Source, out var found) &&
                     found.Width == width && found.Height == height)
@@ -98,10 +100,32 @@ public static class LayerComposer
                     maskKind = MaskKind.None;
                 }
             }
+            else if (maskKind == MaskKind.Cryptomatte)
+            {
+                var levels = new List<FloatFrame>();
+
+                foreach (string level in layer.Mask.Levels)
+                {
+                    if (sources.TryGetValue(level, out var found) &&
+                        found.Width == width && found.Height == height)
+                    {
+                        levels.Add(found);
+                    }
+                }
+
+                maskLevels = levels.ToArray();
+                maskIds = layer.Mask.Picks.Select(p => p.Id).ToArray();
+
+                // Ohne Stufen oder ohne Auswahl gibt es nichts zu maskieren. Die
+                // Maske fallen zu lassen ist hier die richtige Antwort: Eine leere
+                // Auswahl liesse die Ebene ganz verschwinden, und das saehe aus wie
+                // ein Fehler statt wie "es ist noch nichts ausgewaehlt".
+                if (maskLevels.Length == 0 || maskIds.Length == 0) maskKind = MaskKind.None;
+            }
 
             plans[i] = new Plan(used[i].Frame, layer.Mode, Math.Clamp(layer.Opacity, 0f, 1f),
                                 gain * layer.Tint.R, gain * layer.Tint.G, gain * layer.Tint.B, clipped,
-                                layer.Mask, maskKind, maskFrame);
+                                layer.Mask, maskKind, maskFrame, maskLevels, maskIds);
         }
 
         Parallel.For(0, height, new ParallelOptions
@@ -255,6 +279,14 @@ public static class LayerComposer
 
                 return Fit(Masking.Levels(raw, plan.MaskLow, plan.MaskHigh), plan.MaskInvert);
 
+            case MaskKind.Cryptomatte:
+                // Dieselbe Behandlung wie beim Pass: Die Deckung IST der Anteil, und
+                // Schwarz- und Weisspunkt ziehen ihn an - damit laesst sich eine
+                // weiche Kante wegnehmen oder stehenlassen.
+                float coverage = Masking.Coverage(plan.MaskLevels!, plan.MaskIds!, i);
+
+                return Fit(Masking.Levels(coverage, plan.MaskLow, plan.MaskHigh), plan.MaskInvert);
+
             case MaskKind.Gradient:
                 return Fit(Masking.Gradient(x, y, width, height,
                                             plan.GradientCos, plan.GradientSin,
@@ -275,7 +307,8 @@ public static class LayerComposer
     {
         public Plan(FloatFrame frame, BlendMode mode, float opacity,
                     float sr, float sg, float sb, bool clipped,
-                    LayerMask mask, MaskKind kind, FloatFrame? maskFrame)
+                    LayerMask mask, MaskKind kind, FloatFrame? maskFrame,
+                    FloatFrame[]? maskLevels = null, float[]? maskIds = null)
         {
             Frame = frame;
             Mode = mode;
@@ -287,6 +320,8 @@ public static class LayerComposer
 
             Mask = kind;
             MaskFrame = maskFrame;
+            MaskLevels = maskLevels;
+            MaskIds = maskIds;
             MaskInvert = mask.Invert;
             MaskLow = mask.Low;
             MaskHigh = mask.High;
@@ -310,6 +345,8 @@ public static class LayerComposer
 
         public readonly MaskKind Mask;
         public readonly FloatFrame? MaskFrame;
+        public readonly FloatFrame[]? MaskLevels;
+        public readonly float[]? MaskIds;
         public readonly bool MaskInvert;
         public readonly float MaskLow, MaskHigh, MaskSoftness;
         public readonly float GradientCos, GradientSin, GradientFrom, GradientTo;

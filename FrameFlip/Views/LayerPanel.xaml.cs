@@ -34,6 +34,9 @@ public partial class LayerPanel : UserControl
     /// </summary>
     private readonly List<string> _maskSources = new();
 
+    /// <summary>Die Kryptomatten, die die Datei fuehrt. Meist zwei: Objekt und Material.</summary>
+    private IReadOnlyList<CryptomatteSet> _cryptomattes = Array.Empty<CryptomatteSet>();
+
     /// <summary>
     /// Die Maskenarten in der Reihenfolge der Auswahl.
     ///
@@ -42,14 +45,25 @@ public partial class LayerPanel : UserControl
     /// von Objekten - sie hier anzubieten hiesse, einen Eintrag zu zeigen, der nichts
     /// tut.
     /// </summary>
-    private static readonly (MaskKind Kind, string Key)[] MaskKinds =
+    private static readonly (MaskKind Kind, string Key)[] AllMaskKinds =
     {
         (MaskKind.None, "S_MaskNone"),
         (MaskKind.Luminance, "S_MaskLuminance"),
         (MaskKind.Underlying, "S_MaskUnderlying"),
         (MaskKind.Pass, "S_MaskPass"),
         (MaskKind.Gradient, "S_MaskGradient"),
+        (MaskKind.Cryptomatte, "S_MaskCryptomatte"),
     };
+
+    /// <summary>
+    /// Die Arten, die diese Datei hergibt. Die Kryptomatte faellt heraus, wenn keine
+    /// in der Datei steht - ein Eintrag, der nach einer Auswahl verlangt, die es
+    /// nicht gibt, ist schlimmer als keiner.
+    /// </summary>
+    private (MaskKind Kind, string Key)[] MaskKinds
+        => _cryptomattes.Count > 0
+            ? AllMaskKinds
+            : AllMaskKinds.Where(m => m.Kind != MaskKind.Cryptomatte).ToArray();
 
     /// <summary>
     /// Wie weit der Rand des Farbrades traegt. 0,5 heisst: ein Kanal reicht von der
@@ -65,8 +79,7 @@ public partial class LayerPanel : UserControl
         foreach (var (_, key) in Blending.All) ModeBox.Items.Add(Strings.T(key));
         ModeBox.SelectedIndex = 0;
 
-        foreach (var (_, key) in MaskKinds) MaskBox.Items.Add(Strings.T(key));
-        MaskBox.SelectedIndex = 0;
+        FillMaskKinds();
 
         TintWheel.Changed += OnTintChanged;
         TintWheel.Released += () => Raise(interim: false);
@@ -92,8 +105,20 @@ public partial class LayerPanel : UserControl
     /// damit ist zu sehen, dass sich daran etwas machen laesst.
     /// </summary>
     public void Load(IReadOnlyList<ExrPass> passes, LayerStack? stack)
+        => Load(passes, Array.Empty<CryptomatteSet>(), stack);
+
+    /// <inheritdoc cref="Load(IReadOnlyList{ExrPass}, LayerStack?)"/>
+    /// <param name="cryptomattes">
+    /// Was die Datei an Kryptomatten fuehrt. Leer heisst: keine - dann steht die Art
+    /// gar nicht erst zur Wahl.
+    /// </param>
+    public void Load(IReadOnlyList<ExrPass> passes, IReadOnlyList<CryptomatteSet> cryptomattes,
+                     LayerStack? stack)
     {
         _passes = passes;
+        _cryptomattes = cryptomattes;
+
+        FillMaskKinds();
         FillMaskSources();
 
         Stack.Layers.Clear();
@@ -534,6 +559,29 @@ public partial class LayerPanel : UserControl
 
     // --------------------------------------------------------------------- Masken
 
+    private void FillMaskKinds()
+    {
+        _filling = true;
+
+        try
+        {
+            MaskBox.Items.Clear();
+            foreach (var (_, key) in MaskKinds) MaskBox.Items.Add(Strings.T(key));
+            MaskBox.SelectedIndex = 0;
+        }
+        finally
+        {
+            _filling = false;
+        }
+    }
+
+    /// <summary>
+    /// Fuellt die Quellenauswahl - je nach Art mit Passen oder mit Kryptomatten.
+    ///
+    /// Dasselbe Feld fuer beides, weil es dieselbe Frage ist: "woraus kommt die
+    /// Maske?". Zwei Felder uebereinander, von denen immer eines leer waere, kosteten
+    /// im schmalen Streifen Platz und erklaerten nichts.
+    /// </summary>
     private void FillMaskSources()
     {
         _filling = true;
@@ -543,8 +591,24 @@ public partial class LayerPanel : UserControl
             MaskSourceBox.Items.Clear();
             _maskSources.Clear();
 
+            if (_selected?.Mask.Kind == MaskKind.Cryptomatte)
+            {
+                foreach (var set in _cryptomattes)
+                {
+                    MaskSourceBox.Items.Add(set.ShortName);
+                    _maskSources.Add(set.Prefix);
+                }
+
+                return;
+            }
+
             foreach (var pass in _passes)
             {
+                // Eine Kryptomattenstufe ist kein Bild - als Maske gelesen waere sie
+                // ein Hashwert. Sie gehoert in die Kryptomattenauswahl und nicht hier
+                // in die Passliste.
+                if (Cryptomatte.IsLevel(pass.ShortName)) continue;
+
                 MaskSourceBox.Items.Add(pass.ShortName);
                 _maskSources.Add(pass.Name);
             }
@@ -553,6 +617,137 @@ public partial class LayerPanel : UserControl
         {
             _filling = false;
         }
+    }
+
+    // ----------------------------------------------------------- Kryptomatten
+
+    /// <summary>
+    /// Der Anwender moechte ins Bild klicken, um zu waehlen - oder nicht mehr.
+    ///
+    /// Der Streifen kann das nicht selbst: Er hat kein Bild. Er sagt nur Bescheid,
+    /// und wer das Bild zeigt, holt die Kennung und meldet sie zurueck.
+    /// </summary>
+    public event Action<bool>? PickMode;
+
+    /// <summary>
+    /// Die unterste Stufe der Kryptomatte, aus der die Kennung zu lesen ist. Null,
+    /// wenn gerade keine Kryptomattenmaske gewaehlt ist.
+    /// </summary>
+    public string? PickLevel
+        => _selected?.Mask is { Kind: MaskKind.Cryptomatte, Levels.Count: > 0 } mask
+            ? mask.Levels[0]
+            : null;
+
+    /// <summary>Nimmt ein gewaehltes Objekt auf. Ein zweites Mal nimmt es wieder weg.</summary>
+    public void AddPick(string name, float id)
+    {
+        if (_selected is null || _selected.Mask.Kind != MaskKind.Cryptomatte) return;
+
+        var picks = _selected.Mask.Picks;
+        var already = picks.FirstOrDefault(p => p.Id.Equals(id));
+
+        // Noch einmal auf dasselbe Objekt zu klicken nimmt es heraus. Das ist der
+        // Griff, den man ohnehin versucht, und er erspart das Zielen auf ein
+        // Kreuzchen in einer schmalen Liste.
+        if (already is not null) picks.Remove(already);
+        else picks.Add(new CryptoPick { Name = name, Id = id });
+
+        ShowPicks();
+        Rebuild();
+        Raise(interim: false);
+    }
+
+    private void OnCryptoPickToggled(object sender, RoutedEventArgs e)
+    {
+        bool on = CryptoPickButton.IsChecked == true;
+
+        CryptoPickButton.Content = Strings.T(on ? "S_CryptoPickOn" : "S_CryptoPick");
+        if (!_filling) PickMode?.Invoke(on);
+    }
+
+    /// <summary>Beendet den Klickmodus - etwa, wenn ein anderes Bild geoeffnet wird.</summary>
+    public void StopPicking()
+    {
+        if (CryptoPickButton.IsChecked != true) return;
+
+        _filling = true;
+
+        try
+        {
+            CryptoPickButton.IsChecked = false;
+            CryptoPickButton.Content = Strings.T("S_CryptoPick");
+        }
+        finally
+        {
+            _filling = false;
+        }
+    }
+
+    private void ShowPicks()
+    {
+        CryptoPicks.Items.Clear();
+
+        var picks = _selected?.Mask.Picks ?? new List<CryptoPick>();
+
+        foreach (var pick in picks)
+        {
+            var row = new Grid { Margin = new Thickness(8, 2, 4, 2) };
+            row.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+            row.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+
+            var name = new TextBlock
+            {
+                Text = pick.Name.Length > 0 ? pick.Name : Strings.T("S_CryptoUnknown"),
+                FontSize = 11,
+                VerticalAlignment = VerticalAlignment.Center,
+                TextTrimming = TextTrimming.CharacterEllipsis,
+            };
+
+            Grid.SetColumn(name, 0);
+            row.Children.Add(name);
+
+            var drop = new Button
+            {
+                Style = (Style)FindResource("LinkButton"),
+                Content = "\u2715",
+                Tag = pick,
+            };
+
+            drop.Click += OnDropPickClicked;
+            Grid.SetColumn(drop, 1);
+            row.Children.Add(drop);
+
+            CryptoPicks.Items.Add(row);
+        }
+
+        CryptoEmpty.Visibility = picks.Count == 0 ? Visibility.Visible : Visibility.Collapsed;
+    }
+
+    private void OnDropPickClicked(object sender, RoutedEventArgs e)
+    {
+        if (sender is not Button button || button.Tag is not CryptoPick pick) return;
+        if (_selected is null) return;
+
+        _selected.Mask.Picks.Remove(pick);
+
+        ShowPicks();
+        Rebuild();
+        Raise(interim: false);
+    }
+
+    /// <summary>
+    /// Setzt eine Kryptomatte als Quelle: ihren Namen und die Stufen, die dazu in
+    /// der Datei stehen.
+    /// </summary>
+    private void UseCryptomatte(LayerMask mask, string prefix)
+    {
+        mask.Source = prefix;
+        mask.Levels = Cryptomatte.Levels(_passes, prefix).ToList();
+
+        // Die Auswahl gilt nur fuer IHREN Satz: Die Kennungen von Objekten und
+        // Materialien sind verschiedene Hashes, und eine mitgenommene Auswahl traefe
+        // im anderen Satz nichts - eine Maske, die stillschweigend leer ist.
+        mask.Picks.Clear();
     }
 
     private void OnMaskFoldClicked(object sender, RoutedEventArgs e)
@@ -567,16 +762,28 @@ public partial class LayerPanel : UserControl
         if (_filling || _selected is null) return;
 
         var mask = _selected.Mask;
-        mask.Kind = MaskKinds[Math.Clamp(MaskBox.SelectedIndex, 0, MaskKinds.Length - 1)].Kind;
+        var kinds = MaskKinds;
+        mask.Kind = kinds[Math.Clamp(MaskBox.SelectedIndex, 0, kinds.Length - 1)].Kind;
 
-        // Beim Umschalten auf einen Pass gleich den ersten nehmen. Eine Maskenart
-        // ohne Quelle waere eine Einstellung, die stillschweigend nichts tut.
-        if (mask.NeedsSource || mask.Kind is MaskKind.Pass or MaskKind.Cryptomatte)
+        // Beim Umschalten gleich die erste Quelle nehmen. Eine Maskenart ohne Quelle
+        // waere eine Einstellung, die stillschweigend nichts tut.
+        FillMaskSources();
+
+        if (mask.Kind == MaskKind.Cryptomatte)
         {
-            if (mask.Source.Length == 0 && _maskSources.Count > 0) mask.Source = _maskSources[0];
+            if (_cryptomattes.Count > 0 &&
+                !_cryptomattes.Any(s => s.Prefix.Equals(mask.Source, StringComparison.Ordinal)))
+            {
+                UseCryptomatte(mask, _cryptomattes[0].Prefix);
+            }
+        }
+        else if (mask.Kind == MaskKind.Pass && mask.Source.Length == 0 && _maskSources.Count > 0)
+        {
+            mask.Source = _maskSources[0];
         }
 
         ShowMaskControls();
+        PushMaskToControls();
         Rebuild();
         Raise(interim: false);
     }
@@ -588,7 +795,15 @@ public partial class LayerPanel : UserControl
         int at = MaskSourceBox.SelectedIndex;
         if (at < 0 || at >= _maskSources.Count) return;
 
-        _selected.Mask.Source = _maskSources[at];
+        if (_selected.Mask.Kind == MaskKind.Cryptomatte)
+        {
+            UseCryptomatte(_selected.Mask, _maskSources[at]);
+            ShowPicks();
+        }
+        else
+        {
+            _selected.Mask.Source = _maskSources[at];
+        }
 
         // Ein neuer Pass muss gelesen werden - deshalb die vollstaendige Meldung.
         Raise(interim: false);
@@ -644,9 +859,14 @@ public partial class LayerPanel : UserControl
     {
         var kind = _selected?.Mask.Kind ?? MaskKind.None;
 
-        bool range = kind is MaskKind.Luminance or MaskKind.Underlying or MaskKind.Pass;
+        bool range = kind is MaskKind.Luminance or MaskKind.Underlying or MaskKind.Pass
+                          or MaskKind.Cryptomatte;
         bool gradient = kind == MaskKind.Gradient;
         bool source = kind is MaskKind.Pass or MaskKind.Cryptomatte;
+        bool crypto = kind == MaskKind.Cryptomatte;
+
+        MaskCryptoBody.Visibility = crypto ? Visibility.Visible : Visibility.Collapsed;
+        if (!crypto) StopPicking();
 
         MaskRangeBody.Visibility = range ? Visibility.Visible : Visibility.Collapsed;
         MaskGradientBody.Visibility = gradient ? Visibility.Visible : Visibility.Collapsed;
@@ -658,7 +878,9 @@ public partial class LayerPanel : UserControl
         // dazwischen liegt, wirkt. Auf einem Maskenpass sind sie Schwarz- und
         // Weisspunkt: was darunter liegt, faellt weg, was darueber liegt, wirkt voll.
         // Gleich beschriftet waere das eine Falle.
-        bool levels = kind == MaskKind.Pass;
+        // Eine Deckung ist wie ein Maskenpass schon ein Anteil - dort sind es
+        // Schwarz- und Weisspunkt, nicht ein Fenster.
+        bool levels = kind is MaskKind.Pass or MaskKind.Cryptomatte;
 
         MaskLowLabel.Text = Strings.T(levels ? "S_MaskBlack" : "S_MaskFrom");
         MaskHighLabel.Text = Strings.T(levels ? "S_MaskWhite" : "S_MaskTo");
@@ -673,6 +895,7 @@ public partial class LayerPanel : UserControl
             MaskKind.Pass => Strings.T("S_MaskHintPass"),
             MaskKind.Gradient => Strings.T("S_MaskHintGradient"),
             MaskKind.Luminance or MaskKind.Underlying => Strings.T("S_MaskHintLuma"),
+            MaskKind.Cryptomatte => Strings.T("S_CryptoHint"),
             _ => "",
         };
 
@@ -686,6 +909,8 @@ public partial class LayerPanel : UserControl
         int kind = Array.FindIndex(MaskKinds, m => m.Kind == mask.Kind);
         MaskBox.SelectedIndex = Math.Max(0, kind);
 
+        ShowPicks();
+
         MaskInvertButton.IsChecked = mask.Invert;
 
         MaskLowSlider.Value = Math.Clamp(mask.Low, MaskLowSlider.Minimum, MaskLowSlider.Maximum);
@@ -697,6 +922,10 @@ public partial class LayerPanel : UserControl
 
         int source = _maskSources.FindIndex(s => s.Equals(mask.Source, StringComparison.Ordinal));
         MaskSourceBox.SelectedIndex = source;
+
+        // Die Quellen haengen an der Art - wechselt die Auswahl auf eine Ebene mit
+        // Kryptomatte, muss dort auch die Kryptomattenliste stehen.
+        if (source < 0 && mask.Source.Length > 0) FillMaskSources();
 
         UpdateMaskValues();
     }

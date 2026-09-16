@@ -6,11 +6,12 @@ A second mode inside FrameFlip: grade one frame, then apply that grade to the wh
 sequence and write it out. Layers, masks driven by render data, and a colour toolset
 aimed at Photoshop and Lightroom rather than at a node graph.
 
-**Status:** steps 1 to 5 are built and running; 6 to 8 are still design. Of step 5,
-the pass stack works — order, duplication, opacity, colour, blend mode and clipping
-masks; adjustment, image and group layers are not built yet. Where an earlier
-estimate or assumption turned out wrong, the measurement replaced it and the error
-is named — those passages are worth more than the numbers.
+**Status:** steps 1 to 7 are built and running; 8 is still design. Of step 5, the
+pass stack works — order, duplication, opacity, colour, blend mode and clipping
+masks; adjustment, image and group layers are not built yet. Of step 6, masks are
+data-driven: cryptomatte, any pass, luminance and gradient; painted masks are not
+built. Where an earlier estimate or assumption turned out wrong, the measurement
+replaced it and the error is named — those passages are worth more than the numbers.
 
 ---
 
@@ -321,33 +322,76 @@ are usable for static shots and misleading everywhere else.
 Masks therefore have to be **derived from the data**, so they are recomputed per frame
 and always fit:
 
-**Cryptomatte** — the EXR records which object, material or asset lies under each
-pixel. Click the red vase, get a pixel-accurate matte, sub-pixel correct, through
-motion blur and through glass. No selecting, no magic wand, no edge cleanup. Cool down
-just the vase and nothing else.
+**Cryptomatte** — **built.** The EXR records which object, material or asset lies
+under each pixel. Click the sphere, get a pixel-accurate matte, sub-pixel correct,
+through motion blur and through glass. No selecting, no magic wand, no edge cleanup.
 
-This is the single strongest argument for the whole feature. Without it, Atelier is a
-weaker Photoshop. With it, it is a different thing.
+What is actually in the file is not a picture but a lookup table per pixel. Each level
+carries *two* pairs in its four channels — `r` = id, `g` = coverage, `b` = id,
+`a` = coverage — so three levels hold six objects per pixel, enough for hair in
+front of glass. An id is the 32-bit MurmurHash3 of the object's name reinterpreted as
+a float, and the header carries a JSON manifest mapping names to those hashes.
+Selecting an object means reading the id under the cursor, then summing, across every
+level, the coverage of the pairs whose id matches. Viewed as an image a level is
+coloured noise, and correctly so: those are hashes, not colours.
 
-**Z-Depth** — distance per pixel. Depth haze, post depth of field, "only the
-background", "only the foreground". The Mist pass is the pre-normalised variant.
+Two things about the file format were **not** what the specification led me to expect,
+and both would have produced a mask that silently never matched anything:
 
-**Position** — world coordinates per pixel, so a mask can be a box in 3D space.
-Everything left of that wall, everything below that height.
+- Blender writes the cryptomatte channels **lowercase** — `ViewLayer.CryptoObject00.r`
+  — while every other pass in the same file is uppercase. Checking only for `R`
+  leaves the crypto passes unrecognised as colour, and the reader falls back to
+  treating the first channel as greyscale: alpha instead of id.
+- They are **float32 while the rest of the image is half**. An id rounded to sixteen
+  bits is a different id. Mixed pixel types within one file are the normal case here,
+  not an edge case.
 
-**Normal** — surface direction. Everything facing the light, everything facing up.
-Enough for coarse relighting without a rerender.
+Both are now fixture-tested against a real render, and the strongest check is this:
+every id that appears *in the picture* must have a name in the manifest. That only
+holds if the right channel was read, the floats survived the decoder intact, and the
+manifest's hex was reinterpreted rather than converted.
 
-**Luminance range** — a soft mask from brightness, with range and falloff. The fallback
-when there are no passes, and how the highlight and shadow tools work internally
-anyway.
+**Passes as masks** — **built.** Mist, shadow, ambient occlusion, an index matte:
+any pass can drive a layer. Those passes are already fractions between 0 and 1, so the
+value goes in unchanged and gets a black and a white point, exactly as one pulls a
+matte.
 
-**Gradient and shape** — linear and radial ramps, ellipses and rectangles with
-feathering. Static by nature, and honest about it: fine for a vignette or a sky
-gradient, wrong for anything that tracks.
+This differs from the luminance mask below on purpose, and the difference cost a
+rewrite. The first version sent a mask pass through the same *range window* the
+luminance mask uses — but every value between 0 and 1 lies inside the window 0 to 1,
+so a freshly chosen pass mask did precisely nothing. Two different operations, and
+therefore two different labels in the panel: a range says "From/To", a matte says
+"black point / white point". Labelled the same, it would be a trap.
 
-Every mask gets the usual modifiers — invert, feather, expand/contract, opacity, blend
-with the mask above — and masks combine with the same set operations as layers.
+**Luminance range** — **built**, in two flavours: the brightness of the layer
+itself ("only where this pass is bright") and the brightness of what already lies
+below it ("only in the shadows of the picture"). Both read through the same
+`x / (x + 0.18)` mapping the contrast blend modes use, so middle grey lands exactly on
+0.5 and "highlights" means what the eye means — in raw light an ordinary pixel sits
+near 0.05, and everything above 0.5 would be almost nothing.
+
+The range window feathers **outward**, which is the detail that makes it usable: at 0
+to 1 both ramps fall outside the value range and the mask passes everything, however
+soft it is set. Feathered inward, the neutral setting would already darken both ends,
+and nobody would suspect the mask.
+
+**Gradient** — **built.** Direction, centre, width; 0° runs left to right and
+90° top to bottom, in image coordinates where y grows downward, because that is the
+direction in which one darkens a sky. Static by nature, and honest about it: fine for
+a vignette, wrong for anything that tracks.
+
+**Z-Depth, Position, Normal** — designed. Depth works through the pass mask today
+but saturates, because a depth in metres is not a fraction; it wants its own range in
+world units. Position and normal need a mask that reads three channels as a vector
+rather than as brightness.
+
+**Where a mask attaches.** At exactly one point: it makes the opacity local. That is
+the whole integration, and it is deliberate — every blend mode, every clipping group
+and every layer then obeys the same rule, and there is no case in which a mask means
+something else. A mask that behaved differently under Multiply than under Add could
+not be explained to anyone.
+
+Painted masks and set operations between masks are not built.
 
 ---
 
@@ -580,10 +624,13 @@ next one landing.
    stack applied unchanged by the batch run. Luminance and gradient masks are not built.
    This step is also where the pass arithmetic in section 5 turned out to be wrong and
    was corrected against a real render.
-6. **Passes and light mixing.** — largely arrived with step 5; what remains is the
-   per-layer colour tools, which need adjustment layers.
-7. **Cryptomatte.** The distinguishing feature, and last, because it needs the stack and
-   the masks in place to be worth anything.
+6. ~~**Passes and light mixing.**~~ **Done** with step 5. ~~**Luminance and gradient
+   masks.**~~ **Done**, plus any pass as a mask — which turned out to be the same
+   plumbing the cryptomatte needed, so it was worth building first. Painted masks are not.
+7. ~~**Cryptomatte.**~~ **Done.** The distinguishing feature, and it needed the stack
+   and the mask slot in place first, exactly as this list assumed. Click an object in
+   the picture, and the selection holds for the whole sequence — the file names
+   objects, and a name does not move.
 8. **The remaining tools from section 7**, in the order people ask for them.
 
 Steps 1–4 are the product. 5–8 are what makes it uncontested.

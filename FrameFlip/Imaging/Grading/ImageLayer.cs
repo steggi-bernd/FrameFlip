@@ -153,11 +153,8 @@ public sealed class LayerStack
 
             if (!names.Contains(layer.Source, StringComparer.Ordinal)) names.Add(layer.Source);
 
-            if (layer.Mask.NeedsSource &&
-                !names.Contains(layer.Mask.Source, StringComparer.Ordinal))
-            {
-                names.Add(layer.Mask.Source);
-            }
+            foreach (string source in layer.Mask.Sources())
+                if (!names.Contains(source, StringComparer.Ordinal)) names.Add(source);
         }
 
         return names;

@@ -80,18 +80,45 @@ public sealed class LayerMask
     // ------------------------------------------------------------------ die Quelle
 
     /// <summary>
-    /// Der Pass, aus dem die Maske kommt - bei <see cref="MaskKind.Pass"/> und
-    /// <see cref="MaskKind.Cryptomatte"/>. Sonst leer.
+    /// Der Pass, aus dem die Maske kommt - bei <see cref="MaskKind.Pass"/> ein
+    /// einzelner, bei <see cref="MaskKind.Cryptomatte"/> der Name des Satzes.
+    /// Sonst leer.
     /// </summary>
     public string Source { get; set; } = "";
+
+    /// <summary>
+    /// Die Stufen einer Kryptomatte, in der Reihenfolge 00, 01, 02.
+    ///
+    /// Sie stehen hier und werden nicht bei Bedarf erraten, weil ein Rezept
+    /// aufschreiben soll, was es liest. Erraten hiesse, bei jedem Bild acht Stufen
+    /// zu probieren, von denen es drei gibt.
+    /// </summary>
+    public List<string> Levels { get; set; } = new();
+
+    /// <summary>
+    /// Was ausgewaehlt ist. Leer heisst: nichts - die Maske laesst dann nichts durch,
+    /// und das ist richtig so, denn eine Auswahl ohne Gewaehltes ist leer.
+    /// </summary>
+    public List<CryptoPick> Picks { get; set; } = new();
 
     [JsonIgnore]
     public bool IsNeutral => Kind == MaskKind.None;
 
-    /// <summary>Ob die Maske einen eigenen Pass braucht, der gelesen werden muss.</summary>
+    /// <summary>Ob die Maske eigene Passe braucht, die gelesen werden muessen.</summary>
     [JsonIgnore]
     public bool NeedsSource
-        => Kind is MaskKind.Pass or MaskKind.Cryptomatte && Source.Length > 0;
+        => (Kind == MaskKind.Pass && Source.Length > 0) ||
+           (Kind == MaskKind.Cryptomatte && Levels.Count > 0);
+
+    /// <summary>Die Passe, die diese Maske zu lesen verlangt.</summary>
+    public IEnumerable<string> Sources()
+    {
+        if (Kind == MaskKind.Pass && Source.Length > 0) yield return Source;
+
+        if (Kind != MaskKind.Cryptomatte) yield break;
+
+        foreach (string level in Levels) yield return level;
+    }
 
     public LayerMask Clone() => new()
     {
@@ -104,7 +131,30 @@ public sealed class LayerMask
         Centre = Centre,
         Width = Width,
         Source = Source,
+        Levels = new List<string>(Levels),
+        Picks = Picks.Select(p => p.Clone()).ToList(),
     };
+}
+
+/// <summary>
+/// Ein ausgewaehltes Objekt oder Material einer Kryptomatte.
+///
+/// Beides wird mitgefuehrt - der Name, weil er lesbar ist und in der Liste steht,
+/// und die Kennung, weil nur sie im Bild steht. Die Kennung aus dem Namen neu zu
+/// bilden waere moeglich (sie ist sein Hash), hiesse aber, die Hashfunktion
+/// nachzubauen und auf ewig genau so zu lassen, wie Blender sie heute hat.
+/// </summary>
+public sealed class CryptoPick
+{
+    public string Name { get; set; } = "";
+
+    /// <summary>
+    /// Die Kennung, wie sie im Bild steht: der Hash des Namens, als Gleitkomma
+    /// umgedeutet. Verglichen wird auf genaue Gleichheit.
+    /// </summary>
+    public float Id { get; set; }
+
+    public CryptoPick Clone() => new() { Name = Name, Id = Id };
 }
 
 /// <summary>Die Rechnung hinter einer Maske.</summary>
@@ -186,6 +236,41 @@ public static class Masking
     /// </summary>
     public static float Perceptual(float light)
         => light <= 0f ? 0f : light / (light + Blending.MiddleGrey);
+
+    /// <summary>
+    /// Die Deckung der ausgewaehlten Objekte an einem Bildpunkt.
+    ///
+    /// Jede Stufe traegt zwei Paare aus Kennung und Deckung - r/g und b/a. Gesucht
+    /// wird ueber alle Stufen und alle ausgewaehlten Kennungen, und die Deckungen
+    /// werden addiert: Ein Bildpunkt an der Kante zweier ausgewaehlter Objekte
+    /// gehoert zu beiden, und zusammen decken sie ihn ganz.
+    ///
+    /// Verglichen wird auf GENAUE Gleichheit. Das ist hier kein Leichtsinn, sondern
+    /// Pflicht: Die Kennungen sind Hashwerte, und zwei benachbarte Hashes gehoeren zu
+    /// zwei voellig verschiedenen Objekten. Ein Toleranzband waere eine Verwechslung.
+    /// </summary>
+    public static float Coverage(IReadOnlyList<FloatFrame> levels, IReadOnlyList<float> ids, int at)
+    {
+        float sum = 0f;
+
+        for (int l = 0; l < levels.Count; l++)
+        {
+            var frame = levels[l];
+
+            float firstId = frame.R[at];
+            float secondId = frame.B[at];
+
+            for (int k = 0; k < ids.Count; k++)
+            {
+                float id = ids[k];
+
+                if (firstId == id) sum += frame.G[at];
+                if (secondId == id && frame.A is not null) sum += frame.A[at];
+            }
+        }
+
+        return Math.Clamp(sum, 0f, 1f);
+    }
 
     /// <summary>Die glatte Stufe. Ohne sie haette jede Maske eine sichtbare Kante.</summary>
     private static float Smooth(float t)

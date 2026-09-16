@@ -76,6 +76,7 @@ public sealed partial class AtelierPage : UserControl
         Tools.ToolsEnabled = false;
 
         Layers.Changed += OnLayersChanged;
+        Layers.PickMode += OnPickModeChanged;
 
         _settle = new DispatcherTimer(DispatcherPriority.Background)
         {
@@ -107,18 +108,26 @@ public sealed partial class AtelierPage : UserControl
         // staende dabei das ganze Fenster.
         Task.Run(() => Load(path)).ContinueWith(task =>
         {
-            var loaded = task.IsCompletedSuccessfully ? task.Result : (null, Array.Empty<ExrPass>());
+            var loaded = task.IsCompletedSuccessfully
+                ? task.Result
+                : (null, Array.Empty<ExrPass>(), Array.Empty<CryptomatteSet>());
 
-            Dispatcher.Invoke(() => Show(path, loaded.Frame, loaded.Passes));
+            Dispatcher.Invoke(() => Show(path, loaded.Frame, loaded.Passes, loaded.Cryptomattes));
         });
     }
 
-    private void Show(string path, FloatFrame? loaded, IReadOnlyList<ExrPass> passes)
+    private void Show(string path, FloatFrame? loaded, IReadOnlyList<ExrPass> passes,
+                      IReadOnlyList<CryptomatteSet> cryptomattes)
     {
         BusyBadge.Visibility = Visibility.Collapsed;
 
+        // Ein Klickmodus, der eine Datei ueberdauert, waere ein stiller Zustand: Der
+        // naechste Klick ins neue Bild taete etwas, womit niemand rechnet.
+        Layers.StopPicking();
+
         _sources.Clear();
         _passes = passes;
+        _cryptomattes = cryptomattes;
 
         if (loaded is null)
         {
@@ -141,7 +150,7 @@ public sealed partial class AtelierPage : UserControl
         // Der gespeicherte Stapel gilt nur, soweit diese Datei die Passe auch
         // fuehrt. Zwanzig ausgegraute Zeilen nach dem Wechsel auf ein PNG waeren
         // kein Hinweis, sondern ein Raetsel.
-        Layers.Load(passes, Prune(_settings.Layers, passes));
+        Layers.Load(passes, cryptomattes, Prune(_settings.Layers, passes));
 
         // Der Streifen gilt fuer jedes Bild, nicht nur fuer eine Multilayer-EXR.
         // Passe braucht das Format, Ebenen nicht: Dasselbe Bild ein zweites Mal und
@@ -164,21 +173,22 @@ public sealed partial class AtelierPage : UserControl
         if (!Layers.Stack.IsPassThrough) OnLayersChanged(interim: false);
     }
 
-    private (FloatFrame? Frame, IReadOnlyList<ExrPass> Passes) Load(string path)
+    private (FloatFrame? Frame, IReadOnlyList<ExrPass> Passes,
+             IReadOnlyList<CryptomatteSet> Cryptomattes) Load(string path)
     {
         // EXR bringt die Werte selbst mit. Alles andere geht ueber den vorhandenen
         // Decoder und wird aus den acht Bit zurueckgerechnet.
         if (Path.GetExtension(path).Equals(".exr", StringComparison.OrdinalIgnoreCase))
-            return (FloatFrame.FromExr(path), ExrPasses.Of(path));
+            return (FloatFrame.FromExr(path), ExrPasses.Of(path), Cryptomatte.Of(path));
 
         var decoder = _decoders.For(Path.GetExtension(path));
-        if (decoder is null) return (null, Array.Empty<ExrPass>());
+        if (decoder is null) return (null, Array.Empty<ExrPass>(), Array.Empty<CryptomatteSet>());
 
         var frame = decoder.TryDecode(path, 16384, 16384, n => new byte[n], out var decoded)
             ? FloatFrame.FromBgra32(decoded.Pixels, decoded.Width, decoded.Height, decoded.Stride)
             : null;
 
-        return (frame, Array.Empty<ExrPass>());
+        return (frame, Array.Empty<ExrPass>(), Array.Empty<CryptomatteSet>());
     }
 
     /// <summary>

@@ -78,10 +78,25 @@ public static class ExrPasses
 
             bool Has(string leaf) => list.Contains(leaf, StringComparer.Ordinal);
 
+            // Gross UND klein, und zwar nicht aus Grosszuegigkeit: Blender schreibt
+            // die Kryptomatten mit kleinen Buchstaben - "ViewLayer.CryptoObject00.r"
+            // - waehrend alles andere gross geschrieben ist. Nur auf Grossbuchstaben
+            // zu pruefen hiesse, ausgerechnet die Kryptomatten nicht zu erkennen.
+            //
+            // Geprueft wird jeweils das ganze Tripel, nicht Buchstabe fuer Buchstabe:
+            // Ein Gemisch aus "R" und "g" gaebe es in keiner Datei, und es
+            // zusammenzusetzen waere geraten.
             if (Has("R") && Has("G") && Has("B"))
             {
                 passes.Add(new ExrPass(group, Full("R"), Full("G"), Full("B"),
                                        Has("A") ? Full("A") : null, Grey: false));
+                continue;
+            }
+
+            if (Has("r") && Has("g") && Has("b"))
+            {
+                passes.Add(new ExrPass(group, Full("r"), Full("g"), Full("b"),
+                                       Has("a") ? Full("a") : null, Grey: false));
                 continue;
             }
 

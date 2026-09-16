@@ -252,6 +252,30 @@
                                 ValueChanged="OnMaskSliderChanged" MouseDoubleClick="OnSliderReset" Tag="0.1" />
                     </StackPanel>
 
+                    <!--
+                        Kryptomatte: waehlen durch Klicken ins Bild.
+
+                        Eine Liste von Objektnamen und kein Feld zum Eintippen -
+                        die Namen stehen in der Datei, und wer sie abtippen muesste,
+                        haette schon verloren.
+                    -->
+                    <StackPanel x:Name="MaskCryptoBody" Visibility="Collapsed" Margin="0,6,0,0">
+                        <ToggleButton x:Name="CryptoPickButton" Style="{StaticResource OverlayToggle}"
+                                      Content="{DynamicResource S_CryptoPick}"
+                                      Checked="OnCryptoPickToggled" Unchecked="OnCryptoPickToggled" />
+
+                        <Border Margin="0,6,0,0" Background="{StaticResource OverlayBackground}"
+                                BorderBrush="{StaticResource PanelBorder}" BorderThickness="1"
+                                CornerRadius="4" Padding="0,3">
+                            <StackPanel>
+                                <ItemsControl x:Name="CryptoPicks" />
+                                <TextBlock x:Name="CryptoEmpty" Margin="10,4"
+                                           FontSize="10" Foreground="{StaticResource MutedBrush}"
+                                           Text="{DynamicResource S_CryptoEmpty}" />
+                            </StackPanel>
+                        </Border>
+                    </StackPanel>
+
                     <!-- Verlauf: Richtung, Mitte, Breite -->
                     <StackPanel x:Name="MaskGradientBody" Visibility="Collapsed">
                         <Grid Margin="0,10,0,2">

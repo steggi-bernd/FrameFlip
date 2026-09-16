@@ -76,6 +76,12 @@
     <sys:String x:Key="S_MaskPass">Pass</sys:String>
     <sys:String x:Key="S_MaskGradient">Verlauf</sys:String>
     <sys:String x:Key="S_MaskCryptomatte">Kryptomatte</sys:String>
+    <sys:String x:Key="S_CryptoPick">Ins Bild klicken, um zu wählen</sys:String>
+    <sys:String x:Key="S_CryptoPickOn">Klicken beenden</sys:String>
+    <sys:String x:Key="S_CryptoEmpty">Nichts gewählt</sys:String>
+    <sys:String x:Key="S_CryptoUnknown">ohne Namen</sys:String>
+    <sys:String x:Key="S_CryptoHint">Die Auswahl gilt für die ganze Sequenz: Blender schreibt die Kryptomatte in jedes Bild neu, und sie kennt das Objekt – auch wenn es inzwischen durchs Bild gelaufen ist.</sys:String>
+    <sys:String x:Key="S_CryptoNone">Diese Datei führt keine Kryptomatten. In Blender unter Ansichtsebene → Passes → Cryptomatte einschalten.</sys:String>
     <sys:String x:Key="S_MaskFrom">Von</sys:String>
     <sys:String x:Key="S_MaskBlack">Schwarzpunkt</sys:String>
     <sys:String x:Key="S_MaskWhite">Weißpunkt</sys:String>
