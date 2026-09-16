@@ -371,7 +371,21 @@ public static class LayerInvariants
         if (built is null) return;
 
         Check.That(built.Width == 4 && built.Height == 4, "in der Groesse der ersten brauchbaren Ebene");
-        Check.Near(built.R[0], 0.5, 1e-4, "die unpassenden Ebenen bleiben draussen");
+
+        // Der fehlende Pass bleibt draussen - es gibt ihn nicht.
+        //
+        // Die Ebene in anderer GROESSE dagegen bleibt drin und wird eingepasst. Das
+        // war frueher andersherum: Abweichende Groessen fielen heraus, weil Skalieren
+        // eine andere Aufgabe war als Mischen. Seit es die Platzierung gibt, ist es
+        // keine andere Aufgabe mehr, sondern ein Logo - und ein Logo wegzulassen,
+        // weil es kleiner ist als das Bild, waere die falsche Antwort.
+        Check.Near(built.R[0], 9.5, 1e-4, "eine Ebene anderer Groesse wird eingepasst");
+
+        // Ohne sie bleibt genau die Grundebene stehen - der fehlende Pass traegt
+        // wirklich nichts bei.
+        stack.Layers.RemoveAt(2);
+        Check.Near(LayerComposer.Compose(stack, sources)!.R[0], 0.5, 1e-4,
+                   "der fehlende Pass traegt nichts bei");
 
         // Gar nichts Lesbares: dann gibt es auch kein Bild, und der Aufrufer weicht
         // auf die Datei selbst aus.

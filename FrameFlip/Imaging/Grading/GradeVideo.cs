@@ -235,7 +235,7 @@ public static class GradeVideo
     private static byte[]? Render(string path, GradeVideoRequest request, PreparedGrading grading,
                                   int width, int height)
     {
-        var frame = LayeredFrameLoader.Load(path, request.Layers);
+        var (frame, overlays) = LayeredFrameLoader.LoadAll(path, request.Layers);
         if (frame is null) return null;
 
         // Ein Bild mit anderen Massen kann nicht in einen laufenden Rohstrom -
@@ -250,7 +250,8 @@ public static class GradeVideo
         unsafe
         {
             fixed (byte* target = pixels)
-                FloatFrameProcessor.Apply(frame, request.Adjustments, view, grading, (IntPtr)target, stride);
+                FloatFrameProcessor.Apply(frame, request.Adjustments, view, grading,
+                                          (IntPtr)target, stride, step: 1, overlays);
         }
 
         return pixels;

@@ -44,6 +44,16 @@ public sealed class FloatFrame
     public int PixelCount => Width * Height;
 
     /// <summary>
+    /// Dieselben Werte als Anzeigewerte - nur fuer Ebenen, die obenauf liegen.
+    ///
+    /// Gemerkt und nicht jedes Mal neu gerechnet: Beim Stapellauf wird je Bild
+    /// vorbereitet, und ein Wasserzeichen ist in jedem Bild dasselbe. Die Umrechnung
+    /// ist eine Potenz je Kanal; einmal ist sie nichts, dreihundertmal ist sie
+    /// Wartezeit.
+    /// </summary>
+    internal FloatFrame? Display { get; set; }
+
+    /// <summary>
     /// Der groesste Farbwert im Bild. Sagt, wieviel Reserve oberhalb von Weiss
     /// ueberhaupt vorhanden ist - bei einer aus 8 Bit erzeugten Datei ist er 1.
     /// </summary>

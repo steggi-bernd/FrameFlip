@@ -38,6 +38,7 @@ static int RunAll()
     MaskInvariants.Run();
     AdjustmentInvariants.Run();
     ImageAndGroupInvariants.Run();
+    LayerPlacementInvariants.Run();
     LayerPanelInvariants.Run();
     PassRebuildInvariants.Run();
     CryptomatteInvariants.Run();

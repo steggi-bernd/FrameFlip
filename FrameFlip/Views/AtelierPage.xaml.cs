@@ -53,6 +53,9 @@ public sealed partial class AtelierPage : UserControl
     /// </summary>
     private FloatFrame? _composed;
 
+    /// <summary>Die Ebenen, die ueber allem liegen - Wasserzeichen und dergleichen.</summary>
+    private OverlayPlan[] _overlays = Overlays.None;
+
     /// <summary>Die gelesenen Passe, nach Quellnamen. Leerer Name ist das Bild selbst.</summary>
     private readonly Dictionary<string, FloatFrame> _sources = new(StringComparer.Ordinal);
 
@@ -103,6 +106,7 @@ public sealed partial class AtelierPage : UserControl
         Layers.Changed += OnLayersChanged;
         Layers.PickMode += OnPickModeChanged;
         Layers.Editing += Bind;
+        Layers.Thumbnail = Thumbnail;
 
         Bind(null);
 
@@ -163,6 +167,10 @@ public sealed partial class AtelierPage : UserControl
         _composed = null;
         _passes = passes;
         _cryptomattes = cryptomattes;
+
+        // Die Miniaturen liegen unter dem Namen der Quelle - und derselbe Name meint
+        // in einer anderen Datei etwas anderes.
+        ForgetThumbnails();
 
         if (loaded is null)
         {
@@ -356,7 +364,8 @@ public sealed partial class AtelierPage : UserControl
 
             FloatFrameProcessor.Apply(frame, adjustments, ViewFor(frame), grading,
                                       _surface.BackBuffer, _surface.BackBufferStride,
-                                      _coarse ? CoarseStep : 1);
+                                      _coarse ? CoarseStep : 1,
+                                      _showingOriginal ? Overlays.None : _overlays);
 
             _surface.AddDirtyRect(new Int32Rect(0, 0, frame.Width, frame.Height));
         }

@@ -160,6 +160,25 @@ public sealed class ImageLayer
     public LayerMask Mask { get; set; } = new();
 
     /// <summary>
+    /// Wo die Ebene liegt und wie gross sie ist. In Grundstellung: ueber dem ganzen
+    /// Bild, wenn sie dessen Groesse hat, sonst mittig eingepasst.
+    /// </summary>
+    public LayerTransform Place { get; set; } = new();
+
+    /// <summary>
+    /// Liegt ueber allem - auch ueber der Bildwerdung und der Korrektur.
+    ///
+    /// Fuer ein Wasserzeichen ist das die halbe Miete. Eine gewoehnliche Bildebene
+    /// wird mit dem Bild zusammen durch AgX geschickt und mitkorrigiert: Ein reines
+    /// Weiss kaeme als Grau heraus, und eine angehobene Kurve hoebe das Zeichen mit
+    /// an. Obenauf bleibt es in jedem Bild genau, wie es in der Datei steht.
+    ///
+    /// Gilt nur fuer Bildebenen. Eine Korrektur obenauf waere dasselbe wie die
+    /// Korrektur am Ende, und die gibt es schon.
+    /// </summary>
+    public bool OnTop { get; set; }
+
+    /// <summary>
     /// Die Ebenen einer Gruppe, von unten nach oben - dieselbe Richtung wie im
     /// Stapel selbst. Bei allem anderen leer.
     ///
@@ -178,7 +197,8 @@ public sealed class ImageLayer
     [JsonIgnore]
     public bool IsNeutral
         => Content == LayerContent.Pass &&
-           Opacity >= 0.999f && MathF.Abs(Exposure) < 0.001f && Tint.Near(1f) && Mask.IsNeutral;
+           Opacity >= 0.999f && MathF.Abs(Exposure) < 0.001f && Tint.Near(1f) &&
+           Mask.IsNeutral && Place.IsNeutral;
 
     /// <summary>Die Kette dieser Einstellungsebene, fertig vorbereitet.</summary>
     public LayerGrade Grade() => LayerGrade.Prepare(Adjustments, Tools);
@@ -199,6 +219,8 @@ public sealed class ImageLayer
         Mask = Mask.Clone(),
         Content = Content,
         FollowSequence = FollowSequence,
+        Place = Place.Clone(),
+        OnTop = OnTop,
         Children = Children.Select(c => c.Clone()).ToList(),
         Adjustments = Adjustments,
         Tools = Tools?.Clone(),

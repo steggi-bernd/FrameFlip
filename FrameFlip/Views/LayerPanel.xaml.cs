@@ -98,6 +98,15 @@ public partial class LayerPanel : UserControl
     public LayerStack Stack { get; } = new();
 
     /// <summary>
+    /// Woher die Miniaturen kommen. Null heisst: keine.
+    ///
+    /// Der Streifen kennt keine Bilddaten - er kennt Namen. Wer ihn einhaengt, weiss,
+    /// welcher Pass gerade gelesen ist, und liefert dazu ein kleines Bild. So bleibt
+    /// der Streifen frei von Dateien und der Seite die Hoheit ueber den Speicher.
+    /// </summary>
+    public Func<ImageLayer, System.Windows.Media.ImageSource?>? Thumbnail { get; set; }
+
+    /// <summary>
     /// Eine andere Ebene ist gewaehlt. Null heisst: keine Einstellungsebene, die
     /// Werkzeuge gehoeren wieder dem ganzen Bild.
     ///
@@ -277,7 +286,8 @@ public partial class LayerPanel : UserControl
     private ListBoxItem Row(ImageLayer layer, int depth)
     {
         var grid = new Grid();
-        grid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+        grid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });   // Punkt
+        grid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });   // Miniatur
         grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
         grid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
 
@@ -285,7 +295,7 @@ public partial class LayerPanel : UserControl
         {
             Style = (Style)FindResource("LayerEye"),
             IsChecked = layer.Visible,
-            Margin = new Thickness(0, 0, 7, 0),
+            Margin = new Thickness(0, 0, 6, 0),
             VerticalAlignment = VerticalAlignment.Center,
             Tag = layer,
         };
@@ -293,6 +303,35 @@ public partial class LayerPanel : UserControl
         eye.Click += OnVisibilityClicked;
         Grid.SetColumn(eye, 0);
         grid.Children.Add(eye);
+
+        // Eine Miniatur sagt in einem Blick, was ein Name nicht sagt: ob der Pass
+        // ueberhaupt etwas enthaelt. Ein leerer Glanzpass sieht schwarz aus, und das
+        // ist eine Antwort - "GlossDir" ist keine.
+        var preview = Thumbnail?.Invoke(layer);
+
+        if (preview is not null)
+        {
+            var thumb = new Border
+            {
+                Width = 30,
+                Height = 18,
+                Margin = new Thickness(0, 0, 6, 0),
+                CornerRadius = new CornerRadius(2),
+                BorderThickness = new Thickness(1),
+                BorderBrush = (System.Windows.Media.Brush)FindResource("PanelBorder"),
+                ClipToBounds = true,
+                VerticalAlignment = VerticalAlignment.Center,
+                Opacity = layer.Visible ? 1.0 : 0.4,
+                Child = new System.Windows.Controls.Image
+                {
+                    Source = preview,
+                    Stretch = System.Windows.Media.Stretch.UniformToFill,
+                },
+            };
+
+            Grid.SetColumn(thumb, 1);
+            grid.Children.Add(thumb);
+        }
 
         bool missing = layer.Content switch
         {
@@ -330,7 +369,7 @@ public partial class LayerPanel : UserControl
                 : layer.Source,
         };
 
-        Grid.SetColumn(name, 1);
+        Grid.SetColumn(name, 2);
         grid.Children.Add(name);
 
         // Die Mischung steht in der Zeile, nicht nur im Auswahlfeld darunter: Ein
@@ -349,10 +388,49 @@ public partial class LayerPanel : UserControl
             Foreground = (System.Windows.Media.Brush)FindResource("MutedBrush"),
         };
 
-        Grid.SetColumn(mode, 2);
+        Grid.SetColumn(mode, 3);
         grid.Children.Add(mode);
 
         return new ListBoxItem { Content = grid, Tag = layer };
+    }
+
+    /// <summary>
+    /// Eine Datei auf die Liste gezogen wird eine Bildebene.
+    ///
+    /// Der kuerzeste Weg fuer den haeufigsten Fall - ein Wasserzeichen oder eine
+    /// zweite Fassung liegt im Explorer, und der Umweg ueber Menue und Dateidialog
+    /// ist drei Klicks fuer etwas, das eine Geste ist.
+    /// </summary>
+    private void OnFilesDropped(object sender, DragEventArgs e)
+    {
+        if (e.Data.GetData(DataFormats.FileDrop) is not string[] files) return;
+
+        e.Handled = true;
+
+        foreach (string file in files.Where(Readable)) AddImage(file);
+    }
+
+    private void OnFilesDragOver(object sender, DragEventArgs e)
+    {
+        bool welcome = e.Data.GetData(DataFormats.FileDrop) is string[] files && files.Any(Readable);
+
+        e.Effects = welcome ? DragDropEffects.Copy : DragDropEffects.None;
+        e.Handled = true;
+    }
+
+    /// <summary>
+    /// Ob FrameFlip diese Datei als Bild lesen kann.
+    ///
+    /// Nach der Endung und nicht nach dem Inhalt: Beim Ueberfahren muss die Antwort
+    /// sofort da sein, und eine Datei zu oeffnen, waehrend die Maus darueber
+    /// schwebt, ist das nicht.
+    /// </summary>
+    private static bool Readable(string path)
+    {
+        string extension = System.IO.Path.GetExtension(path);
+
+        return extension.ToLowerInvariant() is ".exr" or ".png" or ".jpg" or ".jpeg"
+                                            or ".tif" or ".tiff" or ".bmp" or ".webp";
     }
 
     private void OnSelectionChanged(object sender, SelectionChangedEventArgs e)
@@ -844,6 +922,9 @@ public partial class LayerPanel : UserControl
                                                       _selected.Tint.B / TintScale);
 
             PushMaskToControls();
+            PushPlaceToControls();
+
+            if (_selected?.Content == LayerContent.Image) OnTopButton.IsChecked = _selected.OnTop;
         }
         finally
         {
@@ -878,6 +959,14 @@ public partial class LayerPanel : UserControl
             ? Visibility.Visible : Visibility.Collapsed;
 
         ImageBody.Visibility = content == LayerContent.Image
+            ? Visibility.Visible : Visibility.Collapsed;
+
+        // Platziert wird, was ein Bild mitbringt. Eine Korrektur hat keine Flaeche,
+        // und eine Gruppe erbt die ihrer Kinder.
+        bool placeable = content is LayerContent.Pass or LayerContent.Image;
+
+        PlaceHeader.Visibility = placeable ? Visibility.Visible : Visibility.Collapsed;
+        PlaceBody.Visibility = placeable && PlaceFoldButton.Content as string == "−"
             ? Visibility.Visible : Visibility.Collapsed;
 
         if (content == LayerContent.Image && _selected is not null)
@@ -917,6 +1006,107 @@ public partial class LayerPanel : UserControl
     }
 
     private void Raise(bool interim) => Changed?.Invoke(interim);
+
+    // ----------------------------------------------------------- Platzierung
+
+    private void OnPlaceFoldClicked(object sender, RoutedEventArgs e)
+    {
+        bool open = PlaceBody.Visibility != Visibility.Visible;
+        PlaceBody.Visibility = open ? Visibility.Visible : Visibility.Collapsed;
+        PlaceFoldButton.Content = open ? "−" : "+";
+    }
+
+    private void OnPlaceChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
+    {
+        if (_filling || !IsLoaded || _selected is null) return;
+
+        var place = _selected.Place;
+
+        place.OffsetX = (float)PlaceXSlider.Value;
+        place.OffsetY = (float)PlaceYSlider.Value;
+        place.Scale = (float)PlaceScaleSlider.Value;
+
+        place.CropLeft = (float)CropLeftSlider.Value;
+        place.CropTop = (float)CropTopSlider.Value;
+        place.CropRight = (float)CropRightSlider.Value;
+        place.CropBottom = (float)CropBottomSlider.Value;
+
+        // Gegenueberliegende Anschnitte duerfen sich nicht ueberholen - sonst bleibt
+        // nichts uebrig, und die Ebene sieht aus, als waere sie verschwunden.
+        Hold(CropLeftSlider, CropRightSlider, sender);
+        Hold(CropTopSlider, CropBottomSlider, sender);
+
+        place.CropLeft = (float)CropLeftSlider.Value;
+        place.CropTop = (float)CropTopSlider.Value;
+        place.CropRight = (float)CropRightSlider.Value;
+        place.CropBottom = (float)CropBottomSlider.Value;
+
+        UpdatePlaceValues();
+        Raise(interim: true);
+    }
+
+    /// <summary>Haelt zwei gegenueberliegende Anschnitte zusammen unter 95 Prozent.</summary>
+    private void Hold(Slider first, Slider second, object moved)
+    {
+        if (first.Value + second.Value <= 0.95) return;
+
+        _filling = true;
+
+        try
+        {
+            var other = ReferenceEquals(moved, first) ? second : first;
+            var mover = ReferenceEquals(moved, first) ? first : second;
+
+            other.Value = Math.Max(0, 0.95 - mover.Value);
+        }
+        finally
+        {
+            _filling = false;
+        }
+    }
+
+    private void OnResetPlaceClicked(object sender, RoutedEventArgs e)
+    {
+        if (_selected is null) return;
+
+        _selected.Place = new LayerTransform();
+
+        PushToControls();
+        Raise(interim: false);
+    }
+
+    private void OnOnTopChanged(object sender, RoutedEventArgs e)
+    {
+        if (_filling || _selected?.Content != LayerContent.Image) return;
+
+        _selected.OnTop = OnTopButton.IsChecked == true;
+
+        Rebuild();
+        Raise(interim: false);
+    }
+
+    private void PushPlaceToControls()
+    {
+        var place = _selected?.Place ?? new LayerTransform();
+
+        PlaceXSlider.Value = Math.Clamp(place.OffsetX, PlaceXSlider.Minimum, PlaceXSlider.Maximum);
+        PlaceYSlider.Value = Math.Clamp(place.OffsetY, PlaceYSlider.Minimum, PlaceYSlider.Maximum);
+        PlaceScaleSlider.Value = Math.Clamp(place.Scale, PlaceScaleSlider.Minimum, PlaceScaleSlider.Maximum);
+
+        CropLeftSlider.Value = Math.Clamp(place.CropLeft, 0, CropLeftSlider.Maximum);
+        CropTopSlider.Value = Math.Clamp(place.CropTop, 0, CropTopSlider.Maximum);
+        CropRightSlider.Value = Math.Clamp(place.CropRight, 0, CropRightSlider.Maximum);
+        CropBottomSlider.Value = Math.Clamp(place.CropBottom, 0, CropBottomSlider.Maximum);
+
+        UpdatePlaceValues();
+    }
+
+    private void UpdatePlaceValues()
+    {
+        PlaceXValue.Text = $"{PlaceXSlider.Value:+0.00;-0.00;0.00}";
+        PlaceYValue.Text = $"{PlaceYSlider.Value:+0.00;-0.00;0.00}";
+        PlaceScaleValue.Text = $"{PlaceScaleSlider.Value:0.00}";
+    }
 
     // --------------------------------------------------------------------- Masken
 

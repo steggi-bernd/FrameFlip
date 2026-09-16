@@ -66,8 +66,11 @@ public static class FloatFrameProcessor
     /// </param>
     public static unsafe void Apply(FloatFrame frame, ImageAdjustments adjustments,
                                     IViewTransform view, PreparedGrading grading,
-                                    IntPtr destination, int destinationStride, int step = 1)
+                                    IntPtr destination, int destinationStride, int step = 1,
+                                    OverlayPlan[]? overlays = null)
     {
+        overlays ??= Overlays.None;
+
         var linearTools = grading.SceneLinear ?? Array.Empty<IGradingTool>();
         var displayTools = grading.Display ?? Array.Empty<IGradingTool>();
 
@@ -120,6 +123,10 @@ public static class FloatFrameProcessor
 
                     Shade(in plan, ref vr, ref vg, ref vb, alpha);
 
+                    // Ganz zum Schluss, auf den fertigen Anzeigewerten: Ein
+                    // Wasserzeichen soll in jedem Bild gleich aussehen.
+                    if (overlays.Length > 0) Overlays.Apply(overlays, x, y, ref vr, ref vg, ref vb);
+
                     byte* pixel = row + x * 4;
                     pixel[0] = ToByte(vb);
                     pixel[1] = ToByte(vg);
@@ -170,6 +177,8 @@ public static class FloatFrameProcessor
                     float alpha = a is null ? 1f : a[i];
 
                     Shade(in plan, ref vr, ref vg, ref vb, alpha);
+
+                    if (overlays.Length > 0) Overlays.Apply(overlays, x, y, ref vr, ref vg, ref vb);
 
                     byte* cell = row + gx * 4;
                     cell[0] = ToByte(vb);
@@ -363,8 +372,10 @@ public static class FloatFrameProcessor
     /// </summary>
     public static unsafe void ApplyRgba64(FloatFrame frame, ImageAdjustments adjustments,
                                           IViewTransform view, PreparedGrading grading,
-                                          IntPtr destination, int destinationStride)
+                                          IntPtr destination, int destinationStride,
+                                          OverlayPlan[]? overlays = null)
     {
+        overlays ??= Overlays.None;
         var plan = BuildPlan(adjustments, view, grading);
         ushort* target = (ushort*)destination.ToPointer();
 
@@ -390,6 +401,8 @@ public static class FloatFrameProcessor
                 float alpha = a is null ? 1f : a[i];
 
                 Shade(in plan, ref vr, ref vg, ref vb, alpha);
+
+                if (overlays.Length > 0) Overlays.Apply(overlays, x, y, ref vr, ref vg, ref vb);
 
                 ushort* pixel = row + x * 4;
                 pixel[0] = ToUShort(vr);

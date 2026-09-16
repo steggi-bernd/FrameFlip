@@ -106,7 +106,9 @@
                          BorderThickness="0" Focusable="False"
                          ItemContainerStyle="{StaticResource LayerRow}"
                          ScrollViewer.HorizontalScrollBarVisibility="Disabled"
-                         SelectionChanged="OnSelectionChanged" />
+                         SelectionChanged="OnSelectionChanged"
+                         AllowDrop="True" Drop="OnFilesDropped" DragOver="OnFilesDragOver"
+                         ToolTip="{DynamicResource S_DropHere}" />
             </Border>
 
             <Grid Margin="0,6,0,0">
@@ -199,6 +201,93 @@
                                 ValueChanged="OnSliderChanged" MouseDoubleClick="OnSliderReset" Tag="0" />
                     </StackPanel>
                 </Grid>
+
+                <!--
+                    Platzierung: wo die Ebene liegt, wie gross sie ist, was von ihr
+                    gilt. Alles in Anteilen der Bildgroesse - ein Rezept von 1080p
+                    gilt damit auch fuer 4K.
+                -->
+                <Grid x:Name="PlaceHeader" Margin="0,12,0,0" Visibility="Collapsed">
+                    <TextBlock Text="{DynamicResource S_Place}" Style="{StaticResource PanelHeading}" />
+                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+                        <Button Style="{StaticResource LinkButton}" Margin="0,0,10,0"
+                                Content="{DynamicResource S_PlaceReset}" Click="OnResetPlaceClicked" />
+                        <Button x:Name="PlaceFoldButton" Style="{StaticResource LinkButton}"
+                                Content="+" Click="OnPlaceFoldClicked" />
+                    </StackPanel>
+                </Grid>
+
+                <StackPanel x:Name="PlaceBody" Visibility="Collapsed" Margin="0,6,0,0">
+                    <Grid Margin="0,0,0,2">
+                        <TextBlock Text="{DynamicResource S_PlaceX}" Style="{StaticResource PanelLabel}" />
+                        <TextBlock x:Name="PlaceXValue" Style="{StaticResource PanelValue}" />
+                    </Grid>
+                    <Slider x:Name="PlaceXSlider" Style="{StaticResource PanelSlider}"
+                            Minimum="-1" Maximum="1" Value="0" SmallChange="0.01" LargeChange="0.05"
+                            ValueChanged="OnPlaceChanged" MouseDoubleClick="OnSliderReset" Tag="0" />
+
+                    <Grid Margin="0,8,0,2">
+                        <TextBlock Text="{DynamicResource S_PlaceY}" Style="{StaticResource PanelLabel}" />
+                        <TextBlock x:Name="PlaceYValue" Style="{StaticResource PanelValue}" />
+                    </Grid>
+                    <Slider x:Name="PlaceYSlider" Style="{StaticResource PanelSlider}"
+                            Minimum="-1" Maximum="1" Value="0" SmallChange="0.01" LargeChange="0.05"
+                            ValueChanged="OnPlaceChanged" MouseDoubleClick="OnSliderReset" Tag="0" />
+
+                    <Grid Margin="0,8,0,2">
+                        <TextBlock Text="{DynamicResource S_PlaceScale}" Style="{StaticResource PanelLabel}" />
+                        <TextBlock x:Name="PlaceScaleValue" Style="{StaticResource PanelValue}" />
+                    </Grid>
+                    <Slider x:Name="PlaceScaleSlider" Style="{StaticResource PanelSlider}"
+                            Minimum="0.05" Maximum="3" Value="1" SmallChange="0.01" LargeChange="0.1"
+                            ValueChanged="OnPlaceChanged" MouseDoubleClick="OnSliderReset" Tag="1" />
+
+                    <TextBlock Text="{DynamicResource S_Crop}" Style="{StaticResource PanelLabel}"
+                               Margin="0,12,0,4" />
+
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="*" />
+                        </Grid.ColumnDefinitions>
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="Auto" />
+                        </Grid.RowDefinitions>
+
+                        <StackPanel Grid.Row="0" Grid.Column="0" Margin="0,0,4,0">
+                            <TextBlock Text="{DynamicResource S_CropLeft}" Style="{StaticResource PanelLabel}" />
+                            <Slider x:Name="CropLeftSlider" Style="{StaticResource PanelSlider}"
+                                    Minimum="0" Maximum="0.9" Value="0" SmallChange="0.01"
+                                    ValueChanged="OnPlaceChanged" MouseDoubleClick="OnSliderReset" Tag="0" />
+                        </StackPanel>
+
+                        <StackPanel Grid.Row="0" Grid.Column="1" Margin="4,0,0,0">
+                            <TextBlock Text="{DynamicResource S_CropRight}" Style="{StaticResource PanelLabel}" />
+                            <Slider x:Name="CropRightSlider" Style="{StaticResource PanelSlider}"
+                                    Minimum="0" Maximum="0.9" Value="0" SmallChange="0.01"
+                                    ValueChanged="OnPlaceChanged" MouseDoubleClick="OnSliderReset" Tag="0" />
+                        </StackPanel>
+
+                        <StackPanel Grid.Row="1" Grid.Column="0" Margin="0,8,4,0">
+                            <TextBlock Text="{DynamicResource S_CropTop}" Style="{StaticResource PanelLabel}" />
+                            <Slider x:Name="CropTopSlider" Style="{StaticResource PanelSlider}"
+                                    Minimum="0" Maximum="0.9" Value="0" SmallChange="0.01"
+                                    ValueChanged="OnPlaceChanged" MouseDoubleClick="OnSliderReset" Tag="0" />
+                        </StackPanel>
+
+                        <StackPanel Grid.Row="1" Grid.Column="1" Margin="4,8,0,0">
+                            <TextBlock Text="{DynamicResource S_CropBottom}" Style="{StaticResource PanelLabel}" />
+                            <Slider x:Name="CropBottomSlider" Style="{StaticResource PanelSlider}"
+                                    Minimum="0" Maximum="0.9" Value="0" SmallChange="0.01"
+                                    ValueChanged="OnPlaceChanged" MouseDoubleClick="OnSliderReset" Tag="0" />
+                        </StackPanel>
+                    </Grid>
+
+                    <TextBlock Margin="0,8,0,0" FontSize="10" TextWrapping="Wrap"
+                               Foreground="{StaticResource MutedBrush}"
+                               Text="{DynamicResource S_PlaceHint}" />
+                </StackPanel>
 
                 <!--
                     Die Maske. Ein Wert je Bildpunkt, der sagt, wie stark die Ebene
@@ -338,6 +427,16 @@
                     <ToggleButton x:Name="FollowButton" Style="{StaticResource OverlayToggle}"
                                   Margin="0,6,0,0" Content="{DynamicResource S_FollowSequence}"
                                   Checked="OnFollowChanged" Unchecked="OnFollowChanged" />
+
+                    <!--
+                        Ueber allem: nicht nur oben im Stapel, sondern hinter der
+                        Bildwerdung. Ein Wasserzeichen soll in jedem Bild gleich
+                        aussehen, egal was am Bild eingestellt ist.
+                    -->
+                    <ToggleButton x:Name="OnTopButton" Style="{StaticResource OverlayToggle}"
+                                  Margin="0,4,0,0" Content="{DynamicResource S_OnTop}"
+                                  Checked="OnOnTopChanged" Unchecked="OnOnTopChanged"
+                                  ToolTip="{DynamicResource S_OnTopHint}" />
 
                     <TextBlock Margin="0,8,0,0" FontSize="10" TextWrapping="Wrap"
                                Foreground="{StaticResource MutedBrush}"

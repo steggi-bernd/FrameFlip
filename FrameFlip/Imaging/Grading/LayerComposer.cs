@@ -156,10 +156,23 @@ public static class LayerComposer
                 ? layer.Grade()
                 : default;
 
+            // Platziert wird nur, wenn es etwas zu platzieren gibt: eine Ebene in
+            // der Groesse der Leinwand und ohne Einstellung geht den geraden Weg
+            // ueber den Index, ohne Abtasten und ohne Grenzpruefung.
+            var source = used[i].Frame;
+
+            bool placed = source is not null &&
+                          (!layer.Place.IsNeutral ||
+                           source.Width != width || source.Height != height);
+
+            var placement = placed
+                ? LayerPlacement.Prepare(layer.Place, source!.Width, source.Height, width, height)
+                : default;
+
             plans[i] = new Plan(used[i].Frame, layer.Mode, Math.Clamp(layer.Opacity, 0f, 1f),
                                 gain * layer.Tint.R, gain * layer.Tint.G, gain * layer.Tint.B, clipped,
                                 layer.Mask, maskKind, maskFrame, maskLevels, maskIds,
-                                layer.Content, grade, used[i].Kind);
+                                layer.Content, grade, used[i].Kind, placed, placement);
         }
 
         // Die Gitterpunkte einmal aufschreiben, statt sie je Bildpunkt auszurechnen.
@@ -278,6 +291,8 @@ public static class LayerComposer
                     }
 
                     float lr, lg, lb;
+                    float placedAlpha = 1f;
+                    bool hasPlacedAlpha = false;
 
                     if (plan.Content == LayerContent.Adjustment)
                     {
@@ -295,6 +310,23 @@ public static class LayerComposer
                         lr *= plan.ScaleR;
                         lg *= plan.ScaleG;
                         lb *= plan.ScaleB;
+                    }
+                    else if (plan.Placed)
+                    {
+                        // Ausserhalb ihrer Flaeche traegt die Ebene nichts bei - und
+                        // zwar wirklich nichts, nicht Schwarz. Ein Wasserzeichen
+                        // wuerde sonst das halbe Bild ausloeschen.
+                        if (!plan.Placement.Locate(x, y, out float u, out float v)) continue;
+
+                        plan.Placement.Sample(frame!, u, v, out lr, out lg, out lb, out placedAlpha);
+
+                        lr *= plan.ScaleR;
+                        lg *= plan.ScaleG;
+                        lb *= plan.ScaleB;
+
+                        // Die eigene Deckung der Ebene zaehlt mit: Ein Logo mit
+                        // durchsichtigem Rand soll durchsichtig bleiben.
+                        hasPlacedAlpha = true;
                     }
                     else
                     {
@@ -314,6 +346,10 @@ public static class LayerComposer
                                                 inGroup ? gr : vr,
                                                 inGroup ? gg : vg,
                                                 inGroup ? gb : vb);
+
+                    // Die Deckung einer platzierten Ebene wirkt wie eine Maske: Sie
+                    // macht die Deckkraft oertlich. Dieselbe Stelle, dieselbe Regel.
+                    if (hasPlacedAlpha) opacity *= Math.Clamp(placedAlpha, 0f, 1f);
 
                     if (inGroup)
                     {
@@ -344,7 +380,7 @@ public static class LayerComposer
                     // undurchsichtig zu machen, das es nicht war.
                     if (frame is null) continue;
 
-                    float la = (frame.A is null ? 1f : frame.A[i]) * opacity;
+                    float la = (hasPlacedAlpha ? 1f : frame.A is null ? 1f : frame.A[i]) * opacity;
                     if (la > va) va = la;
                 }
 
@@ -435,6 +471,10 @@ public static class LayerComposer
         {
             if (!layer.Visible || layer.Opacity <= 0.0005f) continue;
 
+            // Was obenauf liegt, gehoert nicht in den Stapel: Es wird erst nach der
+            // Bildwerdung aufgetragen, siehe Overlays.
+            if (layer.OnTop && layer.Content == LayerContent.Image) continue;
+
             if (layer.Content == LayerContent.Group)
             {
                 // Zu tief geschachtelt: die Gruppe faellt weg, ihre Kinder bleiben.
@@ -464,17 +504,20 @@ public static class LayerComposer
 
             if (!sources.TryGetValue(layer.Source, out var frame)) continue;
 
-            // Die erste brauchbare Ebene gibt die Groesse vor; alles Abweichende
-            // faellt heraus. Zwei Groessen ineinanderzurechnen hiesse skalieren, und
-            // das ist eine andere Aufgabe als mischen.
-            if (width == 0)
+            // Die erste brauchbare Ebene gibt die Groesse vor.
+            //
+            // Frueher fiel alles Abweichende heraus - Skalieren war eine andere
+            // Aufgabe als Mischen. Jetzt gibt es die Platzierung, und damit ist eine
+            // Ebene anderer Groesse kein Sonderfall mehr, sondern ein Logo: Sie wird
+            // mittig eingepasst, und Massstab und Versatz rechnen von dort weiter.
+            //
+            // Die GROESSE gibt sie trotzdem nicht vor. Sonst bestimmte ein
+            // Wasserzeichen von 200 Punkten die Leinwand, wenn es zufaellig zuunterst
+            // liegt.
+            if (width == 0 && layer.Content == LayerContent.Pass)
             {
                 width = frame.Width;
                 height = frame.Height;
-            }
-            else if (frame.Width != width || frame.Height != height)
-            {
-                continue;
             }
 
             into.Add((layer, frame, StepKind.Layer));
@@ -560,11 +603,14 @@ public static class LayerComposer
                     float sr, float sg, float sb, bool clipped,
                     LayerMask mask, MaskKind kind, FloatFrame? maskFrame,
                     FloatFrame[]? maskLevels, float[]? maskIds,
-                    LayerContent content, LayerGrade grade, StepKind step)
+                    LayerContent content, LayerGrade grade, StepKind step,
+                    bool placed, LayerPlacement placement)
         {
             Content = content;
             Grade = grade;
             Kind = step;
+            Placed = placed;
+            Placement = placement;
             Frame = frame;
             Mode = mode;
             Opacity = opacity;
@@ -595,6 +641,8 @@ public static class LayerComposer
 
         public readonly FloatFrame? Frame;
         public readonly StepKind Kind;
+        public readonly bool Placed;
+        public readonly LayerPlacement Placement;
         public readonly LayerContent Content;
         public readonly LayerGrade Grade;
         public readonly BlendMode Mode;

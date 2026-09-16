@@ -151,7 +151,10 @@ public partial class AtelierPage
     private void DropStale(IReadOnlyList<string> needed)
     {
         foreach (string stale in _sources.Keys.Where(k => k.Length > 0 && !needed.Contains(k)).ToList())
+        {
             _sources.Remove(stale);
+            _thumbnails.Remove(stale);
+        }
     }
 
     /// <summary>
@@ -176,6 +179,12 @@ public partial class AtelierPage
         _composed = LayerComposer.Compose(Layers.Stack, _sources, _composed,
                                           _coarse ? CoarseStep : 1);
         _frame = _composed ?? _base;
+
+        // Was obenauf liegt, wird nach der Bildwerdung aufgetragen - es steht
+        // deshalb nicht im zusammengesetzten Bild, sondern daneben.
+        _overlays = _frame is null
+            ? Overlays.None
+            : Overlays.Prepare(Layers.Stack, _sources, _frame.Width, _frame.Height);
 
         // Hat der Composer eine Quelle durchgereicht, statt zu rechnen, gehoert sie
         // ihm nicht - beim naechsten Mal darf nicht hineingeschrieben werden.

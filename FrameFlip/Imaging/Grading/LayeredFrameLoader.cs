@@ -24,10 +24,23 @@ public static class LayeredFrameLoader
     /// uebrige ueber die Windows-Bildverarbeitung.
     /// </param>
     public static FloatFrame? Load(string path, LayerStack? layers, Func<string, FloatFrame?>? plain = null)
+        => LoadAll(path, layers, plain).Frame;
+
+    /// <summary>
+    /// Wie <see cref="Load"/>, gibt aber auch die Ebenen zurueck, die OBENAUF
+    /// liegen.
+    ///
+    /// Die gehoeren nicht ins zusammengesetzte Bild - sie werden erst nach der
+    /// Bildwerdung aufgetragen. Wer nur den Frame nimmt, bekommt das Bild ohne
+    /// Wasserzeichen; das ist fuer alles richtig, was mit dem Bild rechnet, und
+    /// falsch fuer das, was es ausgibt.
+    /// </summary>
+    public static (FloatFrame? Frame, OverlayPlan[] Overlays) LoadAll(
+        string path, LayerStack? layers, Func<string, FloatFrame?>? plain = null)
     {
         plain ??= Plain;
 
-        if (layers is null || layers.IsPassThrough) return plain(path);
+        if (layers is null || layers.IsPassThrough) return (plain(path), Overlays.None);
 
         var sources = new Dictionary<string, FloatFrame>(StringComparer.Ordinal);
 
@@ -41,7 +54,10 @@ public static class LayeredFrameLoader
         // Passen stammt. Das Bild selbst zu zeigen ist dann die bessere Antwort als
         // ein schwarzes Feld: Man sieht, dass die Datei in Ordnung ist, und sucht
         // den Fehler dort, wo er liegt.
-        return LayerComposer.Compose(layers, sources) ?? plain(path);
+        var built = LayerComposer.Compose(layers, sources) ?? plain(path);
+        if (built is null) return (null, Overlays.None);
+
+        return (built, Grading.Overlays.Prepare(layers, sources, built.Width, built.Height));
     }
 
     /// <summary>

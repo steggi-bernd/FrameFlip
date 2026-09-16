@@ -56,7 +56,8 @@
 
         <!-- Das Bild -->
         <Border Grid.Row="1" Grid.Column="0" Background="#FF101010" CornerRadius="4"
-                ClipToBounds="True">
+                ClipToBounds="True"
+                AllowDrop="True" Drop="OnImageFilesDropped" DragOver="OnImageFilesDragOver">
             <Grid>
                 <ScrollViewer x:Name="ImageScroll"
                               HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Auto"
