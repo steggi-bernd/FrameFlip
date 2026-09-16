@@ -6,9 +6,9 @@ A second mode inside FrameFlip: grade one frame, then apply that grade to the wh
 sequence and write it out. Layers, masks driven by render data, and a colour toolset
 aimed at Photoshop and Lightroom rather than at a node graph.
 
-**Status:** steps 1 to 7 are built and running; 8 is still design. Of step 5, the
-pass stack works — order, duplication, opacity, colour, blend mode and clipping
-masks; adjustment, image and group layers are not built yet. Of step 6, masks are
+**Status:** steps 1 to 7 are built and running; 8 is still design. Of step 5, pass
+and adjustment layers work — order, duplication, opacity, colour, blend mode and
+clipping masks; image and group layers are not built yet. Of step 6, masks are
 data-driven: cryptomatte, any pass, luminance and gradient; painted masks are not
 built. Where an earlier estimate or assumption turned out wrong, the measurement
 replaced it and the error is named — those passages are worth more than the numbers.
@@ -196,24 +196,60 @@ Four kinds of layer, one stack:
 | Kind | Source | Typical use | State |
 |---|---|---|---|
 | **Pass** | a pass from the multilayer EXR | light mixing: glossy down, emission up | **built** |
-| **Adjustment** | nothing — it is a tool | the colour tools of section 7 | designed |
+| **Adjustment** | nothing — it is a tool | the colour tools of section 7 | **built** |
 | **Image** | a still, or a second sequence | logo, overlay, gradient, version compare | designed |
 | **Group** | other layers | one mask over several operations | designed |
 
-Only the first is built, and that ordering is deliberate rather than convenient: the
-pass layer is the one that decides whether the arithmetic is right, and it turned out
-the arithmetic in this section was not (see below). The other three ride on the same
-composer once it is correct.
+Making colour correction a *layer* rather than a panel is what keeps this one system
+instead of two. An adjustment layer has opacity, a blend mode and a mask like any
+other, which means every tool in section 7 can be masked to a Cryptomatte selection
+without any tool knowing that masks exist — and clipped to the layer below, "warm
+up only the glossy pass" is two clicks rather than a node tree. The clipping mask was
+built before adjustment layers precisely because it is the thing that makes that
+sentence sayable.
 
-Making colour correction a *layer* rather than a panel is what will keep this one
-system instead of two. An adjustment layer has opacity, a blend mode and a mask like
-any other, which means every tool in section 7 can be masked to a Cryptomatte
-selection without any tool knowing that masks exist.
+### The one place an adjustment layer differs from the final grade
 
-Until that exists, the colour tools sit **below** the stack in the panel and act on
-its result. That is not a placeholder arrangement but the correct reading order: the
-stack makes an image, the tools change that image, and the panel is read top to
-bottom in the same order the pixels travel.
+An adjustment layer sits **inside** the stack. What it outputs is composited further
+up, so it has to hand back linear light — and AgX cannot do that. AgX is a 3D LUT:
+it has a way there and no way back.
+
+So an adjustment layer borrows a display transform instead: the same `x / (x + 0.18)`
+the contrast blend modes and the luminance masks already use. Middle grey lands
+exactly on 0.5, nothing is clipped, and the return trip is exact — measured, a
+three-point straight curve on an adjustment layer leaves the image unchanged to within
+0.5 % across twenty stops, which is the invariant the whole construction rests on.
+
+The consequence has to be said out loud: **a curve on an adjustment layer bites on a
+different scale than the same curve in the panel below.** Both are curves on a
+display-like encoding, but one acts while compositing and the other on the finished
+image. That is the same distinction every node-based program has; here it is simply
+named.
+
+The colour tools therefore sit **below** the stack in the panel, and the panel says
+which of the two it is currently editing — in a bar that stays put while the rest
+scrolls. That bar is not decoration: there is one set of tools and any number of
+layers, and someone who misses the switch adjusts the whole image while meaning one
+layer.
+
+### What it costs, measured
+
+Compositing runs on every slider tick, so this had to be measured rather than assumed.
+At 1080p, two passes plus one adjustment layer carrying a curve and a white balance:
+
+| | |
+|---|---|
+| first attempt | **141 ms** — unusable |
+| reusing the output buffer instead of allocating 33 MB per pass | **94 ms** |
+| computing only the grid the coarse preview actually reads | **7.5 ms** |
+
+The last step is the one that matters and it is not a trick: while a slider is moving,
+the display already computes on a grid of every fourth pixel and interpolates between.
+Compositing every pixel meant computing fifteen sixteenths of them for nothing. The
+two grids must agree exactly, including the last column on the edge, so there is a test
+that composes coarsely into a buffer pre-filled with nonsense and checks the drawn
+result is byte-for-byte what a full composite gives — if the composer ever skips a
+pixel the display reads, the nonsense shows up.
 
 ### Two kinds of mixing — and the reason there is only one
 
@@ -619,11 +655,11 @@ next one landing.
    clarity, LUT. Single layer, no masks. Already a genuine grading tool.
 4. ~~**The batch run and sequence export.**~~ **Done**, images and video. At this point the workflow closes, and Atelier
    is finished as a product even if nothing further is built.
-5. ~~**Layer stack, blend modes.**~~ **Done** for pass layers: order, duplication,
-   opacity, colour, ten blend modes and clipping masks, all in linear light, with the
-   stack applied unchanged by the batch run. Luminance and gradient masks are not built.
-   This step is also where the pass arithmetic in section 5 turned out to be wrong and
-   was corrected against a real render.
+5. ~~**Layer stack, blend modes.**~~ **Done**, pass and adjustment layers: order,
+   duplication, opacity, colour, ten blend modes and clipping masks, all in linear
+   light, with the stack applied unchanged by the batch run. Image and group layers
+   are not built. This step is also where the pass arithmetic in section 5 turned out
+   to be wrong and was corrected against a real render.
 6. ~~**Passes and light mixing.**~~ **Done** with step 5. ~~**Luminance and gradient
    masks.**~~ **Done**, plus any pass as a mask — which turned out to be the same
    plumbing the cryptomatte needed, so it was worth building first. Painted masks are not.

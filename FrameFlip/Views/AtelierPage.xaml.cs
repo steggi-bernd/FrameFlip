@@ -44,6 +44,15 @@ public sealed partial class AtelierPage : UserControl
     /// </summary>
     private FloatFrame? _base;
 
+    /// <summary>
+    /// Der Frame, in den zusammengesetzt wird - Eigentum der Seite.
+    ///
+    /// Er wird wiederverwendet, statt bei jedem Reglerzug neu angelegt zu werden: Bei
+    /// 4K sind das rund 130 Megabyte je Durchgang, und gemessen war das Anlegen
+    /// teurer als das Rechnen.
+    /// </summary>
+    private FloatFrame? _composed;
+
     /// <summary>Die gelesenen Passe, nach Quellnamen. Leerer Name ist das Bild selbst.</summary>
     private readonly Dictionary<string, FloatFrame> _sources = new(StringComparer.Ordinal);
 
@@ -52,6 +61,23 @@ public sealed partial class AtelierPage : UserControl
 
     private WriteableBitmap? _surface;
     private string? _path;
+
+    /// <summary>
+    /// Die Ebene, deren Werkzeuge der Streifen gerade zeigt. Null heisst: das
+    /// fertige Bild.
+    /// </summary>
+    private ImageLayer? _editing;
+
+    /// <summary>
+    /// Die Korrektur des fertigen Bildes - unabhaengig davon, was der Streifen
+    /// gerade zeigt.
+    ///
+    /// Getrennt gefuehrt, weil der Streifen sich umhaengt: Waehrend er die Werkzeuge
+    /// einer Ebene zeigt, darf das fertige Bild nicht ploetzlich mit deren Kurve
+    /// gerechnet werden.
+    /// </summary>
+    private ImageAdjustments _finalAdjustments = ImageAdjustments.Neutral;
+    private PreparedGrading _finalGrading = PreparedGrading.None;
 
     private readonly DispatcherTimer _settle;
     private bool _coarse;
@@ -71,12 +97,14 @@ public sealed partial class AtelierPage : UserControl
 
         InitializeComponent();
 
-        Tools.Load(settings.Adjustments, settings.Grading);
         Tools.Changed += OnToolsChanged;
         Tools.ToolsEnabled = false;
 
         Layers.Changed += OnLayersChanged;
         Layers.PickMode += OnPickModeChanged;
+        Layers.Editing += Bind;
+
+        Bind(null);
 
         _settle = new DispatcherTimer(DispatcherPriority.Background)
         {
@@ -90,7 +118,13 @@ public sealed partial class AtelierPage : UserControl
             _settle.Stop();
             if (!_coarse) return;
 
+            // Erst die Schrittweite zuruecksetzen, dann zusammensetzen, dann
+            // zeichnen. Waere das Zusammensetzen noch grob, blieben die Werte
+            // zwischen den Gitterpunkten stehen - und der volle Durchgang zeichnete
+            // sie mit, als waeren sie gerechnet.
             _coarse = false;
+
+            Recompose();
             Render();
             Measure();
         };
@@ -126,6 +160,7 @@ public sealed partial class AtelierPage : UserControl
         Layers.StopPicking();
 
         _sources.Clear();
+        _composed = null;
         _passes = passes;
         _cryptomattes = cryptomattes;
 
@@ -204,11 +239,86 @@ public sealed partial class AtelierPage : UserControl
             ? exr.View
             : new StandardViewTransform();
 
+    /// <summary>
+    /// Haengt den Werkzeugstreifen an ein Ziel: an eine Einstellungsebene oder an
+    /// das fertige Bild.
+    ///
+    /// Der heikle Teil ist, dass beide danach DIESELBEN Werkzeugobjekte halten
+    /// muessen. Der Streifen legt beim Laden an, was fehlt, und traegt es in seinen
+    /// eigenen Stapel ein; wer das nicht zurueckschreibt, verliert ein frisch
+    /// angelegtes Werkzeug beim naechsten Umschalten. Und andersherum darf der
+    /// Streifen nicht einfach seinen Stapel weiterreichen - beim naechsten Laden
+    /// leert er ihn, und die Ebene stuende ohne da.
+    /// </summary>
+    private void Bind(ImageLayer? layer)
+    {
+        _editing = layer;
+
+        if (layer is null)
+        {
+            Tools.Load(_settings.Adjustments, _settings.Grading);
+            _settings.Grading = Snapshot();
+            _settings.Adjustments = Tools.Adjustments;
+
+            _finalAdjustments = Tools.Adjustments;
+            _finalGrading = Tools.Prepared;
+
+            Tools.Target = null;
+            return;
+        }
+
+        Tools.Load(layer.Adjustments, layer.Tools);
+        layer.Tools = Snapshot();
+        layer.Adjustments = Tools.Adjustments;
+
+        Tools.Target = layer.Name;
+    }
+
+    /// <summary>
+    /// Ein eigener Stapel mit denselben Werkzeugen, die der Streifen gerade haelt.
+    ///
+    /// Die Liste ist neu, die Werkzeuge darin sind dieselben Objekte - wer am Regler
+    /// zieht, aendert sie fuer beide. Genau das ist gewollt; nur der Behaelter darf
+    /// nicht geteilt sein.
+    /// </summary>
+    private GradingStack Snapshot() => new() { Tools = Tools.Stack.Tools.ToList() };
+
     private void OnToolsChanged(bool interim)
     {
-        _settings.Adjustments = Tools.Adjustments;
-        _settings.Grading = Tools.Stack;
+        bool layer = _editing is not null;
 
+        if (layer)
+        {
+            _editing!.Adjustments = Tools.Adjustments;
+            _settings.Layers = Layers.Stack;
+        }
+        else
+        {
+            _settings.Adjustments = Tools.Adjustments;
+            _finalAdjustments = Tools.Adjustments;
+            _finalGrading = Tools.Prepared;
+        }
+
+        // Eine Einstellungsebene sitzt IM Stapel - was sie aendert, aendert das
+        // zusammengesetzte Bild und nicht erst die Korrektur am Ende.
+        Refresh(interim, recompose: layer);
+    }
+
+    /// <summary>
+    /// Zeichnet neu, und wenn noetig setzt es vorher zusammen.
+    ///
+    /// Die Reihenfolge ist der ganze Inhalt dieser Methode, und sie ist nicht
+    /// beliebig: ERST steht fest, wie grob gerechnet wird, DANN wird zusammengesetzt,
+    /// DANN gezeichnet. Beim Ziehen rechnet der Composer nur die Gitterpunkte, die
+    /// die Anzeige danach liest - stuende die Schrittweite noch auf dem Wert des
+    /// vorigen Schritts, bliebe beim Loslassen ein grob zusammengesetztes Bild
+    /// stehen, das der volle Durchgang dann als fertig zeichnet.
+    ///
+    /// Das faellt beim Ausprobieren kaum auf: Man sieht ein Bild, das nach dem
+    /// Loslassen etwas zu weich aussieht, und haelt es fuer die Vorschau.
+    /// </summary>
+    private void Refresh(bool interim, bool recompose)
+    {
         if (interim)
         {
             _coarse = true;
@@ -220,6 +330,8 @@ public sealed partial class AtelierPage : UserControl
             _settle.Stop();
             _coarse = false;
         }
+
+        if (recompose) Recompose();
 
         Render();
         if (!interim) Measure();
@@ -263,7 +375,10 @@ public sealed partial class AtelierPage : UserControl
 
         // Jedes vierte Pixel in beiden Richtungen: ein Sechzehntel der Arbeit, und
         // die Verteilung stimmt trotzdem.
-        FloatFrameProcessor.Measure(frame, Tools.Adjustments, ViewFor(frame), Tools.Prepared,
+        // Gemessen wird das FERTIGE Bild, nicht das, was der Streifen gerade zeigt.
+        // Ein Histogramm, das sich beim Anklicken einer Ebene aendert, beantwortet
+        // eine Frage, die niemand gestellt hat.
+        FloatFrameProcessor.Measure(frame, _finalAdjustments, ViewFor(frame), _finalGrading,
                                     histogram, step: 4);
 
         Tools.ShowHistogram(histogram);

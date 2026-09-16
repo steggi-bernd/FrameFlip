@@ -25,14 +25,53 @@ public static class LayerComposer
     /// oder eine andere Groesse hat, wird uebersprungen - eine halb gelesene Datei
     /// soll ein Bild ergeben, das man ansehen kann, und keinen Abbruch.
     /// </param>
-    public static FloatFrame? Compose(LayerStack stack, IReadOnlyDictionary<string, FloatFrame> sources)
+    /// <param name="into">
+    /// Ein Frame aus einem frueheren Durchgang, in den geschrieben werden darf.
+    ///
+    /// Bei 1080p sind das 33 Megabyte je Durchgang, bei 4K rund 130 - und
+    /// zusammengesetzt wird bei JEDEM Reglerzug. Die Felder jedes Mal neu anzulegen
+    /// heisst, sie jedes Mal neu zu nullen und dem Sammler zu ueberlassen; gemessen
+    /// war das der groessere Teil der Zeit, nicht die Rechnung.
+    ///
+    /// Der Aufrufer muss einen Frame uebergeben, der IHM gehoert - niemals einen aus
+    /// <paramref name="sources"/>. Hineinzuschreiben, waehrend daraus gelesen wird,
+    /// ergaebe ein Bild, das sich mit jedem Durchgang weiter verzieht.
+    /// </param>
+    /// <param name="step">
+    /// Nur jeder n-te Bildpunkt wird zusammengesetzt - dieselben Gitterpunkte, die
+    /// der grobe Durchgang der Anzeige anschliessend liest.
+    ///
+    /// Das ist der Grund, warum es diese Zahl hier ueberhaupt gibt: Beim Ziehen an
+    /// einem Regler rechnet die Anzeige ohnehin nur auf einem Gitter und
+    /// interpoliert dazwischen. Wer trotzdem jeden Bildpunkt zusammensetzt, rechnet
+    /// fuenfzehn Sechzehntel davon fuer nichts - gemessen sind das bei 1080p mit
+    /// einer Einstellungsebene neunzig Millisekunden je Reglerzug statt sechs.
+    ///
+    /// Die Werte ZWISCHEN den Gitterpunkten bleiben dabei stehen, wie sie waren. Das
+    /// ist in Ordnung, weil sie niemand liest - aber nur solange die Schrittweite
+    /// dieselbe ist. Beim Loslassen laeuft ein voller Durchgang und fuellt alles.
+    /// </param>
+    public static FloatFrame? Compose(LayerStack stack, IReadOnlyDictionary<string, FloatFrame> sources,
+                                      FloatFrame? into = null, int step = 1)
     {
-        var used = new List<(ImageLayer Layer, FloatFrame Frame)>();
+        step = Math.Clamp(step, 1, 16);
+
+        var used = new List<(ImageLayer Layer, FloatFrame? Frame)>();
         int width = 0, height = 0;
 
         foreach (var layer in stack.Layers)
         {
             if (!layer.Visible || layer.Opacity <= 0.0005f) continue;
+
+            // Eine Einstellungsebene bringt kein Bild mit - sie rechnet mit dem, was
+            // schon da ist. Sie gibt deshalb auch keine Groesse vor; die kommt von
+            // den Passen darunter.
+            if (layer.Content == LayerContent.Adjustment)
+            {
+                used.Add((layer, null));
+                continue;
+            }
+
             if (!sources.TryGetValue(layer.Source, out var frame)) continue;
 
             // Die erste brauchbare Ebene gibt die Groesse vor; alles Abweichende
@@ -51,22 +90,38 @@ public static class LayerComposer
             used.Add((layer, frame));
         }
 
-        if (used.Count == 0) return null;
+        // Ohne einen einzigen Pass gibt es nichts, worauf eine Korrektur wirken
+        // koennte - und auch keine Bildgroesse. Ein Stapel aus lauter
+        // Einstellungsebenen ist kein Bild.
+        if (used.Count == 0 || width == 0) return null;
+
+        // Eine Einstellungsebene ohne Wirkung bleibt trotzdem stehen. Sie
+        // herauszunehmen waere die naheliegende Ersparnis und ein Fehler: Traegt sie
+        // eine angeschnittene Ebene, haengt diese danach an einer anderen - und der
+        // Stapel rechnet etwas anderes, sobald man die Korrektur auf null stellt.
+        // Der Durchlauf kostet ohnehin fast nichts; die Kette kehrt sofort zurueck.
 
         // Eine einzelne unveraenderte Ebene ist das Bild selbst. Sie durchzureichen
         // spart bei 4K rund hundert Megabyte und eine Kopie.
         if (used.Count == 1 && used[0].Layer.IsNeutral && used[0].Layer.LiesOnBlack)
         {
-            return used[0].Frame;
+            return used[0].Frame!;
         }
 
         int count = width * height;
-        var r = new float[count];
-        var g = new float[count];
-        var b = new float[count];
-        var a = new float[count];
 
-        bool sceneReferred = used[0].Frame.IsSceneReferred;
+        // Der alte Frame taugt, wenn er die richtige Groesse hat und keiner der
+        // Quellen ist. Das zweite prueft der Aufrufer; hier wird nur die Groesse
+        // abgeglichen.
+        bool reuse = into is not null && into.Width == width && into.Height == height &&
+                     into.A is not null;
+
+        var r = reuse ? into!.R : new float[count];
+        var g = reuse ? into!.G : new float[count];
+        var b = reuse ? into!.B : new float[count];
+        var a = reuse ? into!.A! : new float[count];
+
+        bool sceneReferred = used.First(u => u.Frame is not null).Frame!.IsSceneReferred;
 
         // Je Ebene einmal vorbereitet, damit die innere Schleife nur noch multipliziert.
         var plans = new Plan[used.Count];
@@ -123,21 +178,38 @@ public static class LayerComposer
                 if (maskLevels.Length == 0 || maskIds.Length == 0) maskKind = MaskKind.None;
             }
 
+            // Die Kette einer Einstellungsebene wird EINMAL vorbereitet, nicht je
+            // Bildpunkt. Bei 4K waeren es sonst 25 Millionen Tabellenaufbauten.
+            var grade = layer.Content == LayerContent.Adjustment
+                ? layer.Grade()
+                : default;
+
             plans[i] = new Plan(used[i].Frame, layer.Mode, Math.Clamp(layer.Opacity, 0f, 1f),
                                 gain * layer.Tint.R, gain * layer.Tint.G, gain * layer.Tint.B, clipped,
-                                layer.Mask, maskKind, maskFrame, maskLevels, maskIds);
+                                layer.Mask, maskKind, maskFrame, maskLevels, maskIds,
+                                layer.Content, grade);
         }
 
-        Parallel.For(0, height, new ParallelOptions
+        // Die Gitterpunkte einmal aufschreiben, statt sie je Bildpunkt auszurechnen.
+        // Bei Schrittweite eins ist es die vollstaendige Liste; die letzte Spalte
+        // liegt in beiden Faellen auf dem Rand, weil der grobe Durchgang der Anzeige
+        // es genauso haelt - eine Abweichung um einen Bildpunkt waere ein Streifen
+        // am rechten Rand, der nie mitgerechnet wird.
+        int[] columns = Grid(width, step);
+        int[] rows = Grid(height, step);
+
+        Parallel.For(0, rows.Length, new ParallelOptions
         {
             MaxDegreeOfParallelism = Math.Clamp(Environment.ProcessorCount, 1, 8),
         },
-        y =>
+        ry =>
         {
+            int y = rows[ry];
             int start = y * width;
 
-            for (int x = 0; x < width; x++)
+            for (int cx = 0; cx < columns.Length; cx++)
             {
+                int x = columns[cx];
                 int i = start + x;
 
                 // Der Untergrund ist Schwarz und nicht die unterste Ebene: Damit
@@ -161,11 +233,48 @@ public static class LayerComposer
                     ref readonly var plan = ref plans[p];
                     var frame = plan.Frame;
 
-                    float lr = frame.R[i] * plan.ScaleR;
-                    float lg = frame.G[i] * plan.ScaleG;
-                    float lb = frame.B[i] * plan.ScaleB;
-
                     bool inGroup = plan.Clipped && open;
+
+                    // Die offene Gruppe wird ZUERST eingerechnet, nicht erst nach
+                    // dem Lesen dieser Ebene.
+                    //
+                    // Das war zuerst andersherum, und es kostete die halbe Wirkung:
+                    // Eine Einstellungsebene und eine Helligkeitsmaske lesen beide,
+                    // was unter ihnen liegt - und "darunter" war dann der Stand VOR
+                    // der letzten Ebene. Eine Korrektur ueber zwei Passen rechnete
+                    // mit dem ersten und uebersah den zweiten.
+                    if (!inGroup && open)
+                    {
+                        Blending.Mix(groupMode, groupOpacity, vr, vg, vb, gr, gg, gb,
+                                     out vr, out vg, out vb);
+                        open = false;
+                    }
+
+                    float lr, lg, lb;
+
+                    if (plan.Content == LayerContent.Adjustment)
+                    {
+                        // Eine Einstellungsebene nimmt als Eingang das, worauf sie
+                        // wirkt: angeschnitten die Gruppe, sonst das Ergebnis
+                        // darunter. Damit heisst "Schnittmaske" hier genau dasselbe
+                        // wie in Photoshop - die Korrektur gilt nur fuer die eine
+                        // Ebene darunter.
+                        lr = inGroup ? gr : vr;
+                        lg = inGroup ? gg : vg;
+                        lb = inGroup ? gb : vb;
+
+                        plan.Grade.Apply(ref lr, ref lg, ref lb);
+
+                        lr *= plan.ScaleR;
+                        lg *= plan.ScaleG;
+                        lb *= plan.ScaleB;
+                    }
+                    else
+                    {
+                        lr = frame!.R[i] * plan.ScaleR;
+                        lg = frame.G[i] * plan.ScaleG;
+                        lb = frame.B[i] * plan.ScaleB;
+                    }
 
                     // Die Maske greift an genau einer Stelle an: Sie macht die
                     // Deckkraft oertlich. Damit gilt fuer jede Mischung und jede
@@ -186,10 +295,6 @@ public static class LayerComposer
                     }
                     else
                     {
-                        if (open)
-                            Blending.Mix(groupMode, groupOpacity, vr, vg, vb, gr, gg, gb,
-                                         out vr, out vg, out vb);
-
                         gr = lr;
                         gg = lg;
                         gb = lb;
@@ -207,6 +312,11 @@ public static class LayerComposer
                     // irgendeine Ebene deckt, deckt das Ergebnis. Sie durch dieselbe
                     // Formel zu schicken wie die Farbe hiesse, Alpha auf Add zu
                     // summieren - drei Passe ergaeben Deckung 3.
+                    // Eine Einstellungsebene deckt nichts ab - sie faerbt nur, was
+                    // schon da ist. Ihr eine Deckung zuzurechnen hiesse, ein Bild
+                    // undurchsichtig zu machen, das es nicht war.
+                    if (frame is null) continue;
+
                     float la = (frame.A is null ? 1f : frame.A[i]) * opacity;
                     if (la > va) va = la;
                 }
@@ -222,17 +332,47 @@ public static class LayerComposer
             }
         });
 
-        return new FloatFrame
+        // Derselbe Frame, wenn seine Felder wiederverwendet wurden - sonst haette
+        // der Aufrufer zwei Huellen um dieselben Daten und wuesste nicht, welche gilt.
+        return reuse
+            ? into!
+            : new FloatFrame
+            {
+                Width = width,
+                Height = height,
+                R = r,
+                G = g,
+                B = b,
+                A = a,
+                Layer = used.Count == 1 ? used[0].Frame?.Layer : null,
+                IsSceneReferred = sceneReferred,
+            };
+    }
+
+    /// <summary>
+    /// Die Stellen, an denen gerechnet wird. Bei Schrittweite eins alle.
+    ///
+    /// Die letzte liegt immer auf dem Rand - genau wie im groben Durchgang der
+    /// Anzeige. Rechnete das Gitter hier bis ueber den Rand hinaus oder hoerte einen
+    /// Schritt frueher auf, bliebe der letzte Streifen ungerechnet und zoege beim
+    /// Reglerzug eine sichtbare Kante nach sich.
+    /// </summary>
+    private static int[] Grid(int size, int step)
+    {
+        if (step <= 1)
         {
-            Width = width,
-            Height = height,
-            R = r,
-            G = g,
-            B = b,
-            A = a,
-            Layer = used.Count == 1 ? used[0].Frame.Layer : null,
-            IsSceneReferred = sceneReferred,
-        };
+            var all = new int[size];
+            for (int i = 0; i < size; i++) all[i] = i;
+
+            return all;
+        }
+
+        int count = (size + step - 1) / step + 1;
+        var grid = new int[count];
+
+        for (int i = 0; i < count; i++) grid[i] = Math.Min(i * step, size - 1);
+
+        return grid;
     }
 
     // Rec.-709-Luminanz, dieselben Gewichte wie im uebrigen Bildweg.
@@ -243,7 +383,12 @@ public static class LayerComposer
     /// <summary>
     /// Der Maskenwert eines Bildpunkts, zwischen 0 und 1.
     /// </summary>
-    /// <param name="lr">Die Ebene selbst, bereits mit Belichtung und Farbe.</param>
+    /// <param name="lr">
+    /// Die Ebene selbst, bereits mit Belichtung und Farbe - bei einer
+    /// Einstellungsebene also das korrigierte Ergebnis. Eine Helligkeitsmaske auf ihr
+    /// fragt damit "wo ist es NACH der Korrektur hell", und das ist die Frage, die
+    /// man beim Hinsehen stellt.
+    /// </param>
     /// <param name="ur">Was an dieser Stelle schon darunter liegt.</param>
     private static float Factor(in Plan plan, int x, int y, int width, int height, int i,
                                 float lr, float lg, float lb,
@@ -305,11 +450,14 @@ public static class LayerComposer
     /// <summary>Was je Ebene einmal feststeht.</summary>
     private readonly struct Plan
     {
-        public Plan(FloatFrame frame, BlendMode mode, float opacity,
+        public Plan(FloatFrame? frame, BlendMode mode, float opacity,
                     float sr, float sg, float sb, bool clipped,
                     LayerMask mask, MaskKind kind, FloatFrame? maskFrame,
-                    FloatFrame[]? maskLevels = null, float[]? maskIds = null)
+                    FloatFrame[]? maskLevels, float[]? maskIds,
+                    LayerContent content, LayerGrade grade)
         {
+            Content = content;
+            Grade = grade;
             Frame = frame;
             Mode = mode;
             Opacity = opacity;
@@ -338,7 +486,9 @@ public static class LayerComposer
             GradientTo = mask.Centre + half;
         }
 
-        public readonly FloatFrame Frame;
+        public readonly FloatFrame? Frame;
+        public readonly LayerContent Content;
+        public readonly LayerGrade Grade;
         public readonly BlendMode Mode;
         public readonly bool Clipped;
         public readonly float Opacity, ScaleR, ScaleG, ScaleB;

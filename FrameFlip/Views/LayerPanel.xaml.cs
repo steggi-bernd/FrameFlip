@@ -2,6 +2,7 @@ using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Controls.Primitives;
 using FrameFlip.Decoding.Exr;
+using FrameFlip.Imaging;
 using FrameFlip.Imaging.Grading;
 using FrameFlip.Localization;
 
@@ -97,6 +98,20 @@ public partial class LayerPanel : UserControl
     public LayerStack Stack { get; } = new();
 
     /// <summary>
+    /// Eine andere Ebene ist gewaehlt. Null heisst: keine Einstellungsebene, die
+    /// Werkzeuge gehoeren wieder dem ganzen Bild.
+    ///
+    /// Der Streifen entscheidet nicht, was damit geschieht - er sagt nur, worauf die
+    /// Wahl gefallen ist. Was die Werkzeuge daraufhin bearbeiten, ist Sache dessen,
+    /// der beide einhaengt.
+    /// </summary>
+    public event Action<ImageLayer?>? Editing;
+
+    /// <summary>Die gewaehlte Ebene, wenn es eine Einstellungsebene ist.</summary>
+    public ImageLayer? EditedLayer
+        => _selected?.Content == LayerContent.Adjustment ? _selected : null;
+
+    /// <summary>
     /// Nimmt eine Datei entgegen: welche Passe sie fuehrt, und welcher Stapel
     /// darauf gelten soll.
     ///
@@ -134,6 +149,8 @@ public partial class LayerPanel : UserControl
         // waeren im schmalen Streifen der teuerste Platz, den es gibt. Die
         // Ueberschrift bleibt stehen - wer schichten will, findet sie.
         Fold(open: HasChoice || Stack.Layers.Count > 1);
+
+        Editing?.Invoke(EditedLayer);
     }
 
     private void Fold(bool open)
@@ -217,7 +234,10 @@ public partial class LayerPanel : UserControl
         Grid.SetColumn(eye, 0);
         grid.Children.Add(eye);
 
-        bool missing = layer.Source.Length > 0 && ExrPasses.Find(_passes, layer.Source) is null;
+        bool adjustment = layer.Content == LayerContent.Adjustment;
+
+        bool missing = !adjustment && layer.Source.Length > 0 &&
+                       ExrPasses.Find(_passes, layer.Source) is null;
 
         // Eine angeschnittene Ebene rueckt ein und bekommt einen Pfeil davor -
         // dieselbe Schreibweise wie in Photoshop, und sie sagt in einem Zeichen,
@@ -227,7 +247,11 @@ public partial class LayerPanel : UserControl
         var name = new TextBlock
         {
             Margin = new Thickness(clipped ? 12 : 0, 0, 0, 0),
-            Text = (clipped ? "↳ " : "") + (layer.Name.Length > 0 ? layer.Name : layer.Source),
+            // Ein Zeichen vor dem Namen: Eine Korrektur bringt kein Bild mit, und in
+            // einer Liste aus Passen muss das auf den ersten Blick zu sehen sein -
+            // sonst sucht man ihren Pass.
+            Text = (clipped ? "↳ " : "") + (adjustment ? "≡ " : "") +
+                   (layer.Name.Length > 0 ? layer.Name : layer.Source),
             FontSize = 11,
             VerticalAlignment = VerticalAlignment.Center,
             TextTrimming = TextTrimming.CharacterEllipsis,
@@ -269,6 +293,7 @@ public partial class LayerPanel : UserControl
         _selected = layer;
         PushToControls();
         UpdateButtons();
+        Editing?.Invoke(EditedLayer);
     }
 
     private void OnVisibilityClicked(object sender, RoutedEventArgs e)
@@ -288,16 +313,12 @@ public partial class LayerPanel : UserControl
 
     private void OnAddClicked(object sender, RoutedEventArgs e)
     {
-        // Ohne Passe zur Wahl gibt es nichts auszuwaehlen. Ein Menue mit einem
-        // einzigen Eintrag ist eine Ruecktrage: Der Knopf legt dann gleich die
-        // Ebene an.
-        if (_passes.Count == 0)
-        {
-            Add(null);
-            return;
-        }
-
         var menu = new ContextMenu { PlacementTarget = AddButton, Placement = PlacementMode.Bottom };
+
+        var adjustment = new MenuItem { Header = Strings.T("S_AddAdjustment") };
+        adjustment.Click += (_, _) => AddAdjustment();
+        menu.Items.Add(adjustment);
+        menu.Items.Add(new Separator());
 
         if (_passes.Count > 1)
         {
@@ -329,6 +350,37 @@ public partial class LayerPanel : UserControl
         menu.IsOpen = true;
     }
 
+    /// <summary>
+    /// Legt eine Einstellungsebene an.
+    ///
+    /// Auf Normal und nicht auf Addieren: Eine Korrektur ERSETZT, was unter ihr
+    /// liegt, durch das korrigierte Ergebnis. Auf Addieren kaeme das Bild ein
+    /// zweites Mal dazu, und es waere doppelt so hell - richtig gerechnet und
+    /// niemals gemeint.
+    ///
+    /// Oeffentlich aus demselben Grund wie <see cref="RebuildFromPasses"/>: Der
+    /// Menuepunkt ist ein Weg hierher und nicht der einzige, und ein Menuepunkt
+    /// laesst sich nicht pruefen.
+    /// </summary>
+    public void AddAdjustment()
+    {
+        var layer = new ImageLayer
+        {
+            Content = LayerContent.Adjustment,
+            Name = Strings.T("S_AdjustmentLayer"),
+            Mode = BlendMode.Normal,
+            Adjustments = ImageAdjustments.Neutral,
+            Tools = new GradingStack(),
+        };
+
+        Stack.Layers.Add(layer);
+        _selected = layer;
+
+        Rebuild();
+        Editing?.Invoke(EditedLayer);
+        Raise(interim: false);
+    }
+
     private void Add(ExrPass? pass)
     {
         var layer = new ImageLayer
@@ -342,6 +394,7 @@ public partial class LayerPanel : UserControl
         _selected = layer;
 
         Rebuild();
+        Editing?.Invoke(EditedLayer);
         Raise(interim: false);
     }
 
@@ -365,6 +418,7 @@ public partial class LayerPanel : UserControl
 
         _selected = Stack.Layers[^1];
         Rebuild();
+        Editing?.Invoke(EditedLayer);
         Raise(interim: false);
     }
 
@@ -379,6 +433,7 @@ public partial class LayerPanel : UserControl
         _selected = copy;
 
         Rebuild();
+        Editing?.Invoke(EditedLayer);
         Raise(interim: false);
     }
 
@@ -393,6 +448,7 @@ public partial class LayerPanel : UserControl
         _selected = Stack.Layers[Math.Clamp(at, 0, Stack.Layers.Count - 1)];
 
         Rebuild();
+        Editing?.Invoke(EditedLayer);
         Raise(interim: false);
     }
 
@@ -442,6 +498,7 @@ public partial class LayerPanel : UserControl
         _selected = Stack.Layers[0];
 
         Rebuild();
+        Editing?.Invoke(EditedLayer);
         Raise(interim: false);
     }
 
@@ -542,6 +599,10 @@ public partial class LayerPanel : UserControl
     private void UpdateButtons()
     {
         int at = _selected is null ? -1 : Stack.Layers.IndexOf(_selected);
+
+        // Eine Einstellungsebene hat keinen Pass - der Hinweis unten gilt ihr.
+        bool adjustment = _selected?.Content == LayerContent.Adjustment;
+        AdjustmentHint.Visibility = adjustment ? Visibility.Visible : Visibility.Collapsed;
 
         DuplicateButton.IsEnabled = at >= 0;
         RemoveButton.IsEnabled = at >= 0 && Stack.Layers.Count > 1;

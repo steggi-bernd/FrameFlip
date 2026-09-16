@@ -66,6 +66,11 @@
     <sys:String x:Key="S_LayersHint">Blender zerlegt nicht in Summanden, sondern in Licht mal Farbe. „Alle Passe“ baut den Stapel so, dass wieder genau das gerenderte Bild herauskommt – jede andere Mischung ist ein Eingriff.</sys:String>
     <sys:String x:Key="S_AddLayer">Pass als Ebene hinzufuegen</sys:String>
     <sys:String x:Key="S_AddAllPasses">Alle Passe – Bild nachbauen</sys:String>
+    <sys:String x:Key="S_AddAdjustment">Einstellungsebene</sys:String>
+    <sys:String x:Key="S_AdjustmentLayer">Korrektur</sys:String>
+    <sys:String x:Key="S_ToolsTargetImage">Wirkt auf das ganze Bild</sys:String>
+    <sys:String x:Key="S_ToolsTargetLayer">Wirkt auf: {0}</sys:String>
+    <sys:String x:Key="S_AdjustmentHint">Die Werkzeuge unten gehören jetzt dieser Ebene. Mit Schnittmaske (↳) wirkt sie nur auf die eine Ebene darunter.</sys:String>
     <sys:String x:Key="S_ClipLayer">Nur auf die Ebene darunter wirken (Schnittmaske)</sys:String>
 
     <!-- ================================================================ Masken -->

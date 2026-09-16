@@ -191,6 +191,17 @@ public partial class AtelierPage
         }
     }
 
+    /// <summary>
+    /// Die Korrektur des fertigen Bildes, kopiert.
+    ///
+    /// NICHT der Stapel des Streifens: Der zeigt womoeglich gerade die Werkzeuge
+    /// einer Einstellungsebene, und die gehoeren in die Ebenen und nicht ein zweites
+    /// Mal ans Ende. Waehrend der Lauf laeuft, darf am Original weitergeregelt
+    /// werden, ohne dass sich die Ausgabe auf halber Strecke aendert.
+    /// </summary>
+    private GradingStack FinalGrading()
+        => (_settings.Grading ?? new GradingStack()).Clone();
+
     private Task<GradeBatchResult> RunImages(IReadOnlyList<string> frames, GradeOutputFormat format,
                                              IProgress<GradeProgress> progress, CancellationToken token)
     {
@@ -199,11 +210,11 @@ public partial class AtelierPage
             Frames = frames,
             OutputDirectory = _target!,
             Format = format,
-            Adjustments = Tools.Adjustments,
+            Adjustments = _finalAdjustments,
 
             // Kopiert: waehrend der Lauf laeuft, darf am Original weitergeregelt
             // werden, ohne dass sich die Ausgabe auf halber Strecke aendert.
-            Grading = Tools.Stack.Clone(),
+            Grading = FinalGrading(),
 
             // Derselbe Stapel auf jedem Bild: Er nennt Passe mit Namen, und die
             // heissen im dreihundertsten Bild genauso wie im ersten. Genau das ist
@@ -227,8 +238,8 @@ public partial class AtelierPage
             OutputPath = VideoTarget(preset),
             Preset = preset,
             Fps = _settings.Fps > 0 ? _settings.Fps : 24,
-            Adjustments = Tools.Adjustments,
-            Grading = Tools.Stack.Clone(),
+            Adjustments = _finalAdjustments,
+            Grading = FinalGrading(),
             Layers = Layers.Stack.Clone(),
             View = _frame is not null ? ViewFor(_frame) : new StandardViewTransform(),
 

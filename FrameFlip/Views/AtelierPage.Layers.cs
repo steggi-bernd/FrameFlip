@@ -64,8 +64,7 @@ public partial class AtelierPage
         // sonst haette jeder Reglerzug eine Datei im Weg.
         if (interim || path is null || _base is null)
         {
-            Recompose();
-            OnToolsChanged(interim);
+            Refresh(interim, recompose: true);
             return;
         }
 
@@ -75,8 +74,7 @@ public partial class AtelierPage
         if (missing.Count == 0)
         {
             DropStale(needed);
-            Recompose();
-            OnToolsChanged(false);
+            Refresh(interim: false, recompose: true);
             return;
         }
 
@@ -112,8 +110,7 @@ public partial class AtelierPage
                 foreach (var (name, frame) in read) _sources[name] = frame;
 
                 DropStale(Layers.Stack.NeededSources());
-                Recompose();
-                OnToolsChanged(false);
+                Refresh(interim: false, recompose: true);
             });
         });
     }
@@ -131,7 +128,10 @@ public partial class AtelierPage
             _sources.Remove(stale);
     }
 
-    /// <summary>Setzt das Bild aus den Ebenen zusammen.</summary>
+    /// <summary>
+    /// Setzt das Bild aus den Ebenen zusammen - beim Reglerzug nur auf dem Gitter,
+    /// das die Anzeige danach liest.
+    /// </summary>
     private void Recompose()
     {
         if (_base is null)
@@ -143,6 +143,27 @@ public partial class AtelierPage
         // Faellt die Zusammensetzung aus - etwa, weil keine Ebene einen lesbaren
         // Pass hat -, steht wieder das Bild der Datei. Ein schwarzes Feld waere die
         // formal richtige Antwort und die unbrauchbare.
-        _frame = LayerComposer.Compose(Layers.Stack, _sources) ?? _base;
+        //
+        // Hineingeschrieben wird in _composed und niemals in einen gelesenen Pass:
+        // Der Composer liest aus den Passen, waehrend er schreibt. Deshalb fuehrt
+        // die Seite einen eigenen Frame mit, den sonst niemand anfasst.
+        _composed = LayerComposer.Compose(Layers.Stack, _sources, _composed,
+                                          _coarse ? CoarseStep : 1);
+        _frame = _composed ?? _base;
+
+        // Hat der Composer eine Quelle durchgereicht, statt zu rechnen, gehoert sie
+        // ihm nicht - beim naechsten Mal darf nicht hineingeschrieben werden.
+        if (_composed is not null && Owned(_composed) == false) _composed = null;
+    }
+
+    /// <summary>Ob dieser Frame der Seite gehoert oder einer der gelesenen Passe ist.</summary>
+    private bool Owned(FloatFrame frame)
+    {
+        if (ReferenceEquals(frame, _base)) return false;
+
+        foreach (var source in _sources.Values)
+            if (ReferenceEquals(frame, source)) return false;
+
+        return true;
     }
 }

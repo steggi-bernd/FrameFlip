@@ -102,7 +102,7 @@ public partial class AtelierPage
     private (ImageAdjustments Adjustments, PreparedGrading Grading) Current()
         => _showingOriginal
             ? (ImageAdjustments.Neutral, PreparedGrading.None)
-            : (Tools.Adjustments, Tools.Prepared);
+            : (_finalAdjustments, _finalGrading);
 
     /// <summary>
     /// Welches Bild gezeichnet wird: das zusammengesetzte, oder beim Vergleich das

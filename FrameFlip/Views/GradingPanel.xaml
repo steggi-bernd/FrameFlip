@@ -3,7 +3,29 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:local="clr-namespace:FrameFlip.Views">
 
-    <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+        </Grid.RowDefinitions>
+
+        <!--
+            Worauf die Regler wirken.
+
+            Sie stehen AUSSERHALB der Bildlaufflaeche und bleiben damit immer sichtbar.
+            Das ist keine Kosmetik: Der Streifen haengt sich um, sobald eine
+            Einstellungsebene gewaehlt wird, und wer das nicht sieht, stellt das ganze
+            Bild ein, waehrend er eine Ebene meint.
+        -->
+        <Border x:Name="TargetBar" Grid.Row="0" Padding="14,8"
+                Background="{StaticResource OverlayBackground}"
+                BorderBrush="{StaticResource PanelBorder}" BorderThickness="0,0,0,1">
+            <TextBlock x:Name="TargetText" FontSize="10" TextTrimming="CharacterEllipsis"
+                       Foreground="{StaticResource MutedBrush}"
+                       Text="{DynamicResource S_ToolsTargetImage}" />
+        </Border>
+
+    <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
         <StackPanel Margin="14,12,14,14">
 
             <!-- Verteilung -->
@@ -291,4 +313,5 @@
 
         </StackPanel>
     </ScrollViewer>
+    </Grid>
 </UserControl>

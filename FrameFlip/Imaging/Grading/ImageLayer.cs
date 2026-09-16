@@ -2,6 +2,24 @@ using System.Text.Json.Serialization;
 
 namespace FrameFlip.Imaging.Grading;
 
+/// <summary>Was eine Ebene beitraegt.</summary>
+public enum LayerContent
+{
+    /// <summary>Ein Pass aus der Datei - sie bringt Licht mit.</summary>
+    Pass,
+
+    /// <summary>
+    /// Eine Korrektur auf das, was darunter liegt - sie bringt nichts mit, sondern
+    /// veraendert.
+    ///
+    /// Mit einer Schnittmaske wirkt sie nur auf die eine Ebene darunter, ohne sie auf
+    /// alles. Das ist derselbe Griff wie in Photoshop und der Grund, warum die
+    /// Schnittmaske hier schon vor den Einstellungsebenen gebaut wurde: Sie ist es,
+    /// die "waerme nur den Glanz" ueberhaupt erst sagbar macht.
+    /// </summary>
+    Adjustment,
+}
+
 /// <summary>
 /// Eine Ebene: ein Pass aus der Datei, und wie er auf das wirkt, was unter ihm liegt.
 ///
@@ -17,10 +35,36 @@ namespace FrameFlip.Imaging.Grading;
 public sealed class ImageLayer
 {
     /// <summary>
+    /// Was die Ebene ist: ein Pass, oder eine Korrektur auf das, was darunter liegt.
+    ///
+    /// Beides in einer Klasse und nicht in zweien, weil beides dieselben sieben Dinge
+    /// hat - Reihenfolge, Sichtbarkeit, Mischung, Deckkraft, Schnittmaske, Maske,
+    /// Name - und sich nur darin unterscheidet, woher der Wert kommt. Zwei Klassen
+    /// hiessen zwei Listen, zwei Zeilenarten und zwei Wege durch den Composer.
+    /// </summary>
+    public LayerContent Content { get; set; } = LayerContent.Pass;
+
+    /// <summary>
     /// Der Pass in der Datei, etwa "ViewLayer.GlossDir". Leer heisst: die Farbkanaele,
-    /// die das Bild ohnehin ergeben - bei einem PNG die einzige Wahl.
+    /// die das Bild ohnehin ergeben - bei einem PNG die einzige Wahl. Bei einer
+    /// Einstellungsebene ohne Bedeutung.
     /// </summary>
     public string Source { get; set; } = "";
+
+    /// <summary>
+    /// Die Grundkorrektur der Einstellungsebene - dieselben Regler wie unten im
+    /// Streifen. Null bei einer Passebene.
+    /// </summary>
+    public ImageAdjustments? Adjustments { get; set; }
+
+    /// <summary>
+    /// Die Werkzeuge der Einstellungsebene. Null bei einer Passebene.
+    ///
+    /// Derselbe Stapel wie fuer das ganze Bild, und damit dieselben Werkzeuge: Es
+    /// gibt sie einmal, und eine Kurve rechnet auf einer Ebene, was sie auch am Ende
+    /// rechnet.
+    /// </summary>
+    public GradingStack? Tools { get; set; }
 
     /// <summary>
     /// Was in der Liste steht. Frei, weil eine Kopie sonst genauso hiesse wie ihr
@@ -88,7 +132,11 @@ public sealed class ImageLayer
     /// </summary>
     [JsonIgnore]
     public bool IsNeutral
-        => Opacity >= 0.999f && MathF.Abs(Exposure) < 0.001f && Tint.Near(1f) && Mask.IsNeutral;
+        => Content == LayerContent.Pass &&
+           Opacity >= 0.999f && MathF.Abs(Exposure) < 0.001f && Tint.Near(1f) && Mask.IsNeutral;
+
+    /// <summary>Die Kette dieser Einstellungsebene, fertig vorbereitet.</summary>
+    public LayerGrade Grade() => LayerGrade.Prepare(Adjustments, Tools);
 
     /// <summary>True, wenn die Mischung auf Schwarz nichts anderes ergibt als die Ebene selbst.</summary>
     [JsonIgnore]
@@ -104,6 +152,9 @@ public sealed class ImageLayer
         Exposure = Exposure,
         Clipped = Clipped,
         Mask = Mask.Clone(),
+        Content = Content,
+        Adjustments = Adjustments,
+        Tools = Tools?.Clone(),
         Tint = Tint.Clone(),
     };
 }
@@ -151,7 +202,13 @@ public sealed class LayerStack
         {
             if (!layer.Visible) continue;
 
-            if (!names.Contains(layer.Source, StringComparer.Ordinal)) names.Add(layer.Source);
+            // Eine Einstellungsebene liest keinen Pass - sie rechnet mit dem, was
+            // schon da ist. Ihre Maske kann trotzdem einen brauchen.
+            if (layer.Content == LayerContent.Pass &&
+                !names.Contains(layer.Source, StringComparer.Ordinal))
+            {
+                names.Add(layer.Source);
+            }
 
             foreach (string source in layer.Mask.Sources())
                 if (!names.Contains(source, StringComparer.Ordinal)) names.Add(source);

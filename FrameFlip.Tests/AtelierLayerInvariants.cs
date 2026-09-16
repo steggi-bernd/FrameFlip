@@ -34,6 +34,7 @@ public static class AtelierLayerInvariants
             TheStripAppears(path);
             TheSharedLoaderRebuilds(path);
             APlainImageLayersToo(folder);
+            EachLayerKeepsItsOwnTools(path);
         }
         finally
         {
@@ -286,6 +287,136 @@ public static class AtelierLayerInvariants
 
         using var file = File.Create(path);
         encoder.Save(file);
+    }
+
+    /// <summary>
+    /// Jede Einstellungsebene behaelt ihre eigenen Werkzeuge.
+    ///
+    /// Das ist die Stelle, an der diese Oberflaeche kaputtgehen konnte. Es gibt
+    /// EINEN Werkzeugstreifen und beliebig viele Ebenen; er haengt sich beim
+    /// Anklicken um. Reicht er dabei seinen eigenen Stapel weiter, halten am Ende
+    /// alle Ebenen denselben - und wer an der zweiten dreht, verstellt die erste
+    /// gleich mit. Umgekehrt: Schreibt er nicht zurueck, was er beim Laden neu
+    /// angelegt hat, ist es beim naechsten Umschalten weg.
+    ///
+    /// Beides sieht man dem Bild nicht an. Man merkt es Wochen spaeter an einer
+    /// Einstellung, die sich nicht mehr erklaeren laesst.
+    /// </summary>
+    private static void EachLayerKeepsItsOwnTools(string path)
+    {
+        Check.Group("Jede Einstellungsebene behaelt ihre Werkzeuge");
+
+        var settings = new AppSettings();
+        var page = new AtelierPage(FrameDecoderRegistry.CreateDefault(() => null), settings, _ => { });
+
+        var window = new Window
+        {
+            Content = page,
+            Width = 1000,
+            Height = 800,
+            ShowInTaskbar = false,
+            WindowStyle = WindowStyle.None,
+            ShowActivated = false,
+            Left = -4000,
+            Top = -4000,
+        };
+
+        try
+        {
+            window.Show();
+            page.UpdateLayout();
+            page.Open(path);
+
+            var size = (System.Windows.Controls.TextBlock)page.FindName("SourceText");
+            if (!Pump(TimeSpan.FromSeconds(10), () => size.Text.Length > 0))
+            {
+                Check.That(false, "das Bild wird geladen");
+                return;
+            }
+
+            var strip = (LayerPanel)page.FindName("Layers");
+            var tools = (GradingPanel)page.FindName("Tools");
+
+            // Zwei Einstellungsebenen anlegen und jeder einen eigenen Wert geben.
+            strip.AddAdjustment();
+            var first = strip.EditedLayer;
+            Check.That(first is not null, "die erste Korrektur steht");
+            if (first is null) return;
+
+            var exposure = (System.Windows.Controls.Slider)tools.FindName("ExposureSlider");
+            exposure.Value = -2.0;
+
+            Check.Near(first.Adjustments!.Exposure, -2.0, 0.001,
+                       "und der Regler landet in ihr");
+
+            strip.AddAdjustment();
+            var second = strip.EditedLayer;
+            Check.That(second is not null && !ReferenceEquals(second, first),
+                       "die zweite ist eine andere Ebene");
+            if (second is null) return;
+
+            Check.Near(exposure.Value, 0.0, 0.001,
+                       "der Streifen steht bei der neuen Ebene auf Grundstellung");
+            Check.Near(first.Adjustments!.Exposure, -2.0, 0.001,
+                       "und die erste behaelt ihren Wert");
+
+            exposure.Value = 1.5;
+
+            Check.Near(second.Adjustments!.Exposure, 1.5, 0.001, "die zweite bekommt ihren");
+            Check.Near(first.Adjustments!.Exposure, -2.0, 0.001,
+                       "ohne die erste mitzuziehen");
+
+            // Die Werkzeugstapel duerfen nicht dieselben Objekte sein.
+            Check.That(!ReferenceEquals(first.Tools, second.Tools),
+                       "beide haben ihren eigenen Werkzeugstapel");
+
+            var firstBalance = first.Tools!.Tools.OfType<WhiteBalanceTool>().FirstOrDefault();
+            var secondBalance = second.Tools!.Tools.OfType<WhiteBalanceTool>().FirstOrDefault();
+
+            Check.That(firstBalance is not null && secondBalance is not null,
+                       "und jede ihre eigenen Werkzeuge");
+            Check.That(!ReferenceEquals(firstBalance, secondBalance),
+                       "die nicht dasselbe Objekt sind");
+
+            // Und zurueck: Der Streifen muss die erste wieder so zeigen, wie sie war.
+            Select(strip, first);
+
+            Check.Near(exposure.Value, -2.0, 0.001,
+                       "zurueckgewechselt steht der Regler wieder auf ihrem Wert");
+
+            // Eine Passebene gibt die Werkzeuge ans fertige Bild zurueck.
+            var pass = strip.Stack.Layers.First(l => l.Content == LayerContent.Pass);
+            Select(strip, pass);
+
+            Check.That(strip.EditedLayer is null, "auf einer Passebene ist keine Korrektur gewaehlt");
+
+            exposure.Value = 0.75;
+
+            Check.That(settings.Adjustments is not null, "der Regler gehoert wieder dem Bild");
+            Check.Near(settings.Adjustments!.Exposure, 0.75, 0.001, "und landet dort");
+            Check.Near(first.Adjustments!.Exposure, -2.0, 0.001,
+                       "die Ebenen bleiben davon unberuehrt");
+            Check.Near(second.Adjustments!.Exposure, 1.5, 0.001, "beide");
+        }
+        finally
+        {
+            window.Close();
+        }
+    }
+
+    /// <summary>Waehlt eine Ebene so aus, wie ein Klick in die Liste es taete.</summary>
+    private static void Select(LayerPanel strip, ImageLayer layer)
+    {
+        var list = (System.Windows.Controls.ListBox)strip.FindName("LayerList");
+
+        foreach (System.Windows.Controls.ListBoxItem item in list.Items)
+        {
+            if (!ReferenceEquals(item.Tag, layer)) continue;
+
+            item.IsSelected = true;
+            strip.UpdateLayout();
+            return;
+        }
     }
 
     /// <summary>

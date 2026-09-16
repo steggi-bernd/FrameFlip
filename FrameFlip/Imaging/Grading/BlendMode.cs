@@ -130,11 +130,17 @@ public static class Blending
     /// Unendlich auf 1 - der Drehpunkt liegt damit exakt dort, wo Photoshop ihn hat,
     /// und nichts wird unterwegs beschnitten. Danach geht es denselben Weg zurueck.
     /// </summary>
-    private static float ToDisplay(float light)
+    /// <remarks>
+    /// Oeffentlich, weil dieselbe Abbildung inzwischen an drei Stellen gebraucht
+    /// wird: hier fuer die Kontrastmischungen, bei den Helligkeitsmasken und bei den
+    /// Einstellungsebenen. Sie dreimal aufzuschreiben hiesse, dass mittleres Grau
+    /// eines Tages an zwei Stellen woanders liegt.
+    /// </remarks>
+    public static float ToDisplay(float light)
         => light <= 0f ? 0f : light / (light + MiddleGrey);
 
     /// <summary>Der Rueckweg von <see cref="ToDisplay"/>.</summary>
-    private static float ToLight(float display)
+    public static float ToLight(float display)
     {
         // Bei 1 waere der Rueckweg unendlich. Knapp darunter abzufangen kostet nichts
         // und haelt eine Division durch null aus der inneren Schleife heraus.

@@ -87,6 +87,27 @@ public partial class GradingPanel : UserControl
     public PreparedGrading Prepared { get; private set; } = PreparedGrading.None;
 
     /// <summary>
+    /// Worauf die Regler gerade wirken. Null heisst: auf das fertige Bild.
+    ///
+    /// Der Streifen selbst weiss davon nichts weiter - er zeigt es nur an. Dass
+    /// dieselben Regler einmal einer Ebene und einmal dem ganzen Bild gehoeren, ist
+    /// die eine Sache an dieser Oberflaeche, die man uebersehen kann, und deshalb
+    /// steht sie ueber allem und ausserhalb der Bildlaufflaeche.
+    /// </summary>
+    public string? Target
+    {
+        set
+        {
+            TargetText.Text = value is null
+                ? Strings.T("S_ToolsTargetImage")
+                : Strings.T("S_ToolsTargetLayer", value);
+
+            TargetText.Foreground = (System.Windows.Media.Brush)FindResource(
+                value is null ? "MutedBrush" : "AccentBrush");
+        }
+    }
+
+    /// <summary>
     /// Uebernimmt gespeicherte Einstellungen. Die Werkzeuge werden dabei aus dem
     /// Stapel geholt oder angelegt, damit jedes genau einmal vorkommt.
     /// </summary>

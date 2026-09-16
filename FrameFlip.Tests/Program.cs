@@ -36,6 +36,7 @@ static int RunAll()
     BlendInvariants.Run();
     LayerInvariants.Run();
     MaskInvariants.Run();
+    AdjustmentInvariants.Run();
     LayerPanelInvariants.Run();
     PassRebuildInvariants.Run();
     CryptomatteInvariants.Run();

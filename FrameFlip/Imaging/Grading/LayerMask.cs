@@ -234,8 +234,7 @@ public static class Masking
     /// das Auge meint, und nicht "alles ueber 0,5 Lichtmenge" - das waere schon fast
     /// das ganze Bild.
     /// </summary>
-    public static float Perceptual(float light)
-        => light <= 0f ? 0f : light / (light + Blending.MiddleGrey);
+    public static float Perceptual(float light) => Blending.ToDisplay(light);
 
     /// <summary>
     /// Die Deckung der ausgewaehlten Objekte an einem Bildpunkt.
