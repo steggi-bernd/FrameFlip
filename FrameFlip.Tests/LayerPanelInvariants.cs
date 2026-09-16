@@ -26,6 +26,7 @@ public static class LayerPanelInvariants
             OrderMovesInTheStack(panel);
             ClipTogglesOnTheSelection(panel);
             MaskControlsReachTheLayer(panel);
+            GroupsNestInTheList(panel);
             ListReadsTopDown(panel);
         });
     }
@@ -337,6 +338,116 @@ public static class LayerPanelInvariants
         // Und zurueck auf keine.
         box.SelectedIndex = IndexOf(box, "S_MaskNone");
         Check.That(layer.Mask.IsNeutral, "ohne Maske ist die Ebene wieder neutral");
+    }
+
+    /// <summary>
+    /// Gruppen in der Liste: einruecken, ausruecken, und was die Knoepfe dabei
+    /// zulassen.
+    ///
+    /// Die Liste ist flach, der Stapel ist ein Baum. Alles, was auf eine Ebene
+    /// zeigt - verschieben, entfernen, verdoppeln -, muss deshalb den richtigen Ast
+    /// treffen. Ein Verschieben, das versehentlich auf der obersten Liste arbeitet,
+    /// zieht eine Ebene aus ihrer Gruppe heraus, ohne dass jemand es verlangt hat.
+    /// </summary>
+    private static void GroupsNestInTheList(LayerPanel panel)
+    {
+        Check.Group("Gruppen schachteln sich in der Liste");
+
+        panel.Load(Passes(), new LayerStack
+        {
+            Layers =
+            {
+                new ImageLayer { Source = "ViewLayer.DiffCol", Name = "Diffus" },
+                new ImageLayer { Source = "ViewLayer.GlossDir", Name = "Glanz", Mode = BlendMode.Add },
+            },
+        });
+
+        var list = (ListBox)panel.FindName("LayerList");
+
+        // Eine Gruppe nimmt die gewaehlte Ebene gleich mit hinein.
+        panel.AddGroup();
+
+        Check.That(panel.Stack.Layers.Count == 2, "oben stehen noch zwei Zeilen",
+                   $"{panel.Stack.Layers.Count}");
+
+        var group = panel.Stack.Layers[1];
+        Check.That(group.Content == LayerContent.Group, "die obere ist die Gruppe");
+        Check.That(group.Children.Count == 1 && group.Children[0].Name == "Glanz",
+                   "und der Glanz steckt darin");
+
+        // Die Liste zeigt drei Zeilen: Gruppe, ihr Kind, die uebrige Ebene.
+        Check.That(list.Items.Count == 3, "die Liste zeigt alle drei", $"{list.Items.Count}");
+
+        var first = (ListBoxItem)list.Items[0];
+        Check.That(ReferenceEquals(first.Tag, group), "die Gruppe steht ueber ihrem Kind");
+
+        var second = (ListBoxItem)list.Items[1];
+        Check.That(ReferenceEquals(second.Tag, group.Children[0]), "danach ihr Kind");
+
+        // Die diffuse Ebene einruecken - die Gruppe steht in der Liste ueber ihr.
+        var diffuse = panel.Stack.Layers[0];
+        Select(panel, diffuse);
+
+        var indent = (Button)panel.FindName("IndentButton");
+        Check.That(indent.IsEnabled, "einruecken geht, wenn eine Gruppe darueber steht");
+
+        Click(panel, "IndentButton");
+
+        Check.That(group.Children.Count == 2, "jetzt stecken beide in der Gruppe",
+                   $"{group.Children.Count}");
+        Check.That(panel.Stack.Layers.Count == 1, "und oben steht nur noch die Gruppe",
+                   $"{panel.Stack.Layers.Count}");
+
+        // Verschieben bleibt im eigenen Zweig.
+        Select(panel, group.Children[0]);
+        var up = (Button)panel.FindName("UpButton");
+        Check.That(up.IsEnabled, "in der Gruppe laesst sich verschieben");
+
+        Click(panel, "UpButton");
+        Check.That(group.Children.Count == 2, "die Ebene bleibt in der Gruppe",
+                   $"{group.Children.Count}");
+        Check.That(panel.Stack.Layers.Count == 1, "und rutscht nicht nach draussen");
+
+        // Ausruecken setzt sie ueber die Gruppe.
+        Select(panel, group.Children[1]);
+        var outdent = (Button)panel.FindName("OutdentButton");
+        Check.That(outdent.IsEnabled, "ausruecken geht aus einer Gruppe heraus");
+
+        Click(panel, "OutdentButton");
+
+        Check.That(panel.Stack.Layers.Count == 2, "sie steht wieder ausserhalb",
+                   $"{panel.Stack.Layers.Count}");
+        Check.That(group.Children.Count == 1, "und fehlt in der Gruppe",
+                   $"{group.Children.Count}");
+
+        // Direkt unter die Gruppe - der Umkehrschritt zum Einruecken.
+        Check.That(ReferenceEquals(panel.Stack.Layers[1], group),
+                   "die Gruppe liegt weiter oben");
+
+        // Ausserhalb einer Gruppe geht kein Ausruecken mehr.
+        Select(panel, panel.Stack.Layers[0]);
+        Check.That(!outdent.IsEnabled, "ausserhalb einer Gruppe ist der Knopf gesperrt");
+
+        // Eine Gruppe laesst sich nicht anschneiden - sie ist keine Ebene, an die
+        // sich etwas anschneidet.
+        Select(panel, group);
+        var clip = (Button)panel.FindName("ClipButton");
+        Check.That(!clip.IsEnabled, "eine Gruppe nimmt keine Schnittmaske");
+    }
+
+    /// <summary>Waehlt eine Ebene so aus, wie ein Klick in die Liste es taete.</summary>
+    private static void Select(LayerPanel panel, ImageLayer layer)
+    {
+        var list = (ListBox)panel.FindName("LayerList");
+
+        foreach (ListBoxItem item in list.Items)
+        {
+            if (!ReferenceEquals(item.Tag, layer)) continue;
+
+            item.IsSelected = true;
+            panel.UpdateLayout();
+            return;
+        }
     }
 
     /// <summary>Der Platz eines Eintrags in der Auswahl, ueber seinen uebersetzten Namen.</summary>

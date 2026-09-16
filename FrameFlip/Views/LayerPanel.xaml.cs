@@ -194,12 +194,9 @@ public partial class LayerPanel : UserControl
         try
         {
             LayerList.Items.Clear();
+            AddRows(Stack.Layers, depth: 0);
 
-            // Rueckwaerts: oben in der Liste ist oben im Bild.
-            for (int i = Stack.Layers.Count - 1; i >= 0; i--)
-                LayerList.Items.Add(Row(Stack.Layers[i]));
-
-            if (_selected is not null && !Stack.Layers.Contains(_selected))
+            if (_selected is not null && Owner(_selected) is null)
                 _selected = Stack.Layers.Count > 0 ? Stack.Layers[^1] : null;
 
             foreach (ListBoxItem item in LayerList.Items)
@@ -214,7 +211,70 @@ public partial class LayerPanel : UserControl
         UpdateButtons();
     }
 
-    private ListBoxItem Row(ImageLayer layer)
+    /// <summary>
+    /// Fuellt die Liste - rueckwaerts, weil oben in der Liste oben im Bild ist, und
+    /// eine Gruppe vor ihren Kindern, weil sie sie zusammenhaelt.
+    /// </summary>
+    private void AddRows(List<ImageLayer> layers, int depth)
+    {
+        for (int i = layers.Count - 1; i >= 0; i--)
+        {
+            var layer = layers[i];
+            LayerList.Items.Add(Row(layer, depth));
+
+            if (layer.Content == LayerContent.Group) AddRows(layer.Children, depth + 1);
+        }
+    }
+
+    /// <summary>
+    /// Die Liste, in der diese Ebene steht - der Stapel selbst oder die Kinder einer
+    /// Gruppe. Null, wenn sie nirgends mehr steht.
+    /// </summary>
+    private List<ImageLayer>? Owner(ImageLayer layer, List<ImageLayer>? within = null)
+    {
+        within ??= Stack.Layers;
+        if (within.Contains(layer)) return within;
+
+        foreach (var candidate in within)
+        {
+            if (candidate.Content != LayerContent.Group) continue;
+
+            var found = Owner(layer, candidate.Children);
+            if (found is not null) return found;
+        }
+
+        return null;
+    }
+
+    /// <summary>Die Gruppe, in der diese Liste steckt. Null auf oberster Ebene.</summary>
+    private ImageLayer? GroupOf(List<ImageLayer> children)
+        => ReferenceEquals(children, Stack.Layers)
+            ? null
+            : Stack.All().FirstOrDefault(l => ReferenceEquals(l.Children, children));
+
+    /// <summary>
+    /// Das Zeichen vor dem Namen. Eine Liste aus Passen, Korrekturen, Bildern und
+    /// Gruppen ist ohne sie nicht zu lesen - man suchte bei einer Korrektur nach
+    /// ihrem Pass.
+    /// </summary>
+    private static string Marker(ImageLayer layer) => layer.Content switch
+    {
+        LayerContent.Adjustment => "≡ ",
+        LayerContent.Group => "▼ ",
+        LayerContent.Image => "▣ ",
+        _ => "",
+    };
+
+    /// <summary>Der Dateiname einer Bildebene - der ganze Pfad passt nicht in die Spalte.</summary>
+    private static string Short(string source)
+    {
+        if (source.Length == 0) return "";
+
+        try { return System.IO.Path.GetFileName(source) is { Length: > 0 } name ? name : source; }
+        catch (ArgumentException) { return source; }
+    }
+
+    private ListBoxItem Row(ImageLayer layer, int depth)
     {
         var grid = new Grid();
         grid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
@@ -234,30 +294,40 @@ public partial class LayerPanel : UserControl
         Grid.SetColumn(eye, 0);
         grid.Children.Add(eye);
 
-        bool adjustment = layer.Content == LayerContent.Adjustment;
-
-        bool missing = !adjustment && layer.Source.Length > 0 &&
-                       ExrPasses.Find(_passes, layer.Source) is null;
+        bool missing = layer.Content switch
+        {
+            LayerContent.Pass => layer.Source.Length > 0 &&
+                                 ExrPasses.Find(_passes, layer.Source) is null,
+            LayerContent.Image => layer.Source.Length == 0 ||
+                                  !System.IO.File.Exists(layer.Source),
+            _ => false,
+        };
 
         // Eine angeschnittene Ebene rueckt ein und bekommt einen Pfeil davor -
         // dieselbe Schreibweise wie in Photoshop, und sie sagt in einem Zeichen,
         // was sonst ein Satz waere: "das hier gilt nur fuer die Zeile darunter".
-        bool clipped = layer.Clipped && Stack.Layers.IndexOf(layer) > 0;
+        bool clipped = layer.Clipped && (Owner(layer)?.IndexOf(layer) ?? 0) > 0;
 
         var name = new TextBlock
         {
-            Margin = new Thickness(clipped ? 12 : 0, 0, 0, 0),
+            // Eingerueckt nach Tiefe: Wer in einer Gruppe steckt, steht weiter
+            // rechts. Ohne das waere eine Gruppe nur eine Zeile mehr, und niemand
+            // saehe, was zu ihr gehoert.
+            Margin = new Thickness(depth * 11 + (clipped ? 12 : 0), 0, 0, 0),
             // Ein Zeichen vor dem Namen: Eine Korrektur bringt kein Bild mit, und in
             // einer Liste aus Passen muss das auf den ersten Blick zu sehen sein -
             // sonst sucht man ihren Pass.
-            Text = (clipped ? "↳ " : "") + (adjustment ? "≡ " : "") +
-                   (layer.Name.Length > 0 ? layer.Name : layer.Source),
+            Text = (clipped ? "↳ " : "") + Marker(layer) +
+                   (layer.Name.Length > 0 ? layer.Name : Short(layer.Source)),
             FontSize = 11,
             VerticalAlignment = VerticalAlignment.Center,
             TextTrimming = TextTrimming.CharacterEllipsis,
             Opacity = layer.Visible ? 1.0 : 0.45,
             Foreground = (System.Windows.Media.Brush)FindResource(missing ? "GapBrush" : "ForegroundBrush"),
-            ToolTip = missing ? layer.Source + " — " + Strings.T("S_PassMissing") : layer.Source,
+            ToolTip = missing
+                ? layer.Source + " — " + Strings.T(layer.Content == LayerContent.Image
+                                                   ? "S_ImageMissing" : "S_PassMissing")
+                : layer.Source,
         };
 
         Grid.SetColumn(name, 1);
@@ -318,6 +388,15 @@ public partial class LayerPanel : UserControl
         var adjustment = new MenuItem { Header = Strings.T("S_AddAdjustment") };
         adjustment.Click += (_, _) => AddAdjustment();
         menu.Items.Add(adjustment);
+
+        var image = new MenuItem { Header = Strings.T("S_AddImage") };
+        image.Click += (_, _) => AddImage();
+        menu.Items.Add(image);
+
+        var group = new MenuItem { Header = Strings.T("S_AddGroup") };
+        group.Click += (_, _) => AddGroup();
+        menu.Items.Add(group);
+
         menu.Items.Add(new Separator());
 
         if (_passes.Count > 1)
@@ -381,6 +460,113 @@ public partial class LayerPanel : UserControl
         Raise(interim: false);
     }
 
+    /// <summary>
+    /// Legt eine Bildebene an - nach der Wahl einer Datei.
+    ///
+    /// Ohne Datei keine Ebene: Eine Bildebene, die auf nichts zeigt, waere eine
+    /// Zeile, die nichts tut und nach einer Erklaerung verlangt.
+    /// </summary>
+    public void AddImage(string? path = null)
+    {
+        path ??= AskForImage();
+        if (path is null) return;
+
+        Place(new ImageLayer
+        {
+            Content = LayerContent.Image,
+            Source = path,
+            Name = Short(path),
+            Mode = BlendMode.Normal,
+        });
+    }
+
+    /// <summary>
+    /// Legt eine Gruppe an - mit der gewaehlten Ebene darin, wenn es eine gibt.
+    ///
+    /// Eine leere Gruppe anzulegen und danach Ebenen hineinzuschieben waere zwei
+    /// Schritte fuer das, was man ohnehin meint.
+    /// </summary>
+    public void AddGroup()
+    {
+        var group = new ImageLayer
+        {
+            Content = LayerContent.Group,
+            Name = Strings.T("S_GroupLayer"),
+            Mode = BlendMode.Normal,
+        };
+
+        var owner = _selected is null ? null : Owner(_selected);
+
+        if (owner is not null && _selected is not null)
+        {
+            int at = owner.IndexOf(_selected);
+            owner.RemoveAt(at);
+            group.Children.Add(_selected);
+            owner.Insert(at, group);
+        }
+        else
+        {
+            Stack.Layers.Add(group);
+        }
+
+        _selected = group;
+
+        Rebuild();
+        Editing?.Invoke(EditedLayer);
+        Raise(interim: false);
+    }
+
+    /// <summary>Haengt eine neue Ebene neben die gewaehlte - in dieselbe Liste.</summary>
+    private void Place(ImageLayer layer)
+    {
+        var owner = _selected is null ? Stack.Layers : Owner(_selected) ?? Stack.Layers;
+
+        if (_selected is not null && owner.Contains(_selected))
+            owner.Insert(owner.IndexOf(_selected) + 1, layer);
+        else
+            owner.Add(layer);
+
+        _selected = layer;
+
+        Rebuild();
+        Editing?.Invoke(EditedLayer);
+        Raise(interim: false);
+    }
+
+    private string? AskForImage()
+    {
+        var dialog = new Microsoft.Win32.OpenFileDialog
+        {
+            Title = Strings.T("S_PickImage"),
+            Filter = "Bilder|*.exr;*.png;*.jpg;*.jpeg;*.tif;*.tiff;*.bmp;*.webp|Alle Dateien|*.*",
+            CheckFileExists = true,
+        };
+
+        return dialog.ShowDialog(Window.GetWindow(this)) == true ? dialog.FileName : null;
+    }
+
+    private void OnPickImageClicked(object sender, RoutedEventArgs e)
+    {
+        if (_selected?.Content != LayerContent.Image) return;
+
+        string? path = AskForImage();
+        if (path is null) return;
+
+        _selected.Source = path;
+        _selected.Name = Short(path);
+
+        Rebuild();
+        Raise(interim: false);
+    }
+
+    private void OnFollowChanged(object sender, RoutedEventArgs e)
+    {
+        if (_filling || _selected?.Content != LayerContent.Image) return;
+
+        _selected.FollowSequence = FollowButton.IsChecked == true;
+        Raise(interim: false);
+    }
+
     private void Add(ExrPass? pass)
     {
         var layer = new ImageLayer
@@ -429,7 +615,10 @@ public partial class LayerPanel : UserControl
         var copy = _selected.Clone();
         copy.Name = _selected.Name + " ·";
 
-        Stack.Layers.Insert(Stack.Layers.IndexOf(_selected) + 1, copy);
+        var owner = Owner(_selected);
+        if (owner is null) return;
+
+        owner.Insert(owner.IndexOf(_selected) + 1, copy);
         _selected = copy;
 
         Rebuild();
@@ -441,11 +630,20 @@ public partial class LayerPanel : UserControl
     {
         // Die letzte Ebene bleibt stehen. Ein leerer Stapel ergaebe ein schwarzes
         // Bild, und das sieht aus wie ein Fehler statt wie eine Einstellung.
-        if (_selected is null || Stack.Layers.Count <= 1) return;
+        if (_selected is null || Stack.All().Count() <= 1) return;
 
-        int at = Stack.Layers.IndexOf(_selected);
-        Stack.Layers.RemoveAt(at);
-        _selected = Stack.Layers[Math.Clamp(at, 0, Stack.Layers.Count - 1)];
+        var owner = Owner(_selected);
+        if (owner is null) return;
+
+        int at = owner.IndexOf(_selected);
+        owner.RemoveAt(at);
+
+        // Eine Gruppe nimmt ihre Kinder mit. Sie stattdessen nach aussen zu setzen
+        // waere die freundlichere Geste und die verwirrendere: Man loescht eine
+        // Zeile, und es erscheinen vier neue.
+        _selected = owner.Count > 0
+            ? owner[Math.Clamp(at, 0, owner.Count - 1)]
+            : GroupOf(owner) ?? (Stack.Layers.Count > 0 ? Stack.Layers[^1] : null);
 
         Rebuild();
         Editing?.Invoke(EditedLayer);
@@ -476,12 +674,19 @@ public partial class LayerPanel : UserControl
     {
         if (_selected is null) return;
 
-        int at = Stack.Layers.IndexOf(_selected);
-        int to = at + direction;
-        if (to < 0 || to >= Stack.Layers.Count) return;
+        var owner = Owner(_selected);
+        if (owner is null) return;
 
-        Stack.Layers.RemoveAt(at);
-        Stack.Layers.Insert(to, _selected);
+        int at = owner.IndexOf(_selected);
+        int to = at + direction;
+
+        // Innerhalb des eigenen Zweigs. An seiner Grenze tut der Knopf nichts - wer
+        // die Gruppe wechseln will, benutzt die Pfeile daneben. Zwei klare Griffe
+        // statt eines, der raet.
+        if (to < 0 || to >= owner.Count) return;
+
+        owner.RemoveAt(at);
+        owner.Insert(to, _selected);
 
         Rebuild();
 
@@ -489,6 +694,67 @@ public partial class LayerPanel : UserControl
         // vertauschbar sind - bei Add ist sie es. Trotzdem wird gerechnet: zu
         // pruefen, ob es sich lohnt, kostet mehr Gedanken als der Durchgang.
         Raise(interim: false);
+    }
+
+    /// <summary>
+    /// Schiebt die gewaehlte Ebene in die Gruppe, die in der Liste UEBER ihr steht.
+    ///
+    /// Im Stapel ist das der naechsthoehere Platz, in der Liste die Zeile darueber -
+    /// die beiden Richtungen sind umgekehrt, und genau daran ist der erste Versuch
+    /// gescheitert. Die Liste zaehlt: Man schiebt eine Zeile unter die Ueberschrift,
+    /// die man darueber sieht.
+    ///
+    /// Hineingelegt wird UNTEN in die Gruppe, also dort, wo die Ebene ohnehin schon
+    /// stand. So springt beim Einruecken nichts - es rueckt nur ein.
+    /// </summary>
+    private void OnIndentClicked(object sender, RoutedEventArgs e)
+    {
+        if (TargetGroup() is not { } group || _selected is null) return;
+
+        Owner(_selected)!.Remove(_selected);
+        group.Children.Insert(0, _selected);
+
+        Rebuild();
+        Raise(interim: false);
+    }
+
+    private void OnOutdentClicked(object sender, RoutedEventArgs e)
+    {
+        if (_selected is null) return;
+
+        var owner = Owner(_selected);
+        if (owner is null || ReferenceEquals(owner, Stack.Layers)) return;
+
+        var group = GroupOf(owner);
+        if (group is null) return;
+
+        var outer = Owner(group);
+        if (outer is null) return;
+
+        owner.Remove(_selected);
+
+        // Direkt unter die Gruppe - der Umkehrschritt zum Einruecken. Darueber
+        // gesetzt spraenge die Zeile ueber den ganzen Gruppenblock hinweg, und man
+        // suchte sie.
+        outer.Insert(outer.IndexOf(group), _selected);
+
+        Rebuild();
+        Raise(interim: false);
+    }
+
+    /// <summary>Die Gruppe, in die das Einruecken fuehren wuerde. Null, wenn keine da ist.</summary>
+    private ImageLayer? TargetGroup()
+    {
+        if (_selected is null) return null;
+
+        var owner = Owner(_selected);
+        if (owner is null) return null;
+
+        int at = owner.IndexOf(_selected);
+        if (at < 0 || at + 1 >= owner.Count) return null;
+
+        var above = owner[at + 1];
+        return above.Content == LayerContent.Group ? above : null;
     }
 
     private void OnResetClicked(object sender, RoutedEventArgs e)
@@ -598,18 +864,52 @@ public partial class LayerPanel : UserControl
 
     private void UpdateButtons()
     {
-        int at = _selected is null ? -1 : Stack.Layers.IndexOf(_selected);
+        var owner = _selected is null ? null : Owner(_selected);
+        int at = owner is null || _selected is null ? -1 : owner.IndexOf(_selected);
+        int count = owner?.Count ?? 0;
 
-        // Eine Einstellungsebene hat keinen Pass - der Hinweis unten gilt ihr.
-        bool adjustment = _selected?.Content == LayerContent.Adjustment;
-        AdjustmentHint.Visibility = adjustment ? Visibility.Visible : Visibility.Collapsed;
+        // Jede Art zeigt, was zu ihr gehoert, und nur das.
+        var content = _selected?.Content ?? LayerContent.Pass;
+
+        AdjustmentHint.Visibility = content == LayerContent.Adjustment
+            ? Visibility.Visible : Visibility.Collapsed;
+
+        GroupHint.Visibility = content == LayerContent.Group
+            ? Visibility.Visible : Visibility.Collapsed;
+
+        ImageBody.Visibility = content == LayerContent.Image
+            ? Visibility.Visible : Visibility.Collapsed;
+
+        if (content == LayerContent.Image && _selected is not null)
+        {
+            _filling = true;
+
+            try
+            {
+                ImagePathText.Text = Short(_selected.Source);
+                FollowButton.IsChecked = _selected.FollowSequence;
+                FollowButton.IsEnabled = SequenceLink.NumberOf(_selected.Source) is not null;
+            }
+            finally
+            {
+                _filling = false;
+            }
+        }
 
         DuplicateButton.IsEnabled = at >= 0;
-        RemoveButton.IsEnabled = at >= 0 && Stack.Layers.Count > 1;
-        UpButton.IsEnabled = at >= 0 && at < Stack.Layers.Count - 1;
+
+        // Die letzte Ebene des GANZEN Stapels bleibt stehen; eine in einer Gruppe
+        // darf verschwinden, denn der Stapel bleibt dann trotzdem bewohnt.
+        RemoveButton.IsEnabled = at >= 0 && Stack.All().Count() > 1;
+
+        UpButton.IsEnabled = at >= 0 && at < count - 1;
         DownButton.IsEnabled = at > 0;
-        ClipButton.IsEnabled = at > 0;
-        ClipButton.Opacity = at > 0 && _selected!.Clipped ? 1.0 : 0.55;
+
+        ClipButton.IsEnabled = at > 0 && content != LayerContent.Group;
+        ClipButton.Opacity = ClipButton.IsEnabled && _selected!.Clipped ? 1.0 : 0.55;
+
+        IndentButton.IsEnabled = TargetGroup() is not null;
+        OutdentButton.IsEnabled = owner is not null && !ReferenceEquals(owner, Stack.Layers);
 
         // Der Hinweis sagt in beiden Faellen etwas anderes: bei Passen, wie sie
         // zusammengehoeren; bei einem Einzelbild, dass Schichten trotzdem geht.

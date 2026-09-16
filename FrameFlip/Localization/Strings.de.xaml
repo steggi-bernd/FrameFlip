@@ -67,6 +67,17 @@
     <sys:String x:Key="S_AddLayer">Pass als Ebene hinzufuegen</sys:String>
     <sys:String x:Key="S_AddAllPasses">Alle Passe – Bild nachbauen</sys:String>
     <sys:String x:Key="S_AddAdjustment">Einstellungsebene</sys:String>
+    <sys:String x:Key="S_AddImage">Bild …</sys:String>
+    <sys:String x:Key="S_AddGroup">Gruppe</sys:String>
+    <sys:String x:Key="S_GroupLayer">Gruppe</sys:String>
+    <sys:String x:Key="S_MoveIntoGroup">In die Gruppe darunter</sys:String>
+    <sys:String x:Key="S_MoveOutOfGroup">Aus der Gruppe heraus</sys:String>
+    <sys:String x:Key="S_FollowSequence">Bildnummer folgen</sys:String>
+    <sys:String x:Key="S_PickImage">Bild oder Sequenz wählen</sys:String>
+    <sys:String x:Key="S_ImageMissing">Datei fehlt</sys:String>
+    <sys:String x:Key="S_ImageHint">Trägt die Datei eine Bildnummer, läuft sie mit der Sequenz mit – bei Bild 47 auch dort Bild 47. Zwei Fassungen auf Differenz zeigen in einem Blick, was sich geändert hat.</sys:String>
+    <sys:String x:Key="S_GroupHint">Die Gruppe rechnet durch: Ihre Ebenen sehen, was unter ihr liegt. Maske und Deckkraft gelten für alle zusammen.</sys:String>
+    <sys:String x:Key="S_SizeMismatch">andere Bildgröße – wird übersprungen</sys:String>
     <sys:String x:Key="S_AdjustmentLayer">Korrektur</sys:String>
     <sys:String x:Key="S_ToolsTargetImage">Wirkt auf das ganze Bild</sys:String>
     <sys:String x:Key="S_ToolsTargetLayer">Wirkt auf: {0}</sys:String>

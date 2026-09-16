@@ -6,12 +6,12 @@ A second mode inside FrameFlip: grade one frame, then apply that grade to the wh
 sequence and write it out. Layers, masks driven by render data, and a colour toolset
 aimed at Photoshop and Lightroom rather than at a node graph.
 
-**Status:** steps 1 to 7 are built and running; 8 is still design. Of step 5, pass
-and adjustment layers work — order, duplication, opacity, colour, blend mode and
-clipping masks; image and group layers are not built yet. Of step 6, masks are
-data-driven: cryptomatte, any pass, luminance and gradient; painted masks are not
-built. Where an earlier estimate or assumption turned out wrong, the measurement
-replaced it and the error is named — those passages are worth more than the numbers.
+**Status:** steps 1 to 7 are built and running; 8 is still design. Step 5 is complete —
+pass, adjustment, image and group layers, with order, duplication, opacity, colour,
+blend modes and clipping masks. Of step 6, masks are data-driven: cryptomatte, any
+pass, luminance and gradient; painted masks are not built. Where an earlier estimate or
+assumption turned out wrong, the measurement replaced it and the error is named —
+those passages are worth more than the numbers.
 
 ---
 
@@ -197,8 +197,8 @@ Four kinds of layer, one stack:
 |---|---|---|---|
 | **Pass** | a pass from the multilayer EXR | light mixing: glossy down, emission up | **built** |
 | **Adjustment** | nothing — it is a tool | the colour tools of section 7 | **built** |
-| **Image** | a still, or a second sequence | logo, overlay, gradient, version compare | designed |
-| **Group** | other layers | one mask over several operations | designed |
+| **Image** | a still, or a second sequence | overlay, version compare | **built** |
+| **Group** | other layers | one mask over several operations | **built** |
 
 Making colour correction a *layer* rather than a panel is what keeps this one system
 instead of two. An adjustment layer has opacity, a blend mode and a mask like any
@@ -231,6 +231,45 @@ which of the two it is currently editing — in a bar that stays put while the r
 scrolls. That bar is not decoration: there is one set of tools and any number of
 layers, and someone who misses the switch adjusts the whole image while meaning one
 layer.
+
+### Image layers follow the frame number
+
+An image layer names another file. If that file carries a frame number, it follows the
+sequence: frame 47 here means frame 47 there, spliced through the **same** regular
+expression the sequence scanner uses everywhere else. A second rule would eventually
+let one file fall under one and not the other, and the layer would sit one frame off —
+visible only in motion. A name without a counter is a still and stays put; a counter
+you want pinned has a toggle.
+
+The case that earns the image layer its place is not the logo. It is: drop the previous
+render version in, set **Difference**, and see in one glance what changed.
+
+What is **not** built: placement and scaling. An image of a different size is marked in
+the list and skipped rather than stretched — resampling with position, scale and
+anchor is its own feature, and half of it would be worse than none.
+
+### Groups pass through
+
+A group holds layers and gives them one mask, one opacity and one blend mode. The
+decision that matters is what its children see below them, and it goes the opposite way
+from the obvious one: **a group passes through**. Its children composite onto what lies
+beneath the group, and the group's result is then blended back over that same starting
+point with its own mode, opacity and mask.
+
+Isolated would have been simpler to implement and wrong for the headline case: a group
+of adjustment layers would find black underneath and erase the picture, and nobody
+would suspect the group. Pass-through also gives the invariant a group has to satisfy —
+**with nothing set, a group is indistinguishable from not being there** — and that is
+the first thing its tests check.
+
+In the panel the stack is a tree and the list is flat, so rows indent by depth and two
+arrows move a layer in and out of the group above it. Drag-and-drop was the alternative
+and the worse one: in a 300-pixel strip a dragged row lands next to where it was aimed,
+and you find out afterwards.
+
+One direction caught me out and is worth recording: **the group is above the layer in
+the list, which is a higher index in the stack.** The list runs top-down, the stack runs
+bottom-up. The first version indented into `index - 1` and the button was simply dead.
 
 ### What it costs, measured
 
@@ -326,7 +365,7 @@ borrowed-domain treatment to be more than decoration.
 
 Difference deserves a specific mention: dropping a second render version in as an
 image layer and setting Difference is the fastest way to see what actually changed
-between two renders. That alone earns the image layer its place.
+between two renders. That alone earns the image layer its place — and it is built.
 
 ### What a layer carries
 
@@ -655,11 +694,11 @@ next one landing.
    clarity, LUT. Single layer, no masks. Already a genuine grading tool.
 4. ~~**The batch run and sequence export.**~~ **Done**, images and video. At this point the workflow closes, and Atelier
    is finished as a product even if nothing further is built.
-5. ~~**Layer stack, blend modes.**~~ **Done**, pass and adjustment layers: order,
-   duplication, opacity, colour, ten blend modes and clipping masks, all in linear
-   light, with the stack applied unchanged by the batch run. Image and group layers
-   are not built. This step is also where the pass arithmetic in section 5 turned out
-   to be wrong and was corrected against a real render.
+5. ~~**Layer stack, blend modes.**~~ **Done**, all four kinds of layer: order,
+   duplication, opacity, colour, ten blend modes, clipping masks and nesting, all in
+   linear light, with the stack applied unchanged by the batch run. This step is also
+   where the pass arithmetic in section 5 turned out to be wrong and was corrected
+   against a real render.
 6. ~~**Passes and light mixing.**~~ **Done** with step 5. ~~**Luminance and gradient
    masks.**~~ **Done**, plus any pass as a mask — which turned out to be the same
    plumbing the cryptomatte needed, so it was worth building first. Painted masks are not.

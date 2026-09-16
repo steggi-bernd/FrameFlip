@@ -18,6 +18,32 @@ public enum LayerContent
     /// die "waerme nur den Glanz" ueberhaupt erst sagbar macht.
     /// </summary>
     Adjustment,
+
+    /// <summary>
+    /// Eine andere Datei: ein Einzelbild oder eine zweite Sequenz.
+    ///
+    /// Der Fall, der sie rechtfertigt, ist nicht das Logo, sondern der Vergleich:
+    /// Zwei Fassungen desselben Renders uebereinander, die obere auf Differenz, und
+    /// man sieht in einem Blick, was sich geaendert hat. Traegt die Datei eine
+    /// Bildnummer, laeuft sie mit der Sequenz mit.
+    /// </summary>
+    Image,
+
+    /// <summary>
+    /// Eine Gruppe: mehrere Ebenen, die eine Maske und eine Deckkraft teilen.
+    ///
+    /// Sie rechnet DURCH und nicht abgeschottet - ihre Kinder sehen, was unter der
+    /// Gruppe liegt. Das ist die Entscheidung, an der alles haengt: Eine Gruppe aus
+    /// Einstellungsebenen soll "diese drei Korrekturen, aber nur hier" heissen.
+    /// Abgeschottet faenden ihre Kinder Schwarz vor, und genau der Fall - eine Maske
+    /// ueber mehreren Korrekturen - ist der, um dessentwillen es Gruppen gibt.
+    ///
+    /// Am Ende wird das Ergebnis der Gruppe auf den Stand von vorher gemischt, mit
+    /// ihrer Mischung, ihrer Deckkraft und ihrer Maske. Ohne all das ist eine Gruppe
+    /// damit genau so, als waere sie nicht da - und das ist die Probe, die eine
+    /// Gruppe bestehen muss.
+    /// </summary>
+    Group,
 }
 
 /// <summary>
@@ -50,6 +76,15 @@ public sealed class ImageLayer
     /// Einstellungsebene ohne Bedeutung.
     /// </summary>
     public string Source { get; set; } = "";
+
+    /// <summary>
+    /// Ob eine Bildebene der Bildnummer folgt.
+    ///
+    /// Bei einer zweiten Fassung desselben Renders will man das; bei einem Logo, das
+    /// zufaellig eine Nummer im Namen hat, nicht. Ein Einzelbild ohne Nummer ist von
+    /// der Frage ohnehin nicht betroffen.
+    /// </summary>
+    public bool FollowSequence { get; set; } = true;
 
     /// <summary>
     /// Die Grundkorrektur der Einstellungsebene - dieselben Regler wie unten im
@@ -125,6 +160,16 @@ public sealed class ImageLayer
     public LayerMask Mask { get; set; } = new();
 
     /// <summary>
+    /// Die Ebenen einer Gruppe, von unten nach oben - dieselbe Richtung wie im
+    /// Stapel selbst. Bei allem anderen leer.
+    ///
+    /// Immer vorhanden und nie null, aus demselben Grund wie bei der Maske: Eine
+    /// leere Gruppe ist eine Gruppe ohne Inhalt und kein fehlender Wert. Das erspart
+    /// jedem Leser eine Pruefung - und es waren die Pruefungen, die man vergisst.
+    /// </summary>
+    public List<ImageLayer> Children { get; set; } = new();
+
+    /// <summary>
     /// True, wenn an der Ebene selbst nichts eingestellt ist. Die Mischung zaehlt
     /// hier NICHT mit: Sie sagt, wie die Ebene auf die darunter wirkt, und das ist
     /// eine Aussage ueber den Stapel, nicht ueber die Ebene. Auf der untersten
@@ -153,6 +198,8 @@ public sealed class ImageLayer
         Clipped = Clipped,
         Mask = Mask.Clone(),
         Content = Content,
+        FollowSequence = FollowSequence,
+        Children = Children.Select(c => c.Clone()).ToList(),
         Adjustments = Adjustments,
         Tools = Tools?.Clone(),
         Tint = Tint.Clone(),
@@ -168,6 +215,12 @@ public sealed class ImageLayer
 /// unten nach oben laeuft und eine rueckwaerts gelesene Schleife eine Fehlerquelle
 /// mehr ist.
 /// </summary>
+/// <summary>Was eine Ebene zu lesen verlangt.</summary>
+/// <param name="Key">
+/// Unter diesem Namen liegt das Ergebnis - ein Passname oder ein Dateipfad.
+/// </param>
+public readonly record struct LayerRead(string Key, LayerContent Kind, bool FollowSequence);
+
 public sealed class LayerStack
 {
     public List<ImageLayer> Layers { get; set; } = new();
@@ -195,26 +248,79 @@ public sealed class LayerStack
     /// aussieht, als waere die Maske falsch eingestellt.
     /// </summary>
     public IReadOnlyList<string> NeededSources()
+        => Reads().Select(r => r.Key).ToList();
+
+    /// <summary>
+    /// Was gelesen werden muss, und woher.
+    ///
+    /// Der Schluessel ist zugleich der Name, unter dem das Ergebnis abgelegt wird -
+    /// bei einem Pass sein Name, bei einer Bildebene ihr Pfad. Dass beides derselbe
+    /// Behaelter ist, ist kein Trick: Fuer den Composer ist es dieselbe Frage
+    /// ("woher kommen die Werte dieser Ebene?"), und zwei Behaelter hiessen zwei
+    /// Wege, die auseinanderlaufen koennen.
+    /// </summary>
+    public IReadOnlyList<LayerRead> Reads()
     {
-        var names = new List<string>();
+        var reads = new List<LayerRead>();
 
-        foreach (var layer in Layers)
+        void Add(LayerRead read)
         {
-            if (!layer.Visible) continue;
-
-            // Eine Einstellungsebene liest keinen Pass - sie rechnet mit dem, was
-            // schon da ist. Ihre Maske kann trotzdem einen brauchen.
-            if (layer.Content == LayerContent.Pass &&
-                !names.Contains(layer.Source, StringComparer.Ordinal))
-            {
-                names.Add(layer.Source);
-            }
-
-            foreach (string source in layer.Mask.Sources())
-                if (!names.Contains(source, StringComparer.Ordinal)) names.Add(source);
+            if (!reads.Any(r => r.Key.Equals(read.Key, StringComparison.Ordinal))) reads.Add(read);
         }
 
-        return names;
+        Walk(Layers);
+
+        return reads;
+
+        void Walk(IEnumerable<ImageLayer> layers)
+        {
+            foreach (var layer in layers)
+            {
+                if (!layer.Visible) continue;
+
+                // Eine Einstellungsebene liest nichts - sie rechnet mit dem, was
+                // schon da ist. Ihre Maske kann trotzdem einen Pass brauchen.
+                switch (layer.Content)
+                {
+                    case LayerContent.Pass:
+                        Add(new LayerRead(layer.Source, LayerContent.Pass, false));
+                        break;
+
+                    case LayerContent.Image when layer.Source.Length > 0:
+                        Add(new LayerRead(layer.Source, LayerContent.Image, layer.FollowSequence));
+                        break;
+
+                    // In eine Gruppe muss hineingesehen werden: Ihre Kinder lesen
+                    // ihre Passe selbst, und wer sie nicht mitzaehlt, komponiert
+                    // eine Gruppe aus lauter fehlenden Quellen.
+                    case LayerContent.Group:
+                        Walk(layer.Children);
+                        break;
+                }
+
+                foreach (string source in layer.Mask.Sources())
+                    Add(new LayerRead(source, LayerContent.Pass, false));
+            }
+        }
+    }
+
+    /// <summary>
+    /// Alle Ebenen, auch die in Gruppen - von unten nach oben, Gruppen vor ihren
+    /// Kindern.
+    /// </summary>
+    public IEnumerable<ImageLayer> All()
+    {
+        foreach (var layer in Walk(Layers)) yield return layer;
+
+        static IEnumerable<ImageLayer> Walk(IEnumerable<ImageLayer> layers)
+        {
+            foreach (var layer in layers)
+            {
+                yield return layer;
+
+                foreach (var child in Walk(layer.Children)) yield return child;
+            }
+        }
     }
 
     public LayerStack Clone() => new()

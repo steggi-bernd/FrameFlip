@@ -67,6 +67,17 @@
     <sys:String x:Key="S_AddLayer">Add a pass as a layer</sys:String>
     <sys:String x:Key="S_AddAllPasses">All passes – rebuild the image</sys:String>
     <sys:String x:Key="S_AddAdjustment">Adjustment layer</sys:String>
+    <sys:String x:Key="S_AddImage">Image …</sys:String>
+    <sys:String x:Key="S_AddGroup">Group</sys:String>
+    <sys:String x:Key="S_GroupLayer">Group</sys:String>
+    <sys:String x:Key="S_MoveIntoGroup">Into the group below</sys:String>
+    <sys:String x:Key="S_MoveOutOfGroup">Out of the group</sys:String>
+    <sys:String x:Key="S_FollowSequence">Follow the frame number</sys:String>
+    <sys:String x:Key="S_PickImage">Choose an image or sequence</sys:String>
+    <sys:String x:Key="S_ImageMissing">file missing</sys:String>
+    <sys:String x:Key="S_ImageHint">If the file carries a frame number it follows the sequence – frame 47 here means frame 47 there. Two versions on Difference show at a glance what changed.</sys:String>
+    <sys:String x:Key="S_GroupHint">A group passes through: its layers see what lies below it. Mask and opacity apply to all of them together.</sys:String>
+    <sys:String x:Key="S_SizeMismatch">different size – skipped</sys:String>
     <sys:String x:Key="S_AdjustmentLayer">Adjustment</sys:String>
     <sys:String x:Key="S_ToolsTargetImage">Acts on the whole image</sys:String>
     <sys:String x:Key="S_ToolsTargetLayer">Acts on: {0}</sys:String>

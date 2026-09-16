@@ -133,11 +133,23 @@
                 </StackPanel>
 
                 <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+                    <!--
+                        Ein- und ausruecken statt Ziehen und Fallenlassen: Eine Maus,
+                        die eine Zeile in eine Gruppe zieht, trifft im schmalen
+                        Streifen daneben, und das Ergebnis sieht man erst hinterher.
+                    -->
+                    <Button x:Name="IndentButton" Style="{StaticResource OverlayButton}"
+                            MinWidth="26" Content="▶" Click="OnIndentClicked"
+                            ToolTip="{DynamicResource S_MoveIntoGroup}" />
+                    <Button x:Name="OutdentButton" Style="{StaticResource OverlayButton}"
+                            Margin="4,0,8,0" MinWidth="26" Content="◀" Click="OnOutdentClicked"
+                            ToolTip="{DynamicResource S_MoveOutOfGroup}" />
+
                     <Button x:Name="UpButton" Style="{StaticResource OverlayButton}"
-                            MinWidth="30" Content="▲" Click="OnUpClicked"
+                            MinWidth="26" Content="▲" Click="OnUpClicked"
                             ToolTip="{DynamicResource S_MoveLayerUp}" />
                     <Button x:Name="DownButton" Style="{StaticResource OverlayButton}"
-                            Margin="4,0,0,0" MinWidth="30" Content="▼" Click="OnDownClicked"
+                            Margin="4,0,0,0" MinWidth="26" Content="▼" Click="OnDownClicked"
                             ToolTip="{DynamicResource S_MoveLayerDown}" />
                 </StackPanel>
             </Grid>
@@ -306,6 +318,36 @@
                     <TextBlock x:Name="MaskHint" Margin="0,8,0,0" FontSize="10"
                                Foreground="{StaticResource MutedBrush}" TextWrapping="Wrap" />
                 </StackPanel>
+
+                <!-- Eine Bildebene: welche Datei, und ob sie mitlaeuft -->
+                <StackPanel x:Name="ImageBody" Visibility="Collapsed" Margin="0,10,0,0">
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+
+                        <TextBlock x:Name="ImagePathText" Grid.Column="0" VerticalAlignment="Center"
+                                   FontSize="10" Foreground="{StaticResource MutedBrush}"
+                                   TextTrimming="CharacterEllipsis" Margin="0,0,6,0" />
+
+                        <Button Grid.Column="1" Style="{StaticResource OverlayButton}"
+                                Content="…" MinWidth="34" Click="OnPickImageClicked" />
+                    </Grid>
+
+                    <ToggleButton x:Name="FollowButton" Style="{StaticResource OverlayToggle}"
+                                  Margin="0,6,0,0" Content="{DynamicResource S_FollowSequence}"
+                                  Checked="OnFollowChanged" Unchecked="OnFollowChanged" />
+
+                    <TextBlock Margin="0,8,0,0" FontSize="10" TextWrapping="Wrap"
+                               Foreground="{StaticResource MutedBrush}"
+                               Text="{DynamicResource S_ImageHint}" />
+                </StackPanel>
+
+                <TextBlock x:Name="GroupHint" Margin="0,10,0,0" FontSize="10"
+                           Visibility="Collapsed"
+                           Foreground="{StaticResource MutedBrush}" TextWrapping="Wrap"
+                           Text="{DynamicResource S_GroupHint}" />
 
                 <TextBlock x:Name="AdjustmentHint" Margin="0,10,0,0" FontSize="10"
                            Visibility="Collapsed"

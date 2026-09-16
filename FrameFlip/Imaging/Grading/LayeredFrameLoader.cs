@@ -31,10 +31,10 @@ public static class LayeredFrameLoader
 
         var sources = new Dictionary<string, FloatFrame>(StringComparer.Ordinal);
 
-        foreach (string source in layers.NeededSources())
+        foreach (var read in layers.Reads())
         {
-            var frame = source.Length == 0 ? plain(path) : FloatFrame.FromExrPass(path, source);
-            if (frame is not null) sources[source] = frame;
+            var frame = Read(read, path, plain);
+            if (frame is not null) sources[read.Key] = frame;
         }
 
         // Nichts Lesbares dabei - etwa, weil das Rezept von einer Datei mit anderen
@@ -42,6 +42,25 @@ public static class LayeredFrameLoader
         // ein schwarzes Feld: Man sieht, dass die Datei in Ordnung ist, und sucht
         // den Fehler dort, wo er liegt.
         return LayerComposer.Compose(layers, sources) ?? plain(path);
+    }
+
+    /// <summary>
+    /// Liest, was eine Ebene verlangt - einen Pass aus dieser Datei oder eine
+    /// andere Datei ganz.
+    /// </summary>
+    public static FloatFrame? Read(LayerRead read, string framePath, Func<string, FloatFrame?>? plain = null)
+    {
+        plain ??= Plain;
+
+        if (read.Kind == LayerContent.Image)
+        {
+            // Eine Bildebene laeuft mit der Nummer mit: Bei Bild 47 meint sie auch
+            // dort Bild 47.
+            string paired = SequenceLink.Pair(read.Key, framePath, read.FollowSequence);
+            return Plain(paired);
+        }
+
+        return read.Key.Length == 0 ? plain(framePath) : FloatFrame.FromExrPass(framePath, read.Key);
     }
 
     /// <summary>Der gewoehnliche Weg: EXR direkt, alles andere ueber Windows.</summary>

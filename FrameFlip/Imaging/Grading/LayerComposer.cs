@@ -56,39 +56,10 @@ public static class LayerComposer
     {
         step = Math.Clamp(step, 1, 16);
 
-        var used = new List<(ImageLayer Layer, FloatFrame? Frame)>();
+        var used = new List<(ImageLayer Layer, FloatFrame? Frame, StepKind Kind)>();
         int width = 0, height = 0;
 
-        foreach (var layer in stack.Layers)
-        {
-            if (!layer.Visible || layer.Opacity <= 0.0005f) continue;
-
-            // Eine Einstellungsebene bringt kein Bild mit - sie rechnet mit dem, was
-            // schon da ist. Sie gibt deshalb auch keine Groesse vor; die kommt von
-            // den Passen darunter.
-            if (layer.Content == LayerContent.Adjustment)
-            {
-                used.Add((layer, null));
-                continue;
-            }
-
-            if (!sources.TryGetValue(layer.Source, out var frame)) continue;
-
-            // Die erste brauchbare Ebene gibt die Groesse vor; alles Abweichende
-            // faellt heraus. Zwei Groessen ineinanderzurechnen hiesse skalieren, und
-            // das ist eine andere Aufgabe als mischen.
-            if (width == 0)
-            {
-                width = frame.Width;
-                height = frame.Height;
-            }
-            else if (frame.Width != width || frame.Height != height)
-            {
-                continue;
-            }
-
-            used.Add((layer, frame));
-        }
+        Collect(stack.Layers, sources, used, ref width, ref height, depth: 0);
 
         // Ohne einen einzigen Pass gibt es nichts, worauf eine Korrektur wirken
         // koennte - und auch keine Bildgroesse. Ein Stapel aus lauter
@@ -103,7 +74,8 @@ public static class LayerComposer
 
         // Eine einzelne unveraenderte Ebene ist das Bild selbst. Sie durchzureichen
         // spart bei 4K rund hundert Megabyte und eine Kopie.
-        if (used.Count == 1 && used[0].Layer.IsNeutral && used[0].Layer.LiesOnBlack)
+        if (used.Count == 1 && used[0].Kind == StepKind.Layer &&
+            used[0].Layer.IsNeutral && used[0].Layer.LiesOnBlack)
         {
             return used[0].Frame!;
         }
@@ -187,7 +159,7 @@ public static class LayerComposer
             plans[i] = new Plan(used[i].Frame, layer.Mode, Math.Clamp(layer.Opacity, 0f, 1f),
                                 gain * layer.Tint.R, gain * layer.Tint.G, gain * layer.Tint.B, clipped,
                                 layer.Mask, maskKind, maskFrame, maskLevels, maskIds,
-                                layer.Content, grade);
+                                layer.Content, grade, used[i].Kind);
         }
 
         // Die Gitterpunkte einmal aufschreiben, statt sie je Bildpunkt auszurechnen.
@@ -207,10 +179,15 @@ public static class LayerComposer
             int y = rows[ry];
             int start = y * width;
 
+            // Der Stand vor jeder offenen Gruppe. Je Zeile einmal geholt, nicht je
+            // Bildpunkt - verschachtelt wird selten und flach.
+            Span<float> saved = stackalloc float[MaxDepth * 3];
+
             for (int cx = 0; cx < columns.Length; cx++)
             {
                 int x = columns[cx];
                 int i = start + x;
+                int depth = 0;
 
                 // Der Untergrund ist Schwarz und nicht die unterste Ebene: Damit
                 // gilt fuer JEDE Ebene dieselbe Regel, auch fuer die unterste. Auf
@@ -232,6 +209,56 @@ public static class LayerComposer
                 {
                     ref readonly var plan = ref plans[p];
                     var frame = plan.Frame;
+
+                    // --- die Klammern einer Gruppe ---
+                    if (plan.Kind != StepKind.Layer)
+                    {
+                        // Eine Schnittgruppe darf keine Gruppengrenze ueberschreiten.
+                        if (open)
+                        {
+                            Blending.Mix(groupMode, groupOpacity, vr, vg, vb, gr, gg, gb,
+                                         out vr, out vg, out vb);
+                            open = false;
+                        }
+
+                        if (plan.Kind == StepKind.Begin)
+                        {
+                            // Der Stand von jetzt wird gesichert, und die Gruppe
+                            // rechnet darauf weiter. Sie sieht also, was unter ihr
+                            // liegt - eine Gruppe aus Korrekturen faende sonst
+                            // Schwarz vor.
+                            if (depth < MaxDepth)
+                            {
+                                saved[depth * 3] = vr;
+                                saved[depth * 3 + 1] = vg;
+                                saved[depth * 3 + 2] = vb;
+                                depth++;
+                            }
+
+                            continue;
+                        }
+
+                        if (depth == 0) continue;
+
+                        depth--;
+
+                        float br = saved[depth * 3];
+                        float bg = saved[depth * 3 + 1];
+                        float bb = saved[depth * 3 + 2];
+
+                        // Das Ergebnis der Gruppe auf den gesicherten Stand - mit
+                        // ihrer Mischung, Deckkraft und Maske. Ohne all das ist eine
+                        // Gruppe damit genau so, als waere sie nicht da.
+                        float groupFactor = plan.Mask == MaskKind.None
+                            ? plan.Opacity
+                            : plan.Opacity * Factor(in plan, x, y, width, height, i,
+                                                    vr, vg, vb, br, bg, bb);
+
+                        Blending.Mix(plan.Mode, groupFactor, br, bg, bb, vr, vg, vb,
+                                     out vr, out vg, out vb);
+
+                        continue;
+                    }
 
                     bool inGroup = plan.Clipped && open;
 
@@ -375,6 +402,85 @@ public static class LayerComposer
         return grid;
     }
 
+    /// <summary>
+    /// Wie tief Gruppen ineinander stehen duerfen.
+    ///
+    /// Acht ist keine gegriffene Zahl, sondern die Grenze, ab der der gesicherte
+    /// Stand je Bildpunkt teurer wuerde als die Gruppen wert sind. Wer tiefer
+    /// schachtelt, hat ein anderes Problem als diese Grenze.
+    /// </summary>
+    private const int MaxDepth = 8;
+
+    /// <summary>Ob ein Schritt eine Ebene ist oder die Klammer einer Gruppe.</summary>
+    private enum StepKind
+    {
+        Layer,
+        Begin,
+        End,
+    }
+
+    /// <summary>
+    /// Macht aus dem Baum eine flache Folge mit Klammern.
+    ///
+    /// Flach und nicht rekursiv, weil die innere Schleife je Bildpunkt laeuft: Eine
+    /// Rekursion dort waere bei 4K fuenfundzwanzig Millionen Aufrufe tief. Die
+    /// Schachtelung steckt stattdessen in zwei Marken und einer kleinen Halde.
+    /// </summary>
+    private static void Collect(IEnumerable<ImageLayer> layers,
+                                IReadOnlyDictionary<string, FloatFrame> sources,
+                                List<(ImageLayer Layer, FloatFrame? Frame, StepKind Kind)> into,
+                                ref int width, ref int height, int depth)
+    {
+        foreach (var layer in layers)
+        {
+            if (!layer.Visible || layer.Opacity <= 0.0005f) continue;
+
+            if (layer.Content == LayerContent.Group)
+            {
+                // Zu tief geschachtelt: die Gruppe faellt weg, ihre Kinder bleiben.
+                // Sie stillschweigend mitsamt Inhalt zu verschlucken waere die
+                // schlechtere Antwort - man saehe ein Bild, in dem etwas fehlt.
+                if (depth >= MaxDepth)
+                {
+                    Collect(layer.Children, sources, into, ref width, ref height, depth);
+                    continue;
+                }
+
+                into.Add((layer, null, StepKind.Begin));
+                Collect(layer.Children, sources, into, ref width, ref height, depth + 1);
+                into.Add((layer, null, StepKind.End));
+
+                continue;
+            }
+
+            // Eine Einstellungsebene bringt kein Bild mit - sie rechnet mit dem, was
+            // schon da ist. Sie gibt deshalb auch keine Groesse vor; die kommt von
+            // den Passen darunter.
+            if (layer.Content == LayerContent.Adjustment)
+            {
+                into.Add((layer, null, StepKind.Layer));
+                continue;
+            }
+
+            if (!sources.TryGetValue(layer.Source, out var frame)) continue;
+
+            // Die erste brauchbare Ebene gibt die Groesse vor; alles Abweichende
+            // faellt heraus. Zwei Groessen ineinanderzurechnen hiesse skalieren, und
+            // das ist eine andere Aufgabe als mischen.
+            if (width == 0)
+            {
+                width = frame.Width;
+                height = frame.Height;
+            }
+            else if (frame.Width != width || frame.Height != height)
+            {
+                continue;
+            }
+
+            into.Add((layer, frame, StepKind.Layer));
+        }
+    }
+
     // Rec.-709-Luminanz, dieselben Gewichte wie im uebrigen Bildweg.
     private const float LumaR = 0.2126f;
     private const float LumaG = 0.7152f;
@@ -454,10 +560,11 @@ public static class LayerComposer
                     float sr, float sg, float sb, bool clipped,
                     LayerMask mask, MaskKind kind, FloatFrame? maskFrame,
                     FloatFrame[]? maskLevels, float[]? maskIds,
-                    LayerContent content, LayerGrade grade)
+                    LayerContent content, LayerGrade grade, StepKind step)
         {
             Content = content;
             Grade = grade;
+            Kind = step;
             Frame = frame;
             Mode = mode;
             Opacity = opacity;
@@ -487,6 +594,7 @@ public static class LayerComposer
         }
 
         public readonly FloatFrame? Frame;
+        public readonly StepKind Kind;
         public readonly LayerContent Content;
         public readonly LayerGrade Grade;
         public readonly BlendMode Mode;

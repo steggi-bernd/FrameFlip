@@ -32,11 +32,36 @@ public partial class AtelierPage
     {
         if (stack is null || stack.Layers.Count == 0) return null;
 
-        var kept = stack.Layers
-            .Where(l => l.Source.Length == 0 || ExrPasses.Find(passes, l.Source) is not null)
-            .ToList();
+        var kept = Keep(stack.Layers);
 
         return kept.Count == 0 ? null : new LayerStack { Layers = kept };
+
+        // Bis in die Gruppen hinein: Ein Rezept mit einer Gruppe voller Passe, die
+        // es hier nicht gibt, soll die Gruppe leeren und nicht ungeprueft
+        // stehenlassen.
+        List<ImageLayer> Keep(List<ImageLayer> layers)
+        {
+            var list = new List<ImageLayer>();
+
+            foreach (var layer in layers)
+            {
+                // Eine Bildebene nennt eine andere Datei und keinen Pass dieser
+                // hier - sie darf nicht daran scheitern, dass es den "Pass" nicht
+                // gibt. Eine Einstellungsebene nennt gar nichts.
+                if (layer.Content == LayerContent.Pass &&
+                    layer.Source.Length > 0 &&
+                    ExrPasses.Find(passes, layer.Source) is null)
+                {
+                    continue;
+                }
+
+                if (layer.Content == LayerContent.Group) layer.Children = Keep(layer.Children);
+
+                list.Add(layer);
+            }
+
+            return list;
+        }
     }
 
     /// <summary>
@@ -68,8 +93,9 @@ public partial class AtelierPage
             return;
         }
 
-        var needed = Layers.Stack.NeededSources();
-        var missing = needed.Where(s => s.Length > 0 && !_sources.ContainsKey(s)).ToList();
+        var reads = Layers.Stack.Reads();
+        var needed = reads.Select(r => r.Key).ToList();
+        var missing = reads.Where(r => r.Key.Length > 0 && !_sources.ContainsKey(r.Key)).ToList();
 
         if (missing.Count == 0)
         {
@@ -84,10 +110,10 @@ public partial class AtelierPage
         {
             var found = new Dictionary<string, FloatFrame>(StringComparer.Ordinal);
 
-            foreach (string source in missing)
+            foreach (var read in missing)
             {
-                var frame = FloatFrame.FromExrPass(path, source);
-                if (frame is not null) found[source] = frame;
+                var frame = LayeredFrameLoader.Read(read, path);
+                if (frame is not null) found[read.Key] = frame;
             }
 
             return found;
