@@ -1049,6 +1049,7 @@ public partial class LayerPanel : UserControl
         place.OffsetX = (float)PlaceXSlider.Value;
         place.OffsetY = (float)PlaceYSlider.Value;
         place.Scale = (float)PlaceScaleSlider.Value;
+        place.Rotation = (float)PlaceRotationSlider.Value;
 
         place.CropLeft = (float)CropLeftSlider.Value;
         place.CropTop = (float)CropTopSlider.Value;
@@ -1117,6 +1118,11 @@ public partial class LayerPanel : UserControl
         PlaceYSlider.Value = Math.Clamp(place.OffsetY, PlaceYSlider.Minimum, PlaceYSlider.Maximum);
         PlaceScaleSlider.Value = Math.Clamp(place.Scale, PlaceScaleSlider.Minimum, PlaceScaleSlider.Maximum);
 
+        // Der Regler laeuft von -180 bis 180, die Drehung selbst darf darueber
+        // hinausgehen - beim Ziehen im Bild kommt leicht mehr als eine Umdrehung
+        // zusammen. Umgerechnet statt beschnitten, sonst spraenge der Griff.
+        PlaceRotationSlider.Value = Wrapped(place.Rotation);
+
         CropLeftSlider.Value = Math.Clamp(place.CropLeft, 0, CropLeftSlider.Maximum);
         CropTopSlider.Value = Math.Clamp(place.CropTop, 0, CropTopSlider.Maximum);
         CropRightSlider.Value = Math.Clamp(place.CropRight, 0, CropRightSlider.Maximum);
@@ -1125,11 +1131,23 @@ public partial class LayerPanel : UserControl
         UpdatePlaceValues();
     }
 
+    /// <summary>Einen Winkel auf -180 bis 180 bringen.</summary>
+    private static double Wrapped(float degrees)
+    {
+        double value = degrees % 360.0;
+
+        if (value > 180.0) value -= 360.0;
+        if (value < -180.0) value += 360.0;
+
+        return value;
+    }
+
     private void UpdatePlaceValues()
     {
         PlaceXValue.Text = $"{PlaceXSlider.Value:+0.00;-0.00;0.00}";
         PlaceYValue.Text = $"{PlaceYSlider.Value:+0.00;-0.00;0.00}";
         PlaceScaleValue.Text = $"{PlaceScaleSlider.Value:0.00}";
+        PlaceRotationValue.Text = $"{PlaceRotationSlider.Value:0} \u00B0";
     }
 
     // --------------------------------------------------------------------- Masken

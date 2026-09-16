@@ -85,12 +85,13 @@ public static class Overlays
         {
             ref readonly var plan = ref plans[p];
 
-            if (!plan.Placement.Locate(x, y, out float u, out float v)) continue;
+            float covered = plan.Placement.Coverage(x, y, out float u, out float v);
+            if (covered <= 0f) continue;
 
             plan.Placement.Sample(plan.Frame, u, v,
                                   out float or_, out float og, out float ob, out float oa);
 
-            float opacity = plan.Opacity * Math.Clamp(oa, 0f, 1f);
+            float opacity = plan.Opacity * Math.Clamp(oa, 0f, 1f) * covered;
             if (opacity <= 0f) continue;
 
             Blending.Mix(plan.Mode, opacity, r, g, b,

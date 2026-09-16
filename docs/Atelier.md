@@ -271,15 +271,34 @@ scaling was a different job from mixing. It is not a different job any more — 
 logo, and dropping a logo because it is smaller than the picture would be the wrong
 answer. The test that pinned the old behaviour was rewritten rather than deleted.
 
-Placement is also editable **directly in the picture**: grab the layer and drag, pull a
-corner to resize. The arithmetic lives apart from the control, in `PlacementDrag`,
-because it holds the kind of mistake you cannot see — a corner that drifts instead of
-staying put feels like a bad mouse, not a bad formula. The invariant the tests hold it
-to is that **dragging one corner leaves the opposite one exactly where it was**, which
-is why both scale *and* offset change during a corner drag: the placement counts from
-the centre, and the centre moves when a corner stays.
+Rotation is about the centre — the same point the scale counts from, so the two do not
+shove each other around.
 
-Not built: rotation.
+Placement is also editable **directly in the picture**: grab the layer and drag, pull a
+corner to resize, take the handle above the top edge to turn. The arithmetic lives apart
+from the control, in `PlacementDrag`, because it holds the kind of mistake you cannot
+see — a corner that drifts instead of staying put feels like a bad mouse, not a bad
+formula. The invariant the tests hold it to is that **dragging one corner leaves the
+opposite one exactly where it was**, at every angle, which is why both scale *and* offset
+change during a corner drag: the placement counts from the centre, and the centre moves
+when a corner stays.
+
+Rotation also settled a question the earlier version had got away with. The drag maths
+first worked **in fractions of the canvas**, which is fine until something turns: the two
+axes are different lengths in that space, so a rotation there *shears* rather than turns
+— a square comes out a rhombus, and the further the frame is from square the worse it
+gets. It now works in canvas pixels throughout and converts back to fractions only when
+writing the offset. The test that holds this is a rotated square on a 16:9 canvas: four
+equal edges, two equal diagonals.
+
+**The edge had to go soft at the same time.** An axis-aligned rectangle hides a hard edge
+— it lies along the pixel rows. A turned one lies across them, and decided hard, all
+four sides look like staircases. Coverage now feathers across one canvas pixel, measured
+as the distance to the nearest edge in layer space, so it narrows correctly when the
+layer is scaled down. That coverage multiplies the layer's opacity, which is the same
+place a mask attaches — one mechanism, not two.
+
+Not built: skew, and dragging the crop edges in the picture.
 
 ### Groups pass through
 

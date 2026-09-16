@@ -316,7 +316,8 @@ public static class LayerComposer
                         // Ausserhalb ihrer Flaeche traegt die Ebene nichts bei - und
                         // zwar wirklich nichts, nicht Schwarz. Ein Wasserzeichen
                         // wuerde sonst das halbe Bild ausloeschen.
-                        if (!plan.Placement.Locate(x, y, out float u, out float v)) continue;
+                        float covered = plan.Placement.Coverage(x, y, out float u, out float v);
+                        if (covered <= 0f) continue;
 
                         plan.Placement.Sample(frame!, u, v, out lr, out lg, out lb, out placedAlpha);
 
@@ -324,8 +325,10 @@ public static class LayerComposer
                         lg *= plan.ScaleG;
                         lb *= plan.ScaleB;
 
-                        // Die eigene Deckung der Ebene zaehlt mit: Ein Logo mit
-                        // durchsichtigem Rand soll durchsichtig bleiben.
+                        // Die eigene Deckung der Ebene zaehlt mit, und die weiche
+                        // Kante der Flaeche ebenso: Ein Logo mit durchsichtigem Rand
+                        // bleibt durchsichtig, und eine gedrehte Kante bleibt glatt.
+                        placedAlpha *= covered;
                         hasPlacedAlpha = true;
                     }
                     else

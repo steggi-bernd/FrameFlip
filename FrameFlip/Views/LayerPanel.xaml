@@ -242,6 +242,19 @@
                             Minimum="0.05" Maximum="3" Value="1" SmallChange="0.01" LargeChange="0.1"
                             ValueChanged="OnPlaceChanged" MouseDoubleClick="OnSliderReset" Tag="1" />
 
+                    <Grid Margin="0,8,0,2">
+                        <TextBlock Text="{DynamicResource S_PlaceRotation}" Style="{StaticResource PanelLabel}" />
+                        <TextBlock x:Name="PlaceRotationValue" Style="{StaticResource PanelValue}" />
+                    </Grid>
+                    <!--
+                        Von -180 bis 180 und nicht von 0 bis 360: Eine Drehung um ein
+                        paar Grad nach links ist der haeufigste Griff, und sie soll
+                        nicht am anderen Ende des Reglers liegen.
+                    -->
+                    <Slider x:Name="PlaceRotationSlider" Style="{StaticResource PanelSlider}"
+                            Minimum="-180" Maximum="180" Value="0" SmallChange="1" LargeChange="15"
+                            ValueChanged="OnPlaceChanged" MouseDoubleClick="OnSliderReset" Tag="0" />
+
                     <TextBlock Text="{DynamicResource S_Crop}" Style="{StaticResource PanelLabel}"
                                Margin="0,12,0,4" />
 

@@ -17,6 +17,8 @@ public static class LayerPlacementInvariants
         OffsetAndScaleMove();
         CroppingCuts();
         APlacedLayerActsOnlyWhereItLies();
+        TheEdgeIsSoft();
+        TurningTurnsTheLayer();
         AWatermarkSurvivesTheGrade();
         Persistence();
     }
@@ -187,6 +189,115 @@ public static class LayerPlacementInvariants
     }
 
     /// <summary>
+    /// Die Kante ist weich - einen Bildpunkt breit.
+    ///
+    /// Bei einem gerade liegenden Rechteck faellt eine harte Kante nicht auf: Sie
+    /// liegt auf der Punktreihe. Ein gedrehtes hat seine Kanten quer darueber, und
+    /// hart entschieden sieht jede der vier Seiten nach Treppe aus - nach
+    /// Selbstgebautem, nicht nach einem Bild.
+    /// </summary>
+    private static void TheEdgeIsSoft()
+    {
+        Check.Group("Die Kante einer platzierten Ebene ist weich");
+
+        // Ein gedrehtes Rechteck auf einer groesseren Leinwand.
+        var place = LayerPlacement.Prepare(
+            new LayerTransform { Scale = 0.5f, Rotation = 30f }, 64, 64, 128, 96);
+
+        int inside = 0, outside = 0, edge = 0;
+
+        for (int y = 0; y < 96; y++)
+        {
+            for (int x = 0; x < 128; x++)
+            {
+                float covered = place.Coverage(x, y, out _, out _);
+
+                if (covered <= 0f) outside++;
+                else if (covered >= 1f) inside++;
+                else edge++;
+            }
+        }
+
+        Check.That(inside > 0, "innen deckt sie ganz", $"{inside} Bildpunkte");
+        Check.That(outside > 0, "aussen gar nicht", $"{outside} Bildpunkte");
+        Check.That(edge > 0, "und dazwischen liegt eine weiche Kante", $"{edge} Bildpunkte");
+
+        // Die Kante ist ein Saum und nicht die halbe Flaeche.
+        Check.That(edge < inside / 4, "die aber schmal bleibt",
+                   $"{edge} Kante gegen {inside} voll");
+
+        // Ganz ohne Drehung ebenso: Auch eine gerade Kante auf krummem Massstab
+        // liegt selten genau auf der Punktreihe.
+        var straight = LayerPlacement.Prepare(
+            new LayerTransform { Scale = 0.37f }, 64, 64, 128, 96);
+
+        int soft = 0;
+        for (int y = 0; y < 96; y++)
+        {
+            for (int x = 0; x < 128; x++)
+            {
+                float covered = straight.Coverage(x, y, out _, out _);
+                if (covered > 0f && covered < 1f) soft++;
+            }
+        }
+
+        Check.That(soft > 0, "auch ungedreht auf krummem Massstab", $"{soft} Bildpunkte");
+    }
+
+    /// <summary>
+    /// Gedreht liegt die Ebene woanders - und die Ecken liegen nicht mehr in ihr.
+    /// </summary>
+    private static void TurningTurnsTheLayer()
+    {
+        Check.Group("Drehen dreht die Ebene");
+
+        // Eine Ebene in Bildgroesse, um 45 Grad gedreht: Ihre Ecken ragen hinaus,
+        // und die Ecken der Leinwand liegen nicht mehr in ihr.
+        var turned = LayerPlacement.Prepare(
+            new LayerTransform { Rotation = 45f }, 64, 64, 64, 64);
+
+        Check.That(turned.Coverage(32, 32, out _, out _) > 0.99f, "die Mitte bleibt gedeckt");
+        Check.That(turned.Coverage(1, 1, out _, out _) <= 0f, "die Ecke oben links nicht mehr");
+        Check.That(turned.Coverage(62, 62, out _, out _) <= 0f, "und die unten rechts auch nicht");
+
+        // Ungedreht sind alle vier Ecken drin - sonst pruefte das obige nichts.
+        var straight = LayerPlacement.Prepare(new LayerTransform(), 64, 64, 64, 64);
+
+        Check.That(straight.Coverage(1, 1, out _, out _) > 0.99f, "ungedreht ist die Ecke gedeckt");
+
+        // Eine volle Umdrehung ist dasselbe wie keine.
+        var round = LayerPlacement.Prepare(new LayerTransform { Rotation = 360f }, 64, 64, 64, 64);
+        Check.That(round.Coverage(1, 1, out _, out _) > 0.99f, "nach 360 Grad ist sie wieder da");
+
+        // Und im Composer: Eine gedrehte Ebene deckt die Ecken nicht mehr ab.
+        var sources = new Dictionary<string, FloatFrame>(StringComparer.Ordinal)
+        {
+            ["bild"] = Frame(32, 32, 1f),
+            ["auflage"] = Frame(32, 32, 2f),
+        };
+
+        var stack = new LayerStack
+        {
+            Layers =
+            {
+                new ImageLayer { Source = "bild", Mode = BlendMode.Normal },
+                new ImageLayer
+                {
+                    Content = LayerContent.Image,
+                    Source = "auflage",
+                    Mode = BlendMode.Add,
+                    Place = new LayerTransform { Rotation = 45f },
+                },
+            },
+        };
+
+        var built = LayerComposer.Compose(stack, sources)!;
+
+        Check.Near(built.R[16 * 32 + 16], 3.0, 1e-3, "in der Mitte kommt sie dazu");
+        Check.Near(built.R[0], 1.0, 1e-3, "in der Ecke nicht mehr");
+    }
+
+    /// <summary>
     /// Die Probe, um die es beim Wasserzeichen geht.
     ///
     /// Eine gewoehnliche Bildebene geht mit dem Bild durch AgX und wird mitkorrigiert.
@@ -265,6 +376,7 @@ public static class LayerPlacementInvariants
                         OffsetX = 0.35f,
                         OffsetY = -0.4f,
                         Scale = 0.22f,
+                        Rotation = -37.5f,
                         CropLeft = 0.1f,
                         CropBottom = 0.2f,
                     },
@@ -281,6 +393,7 @@ public static class LayerPlacementInvariants
         Check.Near(layer.Place.OffsetX, 0.35, 1e-5, "der Versatz bleibt");
         Check.Near(layer.Place.OffsetY, -0.4, 1e-5, "in beiden Richtungen");
         Check.Near(layer.Place.Scale, 0.22, 1e-5, "die Groesse auch");
+        Check.Near(layer.Place.Rotation, -37.5, 1e-4, "und die Drehung");
         Check.Near(layer.Place.CropLeft, 0.1, 1e-5, "und der Anschnitt");
         Check.Near(layer.Place.CropBottom, 0.2, 1e-5, "auf allen Seiten");
 

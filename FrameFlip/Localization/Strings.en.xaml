@@ -73,6 +73,7 @@
     <sys:String x:Key="S_PlaceX">Horizontal</sys:String>
     <sys:String x:Key="S_PlaceY">Vertical</sys:String>
     <sys:String x:Key="S_PlaceScale">Size</sys:String>
+    <sys:String x:Key="S_PlaceRotation">Rotation</sys:String>
     <sys:String x:Key="S_Crop">Crop</sys:String>
     <sys:String x:Key="S_CropLeft">Left</sys:String>
     <sys:String x:Key="S_CropTop">Top</sys:String>

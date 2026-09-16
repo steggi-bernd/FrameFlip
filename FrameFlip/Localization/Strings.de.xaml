@@ -73,6 +73,7 @@
     <sys:String x:Key="S_PlaceX">Waagerecht</sys:String>
     <sys:String x:Key="S_PlaceY">Senkrecht</sys:String>
     <sys:String x:Key="S_PlaceScale">Größe</sys:String>
+    <sys:String x:Key="S_PlaceRotation">Drehung</sys:String>
     <sys:String x:Key="S_Crop">Anschnitt</sys:String>
     <sys:String x:Key="S_CropLeft">Links</sys:String>
     <sys:String x:Key="S_CropTop">Oben</sys:String>

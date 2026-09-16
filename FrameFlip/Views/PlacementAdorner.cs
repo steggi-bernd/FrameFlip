@@ -99,64 +99,70 @@ public sealed class PlacementAdorner : FrameworkElement
         // Ein durchsichtiges Rechteck ueber alles: Ohne es faellt die Maus durch.
         context.DrawRectangle(Background, null, new Rect(0, 0, ActualWidth, ActualHeight));
 
-        if (_transform is null) return;
-        if (!Corners(out var topLeft, out var bottomRight)) return;
+        if (_transform is null || _canvasWidth <= 0) return;
 
-        var rect = new Rect(topLeft, bottomRight);
+        var box = Box();
+        box.Corners(out float x0, out float y0, out float x1, out float y1,
+                    out float x2, out float y2, out float x3, out float y3);
 
-        context.DrawRectangle(null, Shadow, rect);
-        context.DrawRectangle(null, Line, rect);
+        var a = Screen(x0, y0);
+        var b = Screen(x1, y1);
+        var c = Screen(x2, y2);
+        var d = Screen(x3, y3);
 
-        Grip(context, rect.Left, rect.Top, DragHandle.TopLeft);
-        Grip(context, rect.Right, rect.Top, DragHandle.TopRight);
-        Grip(context, rect.Left, rect.Bottom, DragHandle.BottomLeft);
-        Grip(context, rect.Right, rect.Bottom, DragHandle.BottomRight);
+        // Als Linienzug und nicht als Rechteck: Gedreht ist es keines mehr.
+        var shape = new StreamGeometry();
+
+        using (var draw = shape.Open())
+        {
+            draw.BeginFigure(a, false, true);
+            draw.PolyLineTo(new[] { b, c, d }, true, false);
+        }
+
+        shape.Freeze();
+
+        context.DrawGeometry(null, Shadow, shape);
+        context.DrawGeometry(null, Line, shape);
+
+        // Der Drehgriff sitzt ueber der oberen Kante und dreht mit.
+        box.RotateGrip(PlacementDrag.RotateDistance, out float rx, out float ry);
+
+        var grip = Screen(rx, ry);
+        var top = new Point((a.X + b.X) / 2, (a.Y + b.Y) / 2);
+
+        context.DrawLine(Shadow, top, grip);
+        context.DrawLine(Line, top, grip);
+
+        context.DrawEllipse(_drag.IsActive
+                                ? _drag.Handle == DragHandle.Rotate ? Hot : Handle
+                                : _hover == DragHandle.Rotate ? Hot : Handle,
+                            new Pen(HandleEdge, 1), grip, GripSize + 1, GripSize + 1);
+
+        Grip(context, a, DragHandle.TopLeft);
+        Grip(context, b, DragHandle.TopRight);
+        Grip(context, c, DragHandle.BottomRight);
+        Grip(context, d, DragHandle.BottomLeft);
     }
 
-    private void Grip(DrawingContext context, double x, double y, DragHandle which)
+    private void Grip(DrawingContext context, Point at, DragHandle which)
     {
         bool lit = _drag.IsActive ? _drag.Handle == which : _hover == which;
 
         context.DrawRectangle(lit ? Hot : Handle, new Pen(HandleEdge, 1),
-                              new Rect(x - GripSize, y - GripSize, GripSize * 2, GripSize * 2));
+                              new Rect(at.X - GripSize, at.Y - GripSize, GripSize * 2, GripSize * 2));
     }
 
-    /// <summary>Die beiden Ecken der Ebene, in Punkten auf dieser Flaeche.</summary>
-    private bool Corners(out Point topLeft, out Point bottomRight)
+    /// <summary>Die Lage der Ebene, in Bildpunkten der Leinwand.</summary>
+    private PlacementDrag.Frame Box()
+        => PlacementDrag.Region(_transform!, _layerWidth, _layerHeight, _canvasWidth, _canvasHeight);
+
+    /// <summary>Von einem Bildpunkt der Leinwand auf einen Punkt dieser Flaeche.</summary>
+    private Point Screen(float imageX, float imageY)
     {
-        topLeft = bottomRight = default;
+        ImageHit.PointAt(imageX, imageY, ActualWidth, ActualHeight,
+                         _canvasWidth, _canvasHeight, _uniform, out double x, out double y);
 
-        if (_transform is null || _canvasWidth <= 0 || _canvasHeight <= 0) return false;
-
-        PlacementDrag.Basis(_layerWidth, _layerHeight, _canvasWidth, _canvasHeight,
-                            out float baseWidth, out float baseHeight);
-
-        PlacementDrag.Region(_transform, baseWidth, baseHeight,
-                             out float cx, out float cy, out float hw, out float hh);
-
-        // Von Anteilen in Bildpunkte, von dort auf die Flaeche - ueber denselben Weg,
-        // den auch der Klick nimmt.
-        //
-        // Beide Aufrufe einzeln und nicht mit && verkettet: Der Kurzschluss liesse
-        // die zweiten beiden Werte ungesetzt, und der Compiler sagt das zu Recht.
-        if (!ImageHit.PointAt((cx - hw) * _canvasWidth, (cy - hh) * _canvasHeight,
-                              ActualWidth, ActualHeight, _canvasWidth, _canvasHeight,
-                              _uniform, out double left, out double top))
-        {
-            return false;
-        }
-
-        if (!ImageHit.PointAt((cx + hw) * _canvasWidth, (cy + hh) * _canvasHeight,
-                              ActualWidth, ActualHeight, _canvasWidth, _canvasHeight,
-                              _uniform, out double right, out double bottom))
-        {
-            return false;
-        }
-
-        topLeft = new Point(left, top);
-        bottomRight = new Point(right, bottom);
-
-        return true;
+        return new Point(x, y);
     }
 
     // ---------------------------------------------------------------- Bedienung
@@ -164,12 +170,9 @@ public sealed class PlacementAdorner : FrameworkElement
     protected override void OnMouseLeftButtonDown(MouseButtonEventArgs e)
     {
         if (_transform is null) return;
-        if (!Fraction(e.GetPosition(this), out float x, out float y)) return;
+        if (!Canvas(e.GetPosition(this), out float x, out float y)) return;
 
-        PlacementDrag.Basis(_layerWidth, _layerHeight, _canvasWidth, _canvasHeight,
-                            out float baseWidth, out float baseHeight);
-
-        _drag = PlacementDrag.Begin(_transform, baseWidth, baseHeight, x, y, (float)Reach());
+        _drag = PlacementDrag.Begin(_transform, Box(), x, y, (float)Reach());
 
         if (!_drag.IsActive) return;
 
@@ -181,14 +184,11 @@ public sealed class PlacementAdorner : FrameworkElement
     protected override void OnMouseMove(MouseEventArgs e)
     {
         if (_transform is null) return;
-        if (!Fraction(e.GetPosition(this), out float x, out float y)) return;
+        if (!Canvas(e.GetPosition(this), out float x, out float y)) return;
 
         if (!_drag.IsActive)
         {
-            PlacementDrag.Basis(_layerWidth, _layerHeight, _canvasWidth, _canvasHeight,
-                                out float baseWidth, out float baseHeight);
-
-            var over = PlacementDrag.HandleAt(_transform, baseWidth, baseHeight, x, y, (float)Reach());
+            var over = PlacementDrag.HandleAt(Box(), x, y, (float)Reach());
 
             if (over != _hover)
             {
@@ -201,13 +201,14 @@ public sealed class PlacementAdorner : FrameworkElement
                 DragHandle.TopLeft or DragHandle.BottomRight => Cursors.SizeNWSE,
                 DragHandle.TopRight or DragHandle.BottomLeft => Cursors.SizeNESW,
                 DragHandle.Body => Cursors.SizeAll,
+                DragHandle.Rotate => Cursors.Hand,
                 _ => null,
             };
 
             return;
         }
 
-        _transform = _drag.To(x, y);
+        _transform = _drag.To(x, y, _canvasWidth, _canvasHeight);
 
         Changed?.Invoke(_transform, true);
         InvalidateVisual();
@@ -230,17 +231,24 @@ public sealed class PlacementAdorner : FrameworkElement
     }
 
     /// <summary>
-    /// Der Fangbereich in Anteilen - aus Punkten auf dem Schirm umgerechnet.
+    /// Der Fangbereich in Bildpunkten der Leinwand - aus Punkten auf dem Schirm
+    /// umgerechnet.
     ///
-    /// In Punkten und nicht in Anteilen gedacht, weil die Maus in Punkten zielt: Auf
-    /// einem eingepassten 4K-Bild waere ein fester Anteil ein Fangbereich von
+    /// In Schirmpunkten gedacht, weil die Maus darin zielt: Auf einem eingepassten
+    /// 4K-Bild waere ein fester Abstand in Bildpunkten ein Fangbereich von
     /// Haaresbreite.
     /// </summary>
     private double Reach()
-        => ActualWidth <= 0 ? 0.01 : GripReach / ActualWidth;
+    {
+        double scale = _uniform && _canvasWidth > 0 && _canvasHeight > 0
+            ? Math.Min(ActualWidth / _canvasWidth, ActualHeight / _canvasHeight)
+            : 1.0;
 
-    /// <summary>Ein Punkt auf dieser Flaeche als Anteil der Leinwand.</summary>
-    private bool Fraction(Point point, out float x, out float y)
+        return scale <= 0 ? GripReach : GripReach / scale;
+    }
+
+    /// <summary>Ein Punkt dieser Flaeche in Bildpunkten der Leinwand.</summary>
+    private bool Canvas(Point point, out float x, out float y)
     {
         x = y = 0;
 
@@ -259,8 +267,8 @@ public sealed class PlacementAdorner : FrameworkElement
 
         // NICHT auf das Bild begrenzt: Beim Ziehen darf eine Ebene ueber den Rand
         // hinauslaufen, und die Maus darf dabei aus dem Bild geraten.
-        x = (float)((point.X - left) / scale / _canvasWidth);
-        y = (float)((point.Y - top) / scale / _canvasHeight);
+        x = (float)((point.X - left) / scale);
+        y = (float)((point.Y - top) / scale);
 
         return true;
     }
