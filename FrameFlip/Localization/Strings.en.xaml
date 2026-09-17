@@ -833,4 +833,6 @@
     <sys:String x:Key="S_DitherOrdered">ordered (Bayer)</sys:String>
     <sys:String x:Key="S_DitherDiffusion">error diffusion</sys:String>
     <sys:String x:Key="S_DitherPatternHint">Ordered gives a crosshatch that repeats every eight pixels - the look of old screens. Random is grainy without a pattern. Floyd-Steinberg error diffusion hands the rounding error to its neighbours and scatters organically - the look of old printers. It runs on one thread at full resolution, so it stays out while you drag a slider and joins on release. It does not run in the 16-bit export.</sys:String>
+    <sys:String x:Key="S_DitherLines">line screen</sys:String>
+    <sys:String x:Key="S_DitherAngle">line angle</sys:String>
 </ResourceDictionary>

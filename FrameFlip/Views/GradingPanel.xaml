@@ -744,8 +744,24 @@
                     <ComboBoxItem Style="{StaticResource OverlayComboItem}"
                                   Content="{DynamicResource S_DitherNoise}" />
                     <ComboBoxItem Style="{StaticResource OverlayComboItem}"
+                                  Content="{DynamicResource S_DitherLines}" />
+                    <ComboBoxItem Style="{StaticResource OverlayComboItem}"
                                   Content="{DynamicResource S_DitherDiffusion}" />
                 </ComboBox>
+
+                <!--
+                    Nur fuer das Linienraster. Sichtbar statt nur unwirksam: Ein
+                    Regler, der je nach Muster etwas tut oder nicht, ist schwerer zu
+                    verstehen als einer, der verschwindet.
+                -->
+                <Grid x:Name="DitherAngleHeader" Visibility="Collapsed" Margin="0,10,0,2">
+                    <TextBlock Text="{DynamicResource S_DitherAngle}" Style="{StaticResource PanelLabel}" />
+                    <TextBlock x:Name="DitherAngleValue" Style="{StaticResource PanelValue}" />
+                </Grid>
+                <Slider x:Name="DitherAngleSlider" Style="{StaticResource PanelSlider}"
+                        Visibility="Collapsed"
+                        Minimum="0" Maximum="180" Value="0" SmallChange="1" LargeChange="15"
+                        ValueChanged="OnChanged" MouseDoubleClick="OnSliderReset" Tag="0" />
 
                 <TextBlock Margin="0,8,0,0" FontSize="10" TextWrapping="Wrap"
                            Foreground="{StaticResource MutedBrush}"

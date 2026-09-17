@@ -15,6 +15,18 @@ public enum DitherPattern
     /// einem Bildschirm von 1985.
     /// </summary>
     Noise,
+
+    /// <summary>
+    /// Ein Linienraster: die klassische Schraffur, bei der die DICKE der Linie die
+    /// Helligkeit traegt.
+    ///
+    /// Das ist die aelteste Art, Halbtoene zu drucken, und sie sieht voellig anders
+    /// aus als die beiden anderen: kein Korn und kein Kreuz, sondern gleichmaessige
+    /// Linien, die in hellen Stellen dick werden und in dunklen zu einem Faden
+    /// abmagern. Ueber einer gewoelbten Flaeche legen sie sich wie Hoehenlinien -
+    /// genau das, was ein Kupferstich tut.
+    /// </summary>
+    Lines,
 }
 
 /// <summary>
@@ -64,8 +76,18 @@ public sealed class DitherTool : IOpticsTool
     /// </summary>
     public int Levels { get; set; } = 6;
 
-    /// <summary>Geordnet oder zufaellig.</summary>
+    /// <summary>Geordnet, zufaellig oder als Linienraster.</summary>
     public DitherPattern Pattern { get; set; } = DitherPattern.Ordered;
+
+    /// <summary>
+    /// Die Richtung der Linien, in Grad. Nur fuer <see cref="DitherPattern.Lines"/>.
+    ///
+    /// 0 sind waagerechte Linien, 90 senkrechte. Schraege dazwischen: Ein
+    /// Linienraster bei 45 Grad ist das, was ein Drucker waehlt, wenn das Motiv
+    /// selbst viel Waagerechtes hat - sonst legt sich das Raster ueber die Zeichnung
+    /// und man sieht nur noch Streifen.
+    /// </summary>
+    public float Angle { get; set; }
 
     /// <summary>
     /// Die Kantenlaenge eines Rasterpunkts, in Bildpunkten bei 1080p.
@@ -82,6 +104,7 @@ public sealed class DitherTool : IOpticsTool
 
     private float _steps;
     private int _size;
+    private float _sin, _cos;
 
     public void Prepare()
     {
@@ -89,6 +112,11 @@ public sealed class DitherTool : IOpticsTool
         // weiss - gibt es genau einen Sprung dazwischen.
         _steps = Math.Max(1, Math.Clamp(Levels, 2, 64) - 1);
         _size = Math.Clamp(Size, 1, 16);
+
+        float radians = Angle * MathF.PI / 180f;
+
+        _sin = MathF.Sin(radians);
+        _cos = MathF.Cos(radians);
     }
 
     public void Apply(in OpticsPlace place, int x, int y, ref float r, ref float g, ref float b)
@@ -99,10 +127,23 @@ public sealed class DitherTool : IOpticsTool
         // dasselbe Rezept in jeder Aufloesung anders aus.
         int cell = Math.Max(1, (int)MathF.Round(_size * place.Detail));
 
-        int cx = x / cell;
-        int cy = y / cell;
+        float threshold;
 
-        float threshold = Pattern == DitherPattern.Noise ? Hash(cx, cy) : Bayer(cx, cy);
+        if (Pattern == DitherPattern.Lines)
+        {
+            // Beim Linienraster ist der Rasterpunkt der ABSTAND zweier Linien, und
+            // gerechnet wird auf dem vollen Gitter: Die Linie soll ja innerhalb einer
+            // Periode anwachsen, und wer vorher auf Zellen rundet, hat genau die
+            // Zwischenstufen weggeworfen, aus denen die Dicke entsteht.
+            threshold = Line(x, y, Math.Max(2, cell));
+        }
+        else
+        {
+            int cx = x / cell;
+            int cy = y / cell;
+
+            threshold = Pattern == DitherPattern.Noise ? Hash(cx, cy) : Bayer(cx, cy);
+        }
 
         r = Step(r, threshold, amount);
         g = Step(g, threshold, amount);
@@ -175,6 +216,25 @@ public sealed class DitherTool : IOpticsTool
         }
 
         return level;
+    }
+
+    /// <summary>
+    /// Die Schwelle eines Linienrasters - ein Dreieck quer zur Linienrichtung.
+    ///
+    /// Im Kern der Linie ist sie 1: Dort springt der Wert schon bei der geringsten
+    /// Helligkeit um, die Linie steht also immer. Genau in der Mitte zwischen zwei
+    /// Linien ist sie 0 und springt erst bei Weiss. Dazwischen waechst die Linie
+    /// stetig - und DAS ist die Dicke, die die Helligkeit traegt.
+    /// </summary>
+    private float Line(int x, int y, int period)
+    {
+        // Quer zur Linienrichtung: Bei 0 Grad laeuft die Schwelle mit y, die Linien
+        // liegen also waagerecht.
+        float across = (x * _sin + y * _cos) / period;
+
+        float within = across - MathF.Floor(across);
+
+        return MathF.Abs(within - 0.5f) * 2f;
     }
 
     /// <summary>Die Schwelle an einer Stelle, zwischen 0 und 1.</summary>

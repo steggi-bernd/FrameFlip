@@ -224,7 +224,7 @@ public sealed class GradingStack
         DitherTool dither => new DitherTool
         {
             Amount = dither.Amount, Levels = dither.Levels,
-            Pattern = dither.Pattern, Size = dither.Size,
+            Pattern = dither.Pattern, Size = dither.Size, Angle = dither.Angle,
         },
 
         // Wie oben: Ein Werkzeug, das hier fehlt, wuerde geteilt statt kopiert.

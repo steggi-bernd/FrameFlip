@@ -26,11 +26,119 @@ public static class DitherInvariants
         TheAverageSurvives();
         OverbrightsAreLeftAlone();
         BothPatternsHoldUp();
+        TheLineScreenCarriesBrightness();
         DiffusionKeepsTheAverage();
         DiffusionLeavesCoverAlone();
     }
 
     private static OpticsPlace Place => new(1920, 1080, 1);
+
+    /// <summary>
+    /// Das Linienraster: die Helligkeit steckt in der DICKE der Linie.
+    ///
+    /// Das ist seine ganze Aussage, und sie laesst sich genau nachrechnen: Ueber eine
+    /// Periode quer zur Linie muss der Anteil der gesetzten Punkte der Helligkeit
+    /// entsprechen. Ein halbes Grau faerbt eine halbe Periode.
+    ///
+    /// Genau treffen kann es das nicht - bei acht Bildpunkten Abstand gibt es acht
+    /// moegliche Dicken, also Stufen von einem Achtel. Das ist keine Ungenauigkeit,
+    /// sondern die Aufloesung des Verfahrens, und die Toleranz sagt genau das.
+    ///
+    /// Die zweite Probe ist die schaerfere: ENTLANG der Linie darf sich nichts
+    /// aendern. Tut es das doch, ist es kein Linienraster, sondern ein Muster mit
+    /// Linienanmutung.
+    /// </summary>
+    private static void TheLineScreenCarriesBrightness()
+    {
+        Check.Group("Das Linienraster traegt die Helligkeit in der Dicke");
+
+        const int period = 8;
+
+        var tool = new DitherTool
+        {
+            Levels = 2, Amount = 1f, Pattern = DitherPattern.Lines, Size = period, Angle = 0f,
+        };
+
+        tool.Prepare();
+
+        double last = -1;
+
+        foreach (float shown in new[] { 0.15f, 0.3f, 0.5f, 0.7f, 0.9f })
+        {
+            int on = 0, all = 0;
+
+            for (int y = 0; y < period * 8; y++)
+            {
+                for (int x = 0; x < 4; x++)
+                {
+                    float r = Srgb.Decode(shown), g = r, b = r;
+
+                    tool.Apply(Place, x, y, ref r, ref g, ref b);
+
+                    if (Srgb.Encode(r) > 0.5f) on++;
+
+                    all++;
+                }
+            }
+
+            double covered = (double)on / all;
+
+            Check.That(Math.Abs(covered - shown) <= 1.0 / period + 0.02,
+                       $"bei {shown:0.00} deckt die Linie {covered:0.00} der Flaeche",
+                       $"{covered:0.000}");
+
+            Check.That(covered >= last, "und sie wird mit der Helligkeit nur dicker",
+                       $"{covered:0.000} nach {last:0.000}");
+
+            last = covered;
+        }
+
+        // Entlang der Linie - bei 0 Grad also waagerecht - darf sich nichts aendern.
+        int varying = 0;
+
+        for (int y = 0; y < period * 2; y++)
+        {
+            float first = 0f;
+
+            for (int x = 0; x < 40; x++)
+            {
+                float r = Srgb.Decode(0.4f), g = r, b = r;
+
+                tool.Apply(Place, x, y, ref r, ref g, ref b);
+
+                if (x == 0) first = r;
+                else if (MathF.Abs(r - first) > 0.001f) varying++;
+            }
+        }
+
+        Check.That(varying == 0, "und entlang der Linie bleibt sie gleich",
+                   $"{varying} Abweichungen");
+
+        // Und gedreht laeuft sie quer: Bei 90 Grad aendert sich nichts mehr in y,
+        // dafuer in x.
+        var upright = new DitherTool
+        {
+            Levels = 2, Amount = 1f, Pattern = DitherPattern.Lines, Size = period, Angle = 90f,
+        };
+
+        upright.Prepare();
+
+        int down = 0;
+        float top = 0f;
+
+        for (int y = 0; y < 40; y++)
+        {
+            float r = Srgb.Decode(0.4f), g = r, b = r;
+
+            upright.Apply(Place, 3, y, ref r, ref g, ref b);
+
+            if (y == 0) top = r;
+            else if (MathF.Abs(r - top) > 0.001f) down++;
+        }
+
+        Check.That(down == 0, "bei neunzig Grad stehen die Linien senkrecht",
+                   $"{down} Abweichungen");
+    }
 
     // ------------------------------------------------------- die Fehlerdiffusion
 
