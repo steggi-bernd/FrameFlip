@@ -740,6 +740,21 @@
                         ValueChanged="OnChanged" MouseDoubleClick="OnSliderReset" Tag="1"
                         ToolTip="{DynamicResource S_DitherPixelsHint}" />
 
+                <!--
+                    Und die Hoehe getrennt. Ohne sie sieht ein Raster nie wie eine
+                    Schraffur aus: Quadratische Rasterpunkte ergeben Punkte, breite
+                    und flache ergeben Striche - und benachbarte Striche einer Zeile
+                    verschmelzen zu einer Linie, die der Form folgt.
+                -->
+                <Grid Margin="0,10,0,2">
+                    <TextBlock Text="{DynamicResource S_DitherPixelsTall}" Style="{StaticResource PanelLabel}" />
+                    <TextBlock x:Name="DitherPixelsTallValue" Style="{StaticResource PanelValue}" />
+                </Grid>
+                <Slider x:Name="DitherPixelsTallSlider" Style="{StaticResource PanelSlider}"
+                        Minimum="1" Maximum="24" Value="1" SmallChange="1" LargeChange="4"
+                        ValueChanged="OnChanged" MouseDoubleClick="OnSliderReset" Tag="1"
+                        ToolTip="{DynamicResource S_DitherPixelsTallHint}" />
+
                 <Grid Margin="0,10,0,2">
                     <TextBlock Text="{DynamicResource S_DitherSize}" Style="{StaticResource PanelLabel}" />
                     <TextBlock x:Name="DitherSizeValue" Style="{StaticResource PanelValue}" />

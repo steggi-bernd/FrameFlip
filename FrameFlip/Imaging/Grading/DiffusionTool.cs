@@ -90,6 +90,21 @@ public sealed class DiffusionTool : IFramePass
     public int Pixels { get; set; } = 1;
 
     /// <summary>
+    /// Die HOEHE eines Rasterpunkts. 0 heisst: so hoch wie breit.
+    ///
+    /// Der Regler, ohne den ein Raster nie wie eine Schraffur aussieht. Ein
+    /// quadratischer Rasterpunkt ergibt Punkte; ein breiter und flacher ergibt
+    /// waagerechte Striche, und benachbarte Striche in einer Zeile verschmelzen zu
+    /// einer Linie, die der Form folgt. Genau so entstehen die Linien, die man aus
+    /// alten Drucken kennt - und aus jedem Bild, das "wie gerastert" aussehen soll,
+    /// statt "wie verrauscht".
+    ///
+    /// Breit 8, hoch 1 ist der Anfang. Umgekehrt - schmal und hoch - ergibt
+    /// senkrechte Striche.
+    /// </summary>
+    public int PixelsTall { get; set; }
+
+    /// <summary>
     /// True, wenn ein ortsabhaengiges Muster gerechnet wird statt einer Diffusion.
     /// </summary>
     public bool Place { get; set; }
@@ -108,7 +123,7 @@ public sealed class DiffusionTool : IFramePass
 
     private float _step;
     private float _amount;
-    private int _block;
+    private int _blockX, _blockY;
     private float _sin, _cos;
     private (int X, int Y, float Weight)[] _spread = Array.Empty<(int, int, float)>();
     private int _reach;
@@ -117,7 +132,8 @@ public sealed class DiffusionTool : IFramePass
     {
         _step = 255f / Math.Max(1, Math.Clamp(Levels, 2, 64) - 1);
         _amount = Math.Clamp(Amount, 0f, 1f);
-        _block = Math.Clamp(Pixels, 1, 64);
+        _blockX = Math.Clamp(Pixels, 1, 64);
+        _blockY = PixelsTall <= 0 ? _blockX : Math.Clamp(PixelsTall, 1, 64);
 
         float radians = Angle * MathF.PI / 180f;
 
@@ -138,8 +154,8 @@ public sealed class DiffusionTool : IFramePass
 
         // Das Bild in Bloecken. Bei Groesse eins ist ein Block ein Bildpunkt, und
         // alles darunter laeuft unveraendert weiter.
-        int across = (width + _block - 1) / _block;
-        int down = (height + _block - 1) / _block;
+        int across = (width + _blockX - 1) / _blockX;
+        int down = (height + _blockY - 1) / _blockY;
 
         int rows = _reach + 1;
         var error = new float[rows][];
@@ -213,9 +229,9 @@ public sealed class DiffusionTool : IFramePass
     private unsafe float Average(byte* target, int stride, int width, int height,
                                  int bx, int by, int c)
     {
-        int x0 = bx * _block, y0 = by * _block;
-        int x1 = Math.Min(x0 + _block, width);
-        int y1 = Math.Min(y0 + _block, height);
+        int x0 = bx * _blockX, y0 = by * _blockY;
+        int x1 = Math.Min(x0 + _blockX, width);
+        int y1 = Math.Min(y0 + _blockY, height);
 
         if (x1 <= x0 || y1 <= y0) return 0f;
 
@@ -237,9 +253,9 @@ public sealed class DiffusionTool : IFramePass
     {
         byte shown = (byte)Math.Clamp((int)MathF.Round(value), 0, 255);
 
-        int x0 = bx * _block, y0 = by * _block;
-        int x1 = Math.Min(x0 + _block, width);
-        int y1 = Math.Min(y0 + _block, height);
+        int x0 = bx * _blockX, y0 = by * _blockY;
+        int x1 = Math.Min(x0 + _blockX, width);
+        int y1 = Math.Min(y0 + _blockY, height);
 
         for (int y = y0; y < y1; y++)
         {

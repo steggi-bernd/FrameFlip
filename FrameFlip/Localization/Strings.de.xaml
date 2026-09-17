@@ -836,6 +836,8 @@
     <sys:String x:Key="S_DitherLines">Linienraster</sys:String>
     <sys:String x:Key="S_DitherAngle">Linienrichtung</sys:String>
     <sys:String x:Key="S_DiffusionKernelHint">Welches Schema den Rundungsfehler weitergibt. Floyd-Steinberg ist der Massstab: eng gestreut und fein. Atkinson ist der Blick des ersten Macintosh - es reicht nur sechs Achtel des Fehlers weiter und wirft das letzte Viertel weg; helle Stellen laufen dadurch ganz ins Weiss, dunkle ganz ins Schwarz, und die Flaechen werden gestreift statt gleichmaessig gekrisselt. Jarvis und Stucki streuen ueber zwei Zeilen und wirken fast koernig, Burkes und Sierra liegen dazwischen.</sys:String>
-    <sys:String x:Key="S_DitherPixels">Rasterpunktgröße</sys:String>
+    <sys:String x:Key="S_DitherPixels">Rasterpunkt breit</sys:String>
     <sys:String x:Key="S_DitherPixelsHint">Die Kantenlänge eines Rasterpunkts in Bildpunkten. Bei 1 wird jeder Bildpunkt einzeln entschieden - das ist die feinste Rasterung und bei hoher Auflösung genau die, die wie gleichmäßiges Rauschen aussieht. Vier bis acht ist der Bereich, in dem das Muster wieder ein Muster wird. Sobald der Wert über 1 liegt, läuft auch ein Ortsmuster über den ganzen Rahmen und erscheint deshalb erst beim Loslassen.</sys:String>
+    <sys:String x:Key="S_DitherPixelsTall">Rasterpunkt hoch</sys:String>
+    <sys:String x:Key="S_DitherPixelsTallHint">Die Höhe eines Rasterpunkts, getrennt von der Breite. Gleich hoch wie breit ergibt Punkte. Breit 8 und hoch 1 ergibt waagerechte Striche, und benachbarte Striche einer Zeile verschmelzen zu einer Linie, die der Form folgt - so entstehen die Schraffuren alter Drucke. Umgekehrt, schmal und hoch, ergibt senkrechte Striche.</sys:String>
 </ResourceDictionary>

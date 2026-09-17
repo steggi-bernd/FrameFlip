@@ -836,6 +836,8 @@
     <sys:String x:Key="S_DitherLines">line screen</sys:String>
     <sys:String x:Key="S_DitherAngle">line angle</sys:String>
     <sys:String x:Key="S_DiffusionKernelHint">Which scheme passes the rounding error on. Floyd-Steinberg is the yardstick: tightly spread and fine. Atkinson is the look of the first Macintosh - it passes on only six eighths of the error and discards the last quarter, so bright areas run all the way to white and dark ones to black, and surfaces come out streaked rather than evenly speckled. Jarvis and Stucki spread over two rows and look almost grainy; Burkes and Sierra sit in between.</sys:String>
-    <sys:String x:Key="S_DitherPixels">Cell in pixels</sys:String>
+    <sys:String x:Key="S_DitherPixels">Cell width</sys:String>
     <sys:String x:Key="S_DitherPixelsHint">The edge length of one raster dot in pixels. At 1 every pixel is decided on its own - the finest rastering, and at high resolution exactly the one that looks like even noise. Four to eight is where the pattern becomes a pattern again. Above 1 even a place-based pattern runs over the whole frame and therefore only appears on release.</sys:String>
+    <sys:String x:Key="S_DitherPixelsTall">Cell height</sys:String>
+    <sys:String x:Key="S_DitherPixelsTallHint">The height of one raster dot, separate from its width. Equal width and height gives dots. Width 8 and height 1 gives horizontal dashes, and neighbouring dashes in a row merge into a line that follows the form - that is how the hatching of old prints comes about. The other way round, narrow and tall, gives vertical dashes.</sys:String>
 </ResourceDictionary>

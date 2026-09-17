@@ -151,7 +151,7 @@ public static class DitherInvariants
     private static byte[] Diffused(int width, int height, byte value, int levels,
                                    float amount = 1f,
                                    DiffusionKernel kernel = DiffusionKernel.FloydSteinberg,
-                                   int cell = 1, bool place = false,
+                                   int cell = 1, int tall = 0, bool place = false,
                                    DitherPattern pattern = DitherPattern.Ordered)
     {
         int stride = width * 4;
@@ -168,7 +168,7 @@ public static class DitherInvariants
         var tool = new DiffusionTool
         {
             Levels = levels, Amount = amount, Kernel = kernel, Pixels = cell,
-            Place = place, Pattern = pattern,
+            PixelsTall = tall, Place = place, Pattern = pattern,
         };
 
         tool.Prepare();
@@ -388,6 +388,41 @@ public static class DitherInvariants
             Check.That(between == 0, $"{what}: und es bleibt nichts zwischen den Stufen",
                        $"{between}");
         }
+
+        // Und der Fall, um den es eigentlich ging: ein BREITER, FLACHER Rasterpunkt.
+        //
+        // Ein quadratischer ergibt Punkte, ein breiter und flacher ergibt Striche -
+        // und benachbarte Striche einer Zeile verschmelzen zu einer Linie. Ohne
+        // getrennte Hoehe sieht ein Raster nie wie eine Schraffur aus, sondern immer
+        // wie Rauschen mit groesseren Koernern.
+        const int wide = 8;
+
+        var dashes = Diffused(64, 64, 120, 2, cell: wide, tall: 1);
+
+        int torn = 0;
+        int rowsDiffer = 0;
+
+        for (int y = 0; y < 64; y++)
+        {
+            for (int bx = 0; bx < 64 / wide; bx++)
+            {
+                byte first = dashes[(y * 64 + bx * wide) * 4];
+
+                for (int x = 1; x < wide; x++)
+                    if (dashes[(y * 64 + bx * wide + x) * 4] != first) torn++;
+
+                // Und die Zeile darunter darf anders sein - sonst waere es ein Block
+                // und kein Strich.
+                if (y + 1 < 64 && dashes[((y + 1) * 64 + bx * wide) * 4] != first) rowsDiffer++;
+            }
+        }
+
+        Check.That(torn == 0, "ein breiter Rasterpunkt bleibt in der Waagerechten ein Strich",
+                   $"{torn} Bruchstellen");
+
+        Check.That(rowsDiffer > 0,
+                   "und die Zeile darunter entscheidet fuer sich - sonst waere es ein Block",
+                   $"{rowsDiffer} Wechsel");
 
         // Die Helligkeit muss auch blockweise stehenbleiben.
         var coarse = Diffused(64, 64, 96, 2, cell: cell);

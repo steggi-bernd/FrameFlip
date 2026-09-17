@@ -609,6 +609,10 @@ public partial class GradingPanel : UserControl
                                                   DitherPixelsSlider.Minimum,
                                                   DitherPixelsSlider.Maximum);
 
+            DitherPixelsTallSlider.Value = Math.Clamp(
+                _diffusion.PixelsTall <= 0 ? _diffusion.Pixels : _diffusion.PixelsTall,
+                DitherPixelsTallSlider.Minimum, DitherPixelsTallSlider.Maximum);
+
             // Die ersten drei Eintraege sind die Ortsmuster, danach folgen die
             // Streuschemata in der Reihenfolge ihrer Aufzaehlung.
             DitherPatternBox.SelectedIndex = diffusing
@@ -766,12 +770,13 @@ public partial class GradingPanel : UserControl
         int levels = (int)Math.Round(DitherLevelsSlider.Value);
         float strength = (float)DitherSlider.Value;
         int pixels = (int)Math.Round(DitherPixelsSlider.Value);
+        int tall = (int)Math.Round(DitherPixelsTallSlider.Value);
 
         // Sobald ein Rasterpunkt groesser als ein Bildpunkt ist, muss auch ein
         // Ortsmuster ueber den ganzen Rahmen laufen: Ein Block bekommt EINEN Wert,
         // und dafuer muss jemand den Block mitteln koennen. Ein Werkzeug, das einen
         // Bildpunkt sieht, kann das nicht.
-        bool wholeFrame = diffuse || pixels > 1;
+        bool wholeFrame = diffuse || pixels > 1 || tall > 1;
 
         _dither.Amount = wholeFrame ? 0f : strength;
         _dither.Levels = levels;
@@ -788,6 +793,7 @@ public partial class GradingPanel : UserControl
         _diffusion.Amount = wholeFrame ? strength : 0f;
         _diffusion.Levels = levels;
         _diffusion.Pixels = pixels;
+        _diffusion.PixelsTall = tall;
         _diffusion.Place = !diffuse;
         _diffusion.Pattern = _dither.Pattern;
         _diffusion.Angle = _dither.Angle;
@@ -873,6 +879,7 @@ public partial class GradingPanel : UserControl
         DitherLevelsValue.Text = $"{DitherLevelsSlider.Value:0}";
         DitherSizeValue.Text = $"{DitherSizeSlider.Value:0}";
         DitherPixelsValue.Text = $"{DitherPixelsSlider.Value:0}";
+        DitherPixelsTallValue.Text = $"{DitherPixelsTallSlider.Value:0}";
 
         // Fehlerdiffusion kennt keinen Rasterpunkt - sie verteilt, statt zu rastern.
         // Den Regler stehenzulassen hiesse, eine Einstellung anzubieten, die nichts
