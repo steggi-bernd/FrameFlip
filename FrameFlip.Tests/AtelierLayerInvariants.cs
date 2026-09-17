@@ -37,6 +37,7 @@ public static class AtelierLayerInvariants
             EachLayerKeepsItsOwnTools(path);
             TheFrameOnlyGrabsWhenItShould(path);
             TheToolDecidesWhatTheMouseDoes(path);
+            TheColumnRemembersHowItStood(path);
         }
         finally
         {
@@ -399,6 +400,98 @@ public static class AtelierLayerInvariants
             Check.Near(first.Adjustments!.Exposure, -2.0, 0.001,
                        "die Ebenen bleiben davon unberuehrt");
             Check.Near(second.Adjustments!.Exposure, 1.5, 0.001, "beide");
+        }
+        finally
+        {
+            window.Close();
+        }
+    }
+
+    /// <summary>
+    /// Die rechte Spalte: Ebenen unten, Groessen verstellbar, Aufteilung gemerkt.
+    ///
+    /// Drei Klagen in einer. "Alles sehr starr" - die Spalte war dreihundert Punkte
+    /// breit und der Ebenenstreifen so hoch, wie er eben wurde. "Dass die Ebenen ganz
+    /// oben sind, ist ungewohnt" - sie standen oben, weil von oben nach unten gelesen
+    /// dort die Rechenreihenfolge stand. Das Argument war gut und hat gegen zwanzig
+    /// Jahre Gewohnheit verloren.
+    ///
+    /// Geprueft wird die Reihenfolge ueber die Gitterzeile und nicht ueber
+    /// Bildschirmkoordinaten: Zeilennummern stimmen auch dann, wenn das Fenster im
+    /// Test nie wirklich gezeichnet wird.
+    /// </summary>
+    private static void TheColumnRemembersHowItStood(string path)
+    {
+        Check.Group("Die rechte Spalte: Ebenen unten und verstellbar");
+
+        // Eine Aufteilung, die NICHT die Voreinstellung ist - sonst prueft der Test
+        // nur, dass eine Voreinstellung eine Voreinstellung ist.
+        var settings = new AppSettings { AtelierColumnWidth = 380, AtelierLayersHeight = 180 };
+        var page = new AtelierPage(FrameDecoderRegistry.CreateDefault(() => null), settings, _ => { });
+
+        var window = new Window
+        {
+            Content = page,
+            Width = 1200,
+            Height = 900,
+            ShowInTaskbar = false,
+            WindowStyle = WindowStyle.None,
+            ShowActivated = false,
+            Left = -4000,
+            Top = -4000,
+        };
+
+        try
+        {
+            window.Show();
+            page.UpdateLayout();
+
+            var column = (System.Windows.Controls.ColumnDefinition)page.FindName("RightColumn");
+            var row = (System.Windows.Controls.RowDefinition)page.FindName("LayersRow");
+            var scroll = (System.Windows.Controls.ScrollViewer)page.FindName("LayerScroll");
+            var colour = (GradingPanel)page.FindName("Tools");
+
+            Check.That(column is not null && row is not null && scroll is not null,
+                       "die Spalte ist in drei Teile geteilt");
+
+            if (column is null || row is null || scroll is null || colour is null) return;
+
+            Check.Near(column.ActualWidth, 380, 1,
+                       "die gemerkte Breite steht wieder da");
+
+            // Die Ebenen liegen UNTER der Farbe. Das ist die eigentliche Umstellung.
+            Check.That(System.Windows.Controls.Grid.GetRow(scroll) >
+                       System.Windows.Controls.Grid.GetRow(colour),
+                       "die Ebenen stehen unter der Farbkorrektur");
+
+            Check.That(scroll.Visibility != Visibility.Visible,
+                       "ohne Bild ist der Streifen weg");
+
+            Check.Near(row.ActualHeight, 0, 0.5,
+                       "und seine Zeile hat dann keine Hoehe - kein Loch am Rand");
+
+            page.Open(path);
+
+            var size = (System.Windows.Controls.TextBlock)page.FindName("SourceText");
+
+            if (!Pump(TimeSpan.FromSeconds(10), () => size.Text.Length > 0))
+            {
+                Check.That(false, "das Bild wird geladen");
+                return;
+            }
+
+            Pump(TimeSpan.FromSeconds(3), () => scroll.Visibility == Visibility.Visible);
+            page.UpdateLayout();
+
+            Check.That(scroll.Visibility == Visibility.Visible, "mit Bild zeigt er sich");
+
+            Check.Near(row.ActualHeight, 180, 1,
+                       "und zwar so hoch, wie er zuletzt stand");
+
+            // Der Streifen selbst muss in einer Bildlaufflaeche sitzen: Seine Hoehe
+            // waechst mit der Zahl der Ebenen, die Zeile nicht.
+            Check.That(scroll.Content is LayerPanel,
+                       "der Streifen sitzt in einer Bildlaufflaeche");
         }
         finally
         {

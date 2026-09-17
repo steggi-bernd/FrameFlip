@@ -112,6 +112,8 @@ public sealed partial class AtelierPage : UserControl
 
         InitializeComponent();
 
+        RestoreColumns();
+
         Tools.Changed += OnToolsChanged;
         Tools.ToolsEnabled = false;
 

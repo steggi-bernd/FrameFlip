@@ -392,6 +392,19 @@ public sealed class AppSettings
     /// </summary>
     public string? AtelierImage { get; set; }
 
+    /// <summary>
+    /// Breite der rechten Spalte im Atelier, in Punkten.
+    ///
+    /// Gemerkt, weil sie nicht Geschmack ist, sondern vom Bildschirm abhaengt: Auf
+    /// einem breiten Schirm will man die Ebenennamen lesen koennen, auf einem engen
+    /// will man das Bild. Wer das bei jedem Start neu einstellt, stellt es
+    /// irgendwann nicht mehr ein.
+    /// </summary>
+    public double AtelierColumnWidth { get; set; } = 300;
+
+    /// <summary>Hoehe des Ebenenstreifens unten in der rechten Spalte.</summary>
+    public double AtelierLayersHeight { get; set; } = 240;
+
     /// <summary>Gespeicherte Korrektureinstellungen, im Panel auswaehlbar.</summary>
     public List<AdjustmentPreset> AdjustmentPresets { get; set; } = new();
 
