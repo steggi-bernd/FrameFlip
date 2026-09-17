@@ -135,8 +135,9 @@
             einem engen will man das Bild - und beides ist richtig.
         -->
         <GridSplitter Grid.Row="1" Grid.Column="2" Width="12"
+                      Style="{StaticResource DashboardSplitter}"
                       HorizontalAlignment="Center" VerticalAlignment="Stretch"
-                      Background="Transparent" ResizeBehavior="PreviousAndNext"
+                      ResizeBehavior="PreviousAndNext"
                       ResizeDirection="Columns" Focusable="False"
                       DragCompleted="OnColumnResized" />
 
@@ -145,47 +146,43 @@
                 BorderBrush="{StaticResource PanelBorder}" BorderThickness="1" CornerRadius="4">
             <Grid>
                 <Grid.RowDefinitions>
-                    <RowDefinition Height="*" MinHeight="140" />
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition x:Name="ColourRow" Height="*" />
                     <RowDefinition Height="Auto" />
                     <RowDefinition x:Name="LayersRow" Height="0" />
                 </Grid.RowDefinitions>
 
                 <!--
-                    Die Farbe oben, die Ebenen UNTEN.
+                    Jeder Abschnitt hat einen Kopf, und jeder Kopf klappt ihn zu.
 
-                    Das war zwanzig Jahre lang andersherum gedacht und einmal gut
-                    begruendet: Von oben nach unten gelesen stand dort dieselbe
-                    Kette, die auch gerechnet wird. Das Argument war richtig und hat
-                    gegen die Gewohnheit verloren - in jedem Programm mit Ebenen
-                    stehen sie unten, und wer sie oben sucht, sucht sie jedes Mal neu.
-                    Die Reihenfolge des Rechenwegs lebt weiter, wo sie hingehoert:
-                    innerhalb der Farbkorrektur, deren Abschnitte in der Reihenfolge
-                    stehen, in der gerechnet wird.
+                    Die Farbe oben, die Ebenen UNTEN. Das war einmal andersherum und
+                    gut begruendet: Von oben nach unten gelesen stand dort dieselbe
+                    Kette, die auch gerechnet wird. Das Argument hat gegen zwanzig
+                    Jahre Gewohnheit verloren und lebt weiter, wo es hingehoert -
+                    innerhalb der Farbkorrektur stehen die Abschnitte weiter in der
+                    Reihenfolge, in der gerechnet wird.
                 -->
-                <local:GradingPanel x:Name="Tools" Grid.Row="0" />
+                <ToggleButton x:Name="ColourHeader" Grid.Row="0"
+                              Style="{StaticResource SectionHeader}" IsChecked="True"
+                              Content="{DynamicResource S_SectionColour}"
+                              Checked="OnSectionToggled" Unchecked="OnSectionToggled" />
 
-                <Border x:Name="LayerSeparator" Grid.Row="1" Height="1" Margin="14,0"
-                        VerticalAlignment="Center" IsHitTestVisible="False"
-                        Background="{StaticResource PanelBorder}" Visibility="Collapsed" />
-
-                <GridSplitter x:Name="LayerSplitter" Grid.Row="1" Height="11"
-                              HorizontalAlignment="Stretch" VerticalAlignment="Center"
-                              Background="Transparent" ResizeBehavior="PreviousAndNext"
-                              ResizeDirection="Rows" Focusable="False"
-                              Visibility="Collapsed"
-                              DragCompleted="OnLayersResized" />
+                <local:GradingPanel x:Name="Tools" Grid.Row="1" />
 
                 <!--
-                    Der Streifen waechst mit der Anzahl der Ebenen, seine Zeile nicht.
-                    Ohne diese Bildlaufflaeche waere die achte Ebene abgeschnitten,
-                    und zwar unsichtbar - eine Liste, die einfach aufhoert, sieht aus
-                    wie eine vollstaendige Liste.
+                    Derselbe Griff wie auf der Uebersichtsseite: ein sichtbarer
+                    Riegel, der unter der Maus die Akzentfarbe annimmt. Eine
+                    unsichtbare Zone, die man erst findet, wenn der Zeiger sich
+                    aendert, ist kein Griff, sondern ein Versteck.
                 -->
-                <ScrollViewer x:Name="LayerScroll" Grid.Row="2" Visibility="Collapsed"
-                              VerticalScrollBarVisibility="Auto"
-                              HorizontalScrollBarVisibility="Disabled">
-                    <local:LayerPanel x:Name="Layers" Visibility="Collapsed" />
-                </ScrollViewer>
+                <GridSplitter x:Name="LayerSplitter" Grid.Row="2" Height="10"
+                              Style="{StaticResource DashboardSplitter}"
+                              HorizontalAlignment="Stretch" VerticalAlignment="Center"
+                              ResizeBehavior="PreviousAndNext" ResizeDirection="Rows"
+                              Focusable="False" Visibility="Collapsed"
+                              DragCompleted="OnLayersResized" />
+
+                <local:LayerPanel x:Name="Layers" Grid.Row="3" Visibility="Collapsed" />
             </Grid>
         </Border>
 

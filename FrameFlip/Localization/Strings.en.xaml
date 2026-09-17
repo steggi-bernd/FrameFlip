@@ -799,4 +799,5 @@
     <sys:String x:Key="S_ToolHandHint">Hand (H) - pans the view. Dragging with the middle mouse button does the same anywhere, without switching tools.</sys:String>
     <sys:String x:Key="S_ToolPickHint">Pick (I) - reads the value under the pointer.</sys:String>
     <sys:String x:Key="S_PickReadout">read</sys:String>
+    <sys:String x:Key="S_SectionColour">Colour</sys:String>
 </ResourceDictionary>

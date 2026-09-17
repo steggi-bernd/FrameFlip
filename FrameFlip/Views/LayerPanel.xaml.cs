@@ -345,10 +345,19 @@ public partial class LayerPanel : UserControl
 
         if (preview is not null)
         {
+            // Groesser als frueher, und auf Karo.
+            //
+            // Dreissig mal achtzehn Punkte reichten, um zu sehen, ob ein Pass
+            // ueberhaupt etwas enthaelt - mehr nicht. Eine Ebene wiederzuerkennen
+            // braucht mehr Flaeche, und das Karo dahinter beantwortet die Frage, die
+            // man an eine Miniatur in einer Liste aus Freistellungen hat: Auf einem
+            // einfarbigen Grund ist "durchsichtig" von "genau dieser Farbe" nicht zu
+            // unterscheiden.
             var thumb = new Border
             {
-                Width = 30,
-                Height = 18,
+                Width = 46,
+                Height = 28,
+                Background = (System.Windows.Media.Brush)FindResource("CheckerBrush"),
                 Margin = new Thickness(0, 0, 6, 0),
                 CornerRadius = new CornerRadius(2),
                 BorderThickness = new Thickness(1),
@@ -359,7 +368,11 @@ public partial class LayerPanel : UserControl
                 Child = new System.Windows.Controls.Image
                 {
                     Source = preview,
-                    Stretch = System.Windows.Media.Stretch.UniformToFill,
+
+                    // Ganz hinein statt fuellend: Eine Ebene mit anderem
+                    // Seitenverhaeltnis soll als solche zu erkennen sein, und
+                    // angeschnitten sieht jede Miniatur gleich aus.
+                    Stretch = System.Windows.Media.Stretch.Uniform,
                 },
             };
 

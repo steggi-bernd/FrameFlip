@@ -80,17 +80,45 @@
         </Style>
     </UserControl.Resources>
 
-    <StackPanel Margin="14,12,14,0">
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+        </Grid.RowDefinitions>
 
-        <Grid Margin="0,0,0,6">
-            <TextBlock Text="{DynamicResource S_Layers}" Style="{StaticResource PanelHeading}" />
-            <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
-                <Button x:Name="ResetButton" Style="{StaticResource LinkButton}" Margin="0,0,10,0"
-                        Content="{DynamicResource S_ResetLayers}" Click="OnResetClicked" />
-                <Button x:Name="FoldButton" Style="{StaticResource LinkButton}" Content="−"
-                        Click="OnFoldClicked" />
-            </StackPanel>
-        </Grid>
+        <!--
+            Der Kopf ist ein BALKEN und keine Zeile mit Abstand darunter.
+
+            Gemeldet wurde, dass nicht zu erkennen ist, wo der Ebenenbereich aufhoert
+            und die Farbkorrektur anfaengt. Das lag nicht an zu wenig Abstand - mit
+            Abstand allein sieht ein Ende aus wie eine Luecke. Eine eigene Flaeche mit
+            einer Linie darunter ist eine Grenze, und sie kostet keine Hoehe, die
+            nicht ohnehin fuer die Ueberschrift draufginge.
+
+            Und er bleibt STEHEN: Er sitzt ausserhalb der Bildlaufflaeche. Ein Kopf,
+            der beim Rollen verschwindet, beantwortet die Frage "wo bin ich hier"
+            genau dann nicht mehr, wenn sie gestellt wird.
+        -->
+        <Border Grid.Row="0" Height="28"
+                Background="{StaticResource OverlayBackground}"
+                BorderBrush="{StaticResource PanelBorder}" BorderThickness="0,0,0,1">
+            <Grid Margin="10,0">
+                <TextBlock Text="{DynamicResource S_Layers}" Style="{StaticResource PanelHeading}"
+                           VerticalAlignment="Center" />
+
+                <StackPanel Orientation="Horizontal" HorizontalAlignment="Right"
+                            VerticalAlignment="Center">
+                    <Button x:Name="ResetButton" Style="{StaticResource LinkButton}" Margin="0,0,6,0"
+                            Content="{DynamicResource S_ResetLayers}" Click="OnResetClicked" />
+                    <Button x:Name="FoldButton" Style="{StaticResource StripButton}" Content="−"
+                            Click="OnFoldClicked" />
+                </StackPanel>
+            </Grid>
+        </Border>
+
+        <ScrollViewer Grid.Row="1" Padding="14,10,14,12"
+                      VerticalScrollBarVisibility="Auto"
+                      HorizontalScrollBarVisibility="Disabled">
 
         <StackPanel x:Name="Body">
 
@@ -101,7 +129,7 @@
             -->
             <Border Background="{StaticResource OverlayBackground}"
                     BorderBrush="{StaticResource PanelBorder}" BorderThickness="1"
-                    CornerRadius="4" Padding="0,3">
+                    CornerRadius="4,4,0,0" Padding="0,3,0,0">
                 <!--
                     Der Strich liegt UEBER der Liste und faengt keine Maus: Er zeigt
                     beim Ziehen, wo die Zeile landen wuerde, und darf dabei nicht
@@ -111,7 +139,7 @@
                     eine Ebenenliste ohne Entfernen-Taste fuehlt sich kaputt an.
                 -->
                 <Grid>
-                    <ListBox x:Name="LayerList" MaxHeight="150" Background="Transparent"
+                    <ListBox x:Name="LayerList" MaxHeight="300" MinHeight="96" Background="Transparent"
                              BorderThickness="0"
                              ItemContainerStyle="{StaticResource LayerRow}"
                              ScrollViewer.HorizontalScrollBarVisibility="Disabled"
@@ -129,50 +157,60 @@
                 </Grid>
             </Border>
 
-            <Grid Margin="0,6,0,0">
-                <StackPanel Orientation="Horizontal">
-                    <Button x:Name="AddButton" Style="{StaticResource OverlayButton}"
-                            MinWidth="30" Content="+" Click="OnAddClicked"
-                            ToolTip="{DynamicResource S_AddLayer}" />
-                    <Button x:Name="DuplicateButton" Style="{StaticResource OverlayButton}"
-                            Margin="4,0,0,0" MinWidth="30" Content="❐" Click="OnDuplicateClicked"
-                            ToolTip="{DynamicResource S_DuplicateLayer}" />
-                    <Button x:Name="RemoveButton" Style="{StaticResource OverlayButton}"
-                            Margin="4,0,0,0" MinWidth="30" Content="✕" Click="OnRemoveClicked"
-                            ToolTip="{DynamicResource S_RemoveLayer}" />
+            <!--
+                Die Leiste gehoert zur LISTE und nicht in den Streifen darunter.
 
-                    <!--
-                        Die Schnittmaske. Fuer Renderpasse ist sie keine Feinheit,
-                        sondern die Bedingung dafuer, dass die Rechnung aufgeht:
-                        Ein Farbpass ist ein Faktor seines Lichtpasses und nicht
-                        des ganzen Stapels darunter.
-                    -->
-                    <Button x:Name="ClipButton" Style="{StaticResource OverlayButton}"
-                            Margin="4,0,0,0" MinWidth="30" Content="↳" Click="OnClipClicked"
-                            ToolTip="{DynamicResource S_ClipLayer}" />
-                </StackPanel>
+                Vorher stand sie frei zwischen der Liste und den Reglern der gewaehlten
+                Ebene, mit acht sichtbaren Kaesten - und teilte den Bereich genau dort,
+                wo er zusammengehoert. Angesetzt an die Liste, mit derselben Flaeche
+                und ohne Fuge, liest sie sich als das, was sie ist: die Werkzeuge
+                dieser Liste.
+            -->
+            <Border Background="{StaticResource OverlayBackground}"
+                    BorderBrush="{StaticResource PanelBorder}" BorderThickness="1,0,1,1"
+                    CornerRadius="0,0,4,4" Padding="5,3">
+                <Grid>
+                    <StackPanel Orientation="Horizontal">
+                        <Button x:Name="AddButton" Style="{StaticResource StripButton}" Content="+" Click="OnAddClicked"
+                                ToolTip="{DynamicResource S_AddLayer}" />
+                        <Button x:Name="DuplicateButton" Style="{StaticResource StripButton}"
+                                Content="❐" Click="OnDuplicateClicked"
+                                ToolTip="{DynamicResource S_DuplicateLayer}" />
+                        <Button x:Name="RemoveButton" Style="{StaticResource StripButton}"
+                                Content="✕" Click="OnRemoveClicked"
+                                ToolTip="{DynamicResource S_RemoveLayer}" />
 
-                <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
-                    <!--
-                        Ein- und ausruecken statt Ziehen und Fallenlassen: Eine Maus,
-                        die eine Zeile in eine Gruppe zieht, trifft im schmalen
-                        Streifen daneben, und das Ergebnis sieht man erst hinterher.
-                    -->
-                    <Button x:Name="IndentButton" Style="{StaticResource OverlayButton}"
-                            MinWidth="26" Content="▶" Click="OnIndentClicked"
-                            ToolTip="{DynamicResource S_MoveIntoGroup}" />
-                    <Button x:Name="OutdentButton" Style="{StaticResource OverlayButton}"
-                            Margin="4,0,8,0" MinWidth="26" Content="◀" Click="OnOutdentClicked"
-                            ToolTip="{DynamicResource S_MoveOutOfGroup}" />
+                        <!--
+                            Die Schnittmaske. Fuer Renderpasse ist sie keine Feinheit,
+                            sondern die Bedingung dafuer, dass die Rechnung aufgeht:
+                            Ein Farbpass ist ein Faktor seines Lichtpasses und nicht
+                            des ganzen Stapels darunter.
+                        -->
+                        <Button x:Name="ClipButton" Style="{StaticResource StripButton}"
+                                Content="↳" Click="OnClipClicked"
+                                ToolTip="{DynamicResource S_ClipLayer}" />
+                    </StackPanel>
 
-                    <Button x:Name="UpButton" Style="{StaticResource OverlayButton}"
-                            MinWidth="26" Content="▲" Click="OnUpClicked"
-                            ToolTip="{DynamicResource S_MoveLayerUp}" />
-                    <Button x:Name="DownButton" Style="{StaticResource OverlayButton}"
-                            Margin="4,0,0,0" MinWidth="26" Content="▼" Click="OnDownClicked"
-                            ToolTip="{DynamicResource S_MoveLayerDown}" />
-                </StackPanel>
-            </Grid>
+                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+                        <!--
+                            Ein- und ausruecken statt Ziehen und Fallenlassen: Eine Maus,
+                            die eine Zeile in eine Gruppe zieht, trifft im schmalen
+                            Streifen daneben, und das Ergebnis sieht man erst hinterher.
+                        -->
+                        <Button x:Name="IndentButton" Style="{StaticResource StripButton}" Content="▶" Click="OnIndentClicked"
+                                ToolTip="{DynamicResource S_MoveIntoGroup}" />
+                        <Button x:Name="OutdentButton" Style="{StaticResource StripButton}"
+                                Margin="0,0,8,0" Content="◀" Click="OnOutdentClicked"
+                                ToolTip="{DynamicResource S_MoveOutOfGroup}" />
+
+                        <Button x:Name="UpButton" Style="{StaticResource StripButton}" Content="▲" Click="OnUpClicked"
+                                ToolTip="{DynamicResource S_MoveLayerUp}" />
+                        <Button x:Name="DownButton" Style="{StaticResource StripButton}"
+                                Content="▼" Click="OnDownClicked"
+                                ToolTip="{DynamicResource S_MoveLayerDown}" />
+                    </StackPanel>
+                </Grid>
+            </Border>
 
             <!-- Was auf die gewaehlte Ebene wirkt -->
             <StackPanel x:Name="LayerTools" Margin="0,10,0,0">
@@ -517,5 +555,6 @@
                            Text="{DynamicResource S_LayersHint}" />
             </StackPanel>
         </StackPanel>
-    </StackPanel>
+        </ScrollViewer>
+    </Grid>
 </UserControl>

@@ -32,6 +32,43 @@ public partial class AtelierPage
     /// </summary>
     private double LayerHeight() => Math.Clamp(_settings.AtelierLayersHeight, 64, 900);
 
+    /// <summary>Ein Abschnittskopf wurde angeklickt.</summary>
+    private void OnSectionToggled(object sender, RoutedEventArgs e) => ApplySections();
+
+    /// <summary>
+    /// Verteilt die Hoehe nach dem, was offen ist.
+    ///
+    /// Die eine Feinheit, die es braucht: Ist die Farbkorrektur zugeklappt, bekommen
+    /// die Ebenen den ganzen Platz. Sonst staende unter einem zugeklappten Kopf eine
+    /// leere Flaeche, die nichts zeigt und auch nichts zeigen kann - und "zuklappen"
+    /// haette dann nichts gespart, was sein einziger Zweck ist.
+    /// </summary>
+    private void ApplySections()
+    {
+        // Waehrend die Oberflaeche aufgebaut wird, meldet der Abschnittskopf sein
+        // Haekchen bereits - und zwar in dem Augenblick, in dem der Aufbau bei ihm
+        // angekommen ist. Was weiter unten in der Datei steht, gibt es dann noch
+        // nicht. Ein Wert, der beim Aufbau gesetzt wird, loest eben auch beim Aufbau
+        // aus, und das ist die haeufigste Art, eine Oberflaeche zum Absturz zu
+        // bringen, die im Uebersetzer einwandfrei aussieht.
+        if (Layers is null || Tools is null || LayerSplitter is null || LayersRow is null) return;
+
+        bool colour = ColourHeader.IsChecked == true;
+        bool layers = Layers.Visibility == Visibility.Visible;
+
+        Tools.Visibility = colour ? Visibility.Visible : Visibility.Collapsed;
+        ColourRow.Height = colour ? new GridLength(1, GridUnitType.Star) : new GridLength(0);
+
+        LayersRow.Height = !layers ? new GridLength(0)
+            : colour ? new GridLength(LayerHeight())
+                     : new GridLength(1, GridUnitType.Star);
+
+        // Ein Griff zwischen zwei Flaechen, von denen eine zu ist, kann nichts
+        // aufteilen. Ihn trotzdem zu zeigen hiesse, an etwas ziehen zu lassen, das
+        // sich nicht bewegt.
+        LayerSplitter.Visibility = layers && colour ? Visibility.Visible : Visibility.Collapsed;
+    }
+
     /// <summary>Stellt die Aufteilung der letzten Sitzung wieder her.</summary>
     private void RestoreColumns()
         => RightColumn.Width = new GridLength(Math.Clamp(_settings.AtelierColumnWidth, 220, 900));

@@ -18,14 +18,12 @@ public partial class AtelierPage
     private void ShowLayers(bool visible)
     {
         Layers.Visibility = visible ? Visibility.Visible : Visibility.Collapsed;
-        LayerScroll.Visibility = visible ? Visibility.Visible : Visibility.Collapsed;
-        LayerSeparator.Visibility = visible ? Visibility.Visible : Visibility.Collapsed;
-        LayerSplitter.Visibility = visible ? Visibility.Visible : Visibility.Collapsed;
 
         // Die Zeile selbst muss mitgehen. Eine unsichtbare Flaeche mit Hoehe waere
         // ein Loch am unteren Rand, fuer das es keine Erklaerung gibt.
-        LayersRow.Height = visible ? new GridLength(LayerHeight()) : new GridLength(0);
         LayersRow.MinHeight = visible ? 64 : 0;
+
+        ApplySections();
     }
 
     /// <summary>

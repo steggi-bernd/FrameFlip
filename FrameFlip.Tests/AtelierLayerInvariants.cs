@@ -448,23 +448,29 @@ public static class AtelierLayerInvariants
 
             var column = (System.Windows.Controls.ColumnDefinition)page.FindName("RightColumn");
             var row = (System.Windows.Controls.RowDefinition)page.FindName("LayersRow");
-            var scroll = (System.Windows.Controls.ScrollViewer)page.FindName("LayerScroll");
+            var strip = (LayerPanel)page.FindName("Layers");
             var colour = (GradingPanel)page.FindName("Tools");
+            var header = (System.Windows.Controls.Primitives.ToggleButton)page.FindName("ColourHeader");
 
-            Check.That(column is not null && row is not null && scroll is not null,
-                       "die Spalte ist in drei Teile geteilt");
+            Check.That(column is not null && row is not null && strip is not null && header is not null,
+                       "die Spalte ist in Abschnitte geteilt, jeder mit einem Kopf");
 
-            if (column is null || row is null || scroll is null || colour is null) return;
+            if (column is null || row is null || strip is null || colour is null || header is null)
+                return;
 
             Check.Near(column.ActualWidth, 380, 1,
                        "die gemerkte Breite steht wieder da");
 
             // Die Ebenen liegen UNTER der Farbe. Das ist die eigentliche Umstellung.
-            Check.That(System.Windows.Controls.Grid.GetRow(scroll) >
+            Check.That(System.Windows.Controls.Grid.GetRow(strip) >
                        System.Windows.Controls.Grid.GetRow(colour),
                        "die Ebenen stehen unter der Farbkorrektur");
 
-            Check.That(scroll.Visibility != Visibility.Visible,
+            Check.That(System.Windows.Controls.Grid.GetRow(header) <
+                       System.Windows.Controls.Grid.GetRow(colour),
+                       "und die Farbe hat einen Kopf ueber sich");
+
+            Check.That(strip.Visibility != Visibility.Visible,
                        "ohne Bild ist der Streifen weg");
 
             Check.Near(row.ActualHeight, 0, 0.5,
@@ -480,18 +486,30 @@ public static class AtelierLayerInvariants
                 return;
             }
 
-            Pump(TimeSpan.FromSeconds(3), () => scroll.Visibility == Visibility.Visible);
+            Pump(TimeSpan.FromSeconds(3), () => strip.Visibility == Visibility.Visible);
             page.UpdateLayout();
 
-            Check.That(scroll.Visibility == Visibility.Visible, "mit Bild zeigt er sich");
+            Check.That(strip.Visibility == Visibility.Visible, "mit Bild zeigt er sich");
 
             Check.Near(row.ActualHeight, 180, 1,
                        "und zwar so hoch, wie er zuletzt stand");
 
-            // Der Streifen selbst muss in einer Bildlaufflaeche sitzen: Seine Hoehe
-            // waechst mit der Zahl der Ebenen, die Zeile nicht.
-            Check.That(scroll.Content is LayerPanel,
-                       "der Streifen sitzt in einer Bildlaufflaeche");
+            // Zuklappen muss Platz FREIGEBEN, sonst hat es keinen Zweck. Ist die
+            // Farbe zu, gehoert ihre Hoehe den Ebenen.
+            header.IsChecked = false;
+            page.UpdateLayout();
+
+            Check.That(colour.Visibility != Visibility.Visible,
+                       "zugeklappt ist die Farbkorrektur weg");
+
+            Check.That(row.ActualHeight > 200,
+                       "und die Ebenen bekommen den frei gewordenen Platz",
+                       $"{row.ActualHeight:0}");
+
+            header.IsChecked = true;
+            page.UpdateLayout();
+
+            Check.Near(row.ActualHeight, 180, 1, "aufgeklappt steht alles wieder wie vorher");
         }
         finally
         {

@@ -799,4 +799,5 @@
     <sys:String x:Key="S_ToolHandHint">Hand (H) - schiebt den Ausschnitt. Ziehen mit gedrückter mittlerer Maustaste tut überall dasselbe, ohne das Werkzeug zu wechseln.</sys:String>
     <sys:String x:Key="S_ToolPickHint">Pipette (I) - liest den Wert unter dem Zeiger ab.</sys:String>
     <sys:String x:Key="S_PickReadout">abgelesen</sys:String>
+    <sys:String x:Key="S_SectionColour">Farbe</sys:String>
 </ResourceDictionary>

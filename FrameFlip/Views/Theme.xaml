@@ -291,6 +291,136 @@
         <Setter Property="Margin" Value="0,0,0,4" />
     </Style>
 
+    <!--
+        Der Kopf eines Abschnitts in der rechten Spalte.
+
+        Er tut zwei Dinge auf einmal, und beide waren gewuenscht: Er sagt, wo ein
+        Bereich ANFAENGT - vorher ging die Farbkorrektur ohne sichtbare Grenze in die
+        Ebenen ueber -, und er klappt ihn zu. Ein Balken mit eigener Flaeche und einer
+        Linie darunter trennt deutlicher als jeder Abstand, und er kostet keine Hoehe,
+        die nicht ohnehin fuer die Ueberschrift draufginge.
+
+        Der Winkel zeigt nach unten, wenn offen, und nach rechts, wenn zu - dieselbe
+        Richtung wie ueberall sonst, damit niemand sie lesen muss.
+    -->
+    <Style x:Key="SectionHeader" TargetType="ToggleButton">
+        <Setter Property="Focusable" Value="False" />
+        <Setter Property="Foreground" Value="{StaticResource ForegroundBrush}" />
+        <Setter Property="FontSize" Value="11" />
+        <Setter Property="FontWeight" Value="SemiBold" />
+        <Setter Property="Height" Value="28" />
+        <Setter Property="Cursor" Value="Hand" />
+        <Setter Property="HorizontalContentAlignment" Value="Left" />
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="ToggleButton">
+                    <Border x:Name="Bar" Background="{StaticResource OverlayBackground}"
+                            BorderBrush="{StaticResource PanelBorder}"
+                            BorderThickness="0,0,0,1">
+                        <Grid Margin="10,0,10,0">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto" />
+                                <ColumnDefinition Width="*" />
+                            </Grid.ColumnDefinitions>
+
+                            <Path x:Name="Chevron" Grid.Column="0" Width="8" Height="8"
+                                  Margin="0,0,7,0" VerticalAlignment="Center"
+                                  Stretch="Uniform" StrokeThickness="1.4"
+                                  StrokeStartLineCap="Round" StrokeEndLineCap="Round"
+                                  StrokeLineJoin="Round"
+                                  Stroke="{StaticResource MutedBrush}"
+                                  Data="M1,3 L5,7 L9,3"
+                                  RenderTransformOrigin="0.5,0.5" />
+
+                            <ContentPresenter Grid.Column="1" VerticalAlignment="Center" />
+                        </Grid>
+                    </Border>
+                    <ControlTemplate.Triggers>
+                        <Trigger Property="IsMouseOver" Value="True">
+                            <Setter TargetName="Bar" Property="Background"
+                                    Value="{StaticResource ControlBrush}" />
+                            <Setter TargetName="Chevron" Property="Stroke"
+                                    Value="{StaticResource ForegroundBrush}" />
+                        </Trigger>
+                        <Trigger Property="IsChecked" Value="False">
+                            <Setter TargetName="Chevron" Property="RenderTransform">
+                                <Setter.Value>
+                                    <RotateTransform Angle="-90" />
+                                </Setter.Value>
+                            </Setter>
+                            <Setter Property="Foreground" Value="{StaticResource MutedBrush}" />
+                        </Trigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <!--
+        Der Knopf der Leiste unter der Ebenenliste.
+
+        Flach und ohne eigene Flaeche, bis die Maus darueber steht. Der gewoehnliche
+        Knopf traegt einen sichtbaren Kasten, und acht Kaesten nebeneinander unter
+        einer Liste sehen aus wie ein Bedienfeld fuer etwas anderes - sie ziehen mehr
+        Aufmerksamkeit auf sich als die Liste, zu der sie gehoeren.
+    -->
+    <Style x:Key="StripButton" TargetType="Button">
+        <Setter Property="Focusable" Value="False" />
+        <Setter Property="Foreground" Value="{StaticResource MutedBrush}" />
+        <Setter Property="FontSize" Value="12" />
+        <Setter Property="Width" Value="26" />
+        <Setter Property="Height" Value="24" />
+        <Setter Property="Cursor" Value="Hand" />
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="Button">
+                    <Grid>
+                        <Border x:Name="Hover" Background="{StaticResource ControlHoverBrush}"
+                                CornerRadius="4" Opacity="0" />
+                        <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
+                    </Grid>
+                    <ControlTemplate.Triggers>
+                        <Trigger Property="IsMouseOver" Value="True">
+                            <Setter TargetName="Hover" Property="Opacity" Value="1" />
+                            <Setter Property="Foreground" Value="{StaticResource ForegroundBrush}" />
+                        </Trigger>
+                        <Trigger Property="IsEnabled" Value="False">
+                            <Setter Property="Foreground" Value="{StaticResource DisabledBrush}" />
+                            <Setter Property="Cursor" Value="Arrow" />
+                        </Trigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <!--
+        Karomuster hinter einer Miniatur: Damit sieht eine freigestellte Ebene in der
+        Liste auch freigestellt aus. Auf einem einfarbigen Grund ist "durchsichtig"
+        von "genau dieser Farbe" nicht zu unterscheiden, und das ist bei einer Liste
+        aus Freistellungen die einzige Frage, die man an eine Miniatur hat.
+    -->
+    <DrawingBrush x:Key="CheckerBrush" TileMode="Tile" Stretch="None"
+                  Viewport="0,0,8,8" ViewportUnits="Absolute">
+        <DrawingBrush.Drawing>
+            <DrawingGroup>
+                <GeometryDrawing Brush="#FF2A2836">
+                    <GeometryDrawing.Geometry>
+                        <RectangleGeometry Rect="0,0,8,8" />
+                    </GeometryDrawing.Geometry>
+                </GeometryDrawing>
+                <GeometryDrawing Brush="#FF35323F">
+                    <GeometryDrawing.Geometry>
+                        <GeometryGroup>
+                            <RectangleGeometry Rect="0,0,4,4" />
+                            <RectangleGeometry Rect="4,4,4,4" />
+                        </GeometryGroup>
+                    </GeometryDrawing.Geometry>
+                </GeometryDrawing>
+            </DrawingGroup>
+        </DrawingBrush.Drawing>
+    </DrawingBrush>
+
     <!-- ================================================================ Regler
 
          Scrubber und Panelregler teilen sich denselben Aufbau: eine durchgehende
