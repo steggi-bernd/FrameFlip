@@ -124,6 +124,12 @@ public sealed partial class AtelierPage : UserControl
 
         Bind(null);
 
+        // Die Sitzung kommt zurueck, sobald jemand das Atelier zum ersten Mal
+        // ansieht - und nicht beim Start des Programms. Wer FrameFlip oeffnet, um
+        // eine Sequenz durchzusehen, soll nicht auf eine 4K-Datei warten, die er
+        // vielleicht gar nicht mehr braucht.
+        IsVisibleChanged += OnFirstShown;
+
         _settle = new DispatcherTimer(DispatcherPriority.Background)
         {
             Interval = TimeSpan.FromMilliseconds(180),
@@ -146,6 +152,29 @@ public sealed partial class AtelierPage : UserControl
             Render();
             Measure();
         };
+    }
+
+    /// <summary>
+    /// Holt beim ersten Ansehen zurueck, was zuletzt offen war.
+    ///
+    /// Vorher blieb das Atelier nach einem Neustart leer, obwohl der Stapel
+    /// gespeichert war - und wer dann irgendein Bild oeffnete, bekam das alte Rezept
+    /// auf die neue Leinwand. Das sah aus, als waere beim Speichern etwas
+    /// verrutscht, und war nur ein Rezept ohne sein Bild.
+    /// </summary>
+    private void OnFirstShown(object sender, DependencyPropertyChangedEventArgs e)
+    {
+        if (!IsVisible) return;
+
+        IsVisibleChanged -= OnFirstShown;
+
+        string? last = _settings.AtelierImage;
+
+        // Eine Datei, die es nicht mehr gibt, ist kein Fehler - sie ist weg. Das
+        // leere Atelier ist dann die richtige Antwort und nicht eine Meldung.
+        if (_path is not null || string.IsNullOrWhiteSpace(last) || !File.Exists(last)) return;
+
+        Open(last);
     }
 
     /// <summary>Oeffnet ein Bild - der Weg, den auch die Projektseite nehmen kann.</summary>
@@ -207,6 +236,15 @@ public sealed partial class AtelierPage : UserControl
 
         _base = loaded;
         _sources[""] = loaded;
+
+        // Erst jetzt gemerkt, nicht beim Oeffnen: Eine Datei, die sich nicht lesen
+        // laesst, soll beim naechsten Start nicht wieder versucht werden.
+        //
+        // Und gleich geschrieben. Das Merken im Speicher haette dem Rezept nichts
+        // genuetzt: Es wird beim Beenden gespeichert, das Bild dazu waere es nicht,
+        // und die beiden duerfen nicht auseinanderfallen.
+        _settings.AtelierImage = path;
+        _persist(_settings);
         _surface = null;
         Tools.ToolsEnabled = true;
 

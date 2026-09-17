@@ -382,6 +382,16 @@ public sealed class AppSettings
     /// </summary>
     public Imaging.Grading.LayerStack? Layers { get; set; }
 
+    /// <summary>
+    /// Das Bild, das im Atelier zuletzt offen war.
+    ///
+    /// Gemerkt, weil der Stapel es ohnehin wird: Ein Rezept ohne sein Bild ist beim
+    /// naechsten Start ein Stapel, der auf die erste beste Datei faellt, die jemand
+    /// oeffnet - und dann sieht alles verschoben aus, weil es fuer eine andere
+    /// Leinwand gemacht wurde. Entweder beides oder nichts.
+    /// </summary>
+    public string? AtelierImage { get; set; }
+
     /// <summary>Gespeicherte Korrektureinstellungen, im Panel auswaehlbar.</summary>
     public List<AdjustmentPreset> AdjustmentPresets { get; set; } = new();
 
