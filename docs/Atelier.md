@@ -395,9 +395,40 @@ What that costs, stated plainly:
   the image untouched — which is the invariant the whole construction rests on and the
   test that guards it.
 
-The only visible difference from Photoshop is on two images that both stay below
-white, where Multiply in linear looks a little different from Multiply in gamma. In
-exchange, everything works on values above white — and those are the reason EXR is
+**One more cost, and it is bigger than it sounds.** This section used to end by saying
+the only visible difference from Photoshop was that Multiply on two below-white images
+"looks a little different". That is true for solid colours and badly wrong for **faint**
+contributions, which is where somebody actually notices.
+
+Compositing in linear light means decoding, mixing, and encoding again. The sRGB decode
+crushes the darks and the encode expands them, so a contribution weighted by a small
+alpha comes out roughly `a^0.42` instead of `a`. At an alpha of 4/255 that is a factor
+of ten.
+
+| alpha | source | Photoshop (gamma) | here (linear) |
+|---|---|---|---|
+| 4/255 | 128 | **2** | **11** |
+| 4/255 | 200 | **3** | **24** |
+| 8/255 | 200 | **6** | **37** |
+
+On black, an eye starts seeing structure at about 6 of 255. Photoshop stays under it,
+this stays far above — with the same file.
+
+The consequence is not theoretical, and it cost a long search to find: **a cut-out layer
+whose "transparent" area is not exactly transparent looks clean in Photoshop and noisy
+here.** Most files are like that. A denoiser running over the alpha channel, a glow in
+compositing, an export through a program that composites on the way — each leaves a haze
+of a few steps, and underneath most files carry whatever was in the buffer. Photoshop
+multiplies that garbage by 1.6 % and it disappears; linear light multiplies it by 16 %
+and it is noise. On Screen it is worst, because nothing there can ever get darker again.
+
+This is not a reason to leave linear light — it is the whole basis for reading an EXR,
+and a glow *is* light. It is a reason for the **matte cleanup** on an image layer: what
+lies below a set alpha counts as absent. And it is a reason to write the factor down
+here, because "a little different" is what the person who wrote it believed until a
+picture arrived.
+
+In exchange, everything works on values above white — and those are the reason EXR is
 read at all.
 
 ### Blend modes
