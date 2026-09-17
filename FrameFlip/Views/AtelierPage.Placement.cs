@@ -36,7 +36,13 @@ public partial class AtelierPage
     {
         var layer = Layers.Selection;
 
-        if (_frame is null || _showingOriginal || _tool != AtelierTool.Move ||
+        // Zwei Werkzeuge benutzen denselben Rahmen: Verschieben und Zuschneiden.
+        // Welches, sagt sein Modus - die Griffe sitzen an derselben Stelle und
+        // schreiben auf andere Werte.
+        Placement.Mode = _tool == AtelierTool.Crop ? AdornerMode.Crop : AdornerMode.Place;
+
+        if (_frame is null || _showingOriginal ||
+            _tool is not (AtelierTool.Move or AtelierTool.Crop) ||
             layer is null || Layers.Visibility != System.Windows.Visibility.Visible ||
             layer.Content is LayerContent.Adjustment or LayerContent.Group ||
             !_sources.TryGetValue(layer.Source, out var source))

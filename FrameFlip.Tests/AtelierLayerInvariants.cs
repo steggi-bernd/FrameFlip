@@ -778,6 +778,41 @@ public static class AtelierLayerInvariants
         }
     }
 
+    /// <summary>
+    /// Ein Schnitt darf die Ebene nie ganz wegschneiden.
+    ///
+    /// Sonst gibt es sie noch, sie zeigt aber nichts, und alle acht Griffe liegen
+    /// aufeinander - herauszukommen waere nur noch ueber den Doppelklick, und den
+    /// muesste man erst kennen. Ein Rest bleibt deshalb immer stehen.
+    /// </summary>
+    private static void TheCropAlwaysLeavesSomething()
+    {
+        Check.Group("Ein Schnitt laesst immer einen Rest stehen");
+
+        var place = new LayerTransform();
+
+        // Die linke Kante weit ueber die rechte hinausgezogen.
+        var far = PlacementAdorner.WithCrop(place, PlacementAdorner.CropGrip.Left, 5f, 0.5f);
+
+        Check.That(far.CropLeft + far.CropRight <= 0.985f,
+                   "nach links ueber die rechte Kante hinaus bleibt ein Rest",
+                   $"{far.CropLeft:0.000} + {far.CropRight:0.000}");
+
+        // Und nach aussen: Ein Schnitt ist nie negativ - das waere ein Rand aus
+        // nichts, den niemand verlangt hat.
+        var out_ = PlacementAdorner.WithCrop(place, PlacementAdorner.CropGrip.Top, 0.5f, -3f);
+
+        Check.That(out_.CropTop >= 0f, "und nach aussen gezogen bleibt er bei null",
+                   $"{out_.CropTop:0.000}");
+
+        // Der gewoehnliche Fall muss dabei genau ankommen.
+        var half = PlacementAdorner.WithCrop(place, PlacementAdorner.CropGrip.BottomRight,
+                                             0.75f, 0.6f);
+
+        Check.Near(half.CropRight, 0.25, 0.001, "eine Ecke setzt beide Kanten - rechts");
+        Check.Near(half.CropBottom, 0.4, 0.001, "und unten");
+    }
+
     /// <summary>Das gezeichnete Bild als Bytes - die einzige Wahrheit, die zaehlt.</summary>
     private static byte[] Shot(System.Windows.Controls.Image display)
     {
@@ -1014,6 +1049,26 @@ public static class AtelierLayerInvariants
             page.UpdateLayout();
 
             Check.That(!frame.IsHitTestVisible, "beim Auswaehlen faengt der Rahmen nicht");
+
+            // Zuschneiden benutzt DENSELBEN Rahmen wie das Verschieben, nur mit
+            // anderen Griffen. Ein zweiter Rahmen daneben haette die Umrechnung ein
+            // zweites Mal gebraucht, und zwei Umrechnungen laufen frueher oder
+            // spaeter um einen Bildpunkt auseinander.
+            Check.That(page.HandleToolKey(System.Windows.Input.Key.C), "C waehlt das Zuschneiden");
+
+            page.UpdateLayout();
+
+            Check.That(column.Tool == AtelierTool.Crop, "naemlich das Zuschneiden", $"{column.Tool}");
+            Check.That(frame.IsHitTestVisible, "der Rahmen faengt auch dort");
+            Check.That(frame.Mode == AdornerMode.Crop, "und zwar als Schnittrahmen", $"{frame.Mode}");
+
+            page.HandleToolKey(System.Windows.Input.Key.V);
+            page.UpdateLayout();
+
+            Check.That(frame.Mode == AdornerMode.Place,
+                       "und zurueck als Greifrahmen", $"{frame.Mode}");
+
+            TheCropAlwaysLeavesSomething();
         }
         finally
         {

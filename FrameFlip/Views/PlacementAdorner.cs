@@ -25,7 +25,7 @@ namespace FrameFlip.Views;
 /// Quadrate. Ein kraeftiger Rahmen wuerde genau das ueberdecken, was man beurteilen
 /// will.
 /// </summary>
-public sealed class PlacementAdorner : FrameworkElement
+public sealed partial class PlacementAdorner : FrameworkElement
 {
     private LayerTransform? _transform;
     private int _layerWidth, _layerHeight, _canvasWidth, _canvasHeight;
@@ -33,6 +33,30 @@ public sealed class PlacementAdorner : FrameworkElement
 
     private PlacementDrag _drag;
     private DragHandle _hover;
+
+    /// <summary>
+    /// Was der Rahmen gerade ist: der Griff zum Verschieben oder der zum Zuschneiden.
+    ///
+    /// Beides ist derselbe Rahmen an derselben Stelle mit derselben Umrechnung - nur
+    /// schreiben die Griffe auf andere Werte. Ein zweites Element daneben haette die
+    /// Umrechnung ein zweites Mal gebraucht, und zwei Umrechnungen laufen frueher
+    /// oder spaeter um einen Bildpunkt auseinander.
+    /// </summary>
+    public AdornerMode Mode
+    {
+        get => _mode;
+        set
+        {
+            if (_mode == value) return;
+
+            _mode = value;
+
+            Cancel();
+            InvalidateVisual();
+        }
+    }
+
+    private AdornerMode _mode = AdornerMode.Place;
 
     public PlacementAdorner()
     {
@@ -100,6 +124,12 @@ public sealed class PlacementAdorner : FrameworkElement
         context.DrawRectangle(Background, null, new Rect(0, 0, ActualWidth, ActualHeight));
 
         if (_transform is null || _canvasWidth <= 0) return;
+
+        if (_mode == AdornerMode.Crop)
+        {
+            RenderCrop(context);
+            return;
+        }
 
         var box = Box();
         box.Corners(out float x0, out float y0, out float x1, out float y1,
@@ -172,6 +202,12 @@ public sealed class PlacementAdorner : FrameworkElement
         if (_transform is null) return;
         if (!Canvas(e.GetPosition(this), out float x, out float y)) return;
 
+        if (_mode == AdornerMode.Crop)
+        {
+            CropDown(e, x, y);
+            return;
+        }
+
         // Doppelklick auf die Flaeche setzt die Platzierung zurueck: mittig, volle
         // Groesse, ungedreht.
         //
@@ -208,6 +244,12 @@ public sealed class PlacementAdorner : FrameworkElement
         if (_transform is null) return;
         if (!Canvas(e.GetPosition(this), out float x, out float y)) return;
 
+        if (_mode == AdornerMode.Crop)
+        {
+            CropMove(x, y);
+            return;
+        }
+
         if (!_drag.IsActive)
         {
             var over = PlacementDrag.HandleAt(Box(), x, y, (float)Reach());
@@ -238,6 +280,12 @@ public sealed class PlacementAdorner : FrameworkElement
 
     protected override void OnMouseLeftButtonUp(MouseButtonEventArgs e)
     {
+        if (_mode == AdornerMode.Crop)
+        {
+            CropUp(e);
+            return;
+        }
+
         if (!_drag.IsActive) return;
 
         _drag = default;
