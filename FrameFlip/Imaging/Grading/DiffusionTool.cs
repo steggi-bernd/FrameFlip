@@ -23,8 +23,7 @@ public enum DiffusionKernel
     /// Er reicht nur SECHS Achtel des Fehlers weiter und wirft das letzte Viertel
     /// weg. Das ist kein Versehen: Was verlorengeht, fehlt den Nachbarn, und deshalb
     /// laufen helle Stellen ganz ins Weiss und dunkle ganz ins Schwarz. Das Ergebnis
-    /// ist kontrastreich und gestreift statt gleichmaessig gekrisselt - und es ist
-    /// das, wonach die meisten suchen, die "so wie frueher" sagen.
+    /// ist kontrastreich und gestreift statt gleichmaessig gekrisselt.
     /// </summary>
     Atkinson,
 
@@ -45,22 +44,24 @@ public enum DiffusionKernel
 }
 
 /// <summary>
-/// Rastern mit Fehlerdiffusion.
+/// Rastern ueber den ganzen Rahmen - mit einer RASTERPUNKTGROESSE.
 ///
-/// Der Unterschied zum geordneten Rastern steht in einem Satz: Dort entscheidet eine
-/// Schwelle, die an der STELLE haengt; hier wird der Rundungsfehler an die Nachbarn
-/// WEITERGEREICHT. Das Ergebnis streut organisch statt sich alle acht Punkte zu
-/// wiederholen - der Blick alter Drucker statt alter Bildschirme.
+/// Das ist der Unterschied zwischen einem Raster und Gries, und er kostete eine
+/// Runde: Ein 4K-Bild auf zwei Stufen zu bringen ergibt Punkte von einem Bildpunkt
+/// Kantenlaenge. Aus zwei Metern Abstand ist das kein Muster mehr, sondern ein
+/// gleichmaessiges Rauschen - "sieht fritiert aus" trifft es genau. Jedes Programm,
+/// das fuer diesen Blick gebaut ist, verkleinert deshalb ERST, rastert DANN und
+/// vergroessert hinterher mit harten Kanten zurueck.
 ///
-/// WELCHES Schema man nimmt, entscheidet, wie es aussieht, und die Spanne ist gross:
-/// Atkinson wirft ein Viertel des Fehlers weg und gibt harte, gestreifte Flaechen;
-/// Jarvis streut ueber zwei Zeilen und gibt fast Korn. Ein einziges Schema
-/// anzubieten und es "Fehlerdiffusion" zu nennen, waere so, als gaebe es nur einen
-/// Pinsel.
+/// Genau das tut diese Klasse. Sie liest nicht Bildpunkte, sondern BLOECKE: Ein Block
+/// wird gemittelt, als ein Wert gerastert und wieder als Ganzes hingeschrieben. Bei
+/// Groesse eins ist das der alte Weg, Punkt fuer Punkt - dieselbe Schleife, kein
+/// zweiter Code.
 ///
-/// GESCHLAENGELT statt zeilenweise: Jede zweite Zeile laeuft rueckwaerts. Immer in
-/// dieselbe Richtung zu laufen schiebt den Fehler stets nach rechts, und auf grossen
-/// gleichmaessigen Flaechen entstehen daraus Schlieren, die nach rechts wegziehen.
+/// Und sie kann alle neun Verfahren, nicht nur die sechs Fehlerdiffusionen. Die drei
+/// ortsabhaengigen rechnen dieselben Schwellen wie das Ortswerkzeug daneben - die
+/// Formeln stehen einmal, in DitherTool, und werden von hier aufgerufen. Zwei
+/// Fassungen liefen frueher oder spaeter auseinander.
 /// </summary>
 public sealed class DiffusionTool : IFramePass
 {
@@ -74,7 +75,32 @@ public sealed class DiffusionTool : IFramePass
     /// <summary>Wieviele Stufen je Kanal uebrigbleiben. 2 ist reines Schwarzweiss je Kanal.</summary>
     public int Levels { get; set; } = 2;
 
-    /// <summary>Nach welchem Schema gestreut wird.</summary>
+    /// <summary>
+    /// Die Kantenlaenge eines Rasterpunkts in Bildpunkten.
+    ///
+    /// Bei 1 wird jeder Bildpunkt einzeln entschieden - das ist die feinste und
+    /// unauffaelligste Rasterung und gleichzeitig die, die bei hoher Aufloesung wie
+    /// Rauschen aussieht. Vier bis acht ist der Bereich, in dem das Muster wieder ein
+    /// Muster wird.
+    ///
+    /// NICHT auf 1080p bezogen, anders als beim Korn: Hier geht es um die Groesse auf
+    /// dem SCHIRM, und die haengt an Bildpunkten und nicht an der Aufloesung der
+    /// Datei.
+    /// </summary>
+    public int Pixels { get; set; } = 1;
+
+    /// <summary>
+    /// True, wenn ein ortsabhaengiges Muster gerechnet wird statt einer Diffusion.
+    /// </summary>
+    public bool Place { get; set; }
+
+    /// <summary>Welches Ortsmuster - nur wenn <see cref="Place"/> gilt.</summary>
+    public DitherPattern Pattern { get; set; } = DitherPattern.Ordered;
+
+    /// <summary>Die Linienrichtung in Grad - nur fuer das Linienraster.</summary>
+    public float Angle { get; set; }
+
+    /// <summary>Nach welchem Schema gestreut wird - nur wenn nicht <see cref="Place"/>.</summary>
     public DiffusionKernel Kernel { get; set; } = DiffusionKernel.FloydSteinberg;
 
     [JsonIgnore]
@@ -82,20 +108,23 @@ public sealed class DiffusionTool : IFramePass
 
     private float _step;
     private float _amount;
+    private int _block;
+    private float _sin, _cos;
     private (int X, int Y, float Weight)[] _spread = Array.Empty<(int, int, float)>();
     private int _reach;
 
     public void Prepare()
     {
-        // Der Abstand zweier Stufen auf der Byteskala. Bei zwei Stufen ist er 255,
-        // es gibt also nur 0 und 255.
         _step = 255f / Math.Max(1, Math.Clamp(Levels, 2, 64) - 1);
         _amount = Math.Clamp(Amount, 0f, 1f);
-        _spread = Spread(Kernel);
+        _block = Math.Clamp(Pixels, 1, 64);
 
-        // Wie viele Zeilen nach unten das Schema reicht. Danach richtet sich, wie
-        // viele Fehlerzeilen mitgefuehrt werden muessen - Floyd-Steinberg kommt mit
-        // einer aus, Jarvis und Stucki brauchen zwei.
+        float radians = Angle * MathF.PI / 180f;
+
+        _sin = MathF.Sin(radians);
+        _cos = MathF.Cos(radians);
+
+        _spread = Spread(Kernel);
         _reach = 1;
 
         foreach (var (_, y, _) in _spread) _reach = Math.Max(_reach, y);
@@ -103,73 +132,120 @@ public sealed class DiffusionTool : IFramePass
 
     public unsafe void Apply(IntPtr pixels, int width, int height, int stride)
     {
-        if (width <= 0 || height <= 0 || _spread.Length == 0) return;
+        if (width <= 0 || height <= 0) return;
 
         var target = (byte*)pixels;
 
-        // Ein Ringpuffer aus so vielen Zeilen, wie das Schema nach unten reicht, plus
-        // der laufenden. Mehr braucht es nie: Was weiter unten liegt, ist noch nicht
-        // beschrieben worden.
+        // Das Bild in Bloecken. Bei Groesse eins ist ein Block ein Bildpunkt, und
+        // alles darunter laeuft unveraendert weiter.
+        int across = (width + _block - 1) / _block;
+        int down = (height + _block - 1) / _block;
+
         int rows = _reach + 1;
         var error = new float[rows][];
 
-        for (int i = 0; i < rows; i++) error[i] = new float[width * 3];
+        for (int i = 0; i < rows; i++) error[i] = new float[across * 3];
 
-        for (int y = 0; y < height; y++)
+        for (int by = 0; by < down; by++)
         {
-            byte* row = target + (long)y * stride;
-            float[] here = error[y % rows];
+            float[] here = error[by % rows];
 
-            bool backwards = (y & 1) == 1;
+            // Geschlaengelt: Jede zweite Zeile rueckwaerts. Immer in dieselbe Richtung
+            // zu laufen schiebt den Fehler stets nach rechts, und auf grossen Flaechen
+            // entstehen daraus Schlieren, die nach rechts wegziehen.
+            bool backwards = !Place && (by & 1) == 1;
 
-            int from = backwards ? width - 1 : 0;
-            int stop = backwards ? -1 : width;
+            int from = backwards ? across - 1 : 0;
+            int stop = backwards ? -1 : across;
             int walk = backwards ? -1 : 1;
 
-            for (int x = from; x != stop; x += walk)
+            for (int bx = from; bx != stop; bx += walk)
             {
+                float threshold = Place
+                    ? DitherTool.Threshold(Pattern, bx, by, 1, _sin, _cos)
+                    : 0f;
+
                 for (int c = 0; c < 3; c++)
                 {
-                    float was = row[x * 4 + c];
+                    float was = Average(target, stride, width, height, bx, by, c);
 
-                    // Der eigene Wert plus das, was die Nachbarn hierher gereicht
-                    // haben. Es darf ueber 255 und unter 0 hinausgehen - der
-                    // Ueberschuss wandert weiter, statt verlorenzugehen.
-                    float wanted = was + here[x * 3 + c];
+                    float wanted = Place ? was : was + here[bx * 3 + c];
 
-                    float stepped = Math.Clamp(MathF.Round(wanted / _step) * _step, 0f, 255f);
-                    float rest = wanted - stepped;
+                    float stepped = Place
+                        ? Math.Clamp(MathF.Floor(wanted / _step + threshold) * _step, 0f, 255f)
+                        : Math.Clamp(MathF.Round(wanted / _step) * _step, 0f, 255f);
 
-                    // Weitergereicht wird der VOLLE Fehler, auch wenn die Staerke
-                    // unter eins liegt. Sonst waere es keine Fehlerdiffusion mehr,
-                    // sondern eine halbe - und die streut nicht, sie fleckt.
-                    for (int s = 0; s < _spread.Length; s++)
+                    if (!Place)
                     {
-                        var (dx, dy, weight) = _spread[s];
+                        // Weitergereicht wird der VOLLE Fehler, auch wenn die Staerke
+                        // unter eins liegt. Sonst waere es keine Fehlerdiffusion mehr,
+                        // sondern eine halbe - und die streut nicht, sie fleckt.
+                        float rest = wanted - stepped;
 
-                        // "Rechts" heisst in einer rueckwaerts laufenden Zeile links.
-                        // Ohne die Spiegelung schoebe die Umkehr den Fehler dorthin,
-                        // wo schon gerechnet wurde, und er ginge verloren.
-                        int nx = x + dx * walk;
+                        for (int s = 0; s < _spread.Length; s++)
+                        {
+                            var (dx, dy, weight) = _spread[s];
 
-                        if (nx < 0 || nx >= width) continue;
-                        if (y + dy >= height) continue;
+                            // "Rechts" heisst in einer rueckwaerts laufenden Zeile
+                            // links. Ohne die Spiegelung schoebe die Umkehr den Fehler
+                            // dorthin, wo schon gerechnet wurde.
+                            int nx = bx + dx * walk;
 
-                        error[(y + dy) % rows][nx * 3 + c] += rest * weight;
+                            if (nx < 0 || nx >= across) continue;
+                            if (by + dy >= down) continue;
+
+                            error[(by + dy) % rows][nx * 3 + c] += rest * weight;
+                        }
                     }
 
                     // Und erst das Ergebnis wird gemischt. Bei Staerke null steht
                     // wieder der Ausgangswert da.
-                    float shown = was + (stepped - was) * _amount;
-
-                    row[x * 4 + c] = (byte)Math.Clamp((int)MathF.Round(shown), 0, 255);
+                    Fill(target, stride, width, height, bx, by, c,
+                         was + (stepped - was) * _amount);
                 }
             }
 
-            // Die abgearbeitete Zeile wird zur untersten des Ringpuffers und muss
-            // dafuer leer sein. Sie erst spaeter zu leeren waere billiger und
-            // fehleranfaelliger.
             Array.Clear(here);
+        }
+    }
+
+    /// <summary>Der Mittelwert eines Blocks in einem Kanal.</summary>
+    private unsafe float Average(byte* target, int stride, int width, int height,
+                                 int bx, int by, int c)
+    {
+        int x0 = bx * _block, y0 = by * _block;
+        int x1 = Math.Min(x0 + _block, width);
+        int y1 = Math.Min(y0 + _block, height);
+
+        if (x1 <= x0 || y1 <= y0) return 0f;
+
+        int sum = 0;
+
+        for (int y = y0; y < y1; y++)
+        {
+            byte* row = target + (long)y * stride;
+
+            for (int x = x0; x < x1; x++) sum += row[x * 4 + c];
+        }
+
+        return (float)sum / ((x1 - x0) * (y1 - y0));
+    }
+
+    /// <summary>Schreibt einen Wert auf den ganzen Block - harte Kanten, kein Verlauf.</summary>
+    private unsafe void Fill(byte* target, int stride, int width, int height,
+                             int bx, int by, int c, float value)
+    {
+        byte shown = (byte)Math.Clamp((int)MathF.Round(value), 0, 255);
+
+        int x0 = bx * _block, y0 = by * _block;
+        int x1 = Math.Min(x0 + _block, width);
+        int y1 = Math.Min(y0 + _block, height);
+
+        for (int y = y0; y < y1; y++)
+        {
+            byte* row = target + (long)y * stride;
+
+            for (int x = x0; x < x1; x++) row[x * 4 + c] = shown;
         }
     }
 

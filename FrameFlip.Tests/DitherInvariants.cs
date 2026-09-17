@@ -30,6 +30,7 @@ public static class DitherInvariants
         DiffusionKeepsTheAverage();
         EveryKernelIsItself();
         DiffusionLeavesCoverAlone();
+        ACellIsSolid();
     }
 
     private static OpticsPlace Place => new(1920, 1080, 1);
@@ -149,7 +150,9 @@ public static class DitherInvariants
     /// </summary>
     private static byte[] Diffused(int width, int height, byte value, int levels,
                                    float amount = 1f,
-                                   DiffusionKernel kernel = DiffusionKernel.FloydSteinberg)
+                                   DiffusionKernel kernel = DiffusionKernel.FloydSteinberg,
+                                   int cell = 1, bool place = false,
+                                   DitherPattern pattern = DitherPattern.Ordered)
     {
         int stride = width * 4;
         var pixels = new byte[stride * height];
@@ -162,7 +165,11 @@ public static class DitherInvariants
             pixels[i + 3] = 200;
         }
 
-        var tool = new DiffusionTool { Levels = levels, Amount = amount, Kernel = kernel };
+        var tool = new DiffusionTool
+        {
+            Levels = levels, Amount = amount, Kernel = kernel, Pixels = cell,
+            Place = place, Pattern = pattern,
+        };
 
         tool.Prepare();
 
@@ -321,6 +328,78 @@ public static class DitherInvariants
         Check.That(differing > 50,
                    "Floyd-Steinberg und Stucki ergeben verschiedene Bilder",
                    $"{differing} von {one.Length / 4} Punkten");
+    }
+
+    /// <summary>
+    /// Ein Rasterpunkt muss EIN Wert sein - sonst ist er keiner.
+    ///
+    /// Das ist der Unterschied zwischen einem Raster und Gries, und er kostete eine
+    /// Runde: Ein 4K-Bild auf zwei Stufen zu bringen ergibt Punkte von einem
+    /// Bildpunkt Kantenlaenge, und das ist aus zwei Metern Abstand kein Muster mehr,
+    /// sondern gleichmaessiges Rauschen.
+    ///
+    /// Geprueft wird deshalb die Eigenschaft, die das behebt: Innerhalb eines Blocks
+    /// darf sich nichts unterscheiden. Und zwar fuer beide Arten - die Diffusion und
+    /// die Ortsmuster, die ab Groesse zwei denselben Weg nehmen.
+    /// </summary>
+    private static void ACellIsSolid()
+    {
+        Check.Group("Ein Rasterpunkt ist ein Wert");
+
+        const int cell = 4;
+
+        foreach (bool place in new[] { false, true })
+        {
+            var pixels = Diffused(64, 64, 120, 2, cell: cell, place: place,
+                                  pattern: DitherPattern.Ordered);
+
+            int broken = 0;
+
+            for (int by = 0; by < 64 / cell; by++)
+            {
+                for (int bx = 0; bx < 64 / cell; bx++)
+                {
+                    byte first = pixels[(by * cell * 64 + bx * cell) * 4];
+
+                    for (int y = 0; y < cell; y++)
+                    {
+                        for (int x = 0; x < cell; x++)
+                        {
+                            int at = ((by * cell + y) * 64 + bx * cell + x) * 4;
+
+                            if (pixels[at] != first) broken++;
+                        }
+                    }
+                }
+            }
+
+            string what = place ? "Ortsmuster" : "Diffusion";
+
+            Check.That(broken == 0, $"{what}: jeder Block ist einfarbig",
+                       $"{broken} Abweichungen");
+
+            // Und er muss trotzdem rastern - ein Block, der einfarbig ist, weil gar
+            // nichts geschah, waere die billige Art, diesen Test zu bestehen.
+            int between = 0;
+
+            for (int i = 0; i < pixels.Length; i += 4)
+                if (pixels[i] > 1 && pixels[i] < 254) between++;
+
+            Check.That(between == 0, $"{what}: und es bleibt nichts zwischen den Stufen",
+                       $"{between}");
+        }
+
+        // Die Helligkeit muss auch blockweise stehenbleiben.
+        var coarse = Diffused(64, 64, 96, 2, cell: cell);
+
+        double sum = 0;
+
+        for (int i = 0; i < coarse.Length; i += 4) sum += coarse[i];
+
+        double mean = sum / (coarse.Length / 4);
+
+        Check.That(Math.Abs(mean - 96) < 4.0,
+                   "und die Flaeche behaelt ihre Helligkeit auch in Bloecken", $"{mean:0.0}");
     }
 
     /// <summary>

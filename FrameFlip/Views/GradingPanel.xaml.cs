@@ -603,7 +603,11 @@ public partial class GradingPanel : UserControl
             // Welches Muster gilt, sagt kein zusaetzlicher Schalter, sondern welches
             // der beiden Werkzeuge etwas zu tun hat. Ein Zustand daneben waere eine
             // dritte Wahrheit, die mit den beiden anderen auseinanderlaufen koennte.
-            bool diffusing = _diffusion.Amount > 0.005f;
+            bool diffusing = _diffusion.Amount > 0.005f && !_diffusion.Place;
+
+            DitherPixelsSlider.Value = Math.Clamp(_diffusion.Pixels,
+                                                  DitherPixelsSlider.Minimum,
+                                                  DitherPixelsSlider.Maximum);
 
             // Die ersten drei Eintraege sind die Ortsmuster, danach folgen die
             // Streuschemata in der Reihenfolge ihrer Aufzaehlung.
@@ -761,8 +765,15 @@ public partial class GradingPanel : UserControl
 
         int levels = (int)Math.Round(DitherLevelsSlider.Value);
         float strength = (float)DitherSlider.Value;
+        int pixels = (int)Math.Round(DitherPixelsSlider.Value);
 
-        _dither.Amount = diffuse ? 0f : strength;
+        // Sobald ein Rasterpunkt groesser als ein Bildpunkt ist, muss auch ein
+        // Ortsmuster ueber den ganzen Rahmen laufen: Ein Block bekommt EINEN Wert,
+        // und dafuer muss jemand den Block mitteln koennen. Ein Werkzeug, das einen
+        // Bildpunkt sieht, kann das nicht.
+        bool wholeFrame = diffuse || pixels > 1;
+
+        _dither.Amount = wholeFrame ? 0f : strength;
         _dither.Levels = levels;
         _dither.Size = (int)Math.Round(DitherSizeSlider.Value);
         _dither.Pattern = pick switch
@@ -774,8 +785,12 @@ public partial class GradingPanel : UserControl
 
         _dither.Angle = (float)DitherAngleSlider.Value;
 
-        _diffusion.Amount = diffuse ? strength : 0f;
+        _diffusion.Amount = wholeFrame ? strength : 0f;
         _diffusion.Levels = levels;
+        _diffusion.Pixels = pixels;
+        _diffusion.Place = !diffuse;
+        _diffusion.Pattern = _dither.Pattern;
+        _diffusion.Angle = _dither.Angle;
         _diffusion.Kernel = (DiffusionKernel)Math.Max(0, pick - FirstKernel);
 
         _grain.Amount = (float)GrainSlider.Value;
@@ -857,6 +872,7 @@ public partial class GradingPanel : UserControl
         DitherValue.Text = $"{DitherSlider.Value:0.00}";
         DitherLevelsValue.Text = $"{DitherLevelsSlider.Value:0}";
         DitherSizeValue.Text = $"{DitherSizeSlider.Value:0}";
+        DitherPixelsValue.Text = $"{DitherPixelsSlider.Value:0}";
 
         // Fehlerdiffusion kennt keinen Rasterpunkt - sie verteilt, statt zu rastern.
         // Den Regler stehenzulassen hiesse, eine Einstellung anzubieten, die nichts

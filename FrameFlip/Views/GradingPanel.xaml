@@ -721,6 +721,25 @@
                         Minimum="2" Maximum="32" Value="6" SmallChange="1" LargeChange="4"
                         ValueChanged="OnChanged" MouseDoubleClick="OnSliderReset" Tag="6" />
 
+                <!--
+                    Die Rasterpunktgroesse - und sie ist der Unterschied zwischen
+                    einem Raster und Gries.
+
+                    Ein 4K-Bild auf zwei Stufen zu bringen ergibt Punkte von einem
+                    Bildpunkt Kantenlaenge, und das ist aus zwei Metern Abstand kein
+                    Muster mehr, sondern gleichmaessiges Rauschen. Jedes Programm fuer
+                    diesen Blick verkleinert erst, rastert dann und vergroessert
+                    hinterher mit harten Kanten zurueck.
+                -->
+                <Grid Margin="0,10,0,2">
+                    <TextBlock Text="{DynamicResource S_DitherPixels}" Style="{StaticResource PanelLabel}" />
+                    <TextBlock x:Name="DitherPixelsValue" Style="{StaticResource PanelValue}" />
+                </Grid>
+                <Slider x:Name="DitherPixelsSlider" Style="{StaticResource PanelSlider}"
+                        Minimum="1" Maximum="24" Value="1" SmallChange="1" LargeChange="4"
+                        ValueChanged="OnChanged" MouseDoubleClick="OnSliderReset" Tag="1"
+                        ToolTip="{DynamicResource S_DitherPixelsHint}" />
+
                 <Grid Margin="0,10,0,2">
                     <TextBlock Text="{DynamicResource S_DitherSize}" Style="{StaticResource PanelLabel}" />
                     <TextBlock x:Name="DitherSizeValue" Style="{StaticResource PanelValue}" />

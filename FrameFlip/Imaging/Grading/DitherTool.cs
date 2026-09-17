@@ -127,23 +127,7 @@ public sealed class DitherTool : IOpticsTool
         // dasselbe Rezept in jeder Aufloesung anders aus.
         int cell = Math.Max(1, (int)MathF.Round(_size * place.Detail));
 
-        float threshold;
-
-        if (Pattern == DitherPattern.Lines)
-        {
-            // Beim Linienraster ist der Rasterpunkt der ABSTAND zweier Linien, und
-            // gerechnet wird auf dem vollen Gitter: Die Linie soll ja innerhalb einer
-            // Periode anwachsen, und wer vorher auf Zellen rundet, hat genau die
-            // Zwischenstufen weggeworfen, aus denen die Dicke entsteht.
-            threshold = Line(x, y, Math.Max(2, cell));
-        }
-        else
-        {
-            int cx = x / cell;
-            int cy = y / cell;
-
-            threshold = Pattern == DitherPattern.Noise ? Hash(cx, cy) : Bayer(cx, cy);
-        }
+        float threshold = Threshold(Pattern, x, y, cell, _sin, _cos);
 
         r = Step(r, threshold, amount);
         g = Step(g, threshold, amount);
@@ -219,6 +203,33 @@ public sealed class DitherTool : IOpticsTool
     }
 
     /// <summary>
+    /// Die Schwelle an einer Stelle - fuer alle drei Ortsmuster.
+    ///
+    /// Oeffentlich und statisch, weil sie an ZWEI Stellen gebraucht wird: hier, wo
+    /// Punkt fuer Punkt gerechnet wird, und im Durchgang ueber den Rahmen, wo ganze
+    /// Bloecke gerastert werden. Zwei Fassungen derselben Formel liefen frueher oder
+    /// spaeter auseinander, und man saehe es nur daran, dass dasselbe Muster bei
+    /// zwei Rasterpunktgroessen verschieden aussieht.
+    /// </summary>
+    public static float Threshold(DitherPattern pattern, int x, int y, int cell,
+                                  float sin, float cos)
+    {
+        if (pattern == DitherPattern.Lines)
+        {
+            // Beim Linienraster ist der Rasterpunkt der ABSTAND zweier Linien, und
+            // gerechnet wird auf dem vollen Gitter: Die Linie soll innerhalb einer
+            // Periode anwachsen, und wer vorher auf Zellen rundet, hat genau die
+            // Zwischenstufen weggeworfen, aus denen die Dicke entsteht.
+            return Line(x, y, Math.Max(2, cell), sin, cos);
+        }
+
+        int cx = x / Math.Max(1, cell);
+        int cy = y / Math.Max(1, cell);
+
+        return pattern == DitherPattern.Noise ? Hash(cx, cy) : Bayer(cx, cy);
+    }
+
+    /// <summary>
     /// Die Schwelle eines Linienrasters - ein Dreieck quer zur Linienrichtung.
     ///
     /// Im Kern der Linie ist sie 1: Dort springt der Wert schon bei der geringsten
@@ -226,11 +237,11 @@ public sealed class DitherTool : IOpticsTool
     /// Linien ist sie 0 und springt erst bei Weiss. Dazwischen waechst die Linie
     /// stetig - und DAS ist die Dicke, die die Helligkeit traegt.
     /// </summary>
-    private float Line(int x, int y, int period)
+    private static float Line(int x, int y, int period, float sin, float cos)
     {
         // Quer zur Linienrichtung: Bei 0 Grad laeuft die Schwelle mit y, die Linien
         // liegen also waagerecht.
-        float across = (x * _sin + y * _cos) / period;
+        float across = (x * sin + y * cos) / period;
 
         float within = across - MathF.Floor(across);
 
