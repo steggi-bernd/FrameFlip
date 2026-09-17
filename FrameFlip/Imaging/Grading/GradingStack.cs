@@ -201,7 +201,7 @@ public sealed class GradingStack
     {
         DiffusionTool diffusion => new DiffusionTool
         {
-            Amount = diffusion.Amount, Levels = diffusion.Levels,
+            Amount = diffusion.Amount, Levels = diffusion.Levels, Kernel = diffusion.Kernel,
         },
 
         _ => throw new NotSupportedException($"Kein Kopierweg fuer {pass.GetType().Name}."),

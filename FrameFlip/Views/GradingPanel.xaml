@@ -754,6 +754,24 @@
                     Regler, der je nach Muster etwas tut oder nicht, ist schwerer zu
                     verstehen als einer, der verschwindet.
                 -->
+                <!--
+                    Nur fuer die Fehlerdiffusion. Welches Schema gilt, aendert das
+                    Ergebnis mehr als jeder Regler daneben - Atkinson und Jarvis sehen
+                    einander nicht aehnlich.
+                -->
+                <ComboBox x:Name="DiffusionKernelBox" Style="{StaticResource OverlayCombo}"
+                          HorizontalAlignment="Left" Width="180" Margin="0,10,0,0"
+                          Visibility="Collapsed" SelectedIndex="0"
+                          SelectionChanged="OnDitherPattern"
+                          ToolTip="{DynamicResource S_DiffusionKernelHint}">
+                    <ComboBoxItem Style="{StaticResource OverlayComboItem}" Content="Floyd-Steinberg" />
+                    <ComboBoxItem Style="{StaticResource OverlayComboItem}" Content="Atkinson" />
+                    <ComboBoxItem Style="{StaticResource OverlayComboItem}" Content="Jarvis-Judice-Ninke" />
+                    <ComboBoxItem Style="{StaticResource OverlayComboItem}" Content="Stucki" />
+                    <ComboBoxItem Style="{StaticResource OverlayComboItem}" Content="Burkes" />
+                    <ComboBoxItem Style="{StaticResource OverlayComboItem}" Content="Sierra" />
+                </ComboBox>
+
                 <Grid x:Name="DitherAngleHeader" Visibility="Collapsed" Margin="0,10,0,2">
                     <TextBlock Text="{DynamicResource S_DitherAngle}" Style="{StaticResource PanelLabel}" />
                     <TextBlock x:Name="DitherAngleValue" Style="{StaticResource PanelValue}" />

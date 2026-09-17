@@ -587,6 +587,8 @@ public partial class GradingPanel : UserControl
             DitherAngleSlider.Value = Math.Clamp(_dither.Angle,
                                                  DitherAngleSlider.Minimum, DitherAngleSlider.Maximum);
 
+            DiffusionKernelBox.SelectedIndex = (int)_diffusion.Kernel;
+
             DitherSlider.Value = Math.Clamp(diffusing ? _diffusion.Amount : _dither.Amount,
                                             DitherSlider.Minimum, DitherSlider.Maximum);
             DitherLevelsSlider.Value = Math.Clamp(diffusing ? _diffusion.Levels : _dither.Levels,
@@ -743,6 +745,7 @@ public partial class GradingPanel : UserControl
 
         _diffusion.Amount = diffuse ? strength : 0f;
         _diffusion.Levels = levels;
+        _diffusion.Kernel = (DiffusionKernel)Math.Max(0, DiffusionKernelBox.SelectedIndex);
 
         _grain.Amount = (float)GrainSlider.Value;
         _grain.Size = (int)Math.Round(GrainSizeSlider.Value);
@@ -837,6 +840,10 @@ public partial class GradingPanel : UserControl
 
         DitherAngleHeader.Visibility = angled;
         DitherAngleSlider.Visibility = angled;
+
+        DiffusionKernelBox.Visibility = DitherPatternBox.SelectedIndex == 3
+            ? System.Windows.Visibility.Visible
+            : System.Windows.Visibility.Collapsed;
         DitherAngleValue.Text = $"{DitherAngleSlider.Value:0}°";
 
         GrainValue.Text = $"{GrainSlider.Value:0.00}";

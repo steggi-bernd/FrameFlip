@@ -28,6 +28,7 @@ public static class DitherInvariants
         BothPatternsHoldUp();
         TheLineScreenCarriesBrightness();
         DiffusionKeepsTheAverage();
+        EveryKernelIsItself();
         DiffusionLeavesCoverAlone();
     }
 
@@ -147,7 +148,8 @@ public static class DitherInvariants
     /// gibt zurueck, was daraus geworden ist.
     /// </summary>
     private static byte[] Diffused(int width, int height, byte value, int levels,
-                                   float amount = 1f)
+                                   float amount = 1f,
+                                   DiffusionKernel kernel = DiffusionKernel.FloydSteinberg)
     {
         int stride = width * 4;
         var pixels = new byte[stride * height];
@@ -160,7 +162,7 @@ public static class DitherInvariants
             pixels[i + 3] = 200;
         }
 
-        var tool = new DiffusionTool { Levels = levels, Amount = amount };
+        var tool = new DiffusionTool { Levels = levels, Amount = amount, Kernel = kernel };
 
         tool.Prepare();
 
@@ -230,6 +232,95 @@ public static class DitherInvariants
 
         Check.That(quiet[0] == 100 && quiet[4] == 100, "bei Staerke null bleibt alles stehen",
                    $"{quiet[0]}/{quiet[4]}");
+    }
+
+    /// <summary>
+    /// Jedes Schema muss etwas anderes ergeben - sonst waere die Auswahl eine Luege.
+    ///
+    /// Und eines davon muss etwas anderes ergeben als alle uebrigen: Atkinson reicht
+    /// nur sechs Achtel des Fehlers weiter. Das fehlende Viertel ist kein Rundungsrest,
+    /// sondern der Grund, warum es so aussieht - helle Flaechen laufen ins Weiss und
+    /// dunkle ins Schwarz. Der Mittelwert bleibt dort also ABSICHTLICH nicht stehen,
+    /// und ein Test, der ihn auch dort einfordert, haette das Werkzeug kaputtgemacht,
+    /// statt es zu pruefen.
+    /// </summary>
+    private static void EveryKernelIsItself()
+    {
+        Check.Group("Jedes Streuschema ist es selbst");
+
+        var faithful = new[]
+        {
+            DiffusionKernel.FloydSteinberg,
+            DiffusionKernel.JarvisJudiceNinke,
+            DiffusionKernel.Stucki,
+            DiffusionKernel.Burkes,
+            DiffusionKernel.Sierra,
+        };
+
+        double honest = 0;
+
+        foreach (var kernel in faithful)
+        {
+            var pixels = Diffused(64, 64, 90, 2, kernel: kernel);
+
+            double sum = 0;
+
+            for (int i = 0; i < pixels.Length; i += 4) sum += pixels[i];
+
+            double mean = sum / (pixels.Length / 4);
+
+            Check.That(Math.Abs(mean - 90) < 3.0,
+                       $"{kernel} behaelt die Helligkeit", $"{mean:0.0}");
+
+            if (kernel == DiffusionKernel.FloydSteinberg) honest = mean;
+        }
+
+        // Atkinson dagegen verliert ein Viertel - und muss es auch.
+        var sparse = Diffused(64, 64, 90, 2, kernel: DiffusionKernel.Atkinson);
+
+        double dark = 0;
+
+        for (int i = 0; i < sparse.Length; i += 4) dark += sparse[i];
+
+        dark /= sparse.Length / 4;
+
+        // Verglichen wird mit den TREUEN Schemata und nicht mit einer geratenen
+        // Zahl: Die Aussage ist "Atkinson verliert etwas, die anderen nicht", und
+        // genau die laesst sich so pruefen. Wieviel es auf einer gleichmaessigen
+        // Flaeche ausmacht, haengt davon ab, wie sich der Fehler dort aufschaukelt -
+        // das vorherzusagen waere geraten.
+        Check.That(dark < honest - 3.0,
+                   "Atkinson laesst die Flaeche dunkler werden - das fehlende Viertel",
+                   $"{dark:0.0} gegen {honest:0.0}");
+
+        Check.That(dark > 20, "aber nicht ins Nichts", $"{dark:0.0}");
+
+        // Und alle muessen wirklich rastern.
+        foreach (var kernel in Enum.GetValues<DiffusionKernel>())
+        {
+            var pixels = Diffused(32, 32, 120, 2, kernel: kernel);
+
+            int between = 0;
+
+            for (int i = 0; i < pixels.Length; i += 4)
+                if (pixels[i] > 1 && pixels[i] < 254) between++;
+
+            Check.That(between == 0, $"{kernel} laesst bei zwei Stufen nichts dazwischen",
+                       $"{between}");
+        }
+
+        // Zwei Schemata duerfen nicht dasselbe Bild ergeben.
+        var one = Diffused(48, 48, 110, 2, kernel: DiffusionKernel.FloydSteinberg);
+        var two = Diffused(48, 48, 110, 2, kernel: DiffusionKernel.Stucki);
+
+        int differing = 0;
+
+        for (int i = 0; i < one.Length; i += 4)
+            if (one[i] != two[i]) differing++;
+
+        Check.That(differing > 50,
+                   "Floyd-Steinberg und Stucki ergeben verschiedene Bilder",
+                   $"{differing} von {one.Length / 4} Punkten");
     }
 
     /// <summary>
