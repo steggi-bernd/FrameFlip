@@ -567,6 +567,39 @@ public static class AtelierLayerInvariants
 
             Check.That(Differs(cold, warm),
                        "auch ungelesene Ebenen erscheinen, sobald man sie einblendet");
+
+            // ---- und der gemeldete Aufbau: das GRUNDBILD selbst ausgeblendet ----
+            //
+            // Genau so kam die Sitzung zurueck: Nur eine Bildebene hatte einen
+            // gefuellten Punkt, alles andere war aus - auch die unterste Ebene, also
+            // das Bild selbst. Von oben nach unten eingeblendet passierte nichts, bis
+            // die unterste an der Reihe war; dann erschienen alle auf einmal.
+            //
+            // Das ist die eine Aufstellung, die sonst nirgends vorkommt, denn von
+            // Hand blendet niemand das Bild aus, auf dem er arbeitet.
+            var picture = strip.Stack.Layers.FirstOrDefault(l => l.Content == LayerContent.Pass);
+
+            if (picture is null)
+            {
+                Check.That(false, "es gibt eine Bildebene");
+                return;
+            }
+
+            foreach (var layer in new[] { glowA, glowB }) strip.SetVisible(layer, false);
+
+            strip.SetVisible(first, true);
+            strip.SetVisible(picture, false);
+
+            Pump(TimeSpan.FromSeconds(5), () => false);
+
+            byte[] noPicture = Shot(display);
+
+            strip.SetVisible(glowA, true);
+
+            Pump(TimeSpan.FromSeconds(6), () => Differs(Shot(display), noPicture));
+
+            Check.That(Differs(noPicture, Shot(display)),
+                       "eine Glanzebene erscheint auch, wenn das Grundbild aus ist");
         }
         finally
         {
