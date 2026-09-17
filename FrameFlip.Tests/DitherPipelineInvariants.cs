@@ -130,5 +130,61 @@ public static class DitherPipelineInvariants
 
             Check.That(apart > 5.0, $"{kernel} veraendert das Bild", $"{apart:0.0}");
         }
+
+        BothWaysThroughTheProcessor(frame);
+    }
+
+    /// <summary>
+    /// Und dasselbe auf dem ZWEITEN Weg durch den Prozessor.
+    ///
+    /// Es gibt zwei volle Wege: den geraden, und den, den ein oertliches Werkzeug
+    /// erzwingt - Glanz, Klarheit, Schaerfe brauchen die Nachbarschaft und damit einen
+    /// zweiten Durchgang. Beide schreiben am Ende Bytes, und beide muessen den
+    /// Durchgang ueber den Rahmen laufen lassen.
+    ///
+    /// Genau das war der gemeldete Fehler: Er stand nur im geraden Weg. Wer Glanz
+    /// eingeschaltet hatte - und wer rastert, will meistens Glanz -, bekam keine
+    /// Fehlerdiffusion mehr, ohne dass irgendetwas davon berichtet haette.
+    ///
+    /// Geprueft wird gegen das Bild MIT dem oertlichen Werkzeug, aber ohne Raster:
+    /// Sonst maesse man den Glanz statt der Diffusion.
+    /// </summary>
+    private static void BothWaysThroughTheProcessor(FloatFrame frame)
+    {
+        Check.Group("Auch mit einem oertlichen Werkzeug kommt das Raster an");
+
+        static GradingStack WithLocal()
+        {
+            var stack = new GradingStack();
+
+            stack.Local.Add(new ClarityTool { Amount = 0.6f, Reach = 8 });
+
+            return stack;
+        }
+
+        var soft = Drawn(frame, WithLocal());
+
+        foreach (var kernel in new[] { DiffusionKernel.FloydSteinberg, DiffusionKernel.Atkinson })
+        {
+            var stack = WithLocal();
+
+            stack.Frame.Add(new DiffusionTool { Amount = 1f, Levels = 2, Kernel = kernel });
+
+            double apart = Apart(soft, Drawn(frame, stack));
+
+            Console.WriteLine($"         mit Klarheit: {kernel,-16} {apart:0.0}");
+
+            Check.That(apart > 5.0,
+                       $"{kernel} wirkt auch neben einem oertlichen Werkzeug", $"{apart:0.0}");
+        }
+
+        // Und die Gegenprobe: Das geordnete Raster konnte es schon immer - waere es
+        // hier still, laege der Fehler woanders.
+        var ordered = WithLocal();
+
+        ordered.Optics.Add(new DitherTool { Amount = 1f, Levels = 2, Size = 4 });
+
+        Check.That(Apart(soft, Drawn(frame, ordered)) > 5.0,
+                   "und das geordnete Raster ebenso");
     }
 }

@@ -498,6 +498,15 @@ public static class FloatFrameProcessor
                 }
             });
 
+            // Auch hier - und das Vergessen hat gekostet.
+            //
+            // Es gibt ZWEI volle Wege durch diese Methode: den geraden und diesen,
+            // den ein oertliches Werkzeug erzwingt. Der Durchgang ueber den Rahmen
+            // stand nur im geraden. Sobald also Glanz, Klarheit oder Schaerfe an
+            // waren, lief die Fehlerdiffusion nicht mehr - und zwar ohne Meldung,
+            // weil an dem Bild ja trotzdem gerechnet wurde.
+            RunFrame(in grading, destination, width, height, destinationStride);
+
             return;
         }
 
