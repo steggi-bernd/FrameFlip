@@ -1,6 +1,6 @@
 # FrameFlip Atelier — design
 
-[← back to the start page](../README.md)
+[← back to the start page](../README.md) · [the interface, rethought](Atelier-Oberflaeche.md)
 
 A second mode inside FrameFlip: grade one frame, then apply that grade to the whole
 sequence and write it out. Layers, masks driven by render data, and a colour toolset
