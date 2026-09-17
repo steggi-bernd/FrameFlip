@@ -32,6 +32,24 @@ public static class FloatFrameProcessor
     private const float LumaB = 0.0722f;
 
     /// <summary>
+    /// Die Durchgaenge ueber das fertige Bild - der Reihe nach, auf einem Faden.
+    ///
+    /// Sie laufen NUR im vollen Weg. Auf dem groben Raster waere das Ergebnis nicht
+    /// groeber, sondern ein anderes: Fehlerdiffusion entscheidet anhand der
+    /// Nachbarschaft, welcher Punkt welchen Rest abbekommt, und ein Raster aendert
+    /// die Nachbarschaft. Waehrend eines Reglerzugs bleibt der Durchgang deshalb aus
+    /// und kommt beim Loslassen dazu - dieselbe Zweiteilung wie ueberall, nur faellt
+    /// sie hier auf, weil das Bild dabei sichtbar umspringt.
+    /// </summary>
+    private static void RunFrame(in PreparedGrading grading, IntPtr destination,
+                                 int width, int height, int stride)
+    {
+        var passes = grading.Frame;
+
+        for (int i = 0; i < passes.Length; i++) passes[i].Apply(destination, width, height, stride);
+    }
+
+    /// <summary>
     /// Rechnet den Frame mit Korrektur und Sichtumwandlung nach Bgra32.
     ///
     /// Geschrieben wird direkt in den Rueckpuffer der WriteableBitmap, wie im
@@ -125,6 +143,8 @@ public static class FloatFrameProcessor
                     pixel[3] = ToByte(Math.Clamp(alpha, 0f, 1f));
                 }
             });
+
+            RunFrame(in grading, destination, width, height, destinationStride);
 
             return;
         }
@@ -664,6 +684,16 @@ public static class FloatFrameProcessor
         }
     }
 
+    /// <remarks>
+    /// Durchgaenge ueber das fertige Bild - <see cref="Grading.IFramePass"/> - laufen
+    /// hier NICHT. Sie rechnen auf Bgra32, also acht Bit je Kanal, und der Sinn
+    /// dieses Weges ist gerade, mehr als acht Bit auszugeben. Beides zusammen waere
+    /// ein Widerspruch: Ein Bild auf zwei Stufen zu rastern und es dann in sechzehn
+    /// Bit zu schreiben, legt zwei Werte in einen sehr grossen Zahlenraum.
+    ///
+    /// Gesagt statt verschwiegen, weil es ein Unterschied zwischen Vorschau und
+    /// Ausgabe ist - und solche Unterschiede sucht man sonst lange.
+    /// </remarks>
     /// <summary>
     /// Wie <see cref="Apply(FloatFrame, ImageAdjustments, IViewTransform, PreparedGrading, IntPtr, int, int)"/>,
     /// aber nach Rgba64 - sechzehn Bit je Kanal, Reihenfolge R, G, B, A.

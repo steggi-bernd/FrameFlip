@@ -39,6 +39,16 @@ public sealed class GradingStack
     public List<IOpticsTool> Optics { get; set; } = new();
 
     /// <summary>
+    /// Die Durchgaenge ueber das fertige Bild - siehe <see cref="IFramePass"/>.
+    ///
+    /// Sie stehen zuletzt, und das ist keine Liste unter anderen: Was hier steht,
+    /// laeuft auf einem Faden, in voller Aufloesung und nicht waehrend eines
+    /// Reglerzugs. Die Trennung macht diesen Preis an der Stelle sichtbar, an der er
+    /// entsteht, statt ihn in einer gemeinsamen Liste zu verstecken.
+    /// </summary>
+    public List<IFramePass> Frame { get; set; } = new();
+
+    /// <summary>
     /// Die Werkzeuge, die Bildpunkte verschieben - Verzeichnung und chromatische
     /// Aberration.
     ///
@@ -61,7 +71,8 @@ public sealed class GradingStack
            (Local.Count == 0 || Local.All(t => t.IsNeutral)) &&
            (Optics.Count == 0 || Optics.All(t => t.IsNeutral)) &&
            (Geometry.Count == 0 || Geometry.All(t => t.IsNeutral)) &&
-           (Data.Count == 0 || Data.All(t => t.IsNeutral));
+           (Data.Count == 0 || Data.All(t => t.IsNeutral)) &&
+           (Frame.Count == 0 || Frame.All(t => t.IsNeutral));
 
     /// <summary>
     /// Bereitet alle Werkzeuge vor und sammelt die ein, die tatsaechlich etwas tun.
@@ -134,9 +145,19 @@ public sealed class GradingStack
             data.Add(tool);
         }
 
+        var frame = new List<IFramePass>();
+
+        foreach (var pass in Frame)
+        {
+            if (pass.IsNeutral) continue;
+
+            pass.Prepare();
+            frame.Add(pass);
+        }
+
         return new PreparedGrading(linear.ToArray(), display.ToArray(), local.ToArray(),
                                    light.ToArray(), optics.ToArray(), geometry.ToArray(),
-                                   data.ToArray());
+                                   data.ToArray(), frame.ToArray());
     }
 
     /// <summary>
@@ -151,6 +172,7 @@ public sealed class GradingStack
         Tools = Tools.Select(Copy).ToList(),
         Local = Local.Select(CopyLocal).ToList(),
         Optics = Optics.Select(CopyOptics).ToList(),
+        Frame = Frame.Select(CopyFrame).ToList(),
         Geometry = Geometry.Select(CopyGeometry).ToList(),
         Data = Data.Select(CopyData).ToList(),
     };
@@ -173,6 +195,16 @@ public sealed class GradingStack
 
         // Wie oben: Ein Werkzeug, das hier fehlt, wuerde geteilt statt kopiert.
         _ => throw new NotSupportedException($"Kein Kopierweg fuer {tool.GetType().Name}."),
+    };
+
+    private static IFramePass CopyFrame(IFramePass pass) => pass switch
+    {
+        DiffusionTool diffusion => new DiffusionTool
+        {
+            Amount = diffusion.Amount, Levels = diffusion.Levels,
+        },
+
+        _ => throw new NotSupportedException($"Kein Kopierweg fuer {pass.GetType().Name}."),
     };
 
     private static IOpticsTool CopyOptics(IOpticsTool tool) => tool switch
@@ -260,8 +292,9 @@ public readonly struct PreparedGrading
     public PreparedGrading(IGradingTool[] sceneLinear, IGradingTool[] display,
                            ILocalTool[] local, ILocalTool[]? light = null,
                            IOpticsTool[]? optics = null, IGeometryTool[]? geometry = null,
-                           IDataTool[]? data = null)
+                           IDataTool[]? data = null, IFramePass[]? frame = null)
     {
+        Frame = frame ?? Array.Empty<IFramePass>();
         Data = data ?? Array.Empty<IDataTool>();
         SceneLinear = sceneLinear;
         Display = display;
@@ -270,6 +303,14 @@ public readonly struct PreparedGrading
         Optics = optics ?? Array.Empty<IOpticsTool>();
         Geometry = geometry ?? Array.Empty<IGeometryTool>();
     }
+
+    /// <summary>
+    /// Die Durchgaenge ueber das fertige Bild. Leer ist der Normalfall.
+    ///
+    /// Sie laufen NACH allem anderen und nur beim vollen Durchgang - waehrend eines
+    /// Reglerzugs bleiben sie aus, weil sie das grobe Raster nicht vertragen.
+    /// </summary>
+    public IFramePass[] Frame { get; }
 
     public IGradingTool[] SceneLinear { get; }
 

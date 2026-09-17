@@ -830,4 +830,7 @@
     <sys:String x:Key="S_DitherNoise">zufällig</sys:String>
     <sys:String x:Key="S_DitherNoiseHint">Zufällig statt geordnet: körnig statt als Kreuzmuster. Die Schwelle ist dabei fest an die Stelle gebunden — dieselbe Stelle bekommt in jedem Durchgang dieselbe, sonst flimmerte das Bild schon beim Ziehen an einem Regler.</sys:String>
     <sys:String x:Key="S_DitherHint">Bringt das Bild auf wenige Stufen je Kanal, ohne dass es in Flächen zerfällt: Die Schwelle hängt von der Stelle ab, der Umsprung wandert über die Fläche, und das Auge mittelt ihn wieder zusammen. Fehlerdiffusion nach Floyd-Steinberg gibt es hier nicht — die reicht den Rundungsfehler an die Nachbarn weiter und müsste die Bildpunkte der Reihe nach abarbeiten. Über Weiß wird nicht gerastert.</sys:String>
+    <sys:String x:Key="S_DitherOrdered">geordnet (Bayer)</sys:String>
+    <sys:String x:Key="S_DitherDiffusion">Fehlerdiffusion</sys:String>
+    <sys:String x:Key="S_DitherPatternHint">Geordnet ergibt ein Kreuzmuster, das sich alle acht Punkte wiederholt - der Blick alter Bildschirme. Zufaellig ist koernig ohne Muster. Fehlerdiffusion nach Floyd-Steinberg reicht den Rundungsfehler an die Nachbarn weiter und streut organisch - der Blick alter Drucker. Sie laeuft auf einem Faden und in voller Aufloesung und bleibt deshalb waehrend eines Reglerzugs aus; beim Loslassen kommt sie dazu. Im 16-Bit-Export laeuft sie nicht.</sys:String>
 </ResourceDictionary>

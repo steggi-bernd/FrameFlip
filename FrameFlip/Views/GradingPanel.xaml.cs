@@ -46,6 +46,7 @@ public partial class GradingPanel : UserControl
     private VignetteTool _vignette = new();
     private GrainTool _grain = new();
     private DitherTool _dither = new();
+    private DiffusionTool _diffusion = new();
     private DistortionTool _distortion = new();
     private ChromaticTool _chromatic = new();
     private DepthFieldTool _depth = new();
@@ -243,6 +244,7 @@ public partial class GradingPanel : UserControl
         _vignette = TakeOptics<VignetteTool>();
         _grain = TakeOptics<GrainTool>();
         _dither = TakeOptics<DitherTool>();
+        _diffusion = TakeFrame<DiffusionTool>();
 
         // Und die vierte Liste: die Werkzeuge, die Bildpunkte verschieben.
         _distortion = TakeGeometry<DistortionTool>();
@@ -259,6 +261,17 @@ public partial class GradingPanel : UserControl
 
             var created = new T();
             Stack.Local.Add(created);
+
+            return created;
+        }
+
+        T TakeFrame<T>() where T : IFramePass, new()
+        {
+            var found = Stack.Frame.OfType<T>().FirstOrDefault();
+            if (found is not null) return found;
+
+            var created = new T();
+            Stack.Frame.Add(created);
 
             return created;
         }
@@ -558,13 +571,20 @@ public partial class GradingPanel : UserControl
             VignetteFeatherSlider.Value = Math.Clamp(_vignette.Feather,
                                                      VignetteFeatherSlider.Minimum, VignetteFeatherSlider.Maximum);
 
-            DitherSlider.Value = Math.Clamp(_dither.Amount,
+            // Welches Muster gilt, sagt kein zusaetzlicher Schalter, sondern welches
+            // der beiden Werkzeuge etwas zu tun hat. Ein Zustand daneben waere eine
+            // dritte Wahrheit, die mit den beiden anderen auseinanderlaufen koennte.
+            bool diffusing = _diffusion.Amount > 0.005f;
+
+            DitherPatternBox.SelectedIndex = diffusing ? 2
+                : _dither.Pattern == DitherPattern.Noise ? 1 : 0;
+
+            DitherSlider.Value = Math.Clamp(diffusing ? _diffusion.Amount : _dither.Amount,
                                             DitherSlider.Minimum, DitherSlider.Maximum);
-            DitherLevelsSlider.Value = Math.Clamp(_dither.Levels,
+            DitherLevelsSlider.Value = Math.Clamp(diffusing ? _diffusion.Levels : _dither.Levels,
                                                   DitherLevelsSlider.Minimum, DitherLevelsSlider.Maximum);
             DitherSizeSlider.Value = Math.Clamp(_dither.Size,
                                                 DitherSizeSlider.Minimum, DitherSizeSlider.Maximum);
-            DitherNoiseButton.IsChecked = _dither.Pattern == DitherPattern.Noise;
 
             GrainSlider.Value = Math.Clamp(_grain.Amount, GrainSlider.Minimum, GrainSlider.Maximum);
             GrainSizeSlider.Value = Math.Clamp(_grain.Size,
@@ -694,12 +714,22 @@ public partial class GradingPanel : UserControl
         _vignette.Roundness = (float)VignetteRoundnessSlider.Value;
         _vignette.Feather = (float)VignetteFeatherSlider.Value;
 
-        _dither.Amount = (float)DitherSlider.Value;
-        _dither.Levels = (int)Math.Round(DitherLevelsSlider.Value);
+        // Genau eines der beiden rechnet. Beide zugleich waere zweimal rastern, und
+        // das zweite fande nichts mehr vor, was sich aufteilen liesse.
+        bool diffuse = DitherPatternBox.SelectedIndex == 2;
+
+        int levels = (int)Math.Round(DitherLevelsSlider.Value);
+        float strength = (float)DitherSlider.Value;
+
+        _dither.Amount = diffuse ? 0f : strength;
+        _dither.Levels = levels;
         _dither.Size = (int)Math.Round(DitherSizeSlider.Value);
-        _dither.Pattern = DitherNoiseButton.IsChecked == true
+        _dither.Pattern = DitherPatternBox.SelectedIndex == 1
             ? DitherPattern.Noise
             : DitherPattern.Ordered;
+
+        _diffusion.Amount = diffuse ? strength : 0f;
+        _diffusion.Levels = levels;
 
         _grain.Amount = (float)GrainSlider.Value;
         _grain.Size = (int)Math.Round(GrainSizeSlider.Value);
@@ -780,6 +810,11 @@ public partial class GradingPanel : UserControl
         DitherValue.Text = $"{DitherSlider.Value:0.00}";
         DitherLevelsValue.Text = $"{DitherLevelsSlider.Value:0}";
         DitherSizeValue.Text = $"{DitherSizeSlider.Value:0}";
+
+        // Fehlerdiffusion kennt keinen Rasterpunkt - sie verteilt, statt zu rastern.
+        // Den Regler stehenzulassen hiesse, eine Einstellung anzubieten, die nichts
+        // tut, und danach sucht man hinterher lange.
+        DitherSizeSlider.IsEnabled = DitherPatternBox.SelectedIndex != 2;
 
         GrainValue.Text = $"{GrainSlider.Value:0.00}";
         GrainSizeValue.Text = $"{GrainSizeSlider.Value:0}";

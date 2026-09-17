@@ -730,14 +730,22 @@
                         ValueChanged="OnChanged" MouseDoubleClick="OnSliderReset" Tag="2" />
 
                 <!--
-                    Zwei Muster, ein Schalter. Eine Auswahlliste fuer zwei Eintraege
-                    kostet einen Klick mehr und sagt nicht mehr aus.
+                    Drei Muster. Das dritte laeuft auf einem anderen Weg als die
+                    beiden anderen - es ist kein Ortswerkzeug, sondern ein Durchgang
+                    ueber das ganze Bild. Hier steht es trotzdem daneben: Wer rastern
+                    will, sucht das Muster und nicht die Passart.
                 -->
-                <ToggleButton x:Name="DitherNoiseButton" Style="{StaticResource OverlayToggle}"
-                              HorizontalAlignment="Left" Margin="0,10,0,0" Padding="8,1" FontSize="10"
-                              Content="{DynamicResource S_DitherNoise}"
-                              Checked="OnDitherPattern" Unchecked="OnDitherPattern"
-                              ToolTip="{DynamicResource S_DitherNoiseHint}" />
+                <ComboBox x:Name="DitherPatternBox" Style="{StaticResource OverlayCombo}"
+                          HorizontalAlignment="Left" Width="180" Margin="0,10,0,0"
+                          SelectedIndex="0" SelectionChanged="OnDitherPattern"
+                          ToolTip="{DynamicResource S_DitherPatternHint}">
+                    <ComboBoxItem Style="{StaticResource OverlayComboItem}"
+                                  Content="{DynamicResource S_DitherOrdered}" />
+                    <ComboBoxItem Style="{StaticResource OverlayComboItem}"
+                                  Content="{DynamicResource S_DitherNoise}" />
+                    <ComboBoxItem Style="{StaticResource OverlayComboItem}"
+                                  Content="{DynamicResource S_DitherDiffusion}" />
+                </ComboBox>
 
                 <TextBlock Margin="0,8,0,0" FontSize="10" TextWrapping="Wrap"
                            Foreground="{StaticResource MutedBrush}"

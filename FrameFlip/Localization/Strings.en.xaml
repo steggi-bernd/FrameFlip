@@ -830,4 +830,7 @@
     <sys:String x:Key="S_DitherNoise">random</sys:String>
     <sys:String x:Key="S_DitherNoiseHint">Random instead of ordered: grainy rather than a crosshatch. The threshold is still tied to the position - the same spot gets the same one every pass, otherwise the picture would shimmer while you drag a slider.</sys:String>
     <sys:String x:Key="S_DitherHint">Brings the picture down to a few levels per channel without breaking it into flat areas: the threshold depends on where the pixel is, the step wanders across the surface, and the eye averages it back together. There is no Floyd-Steinberg error diffusion here - that passes the rounding error to its neighbours and would have to walk the pixels in order. Anything above white is left alone.</sys:String>
+    <sys:String x:Key="S_DitherOrdered">ordered (Bayer)</sys:String>
+    <sys:String x:Key="S_DitherDiffusion">error diffusion</sys:String>
+    <sys:String x:Key="S_DitherPatternHint">Ordered gives a crosshatch that repeats every eight pixels - the look of old screens. Random is grainy without a pattern. Floyd-Steinberg error diffusion hands the rounding error to its neighbours and scatters organically - the look of old printers. It runs on one thread at full resolution, so it stays out while you drag a slider and joins on release. It does not run in the 16-bit export.</sys:String>
 </ResourceDictionary>

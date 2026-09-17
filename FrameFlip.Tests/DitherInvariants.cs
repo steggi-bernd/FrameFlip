@@ -1,3 +1,4 @@
+using System.Runtime.InteropServices;
 using FrameFlip.Imaging;
 using FrameFlip.Imaging.Grading;
 
@@ -25,9 +26,125 @@ public static class DitherInvariants
         TheAverageSurvives();
         OverbrightsAreLeftAlone();
         BothPatternsHoldUp();
+        DiffusionKeepsTheAverage();
+        DiffusionLeavesCoverAlone();
     }
 
     private static OpticsPlace Place => new(1920, 1080, 1);
+
+    // ------------------------------------------------------- die Fehlerdiffusion
+
+    /// <summary>
+    /// Baut eine gleichmaessige Flaeche, laesst die Diffusion darueber laufen und
+    /// gibt zurueck, was daraus geworden ist.
+    /// </summary>
+    private static byte[] Diffused(int width, int height, byte value, int levels,
+                                   float amount = 1f)
+    {
+        int stride = width * 4;
+        var pixels = new byte[stride * height];
+
+        for (int i = 0; i < pixels.Length; i += 4)
+        {
+            pixels[i] = value;
+            pixels[i + 1] = value;
+            pixels[i + 2] = value;
+            pixels[i + 3] = 200;
+        }
+
+        var tool = new DiffusionTool { Levels = levels, Amount = amount };
+
+        tool.Prepare();
+
+        var buffer = Marshal.AllocHGlobal(pixels.Length);
+
+        try
+        {
+            Marshal.Copy(pixels, 0, buffer, pixels.Length);
+
+            tool.Apply(buffer, width, height, stride);
+
+            Marshal.Copy(buffer, pixels, 0, pixels.Length);
+        }
+        finally
+        {
+            Marshal.FreeHGlobal(buffer);
+        }
+
+        return pixels;
+    }
+
+    /// <summary>
+    /// Dieselbe Probe wie beim geordneten Rastern, und sie ist hier noch schaerfer:
+    /// Fehlerdiffusion verliert NICHTS, weil jeder Rest weitergereicht wird.
+    ///
+    /// Auf einer gleichmaessigen Flaeche muss der Mittelwert deshalb fast genau
+    /// stehenbleiben - nicht nur ungefaehr wie bei einer Matrix, die sich alle acht
+    /// Punkte wiederholt.
+    /// </summary>
+    private static void DiffusionKeepsTheAverage()
+    {
+        Check.Group("Fehlerdiffusion behaelt die Helligkeit");
+
+        foreach (byte value in new byte[] { 40, 128, 200 })
+        {
+            foreach (int levels in new[] { 2, 4 })
+            {
+                var pixels = Diffused(64, 64, value, levels);
+
+                double sum = 0;
+
+                for (int i = 0; i < pixels.Length; i += 4) sum += pixels[i];
+
+                double mean = sum / (pixels.Length / 4);
+
+                Check.That(Math.Abs(mean - value) < 2.0,
+                           $"{value} bei {levels} Stufen bleibt im Mittel stehen",
+                           $"{mean:0.00}");
+
+                // Und es muss wirklich gerastert haben - sonst waere der Mittelwert
+                // trivialerweise richtig, weil nichts geschehen ist.
+                int between = 0;
+
+                for (int i = 0; i < pixels.Length; i += 4)
+                    if (pixels[i] > 1 && pixels[i] < 254 && levels == 2) between++;
+
+                if (levels == 2)
+                {
+                    Check.That(between == 0, $"{value}: bei zwei Stufen bleibt nichts dazwischen",
+                               $"{between} Punkte");
+                }
+            }
+        }
+
+        // Aus heisst aus.
+        var quiet = Diffused(32, 32, 100, 2, amount: 0f);
+
+        Check.That(quiet[0] == 100 && quiet[4] == 100, "bei Staerke null bleibt alles stehen",
+                   $"{quiet[0]}/{quiet[4]}");
+    }
+
+    /// <summary>
+    /// Die Deckung ist keine Farbe.
+    ///
+    /// Sie mitzurastern hiesse, eine halbdurchsichtige Stelle auf ganz oder gar nicht
+    /// zu werfen - und das sieht man nicht im Bild, sondern erst dort, wo es
+    /// weiterverwendet wird.
+    /// </summary>
+    private static void DiffusionLeavesCoverAlone()
+    {
+        Check.Group("Die Deckung bleibt unberuehrt");
+
+        var pixels = Diffused(16, 16, 128, 2);
+
+        int changed = 0;
+
+        for (int i = 3; i < pixels.Length; i += 4)
+            if (pixels[i] != 200) changed++;
+
+        Check.That(changed == 0, "kein einziger Deckungswert wurde angefasst",
+                   $"{changed} von {pixels.Length / 4}");
+    }
 
     private static DitherTool Made(int levels, float amount = 1f,
                                    DitherPattern pattern = DitherPattern.Ordered)
