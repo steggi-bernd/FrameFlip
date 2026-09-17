@@ -56,6 +56,16 @@ public sealed partial class AtelierPage : UserControl
     /// <summary>Die Ebenen, die ueber allem liegen - Wasserzeichen und dergleichen.</summary>
     private OverlayPlan[] _overlays = Overlays.None;
 
+    /// <summary>
+    /// Quellen, deren Leseversuch nichts ergeben hat.
+    ///
+    /// Sie werden beim naechsten Anlass wieder versucht - ein Lesefehler kann
+    /// voruebergehend sein, etwa weil die Datei gerade geschrieben wurde. Was sich
+    /// aendert, ist nur, dass es SICHTBAR wird: Die Zeile im Streifen zeigt sich als
+    /// fehlend, statt dass eine eingeblendete Ebene stumm nichts tut.
+    /// </summary>
+    private readonly HashSet<string> _unreadable = new(StringComparer.Ordinal);
+
     /// <summary>Die gelesenen Passe, nach Quellnamen. Leerer Name ist das Bild selbst.</summary>
     private readonly Dictionary<string, FloatFrame> _sources = new(StringComparer.Ordinal);
 
@@ -216,6 +226,7 @@ public sealed partial class AtelierPage : UserControl
         Layers.StopPicking();
 
         _sources.Clear();
+        _unreadable.Clear();
         _composed = null;
         _passes = passes;
         _cryptomattes = cryptomattes;

@@ -107,6 +107,16 @@ public partial class LayerPanel : UserControl
     public Func<ImageLayer, System.Windows.Media.ImageSource?>? Thumbnail { get; set; }
 
     /// <summary>
+    /// Quellen, die sich nicht lesen liessen - gesetzt von der Seite.
+    ///
+    /// Eine Datei, die es gibt und die sich trotzdem nicht oeffnen laesst, war bisher
+    /// nicht von einer Ebene zu unterscheiden, die nichts beitraegt: Der Leseversuch
+    /// gab null zurueck, und niemand sagte etwas. Im Bild sah das aus wie "das
+    /// Einblenden tut nichts", und danach sucht man an der falschen Stelle.
+    /// </summary>
+    public IReadOnlyCollection<string> Unreadable { get; set; } = Array.Empty<string>();
+
+    /// <summary>
     /// Eine andere Ebene ist gewaehlt. Null heisst: keine Einstellungsebene, die
     /// Werkzeuge gehoeren wieder dem ganzen Bild.
     ///
@@ -385,7 +395,8 @@ public partial class LayerPanel : UserControl
             LayerContent.Pass => layer.Source.Length > 0 &&
                                  ExrPasses.Find(_passes, layer.Source) is null,
             LayerContent.Image => layer.Source.Length == 0 ||
-                                  !System.IO.File.Exists(layer.Source),
+                                  !System.IO.File.Exists(layer.Source) ||
+                                  Unreadable.Contains(layer.Source),
             _ => false,
         };
 
@@ -513,7 +524,20 @@ public partial class LayerPanel : UserControl
     {
         if (sender is not ToggleButton button || button.Tag is not ImageLayer layer) return;
 
-        layer.Visible = button.IsChecked == true;
+        SetVisible(layer, button.IsChecked == true);
+    }
+
+    /// <summary>
+    /// Blendet eine Ebene ein oder aus - derselbe Weg, den auch das Auge in der Zeile
+    /// geht.
+    ///
+    /// Oeffentlich, damit es genau EINEN Weg gibt. Wer von aussen stattdessen
+    /// layer.Visible setzt und sich selbst eine Meldung ausdenkt, prueft hinterher
+    /// seinen eigenen Nachbau und nicht das Programm.
+    /// </summary>
+    public void SetVisible(ImageLayer layer, bool on)
+    {
+        layer.Visible = on;
         _selected = layer;
 
         // Ein neuer Pass kann dadurch gebraucht werden, der noch nicht gelesen ist -

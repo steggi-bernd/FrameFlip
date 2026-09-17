@@ -152,11 +152,31 @@ public partial class AtelierPage
 
                 foreach (var (name, frame) in read) _sources[name] = frame;
 
+                // Was angefordert war und nicht kam, wird vermerkt - und was diesmal
+                // kam, wird vergessen. Ein Lesefehler ist nicht endgueltig.
+                bool changed = false;
+
+                foreach (var want in missing)
+                {
+                    if (want.Key.Length == 0) continue;
+
+                    changed |= read.ContainsKey(want.Key)
+                        ? _unreadable.Remove(want.Key)
+                        : _unreadable.Add(want.Key);
+                }
+
+                Layers.Unreadable = _unreadable;
+
                 DropStale(NeededPasses());
 
                 // Jetzt erst gibt es Miniaturen: Die Zeilen standen schon, als die
                 // Dateien noch gelesen wurden, und haben damals nichts bekommen.
-                if (read.Count > 0) Layers.ShowThumbnails();
+                //
+                // Und auch dann, wenn NICHTS ankam: Dann hat sich der Vermerk
+                // geaendert, und die Zeile muss ihn zeigen. Ein fehlgeschlagener
+                // Leseversuch, nach dem die Oberflaeche unveraendert dasteht, ist
+                // genau der Fall, den niemand als Fehler erkennt.
+                if (read.Count > 0 || changed) Layers.ShowThumbnails();
 
                 Refresh(interim: false, recompose: true);
             });

@@ -38,6 +38,7 @@ public static class AtelierLayerInvariants
             TheFrameOnlyGrabsWhenItShould(path);
             TheToolDecidesWhatTheMouseDoes(path);
             TheColumnRemembersHowItStood(path);
+            ShowingALayerShowsItAtOnce(folder);
         }
         finally
         {
@@ -405,6 +406,202 @@ public static class AtelierLayerInvariants
         {
             window.Close();
         }
+    }
+
+    /// <summary>
+    /// Eine eingeblendete Ebene muss SOFORT erscheinen - nicht erst, wenn man noch
+    /// eine zweite einblendet.
+    ///
+    /// Gemeldet wurde genau das: Erst die beiden Glanzebenen einblenden, nichts
+    /// passiert; danach die hintere Bildebene einblenden, und ploetzlich stehen alle
+    /// drei da. Das ist der Fingerabdruck eines Durchgangs, der mit einem Stand
+    /// rechnet, der schon veraltet ist - die zweite Aenderung holt dann nach, was die
+    /// erste versaeumt hat.
+    ///
+    /// Gemessen wird am WIRKLICH GEZEICHNETEN Bild und nicht am Stapel: Ob eine Ebene
+    /// im Stapel auf sichtbar steht, war nie die Frage.
+    /// </summary>
+    private static void ShowingALayerShowsItAtOnce(string folder)
+    {
+        Check.Group("Eine eingeblendete Ebene erscheint sofort");
+
+        string ground = Path.Combine(folder, "sicht_grund.png");
+        string glow = Path.Combine(folder, "sicht_glanz.png");
+
+        Write(ground, 40);
+        Write(glow, 200);
+
+        var settings = new AppSettings();
+        var page = new AtelierPage(FrameDecoderRegistry.CreateDefault(() => null), settings, _ => { });
+
+        var window = new Window
+        {
+            Content = page,
+            Width = 900,
+            Height = 700,
+            ShowInTaskbar = false,
+            WindowStyle = WindowStyle.None,
+            ShowActivated = false,
+            Left = -4000,
+            Top = -4000,
+        };
+
+        try
+        {
+            window.Show();
+            page.UpdateLayout();
+            page.Open(ground);
+
+            var size = (System.Windows.Controls.TextBlock)page.FindName("SourceText");
+
+            if (!Pump(TimeSpan.FromSeconds(10), () => size.Text.Length > 0))
+            {
+                Check.That(false, "das Bild wird geladen");
+                return;
+            }
+
+            var strip = (LayerPanel)page.FindName("Layers");
+            var display = (System.Windows.Controls.Image)page.FindName("Display");
+
+            // Zwei Glanzebenen obenauf auf Screen, dazu eine gewoehnliche Bildebene -
+            // der gemeldete Aufbau.
+            strip.AddImage(glow);
+            strip.AddImage(glow);
+            strip.AddImage(glow);
+
+            Pump(TimeSpan.FromSeconds(5), () => display.Source is not null);
+
+            var added = strip.Stack.Layers.Where(l => l.Content == LayerContent.Image).ToList();
+
+            if (added.Count < 3)
+            {
+                Check.That(false, "drei Bildebenen liegen im Stapel", $"{added.Count}");
+                return;
+            }
+
+            var first = added[0];
+            var glowA = added[1];
+            var glowB = added[2];
+
+            foreach (var layer in new[] { glowA, glowB })
+            {
+                layer.OnTop = true;
+                layer.Mode = BlendMode.Screen;
+            }
+
+            foreach (var layer in new[] { first, glowA, glowB }) strip.SetVisible(layer, false);
+
+            Pump(TimeSpan.FromSeconds(5), () => false);
+
+            byte[] hidden = Shot(display);
+
+            // Jetzt die beiden Glanzebenen - und zwar NUR die.
+            strip.SetVisible(glowA, true);
+            strip.SetVisible(glowB, true);
+
+            Pump(TimeSpan.FromSeconds(5), () => false);
+
+            byte[] withGlow = Shot(display);
+
+            Check.That(Differs(hidden, withGlow),
+                       "die beiden Glanzebenen erscheinen, sobald man sie einblendet");
+
+            // Und die Gegenprobe auf die gemeldete Reihenfolge: Erst die dritte Ebene
+            // einzublenden darf nicht der Augenblick sein, in dem die ersten beiden
+            // auftauchen.
+            strip.SetVisible(first, true);
+
+            Pump(TimeSpan.FromSeconds(5), () => false);
+
+            byte[] all = Shot(display);
+
+            Check.That(Differs(withGlow, all),
+                       "und die dritte ebenso, wenn sie an der Reihe ist");
+
+            // ---- und jetzt derselbe Griff an Ebenen, die NIE GELESEN wurden ----
+            //
+            // Das ist der Unterschied, auf den es ankommt. Oben lagen die Dateien
+            // schon im Vorrat: Sie wurden beim Hinzufuegen gelesen, und Ausblenden
+            // wirft sie nicht weg. Wer FrameFlip schliesst und wieder oeffnet, hat
+            // eine ausgeblendete Ebene dagegen NOCH NIE gelesen - sie wird erst
+            // geholt, wenn sie gebraucht wird, und das laeuft nebenher.
+            //
+            // Ein Bild neu zu oeffnen leert den Vorrat und stellt genau diesen Stand
+            // her, ohne dass das Fenster dafuer zugemacht werden muss.
+            foreach (var layer in new[] { first, glowA, glowB }) strip.SetVisible(layer, false);
+
+            page.Open(ground);
+
+            if (!Pump(TimeSpan.FromSeconds(10), () => size.Text.Length > 0))
+            {
+                Check.That(false, "das Bild wird wieder geladen");
+                return;
+            }
+
+            Pump(TimeSpan.FromSeconds(5), () => false);
+
+            // Nach dem Oeffnen kann der Stapel neu aufgebaut worden sein - dann
+            // zeigen die alten Verweise auf Ebenen, die niemand mehr ansieht.
+            var again = strip.Stack.Layers.Where(l => l.Content == LayerContent.Image).ToList();
+
+            Console.WriteLine($"         Ebenen nach dem Oeffnen: {again.Count}, " +
+                              $"dieselben Objekte: {again.Count > 2 && ReferenceEquals(again[1], glowA)}");
+
+            if (again.Count > 2)
+            {
+                glowA = again[1];
+                glowB = again[2];
+                first = again[0];
+            }
+
+            byte[] cold = Shot(display);
+
+            strip.SetVisible(glowA, true);
+            strip.SetVisible(glowB, true);
+
+            // Gelesen wird nebenher - es wird also gewartet, und zwar auf das BILD
+            // und nicht auf eine feste Zeit.
+            Pump(TimeSpan.FromSeconds(8), () => Differs(Shot(display), cold));
+
+            byte[] warm = Shot(display);
+
+            Check.That(Differs(cold, warm),
+                       "auch ungelesene Ebenen erscheinen, sobald man sie einblendet");
+        }
+        finally
+        {
+            window.Close();
+        }
+    }
+
+    /// <summary>Das gezeichnete Bild als Bytes - die einzige Wahrheit, die zaehlt.</summary>
+    private static byte[] Shot(System.Windows.Controls.Image display)
+    {
+        if (display.Source is not System.Windows.Media.Imaging.BitmapSource source)
+            return Array.Empty<byte>();
+
+        int stride = source.PixelWidth * 4;
+        var pixels = new byte[stride * source.PixelHeight];
+
+        source.CopyPixels(pixels, stride, 0);
+
+        return pixels;
+    }
+
+    /// <summary>Ob zwei Aufnahmen sich sichtbar unterscheiden.</summary>
+    private static bool Differs(byte[] a, byte[] b)
+    {
+        if (a.Length == 0 || a.Length != b.Length) return a.Length != b.Length;
+
+        long sum = 0;
+
+        for (int i = 0; i < a.Length; i++) sum += Math.Abs(a[i] - b[i]);
+
+        double mean = (double)sum / a.Length;
+
+        Console.WriteLine($"         Unterschied im Bild: {mean:0.00} Stufen je Byte");
+
+        return mean > 0.5;
     }
 
     /// <summary>
