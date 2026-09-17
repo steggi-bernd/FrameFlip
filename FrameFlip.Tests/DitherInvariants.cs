@@ -31,6 +31,7 @@ public static class DitherInvariants
         EveryKernelIsItself();
         DiffusionLeavesCoverAlone();
         ACellIsSolid();
+        TwoColoursKeepTheForm();
     }
 
     private static OpticsPlace Place => new(1920, 1080, 1);
@@ -435,6 +436,100 @@ public static class DitherInvariants
 
         Check.That(Math.Abs(mean - 96) < 4.0,
                    "und die Flaeche behaelt ihre Helligkeit auch in Bloecken", $"{mean:0.0}");
+    }
+
+    /// <summary>
+    /// Zweifarbig: EINE Entscheidung je Rasterpunkt, und die Form bleibt lesbar.
+    ///
+    /// Ohne diesen Schalter entscheiden Rot, Gruen und Blau jeder fuer sich. Auf
+    /// einem farbigen Bild laufen sie auseinander, und was als Silhouette erkennbar
+    /// war, zerfaellt in drei unabhaengige Punktwolken. Genau das steht hier als Zahl:
+    /// Bei einer FARBIGEN Flaeche muss zweifarbig gerastert genau zwei Werte je
+    /// Bildpunkt kennen - Schwarz oder die gewaehlte Farbe -, waehrend die getrennte
+    /// Rasterung acht Mischungen ergibt.
+    /// </summary>
+    private static void TwoColoursKeepTheForm()
+    {
+        Check.Group("Zweifarbig haelt die Form zusammen");
+
+        static byte[] Coloured(bool duotone)
+        {
+            const int side = 48;
+
+            int stride = side * 4;
+            var pixels = new byte[stride * side];
+
+            // Eine mitteltonige FARBE - dort laufen drei getrennte Kanaele am
+            // weitesten auseinander.
+            for (int i = 0; i < pixels.Length; i += 4)
+            {
+                pixels[i] = 60;       // Blau
+                pixels[i + 1] = 110;  // Gruen
+                pixels[i + 2] = 170;  // Rot
+                pixels[i + 3] = 255;
+            }
+
+            var tool = new DiffusionTool
+            {
+                Amount = 1f, Levels = 2, Pixels = 2, PixelsTall = 1,
+                Duotone = duotone, Hue = 210f, Saturation = 0.8f,
+            };
+
+            tool.Prepare();
+
+            var buffer = Marshal.AllocHGlobal(pixels.Length);
+
+            try
+            {
+                Marshal.Copy(pixels, 0, buffer, pixels.Length);
+                tool.Apply(buffer, side, side, stride);
+                Marshal.Copy(buffer, pixels, 0, pixels.Length);
+            }
+            finally
+            {
+                Marshal.FreeHGlobal(buffer);
+            }
+
+            return pixels;
+        }
+
+        static int Shades(byte[] pixels)
+        {
+            var seen = new HashSet<int>();
+
+            for (int i = 0; i < pixels.Length; i += 4)
+                seen.Add(pixels[i] | (pixels[i + 1] << 8) | (pixels[i + 2] << 16));
+
+            return seen.Count;
+        }
+
+        int apart = Shades(Coloured(false));
+        int together = Shades(Coloured(true));
+
+        Console.WriteLine($"         getrennt {apart} Farben, zweifarbig {together}");
+
+        Check.That(together == 2, "zweifarbig kennt genau zwei Farben", $"{together}");
+
+        Check.That(apart > together,
+                   "getrennt gerastert werden es mehr - die Kanaele laufen auseinander",
+                   $"{apart}");
+
+        // Und die helle Farbe muss die gewaehlte sein: bei Farbton 210 mehr Blau als
+        // Rot. Andersherum waere der Regler eine Zierde.
+        var lit = Coloured(true);
+
+        int blue = 0, red = 0;
+
+        for (int i = 0; i < lit.Length; i += 4)
+        {
+            if (lit[i] <= 1 && lit[i + 2] <= 1) continue;
+
+            blue = Math.Max(blue, lit[i]);
+            red = Math.Max(red, lit[i + 2]);
+        }
+
+        Check.That(blue > red, "und die helle Farbe ist die eingestellte",
+                   $"blau {blue}, rot {red}");
     }
 
     /// <summary>

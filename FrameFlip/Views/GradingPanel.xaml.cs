@@ -609,6 +609,14 @@ public partial class GradingPanel : UserControl
                                                   DitherPixelsSlider.Minimum,
                                                   DitherPixelsSlider.Maximum);
 
+            DitherDuotoneButton.IsChecked = _diffusion.Duotone;
+
+            DitherHueSlider.Value = Math.Clamp(_diffusion.Hue,
+                                               DitherHueSlider.Minimum, DitherHueSlider.Maximum);
+            DitherSaturationSlider.Value = Math.Clamp(_diffusion.Saturation,
+                                                      DitherSaturationSlider.Minimum,
+                                                      DitherSaturationSlider.Maximum);
+
             DitherPixelsTallSlider.Value = Math.Clamp(
                 _diffusion.PixelsTall <= 0 ? _diffusion.Pixels : _diffusion.PixelsTall,
                 DitherPixelsTallSlider.Minimum, DitherPixelsTallSlider.Maximum);
@@ -794,6 +802,9 @@ public partial class GradingPanel : UserControl
         _diffusion.Levels = levels;
         _diffusion.Pixels = pixels;
         _diffusion.PixelsTall = tall;
+        _diffusion.Duotone = DitherDuotoneButton.IsChecked == true;
+        _diffusion.Hue = (float)DitherHueSlider.Value;
+        _diffusion.Saturation = (float)DitherSaturationSlider.Value;
         _diffusion.Place = !diffuse;
         _diffusion.Pattern = _dither.Pattern;
         _diffusion.Angle = _dither.Angle;
@@ -880,6 +891,19 @@ public partial class GradingPanel : UserControl
         DitherSizeValue.Text = $"{DitherSizeSlider.Value:0}";
         DitherPixelsValue.Text = $"{DitherPixelsSlider.Value:0}";
         DitherPixelsTallValue.Text = $"{DitherPixelsTallSlider.Value:0}";
+        DitherHueValue.Text = $"{DitherHueSlider.Value:0}\u00b0";
+        DitherSaturationValue.Text = $"{DitherSaturationSlider.Value:0.00}";
+
+        // Farbton und Saettigung gelten nur zweifarbig - sonst stuenden zwei Regler
+        // da, die nichts tun.
+        var tone = DitherDuotoneButton.IsChecked == true
+            ? System.Windows.Visibility.Visible
+            : System.Windows.Visibility.Collapsed;
+
+        DitherHueHeader.Visibility = tone;
+        DitherHueSlider.Visibility = tone;
+        DitherSaturationHeader.Visibility = tone;
+        DitherSaturationSlider.Visibility = tone;
 
         // Fehlerdiffusion kennt keinen Rasterpunkt - sie verteilt, statt zu rastern.
         // Den Regler stehenzulassen hiesse, eine Einstellung anzubieten, die nichts

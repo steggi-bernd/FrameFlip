@@ -118,6 +118,31 @@ public sealed class DiffusionTool : IFramePass
     /// <summary>Nach welchem Schema gestreut wird - nur wenn nicht <see cref="Place"/>.</summary>
     public DiffusionKernel Kernel { get; set; } = DiffusionKernel.FloydSteinberg;
 
+    /// <summary>
+    /// Zweifarbig: EINE Entscheidung je Rasterpunkt statt dreier.
+    ///
+    /// Das ist der Unterschied zwischen einem gerasterten Bild und einem
+    /// gerasterten Durcheinander. Ohne diesen Schalter entscheiden Rot, Gruen und
+    /// Blau jeder fuer sich; auf einem farbigen Bild laufen sie auseinander, und was
+    /// als Silhouette erkennbar war, zerfaellt in drei unabhaengige Punktwolken.
+    ///
+    /// Mit ihm wird die HELLIGKEIT gerastert - ein Wert, eine Entscheidung, ein
+    /// Fehler, der weitergereicht wird - und das Ergebnis danach auf zwei Farben
+    /// abgebildet. Die Form bleibt dadurch lesbar, weil sie eine Aussage ueber die
+    /// Helligkeit ist und nicht ueber drei Kanaele.
+    ///
+    /// Es ist ausserdem die einzige Art, hier ueberhaupt Farbe zu bekommen: Dieser
+    /// Durchgang laeuft ganz am Ende, nach allen Farbwerkzeugen. Was er ausgibt,
+    /// faerbt niemand mehr ein.
+    /// </summary>
+    public bool Duotone { get; set; }
+
+    /// <summary>Der Farbton der hellen Farbe, in Grad. Die dunkle ist Schwarz.</summary>
+    public float Hue { get; set; } = 210f;
+
+    /// <summary>Wie bunt die helle Farbe ist. 0 ist Weiss.</summary>
+    public float Saturation { get; set; } = 0.8f;
+
     [JsonIgnore]
     public bool IsNeutral => Amount < 0.005f || Levels >= 64;
 
@@ -125,6 +150,7 @@ public sealed class DiffusionTool : IFramePass
     private float _amount;
     private int _blockX, _blockY;
     private float _sin, _cos;
+    private float _lightR, _lightG, _lightB;
     private (int X, int Y, float Weight)[] _spread = Array.Empty<(int, int, float)>();
     private int _reach;
 
@@ -139,6 +165,9 @@ public sealed class DiffusionTool : IFramePass
 
         _sin = MathF.Sin(radians);
         _cos = MathF.Cos(radians);
+
+        Lit(Hue, Math.Clamp(Saturation, 0f, 1f),
+            out _lightR, out _lightG, out _lightB);
 
         _spread = Spread(Kernel);
         _reach = 1;
@@ -181,9 +210,14 @@ public sealed class DiffusionTool : IFramePass
                     ? DitherTool.Threshold(Pattern, bx, by, 1, _sin, _cos)
                     : 0f;
 
-                for (int c = 0; c < 3; c++)
+                // Zweifarbig heisst: EIN Wert, eine Entscheidung. Sonst drei.
+                int channels = Duotone ? 1 : 3;
+
+                for (int c = 0; c < channels; c++)
                 {
-                    float was = Average(target, stride, width, height, bx, by, c);
+                    float was = Duotone
+                        ? Luma(target, stride, width, height, bx, by)
+                        : Average(target, stride, width, height, bx, by, c);
 
                     float wanted = Place ? was : was + here[bx * 3 + c];
 
@@ -216,13 +250,65 @@ public sealed class DiffusionTool : IFramePass
 
                     // Und erst das Ergebnis wird gemischt. Bei Staerke null steht
                     // wieder der Ausgangswert da.
-                    Fill(target, stride, width, height, bx, by, c,
-                         was + (stepped - was) * _amount);
+                    float shown = was + (stepped - was) * _amount;
+
+                    if (Duotone)
+                    {
+                        // Die Helligkeit auf die helle Farbe abgebildet - Schwarz
+                        // bleibt Schwarz, weil die dunkle Farbe Schwarz ist.
+                        Fill(target, stride, width, height, bx, by, 0, shown * _lightB);
+                        Fill(target, stride, width, height, bx, by, 1, shown * _lightG);
+                        Fill(target, stride, width, height, bx, by, 2, shown * _lightR);
+                    }
+                    else
+                    {
+                        Fill(target, stride, width, height, bx, by, c, shown);
+                    }
                 }
             }
 
             Array.Clear(here);
         }
+    }
+
+    /// <summary>
+    /// Die Helligkeit eines Blocks - dieselben Gewichte wie im uebrigen Bildweg.
+    ///
+    /// Gerechnet auf den ANZEIGEWERTEN, weil dieser Durchgang dort lebt. Eine
+    /// Helligkeit in linearem Licht waere die physikalisch richtige und die hier
+    /// unbrauchbare: Gerastert wird, was man sieht.
+    /// </summary>
+    private unsafe float Luma(byte* target, int stride, int width, int height, int bx, int by)
+        => 0.2126f * Average(target, stride, width, height, bx, by, 2)
+         + 0.7152f * Average(target, stride, width, height, bx, by, 1)
+         + 0.0722f * Average(target, stride, width, height, bx, by, 0);
+
+    /// <summary>
+    /// Die helle Farbe aus Farbton und Saettigung - bei voller Helligkeit.
+    ///
+    /// Zwei Regler statt dreier: Die dritte Zahl waere die Helligkeit, und die ist
+    /// hier immer eins. Eine helle Farbe, die nicht hell ist, ergaebe ein Bild aus
+    /// zwei dunklen Toenen, und dafuer braucht niemand ein Raster.
+    /// </summary>
+    private static void Lit(float hue, float saturation,
+                            out float r, out float g, out float b)
+    {
+        float h = (hue % 360f + 360f) % 360f / 60f;
+        float x = 1f - MathF.Abs(h % 2f - 1f);
+
+        (float pr, float pg, float pb) = (int)h switch
+        {
+            0 => (1f, x, 0f),
+            1 => (x, 1f, 0f),
+            2 => (0f, 1f, x),
+            3 => (0f, x, 1f),
+            4 => (x, 0f, 1f),
+            _ => (1f, 0f, x),
+        };
+
+        r = 1f + (pr - 1f) * saturation;
+        g = 1f + (pg - 1f) * saturation;
+        b = 1f + (pb - 1f) * saturation;
     }
 
     /// <summary>Der Mittelwert eines Blocks in einem Kanal.</summary>

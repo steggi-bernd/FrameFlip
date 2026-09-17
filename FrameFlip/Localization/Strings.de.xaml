@@ -840,4 +840,8 @@
     <sys:String x:Key="S_DitherPixelsHint">Die Kantenlänge eines Rasterpunkts in Bildpunkten. Bei 1 wird jeder Bildpunkt einzeln entschieden - das ist die feinste Rasterung und bei hoher Auflösung genau die, die wie gleichmäßiges Rauschen aussieht. Vier bis acht ist der Bereich, in dem das Muster wieder ein Muster wird. Sobald der Wert über 1 liegt, läuft auch ein Ortsmuster über den ganzen Rahmen und erscheint deshalb erst beim Loslassen.</sys:String>
     <sys:String x:Key="S_DitherPixelsTall">Rasterpunkt hoch</sys:String>
     <sys:String x:Key="S_DitherPixelsTallHint">Die Höhe eines Rasterpunkts, getrennt von der Breite. Gleich hoch wie breit ergibt Punkte. Breit 8 und hoch 1 ergibt waagerechte Striche, und benachbarte Striche einer Zeile verschmelzen zu einer Linie, die der Form folgt - so entstehen die Schraffuren alter Drucke. Umgekehrt, schmal und hoch, ergibt senkrechte Striche.</sys:String>
+    <sys:String x:Key="S_DitherDuotone">zweifarbig</sys:String>
+    <sys:String x:Key="S_DitherDuotoneHint">Rastert die HELLIGKEIT statt jeden Kanal für sich und bildet das Ergebnis auf zwei Farben ab - Schwarz und die gewählte. Ohne diesen Schalter entscheiden Rot, Grün und Blau jeder für sich; auf einem farbigen Bild laufen sie auseinander, und was als Silhouette erkennbar war, zerfällt in drei unabhängige Punktwolken. Es ist außerdem die einzige Art, hier überhaupt Farbe zu bekommen: Der Rasterdurchgang läuft ganz am Ende, nach allen Farbwerkzeugen.</sys:String>
+    <sys:String x:Key="S_DitherHue">Farbton</sys:String>
+    <sys:String x:Key="S_DitherSaturation">Sättigung</sys:String>
 </ResourceDictionary>

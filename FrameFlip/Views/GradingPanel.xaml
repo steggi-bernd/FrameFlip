@@ -808,6 +808,36 @@
                         Minimum="0" Maximum="180" Value="0" SmallChange="1" LargeChange="15"
                         ValueChanged="OnChanged" MouseDoubleClick="OnSliderReset" Tag="0" />
 
+                <!--
+                    Zweifarbig. Der Schalter, ohne den ein gerastertes Farbbild in
+                    drei unabhaengige Punktwolken zerfaellt - und die einzige Art,
+                    hier ueberhaupt Farbe zu bekommen: Dieser Durchgang laeuft ganz am
+                    Ende, nach allen Farbwerkzeugen.
+                -->
+                <ToggleButton x:Name="DitherDuotoneButton" Style="{StaticResource OverlayToggle}"
+                              HorizontalAlignment="Left" Margin="0,12,0,0" Padding="8,1" FontSize="10"
+                              Content="{DynamicResource S_DitherDuotone}"
+                              Checked="OnDitherPattern" Unchecked="OnDitherPattern"
+                              ToolTip="{DynamicResource S_DitherDuotoneHint}" />
+
+                <Grid x:Name="DitherHueHeader" Visibility="Collapsed" Margin="0,10,0,2">
+                    <TextBlock Text="{DynamicResource S_DitherHue}" Style="{StaticResource PanelLabel}" />
+                    <TextBlock x:Name="DitherHueValue" Style="{StaticResource PanelValue}" />
+                </Grid>
+                <Slider x:Name="DitherHueSlider" Style="{StaticResource PanelSlider}"
+                        Visibility="Collapsed"
+                        Minimum="0" Maximum="360" Value="210" SmallChange="1" LargeChange="30"
+                        ValueChanged="OnChanged" MouseDoubleClick="OnSliderReset" Tag="210" />
+
+                <Grid x:Name="DitherSaturationHeader" Visibility="Collapsed" Margin="0,10,0,2">
+                    <TextBlock Text="{DynamicResource S_DitherSaturation}" Style="{StaticResource PanelLabel}" />
+                    <TextBlock x:Name="DitherSaturationValue" Style="{StaticResource PanelValue}" />
+                </Grid>
+                <Slider x:Name="DitherSaturationSlider" Style="{StaticResource PanelSlider}"
+                        Visibility="Collapsed"
+                        Minimum="0" Maximum="1" Value="0.8" SmallChange="0.02" LargeChange="0.1"
+                        ValueChanged="OnChanged" MouseDoubleClick="OnSliderReset" Tag="0.8" />
+
                 <TextBlock Margin="0,8,0,0" FontSize="10" TextWrapping="Wrap"
                            Foreground="{StaticResource MutedBrush}"
                            Text="{DynamicResource S_DitherHint}" />

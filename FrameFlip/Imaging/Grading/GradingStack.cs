@@ -205,6 +205,8 @@ public sealed class GradingStack
             Pixels = diffusion.Pixels, PixelsTall = diffusion.PixelsTall,
             Place = diffusion.Place,
             Pattern = diffusion.Pattern, Angle = diffusion.Angle,
+            Duotone = diffusion.Duotone, Hue = diffusion.Hue,
+            Saturation = diffusion.Saturation,
         },
 
         _ => throw new NotSupportedException($"Kein Kopierweg fuer {pass.GetType().Name}."),
