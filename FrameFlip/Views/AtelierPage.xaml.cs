@@ -137,6 +137,7 @@ public sealed partial class AtelierPage : UserControl
 
         Placement.Changed += OnPlacementDragged;
         Placement.Painted += OnPainted;
+        Placement.MaskWanted = MakeMaskLayer;
 
         Bind(null);
 

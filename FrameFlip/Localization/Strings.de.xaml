@@ -857,4 +857,5 @@
     <sys:String x:Key="S_MaskLockHint">Gesperrt gilt ein Anstrich für die ganze Sequenz. Entsperrt gilt je Bild ein eigener — dann lässt sich ein einzelnes Bild retuschieren, ohne die anderen anzufassen. Beim Entsperren wandert der bisherige Anstrich auf das aktuelle Bild, statt verworfen zu werden.</sys:String>
     <sys:String x:Key="S_MaskLockedNote">Ein Anstrich für alle Bilder.</sys:String>
     <sys:String x:Key="S_MaskLooseNote">Je Bild ein eigener Anstrich — für Einzelbildretusche.</sys:String>
+    <sys:String x:Key="S_MaskLayerName">Maske</sys:String>
 </ResourceDictionary>

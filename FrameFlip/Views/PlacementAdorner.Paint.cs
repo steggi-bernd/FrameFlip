@@ -46,6 +46,16 @@ public sealed partial class PlacementAdorner
     public event Action<bool>? Painted;
 
     /// <summary>
+    /// Woher eine Maske kommt, wenn noch keine da ist - beim ERSTEN Strich gefragt.
+    ///
+    /// Erst beim Strich und nicht beim Waehlen des Werkzeugs: Wer den Pinsel nur
+    /// anfasst, um zu sehen, was er tut, soll keine Ebene erzeugt haben. Eine Ebene,
+    /// die entsteht, weil jemand ein Werkzeug angeklickt hat, ist eine Ebene, die man
+    /// hinterher wegraeumt.
+    /// </summary>
+    public Func<PaintedMask?>? MaskWanted { get; set; }
+
+    /// <summary>
     /// Zeigt eine Maske zum Bemalen - oder null, um den Pinsel abzuschalten.
     ///
     /// Die Leinwandmasse kommen mit, weil der Pinsel in BILDpunkten rechnet und die
@@ -59,7 +69,10 @@ public sealed partial class PlacementAdorner
         _uniform = uniform;
         _washStale = true;
 
-        IsHitTestVisible = mask is not null;
+        // Faengt auch OHNE Maske, solange jemand eine liefern kann: Sonst gaebe es
+        // keinen ersten Strich, mit dem sie entstehen koennte - und der Ring am
+        // Zeiger waere auch nicht zu sehen.
+        IsHitTestVisible = mask is not null || MaskWanted is not null;
 
         InvalidateVisual();
     }
@@ -77,11 +90,11 @@ public sealed partial class PlacementAdorner
 
     private void RenderPaint(DrawingContext context)
     {
-        if (_mask is null || _canvasWidth <= 0) return;
+        if (_canvasWidth <= 0) return;
 
         Wash();
 
-        if (_wash is not null)
+        if (_mask is not null && _wash is not null)
         {
             // Ueber die ganze Bildflaeche gezogen: Die Maske ist groeber als das Bild,
             // und das Strecken uebernimmt dieselbe Umrechnung wie die Anzeige.
@@ -91,7 +104,9 @@ public sealed partial class PlacementAdorner
             context.DrawImage(_wash, new Rect(a, b));
         }
 
-        // Der Pinselkreis am Zeiger - sonst weiss niemand, wie gross er ist.
+        // Der Pinselkreis am Zeiger - sonst weiss niemand, wie gross er ist, und der
+        // Zeiger selbst ist ausgeblendet. Er haengt NICHT an der Maske: Vor dem
+        // ersten Strich gibt es noch keine, und genau dann braucht man ihn am meisten.
         if (!IsMouseOver) return;
 
         var at = Mouse.GetPosition(this);
@@ -111,6 +126,7 @@ public sealed partial class PlacementAdorner
     private void Wash()
     {
         if (!_washStale || _mask is null) return;
+
 
         _washStale = false;
 
@@ -142,7 +158,12 @@ public sealed partial class PlacementAdorner
 
     private void PaintDown(MouseButtonEventArgs e, float x, float y)
     {
+        // Jetzt erst wird eine Maske gebraucht - und, wenn noetig, angelegt.
+        _mask ??= MaskWanted?.Invoke();
+
         if (_mask is null) return;
+
+        _washStale = true;
 
         _painting = true;
 
@@ -159,6 +180,21 @@ public sealed partial class PlacementAdorner
 
         e.Handled = true;
         CaptureMouse();
+    }
+
+    /// <summary>Der Ring muss dem Zeiger folgen, auch wenn nicht gemalt wird.</summary>
+    protected override void OnMouseEnter(MouseEventArgs e)
+    {
+        base.OnMouseEnter(e);
+
+        if (_mode == AdornerMode.Paint) InvalidateVisual();
+    }
+
+    protected override void OnMouseLeave(MouseEventArgs e)
+    {
+        base.OnMouseLeave(e);
+
+        if (_mode == AdornerMode.Paint) InvalidateVisual();
     }
 
     private void PaintMove(float x, float y)

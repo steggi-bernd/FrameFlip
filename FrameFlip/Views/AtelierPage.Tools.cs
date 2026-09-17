@@ -53,7 +53,10 @@ public partial class AtelierPage
             {
                 AtelierTool.Select or AtelierTool.Pick or AtelierTool.Crop => Cursors.Cross,
                 AtelierTool.Hand => Cursors.Hand,
-                AtelierTool.Brush => Cursors.None,
+                // Der Pinsel blendet den Zeiger aus, weil der Ring seine Stelle
+                // einnimmt. Das tut aber ShowBrush - erst dort steht fest, ob
+                // ueberhaupt gemalt werden kann.
+                AtelierTool.Brush => Display.Cursor,
                 _ => null,
             };
 

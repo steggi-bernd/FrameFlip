@@ -83,9 +83,23 @@ public partial class AtelierPage
     {
         var layer = Layers.Selection;
 
-        if (_frame is null || layer is null || layer.Mask.Kind != MaskKind.Painted)
+        if (_frame is null)
         {
             Placement.Paint(null, 0, 0, false);
+            Display.Cursor = null;
+
+            return;
+        }
+
+        // Noch keine gemalte Maske? Dann faengt der Pinsel trotzdem - und legt beim
+        // ERSTEN Strich eine Maskenebene an. Siehe MakeMaskLayer.
+        if (layer is null || layer.Mask.Kind != MaskKind.Painted)
+        {
+            Placement.Paint(null, _frame.Width, _frame.Height,
+                            Display.Stretch == System.Windows.Media.Stretch.Uniform);
+
+            Display.Cursor = System.Windows.Input.Cursors.None;
+
             return;
         }
 
@@ -93,6 +107,47 @@ public partial class AtelierPage
 
         Placement.Paint(mask, _frame.Width, _frame.Height,
                         Display.Stretch == System.Windows.Media.Stretch.Uniform);
+
+        // Der Zeiger weicht dem Ring - aber erst jetzt, wo feststeht, dass gemalt
+        // werden kann. Ihn vorher auszublenden hiesse, ihn auch dort wegzunehmen, wo
+        // der Ring gar nicht erscheint.
+        Display.Cursor = System.Windows.Input.Cursors.None;
+    }
+
+    /// <summary>
+    /// Liefert die Maske fuer den ersten Strich - und legt dafuer eine EIGENE EBENE an.
+    ///
+    /// Das Bild wird nie bemalt. Wer den Pinsel nimmt, meint eine Maske und keine
+    /// Aenderung am Bild selbst; eine Maske auf der untersten Ebene waere aber genau
+    /// das - sie schnitte das Bild an, und rueckgaengig ginge es nur ueber denselben
+    /// Pinsel.
+    ///
+    /// Angelegt wird eine EINSTELLUNGSEBENE. Sie bringt nichts mit und aendert nichts,
+    /// solange niemand einen Regler anfasst - genau das, was eine Maskenebene sein
+    /// soll: ein Ort, an dem "hier" steht, und der wartet, bis jemand sagt, was dort
+    /// geschehen soll. Wegwerfen heisst eine Zeile loeschen.
+    ///
+    /// Und erst beim Strich, nicht beim Waehlen des Werkzeugs: Wer den Pinsel nur
+    /// anfasst, um zu sehen, was er tut, soll keine Ebene erzeugt haben.
+    /// </summary>
+    private PaintedMask? MakeMaskLayer()
+    {
+        if (_frame is null) return null;
+
+        var layer = Layers.Selection;
+
+        if (layer is not null && layer.Mask.Kind == MaskKind.Painted)
+            return layer.Mask.PaintOn(_number, _frame.Width, _frame.Height);
+
+        Layers.AddAdjustment();
+
+        var made = Layers.Selection;
+        if (made is null) return null;
+
+        made.Mask.Kind = MaskKind.Painted;
+        made.Name = FrameFlip.Localization.Strings.T("S_MaskLayerName");
+
+        return made.Mask.PaintOn(_number, _frame.Width, _frame.Height);
     }
 
     /// <summary>

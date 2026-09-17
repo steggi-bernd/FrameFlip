@@ -1214,22 +1214,22 @@ public static class AtelierLayerInvariants
             Check.That(column.Tool == AtelierTool.Brush, "naemlich den Pinsel", $"{column.Tool}");
             Check.That(frame.Mode == AdornerMode.Paint, "und der Rahmen malt", $"{frame.Mode}");
 
-            Check.That(!frame.IsHitTestVisible,
-                       "ohne gemalte Maske faengt er nichts");
+            // Er faengt auch OHNE Maske - sonst gaebe es keinen ersten Strich, mit
+            // dem eine entstehen koennte, und der Ring am Zeiger waere unsichtbar.
+            Check.That(frame.IsHitTestVisible, "er faengt, auch bevor es eine Maske gibt");
 
-            var chosen = ((LayerPanel)page.FindName("Layers")).Selection;
+            // Aber er legt NICHTS an, solange niemand malt. Wer ein Werkzeug nur
+            // anfasst, um zu sehen, was es tut, soll keine Ebene erzeugt haben.
+            var strip = (LayerPanel)page.FindName("Layers");
+            int before = strip.Stack.Layers.Count;
 
-            if (chosen is not null)
-            {
-                chosen.Mask.Kind = MaskKind.Painted;
+            page.HandleToolKey(System.Windows.Input.Key.V);
+            page.HandleToolKey(System.Windows.Input.Key.B);
+            page.UpdateLayout();
 
-                page.HandleToolKey(System.Windows.Input.Key.V);
-                page.HandleToolKey(System.Windows.Input.Key.B);
-                page.UpdateLayout();
-
-                Check.That(frame.IsHitTestVisible,
-                           "mit gemalter Maske sehr wohl");
-            }
+            Check.That(strip.Stack.Layers.Count == before,
+                       "und legt dabei keine Ebene an - erst der Strich tut das",
+                       $"{strip.Stack.Layers.Count} statt {before}");
 
             page.HandleToolKey(System.Windows.Input.Key.V);
             page.UpdateLayout();

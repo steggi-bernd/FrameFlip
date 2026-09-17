@@ -857,4 +857,5 @@
     <sys:String x:Key="S_MaskLockHint">Locked, one painting applies to the whole sequence. Unlocked, each frame gets its own - then a single frame can be retouched without touching the others. On unlocking, the painting so far moves to the current frame rather than being discarded.</sys:String>
     <sys:String x:Key="S_MaskLockedNote">One painting for every frame.</sys:String>
     <sys:String x:Key="S_MaskLooseNote">A separate painting per frame - for single-frame retouching.</sys:String>
+    <sys:String x:Key="S_MaskLayerName">Mask</sys:String>
 </ResourceDictionary>
