@@ -364,11 +364,24 @@ public sealed partial class AtelierPage : UserControl
     /// zieht, aendert sie fuer beide. Genau das ist gewollt; nur der Behaelter darf
     /// nicht geteilt sein.
     /// </summary>
-    private GradingStack Snapshot() => new()
-    {
-        Tools = Tools.Stack.Tools.ToList(),
-        Local = Tools.Stack.Local.ToList(),
-    };
+    /// <summary>
+    /// Der Stapel, wie er gerade steht - VOLLSTAENDIG.
+    ///
+    /// Er zaehlte frueher zwei seiner sechs Listen auf, und das war ein Fehler mit
+    /// langem Nachhall: Optik, Geometrie, Renderdaten und die Durchgaenge ueber den
+    /// Rahmen fielen weg. Weil diese Aufnahme sofort in die Einstellungen
+    /// zurueckgeschrieben wird und der naechste Ladevorgang daraus liest, wischte
+    /// jeder Wechsel der gewaehlten Ebene die Vignette, das Korn, das Raster, die
+    /// Verzeichnung, die Tiefenschaerfe und die Bewegungsunschaerfe wieder aus.
+    ///
+    /// Im Fenster sah das aus, als taete der Regler nichts - er tat etwas, und kurz
+    /// darauf nahm es ihm jemand wieder ab.
+    ///
+    /// Jetzt wird kopiert statt aufgezaehlt. Eine Aufzaehlung ist eine Liste, die man
+    /// pflegen muss; sie war schon beim Schreiben unvollstaendig und wurde es mit
+    /// jeder neuen Passart mehr.
+    /// </summary>
+    private GradingStack Snapshot() => Tools.Stack.Clone();
 
     private void OnToolsChanged(bool interim)
     {
@@ -376,12 +389,26 @@ public sealed partial class AtelierPage : UserControl
 
         if (layer)
         {
+            // Die Werkzeuge der Ebene liegen im Stapel selbst - der Streifen hat sie
+            // beim Binden hineingelegt und aendert dasselbe Objekt weiter.
             _editing!.Adjustments = Tools.Adjustments;
             _settings.Layers = Layers.Stack;
         }
         else
         {
             _settings.Adjustments = Tools.Adjustments;
+
+            // Und der Stapel dazu. Ihn hier zu vergessen war die zweite Haelfte eines
+            // langen Fehlers: Die Aenderung kam im BILD an - _finalGrading steht ja
+            // gleich darunter -, aber nicht in den Einstellungen. Sobald die Auswahl
+            // auf eine Ebene wechselte, las der Streifen deren Werkzeuge ein und
+            // leerte dabei seine Listen; beim Zurueckwechseln stellte er den Stand aus
+            // den Einstellungen wieder her - also den von VOR der Aenderung.
+            //
+            // Im Fenster sah das aus, als taete der Regler nichts. Er tat etwas, und
+            // der naechste Klick woanders nahm es ihm wieder ab.
+            _settings.Grading = Snapshot();
+
             _finalAdjustments = Tools.Adjustments;
             _finalGrading = Tools.Prepared;
         }

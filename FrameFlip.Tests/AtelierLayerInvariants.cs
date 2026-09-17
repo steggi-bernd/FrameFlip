@@ -480,6 +480,8 @@ public static class AtelierLayerInvariants
             levels.Value = 2;
             amount.Value = 1;
 
+            ItSurvivesASelectionChange(page, tools, box, display, plain);
+
             // Vier: geordnet, zufaellig, Linien, Floyd-Steinberg - dann Atkinson.
             foreach (int pick in new[] { 0, 4 })
             {
@@ -504,6 +506,61 @@ public static class AtelierLayerInvariants
         {
             window.Close();
         }
+    }
+
+    /// <summary>
+    /// Eine Rastereinstellung muss einen WECHSEL DER GEWAEHLTEN EBENE ueberleben.
+    ///
+    /// Das war der eigentliche Grund, und er ist unangenehm gut versteckt: Die
+    /// Aufnahme des Stapels zaehlte zwei ihrer sechs Listen auf. Weil sie sofort in
+    /// die Einstellungen zurueckgeschrieben wird und der naechste Ladevorgang daraus
+    /// liest, wischte jeder Wechsel der Auswahl alles aus, was nicht aufgezaehlt war
+    /// - Optik, Geometrie, Renderdaten, Rahmendurchgaenge.
+    ///
+    /// Im Fenster sah das aus, als taete der Regler nichts. Er tat etwas, und kurz
+    /// darauf nahm es ihm jemand wieder ab. Geprueft wird deshalb nicht der Regler,
+    /// sondern was nach einem Klick woanders noch davon uebrig ist.
+    /// </summary>
+    private static void ItSurvivesASelectionChange(
+        AtelierPage page, GradingPanel tools,
+        System.Windows.Controls.ComboBox box,
+        System.Windows.Controls.Image display, byte[] plain)
+    {
+        // Atkinson - eine Fehlerdiffusion, also ein Rahmendurchgang.
+        box.SelectedIndex = 4;
+
+        Pump(TimeSpan.FromSeconds(2), () => false);
+
+        Check.That(tools.Prepared.Frame.Length == 1, "gesetzt ist der Durchgang da",
+                   $"{tools.Prepared.Frame.Length}");
+
+        // Und jetzt das, was jeder tut: eine Ebene anklicken und zurueck.
+        var strip = (LayerPanel)page.FindName("Layers");
+
+        strip.AddAdjustment();
+
+        Pump(TimeSpan.FromSeconds(1), () => false);
+
+        var pass = strip.Stack.Layers.First(l => l.Content == LayerContent.Pass);
+
+        Select(strip, pass);
+
+        Pump(TimeSpan.FromSeconds(2), () => false);
+
+        Check.That(tools.Prepared.Frame.Length == 1,
+                   "nach einem Wechsel der Auswahl ist er immer noch da",
+                   $"{tools.Prepared.Frame.Length}");
+
+        Check.That(Differs(plain, Shot(display)),
+                   "und das Bild zeigt ihn weiterhin");
+
+        // Und dieselbe Frage fuer die Optik, die an derselben Luecke haengt.
+        box.SelectedIndex = 0;
+
+        Pump(TimeSpan.FromSeconds(2), () => false);
+
+        Check.That(tools.Prepared.Optics.Length > 0,
+                   "auch das geordnete Raster ueberlebt", $"{tools.Prepared.Optics.Length}");
     }
 
     /// <summary>
