@@ -40,6 +40,7 @@ public static class AtelierLayerInvariants
             TheColumnRemembersHowItStood(path);
             ShowingALayerShowsItAtOnce(folder);
             TheReportedSessionComesBack(folder);
+            RasterReachesTheAtelier(folder);
         }
         finally
         {
@@ -402,6 +403,102 @@ public static class AtelierLayerInvariants
             Check.Near(first.Adjustments!.Exposure, -2.0, 0.001,
                        "die Ebenen bleiben davon unberuehrt");
             Check.Near(second.Adjustments!.Exposure, 1.5, 0.001, "beide");
+        }
+        finally
+        {
+            window.Close();
+        }
+    }
+
+    /// <summary>
+    /// Rastern muss im ATELIER ankommen - nicht nur im Prozessor.
+    ///
+    /// Die Rechnung stimmt, der Prozessor traegt alle neun Verfahren, und das
+    /// Bedienfeld schreibt das Richtige in den Stapel. Alles drei ist geprueft, und
+    /// gemeldet wurde trotzdem dreimal "kein Unterschied". Zwischen dem Bedienfeld
+    /// und dem Bildpunkt auf dem Schirm liegt naemlich noch die Seite: Sie haelt eine
+    /// vorbereitete Korrektur, tauscht sie beim Wechsel der gewaehlten Ebene aus und
+    /// zeichnet erst nach einem Zeitgeber wieder voll.
+    ///
+    /// Hier wird deshalb die Seite bedient wie von Hand - Regler ziehen, Liste
+    /// umstellen - und das GEZEICHNETE Bild verglichen.
+    /// </summary>
+    private static void RasterReachesTheAtelier(string folder)
+    {
+        Check.Group("Rastern kommt im Atelier an");
+
+        string picture = Path.Combine(folder, "raster_bild.png");
+
+        Write(picture, 128);
+
+        var settings = new AppSettings();
+        var page = new AtelierPage(FrameDecoderRegistry.CreateDefault(() => null), settings, _ => { });
+
+        var window = new Window
+        {
+            Content = page,
+            Width = 1100,
+            Height = 800,
+            ShowInTaskbar = false,
+            WindowStyle = WindowStyle.None,
+            ShowActivated = false,
+            Left = -4000,
+            Top = -4000,
+        };
+
+        try
+        {
+            window.Show();
+            page.UpdateLayout();
+            page.Open(picture);
+
+            var size = (System.Windows.Controls.TextBlock)page.FindName("SourceText");
+
+            if (!Pump(TimeSpan.FromSeconds(10), () => size.Text.Length > 0))
+            {
+                Check.That(false, "das Bild wird geladen");
+                return;
+            }
+
+            Pump(TimeSpan.FromSeconds(3), () => false);
+
+            var display = (System.Windows.Controls.Image)page.FindName("Display");
+            var tools = (GradingPanel)page.FindName("Tools");
+
+            var box = (System.Windows.Controls.ComboBox)tools.FindName("DitherPatternBox");
+            var amount = (System.Windows.Controls.Slider)tools.FindName("DitherSlider");
+            var levels = (System.Windows.Controls.Slider)tools.FindName("DitherLevelsSlider");
+
+            if (box is null || amount is null || levels is null)
+            {
+                Check.That(false, "die Rasterliste ist Teil der Farbspalte");
+                return;
+            }
+
+            byte[] plain = Shot(display);
+
+            levels.Value = 2;
+            amount.Value = 1;
+
+            // Vier: geordnet, zufaellig, Linien, Floyd-Steinberg - dann Atkinson.
+            foreach (int pick in new[] { 0, 4 })
+            {
+                box.SelectedIndex = pick;
+
+                // FEST gewartet und nicht auf das Ergebnis: Der volle Durchgang kommt
+                // erst nach einem Zeitgeber, und die Fehlerdiffusion laeuft ueberhaupt
+                // nur dort. Wer auf den Unterschied wartet, hat einen Test, der bei
+                // Erfolg schnell und bei Misserfolg langsam ist - und der bestanden
+                // gilt, sobald die Maschine gerade schnell genug war.
+                Pump(TimeSpan.FromSeconds(2), () => false);
+
+                Check.That(tools.Prepared.Frame.Length == (pick >= 3 ? 1 : 0),
+                           $"Eintrag {pick}: der vorbereitete Stapel fuehrt den Rahmendurchgang",
+                           $"{tools.Prepared.Frame.Length}");
+
+                Check.That(Differs(plain, Shot(display)),
+                           $"Eintrag {pick} veraendert das gezeichnete Bild");
+            }
         }
         finally
         {

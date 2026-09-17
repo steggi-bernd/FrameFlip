@@ -223,6 +223,7 @@ public partial class GradingPanel : UserControl
         var optics = stack?.Optics.ToList();
         var geometry = stack?.Geometry.ToList();
         var data = stack?.Data.ToList();
+        var frame = stack?.Frame.ToList();
 
         Stack.Tools.Clear();
         if (tools is not null) Stack.Tools.AddRange(tools);
@@ -241,6 +242,13 @@ public partial class GradingPanel : UserControl
 
         Stack.Data.Clear();
         if (data is not null) Stack.Data.AddRange(data);
+
+        // Und die Durchgaenge ueber den Rahmen. Sie hier zu vergessen war derselbe
+        // Fehler wie einst bei der oertlichen Liste, nur schlechter zu finden: Der
+        // Bereich behielt sein eigenes Werkzeug, es wurde nie aus dem gespeicherten
+        // Stapel gefuellt und beim naechsten Start war die Einstellung weg.
+        Stack.Frame.Clear();
+        if (frame is not null) Stack.Frame.AddRange(frame);
 
         _curves = Take<CurvesTool>();
         _whiteBalance = Take<WhiteBalanceTool>();
