@@ -39,6 +39,7 @@ public static class AtelierLayerInvariants
             TheToolDecidesWhatTheMouseDoes(path);
             TheColumnRemembersHowItStood(path);
             ShowingALayerShowsItAtOnce(folder);
+            TheReportedSessionComesBack(folder);
         }
         finally
         {
@@ -406,6 +407,176 @@ public static class AtelierLayerInvariants
         {
             window.Close();
         }
+    }
+
+    /// <summary>
+    /// Die gemeldete Sitzung, Zeile fuer Zeile aus der Einstellungsdatei nachgebaut.
+    ///
+    /// Vier Ebenen: unten das Bild selbst als Pass - AUSGEBLENDET und mit einem
+    /// winzigen Versatz -, darueber zwei Bildebenen auf Normal und ganz oben eine
+    /// dritte, die auf DIESELBE DATEI zeigt wie das geoeffnete Bild. Nur die oberste
+    /// ist sichtbar.
+    ///
+    /// Das ist keine Aufstellung, die jemand von Hand baut, und genau deshalb kam sie
+    /// in keinem der vier Nachbauten vor. Sie entsteht, wenn eine Sitzung
+    /// zurueckkommt.
+    /// </summary>
+    private static void TheReportedSessionComesBack(string folder)
+    {
+        Check.Group("Die gemeldete Sitzung, aus der Einstellungsdatei nachgebaut");
+
+        string picture = Path.Combine(folder, "sitzung_bild.png");
+        string glareA = Path.Combine(folder, "sitzung_glanz_a.png");
+        string glareB = Path.Combine(folder, "sitzung_glanz_b.png");
+
+        Write(picture, 70);
+        Write(glareA, 150);
+        Write(glareB, 210);
+
+        // Die Reihenfolge NACH dem gemeldeten Zug: das Bild ganz nach unten gezogen.
+        var saved = new LayerStack
+        {
+            Layers =
+            {
+                new ImageLayer
+                {
+                    Content = LayerContent.Image, Source = picture, Name = "Bild0035",
+                    Mode = BlendMode.Normal, Visible = true,
+                },
+                new ImageLayer
+                {
+                    Content = LayerContent.Pass, Source = "", Name = "Bild",
+                    Mode = BlendMode.Normal, Visible = false,
+                    Place = new LayerTransform { OffsetX = -0.00036f, OffsetY = 0.0128f },
+                },
+                new ImageLayer
+                {
+                    Content = LayerContent.Image, Source = glareB, Name = "Glanz B",
+                    Mode = BlendMode.Normal, Visible = false,
+                },
+                new ImageLayer
+                {
+                    Content = LayerContent.Image, Source = glareA, Name = "Glanz A",
+                    Mode = BlendMode.Normal, Visible = false,
+                },
+            },
+        };
+
+        var settings = new AppSettings { Layers = saved };
+        var page = new AtelierPage(FrameDecoderRegistry.CreateDefault(() => null), settings, _ => { });
+
+        var window = new Window
+        {
+            Content = page,
+            Width = 900,
+            Height = 700,
+            ShowInTaskbar = false,
+            WindowStyle = WindowStyle.None,
+            ShowActivated = false,
+            Left = -4000,
+            Top = -4000,
+        };
+
+        try
+        {
+            window.Show();
+            page.UpdateLayout();
+            page.Open(picture);
+
+            var size = (System.Windows.Controls.TextBlock)page.FindName("SourceText");
+
+            if (!Pump(TimeSpan.FromSeconds(10), () => size.Text.Length > 0))
+            {
+                Check.That(false, "das Bild wird geladen");
+                return;
+            }
+
+            Pump(TimeSpan.FromSeconds(6), () => false);
+
+            var strip = (LayerPanel)page.FindName("Layers");
+            var display = (System.Windows.Controls.Image)page.FindName("Display");
+            var live = strip.Stack.Layers;
+
+            Check.That(live.Count == 4, "vier Ebenen kommen zurueck", $"{live.Count}");
+            if (live.Count != 4) return;
+
+            byte[] start = Shot(display);
+
+            // Von oben nach unten einblenden - genau die gemeldete Reihenfolge.
+            strip.SetVisible(live[3], true);
+            Pump(TimeSpan.FromSeconds(6), () => Differs(Shot(display), start));
+
+            byte[] one = Shot(display);
+
+            Check.That(Differs(start, one),
+                       "die oberste Glanzebene erscheint, sobald sie eingeblendet wird");
+
+            // Die zweite liegt UNTER der ersten, und die erste ist auf Normal bei
+            // voller Deckkraft - sie deckt alles. Dass sich dann nichts aendert, ist
+            // richtig; geprueft wird deshalb die zweite FUER SICH.
+            strip.SetVisible(live[3], false);
+            strip.SetVisible(live[2], true);
+
+            Pump(TimeSpan.FromSeconds(6), () => Differs(Shot(display), start));
+
+            Check.That(Differs(start, Shot(display)),
+                       "und die zweite ebenso, wenn sie nicht verdeckt wird");
+        }
+        finally
+        {
+            window.Close();
+        }
+
+        // Und dieselbe Aufstellung rein gerechnet, ohne Fenster: Damit steht fest, ob
+        // der Composer sie verschluckt oder die Seite sie nie zu sehen bekommt.
+        var sources = new Dictionary<string, FloatFrame>(StringComparer.Ordinal);
+
+        foreach (string file in new[] { picture, glareA, glareB })
+        {
+            var loaded = LayeredFrameLoader.Load(file, null);
+            if (loaded is not null) sources[file] = loaded;
+        }
+
+        if (sources.TryGetValue(picture, out var ground)) sources[""] = ground;
+
+        if (sources.Count < 4)
+        {
+            Check.That(false, "die drei Dateien lassen sich lesen", $"{sources.Count}");
+            return;
+        }
+
+        float Middle(LayerStack stack)
+        {
+            var built = LayerComposer.Compose(stack, sources);
+
+            return built is null ? -1f : built.R[built.Height / 2 * built.Width + built.Width / 2];
+        }
+
+        var bare = new LayerStack
+        {
+            Layers =
+            {
+                new ImageLayer { Content = LayerContent.Image, Source = picture, Mode = BlendMode.Normal },
+                new ImageLayer { Content = LayerContent.Pass, Source = "", Visible = false,
+                                 Place = new LayerTransform { OffsetY = 0.0128f } },
+                new ImageLayer { Content = LayerContent.Image, Source = glareB, Visible = false,
+                                 Mode = BlendMode.Normal },
+                new ImageLayer { Content = LayerContent.Image, Source = glareA, Visible = false,
+                                 Mode = BlendMode.Normal },
+            },
+        };
+
+        float without = Middle(bare);
+
+        bare.Layers[3].Visible = true;
+
+        float with = Middle(bare);
+
+        Console.WriteLine($"         gerechnet: ohne Glanz {without:0.0000}, mit Glanz {with:0.0000}");
+
+        Check.That(Math.Abs(with - without) > 0.01f,
+                   "der Composer selbst sieht die eingeblendete Ebene sehr wohl",
+                   $"{without:0.0000} gegen {with:0.0000}");
     }
 
     /// <summary>

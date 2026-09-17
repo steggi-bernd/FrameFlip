@@ -61,6 +61,43 @@ public static class LayerComposer
 
         Collect(stack.Layers, sources, used, ref width, ref height, depth: 0);
 
+        // Keine SICHTBARE Passebene? Dann gibt das Bild selbst die Groesse vor.
+        //
+        // Die Regel dort drueben - nur ein Pass legt die Leinwand fest - hat einen
+        // guten Grund: Sonst bestimmte ein Wasserzeichen von zweihundert Punkten die
+        // Groesse, wenn es zufaellig zuunterst liegt. Sie hatte aber eine Luecke, und
+        // die war teuer: Ist die Passebene AUSGEBLENDET, legt niemand eine Groesse
+        // fest, und dann kam ueberhaupt kein Bild zustande.
+        //
+        // Im Atelier sah das aus, als taete das Einblenden nichts. Der Rueckfall
+        // zeigte weiter die Datei, jede eingeblendete Ebene blieb wirkungslos - und
+        // in dem Augenblick, in dem jemand die unterste Ebene einblendete, erschienen
+        // alle anderen auf einmal. Nach einer wiederhergestellten Sitzung ist genau
+        // das der Normalfall, denn dort kommt der Stapel zurueck, wie er stand.
+        //
+        // Das Bild liegt immer unter dem leeren Schluessel. Es ist die richtige
+        // Antwort auf "wie gross ist die Leinwand", ganz gleich, welche Ebene gerade
+        // zu sehen ist: Die Leinwand haengt nicht daran, was jemand eingeblendet hat.
+        if (width == 0 && sources.TryGetValue("", out var canvas))
+        {
+            width = canvas.Width;
+            height = canvas.Height;
+        }
+
+        // Und wenn es auch das nicht gibt: die groesste Ebene, die etwas mitbringt.
+        // Kein gutes Mass, aber ein Bild - und ein Bild ist besser als keines.
+        if (width == 0)
+        {
+            foreach (var (_, frame, _) in used)
+            {
+                if (frame is null) continue;
+                if ((long)frame.Width * frame.Height <= (long)width * height) continue;
+
+                width = frame.Width;
+                height = frame.Height;
+            }
+        }
+
         // Ohne einen einzigen Pass gibt es nichts, worauf eine Korrektur wirken
         // koennte - und auch keine Bildgroesse. Ein Stapel aus lauter
         // Einstellungsebenen ist kein Bild.
