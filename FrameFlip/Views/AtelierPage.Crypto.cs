@@ -28,18 +28,35 @@ public partial class AtelierPage
     /// <summary>True, solange ein Klick ins Bild eine Auswahl bedeutet.</summary>
     private bool _picking;
 
+    /// <summary>
+    /// Der Maskenbereich bittet um eine Auswahl - oder gibt sie zurueck.
+    ///
+    /// Er bekommt keinen eigenen Zustand mehr, sondern schaltet das WERKZEUG. Damit
+    /// gibt es nur noch eine Stelle, an der steht, was ein Klick ins Bild bedeutet,
+    /// und sie ist in der Spalte zu sehen.
+    /// </summary>
     private void OnPickModeChanged(bool on)
     {
-        _picking = on;
+        var tool = on ? AtelierTool.Select : AtelierTool.Move;
 
-        // Ein Fadenkreuz statt des Pfeils: Ohne es ist nicht zu sehen, dass ein
-        // Klick ins Bild jetzt etwas anderes bedeutet als sonst.
-        Display.Cursor = on ? Cursors.Cross : null;
+        MouseTools.Select(tool);
+        OnToolChanged(tool);
     }
 
     private void OnImageClicked(object sender, MouseButtonEventArgs e)
     {
-        if (!_picking) return;
+        // Die Pipette liest nur ab und aendert nichts - deshalb steht sie vor allem
+        // anderen und braucht keine Ebene, keine Maske und keinen Stapel.
+        if (_tool == AtelierTool.Pick)
+        {
+            if (PixelAt(e.GetPosition(Display), out int rx, out int ry)) ReadAt(rx, ry);
+
+            e.Handled = true;
+
+            return;
+        }
+
+        if (_tool != AtelierTool.Select) return;
 
         string? level = Layers.PickLevel;
         if (level is null) return;

@@ -793,4 +793,10 @@
     <sys:String x:Key="D_TermsAccepted">Zugestimmt – Verbindungen nach draußen sind jetzt erlaubt.</sys:String>
     <sys:String x:Key="D_TermsDeclined">Nicht zugestimmt – es geht nichts nach draußen.</sys:String>
     <sys:String x:Key="S_TermsMissing">Ohne Zustimmung zu den Nutzungsbedingungen baut FrameFlip keine Verbindung nach draußen auf.</sys:String>
+    <sys:String x:Key="S_ToolMoveHint">Verschieben (V) - verschiebt, dreht und skaliert die gewählte Ebene. Der Rahmen im Bild gehört diesem Werkzeug: Er erscheint, solange es gewählt ist, und verschwindet sonst.</sys:String>
+    <sys:String x:Key="S_ToolSelectHint">Auswählen (W) - ein Klick auf ein Objekt im Bild legt eine Kryptomatte an. Gewählt wird ein Objekt und kein Bereich: In Bild 300 sitzt die Maske dort, wo das Objekt inzwischen ist.</sys:String>
+    <sys:String x:Key="S_ToolCropHint">Zuschneiden (C) - zieht die Schnittkanten, statt sie einzutippen.</sys:String>
+    <sys:String x:Key="S_ToolHandHint">Hand (H) - schiebt den Ausschnitt. Ziehen mit gedrückter mittlerer Maustaste tut überall dasselbe, ohne das Werkzeug zu wechseln.</sys:String>
+    <sys:String x:Key="S_ToolPickHint">Pipette (I) - liest den Wert unter dem Zeiger ab.</sys:String>
+    <sys:String x:Key="S_PickReadout">abgelesen</sys:String>
 </ResourceDictionary>

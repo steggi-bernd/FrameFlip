@@ -18,17 +18,25 @@ public partial class AtelierPage
     /// <summary>
     /// Zeigt den Rahmen um die gewaehlte Ebene - oder blendet ihn aus.
     ///
-    /// Ausgeblendet wird er in drei Faellen, und jeder hat seinen Grund: Ohne Bild
-    /// gibt es nichts zu platzieren. Waehrend das Original gezeigt wird oder eine
-    /// Kryptomatte gewaehlt wird, gehoert der Klick jemand anderem. Und eine
-    /// Korrektur oder Gruppe hat keine eigene Flaeche - ein Rahmen um sie waere ein
-    /// Rahmen um etwas, das es nicht gibt.
+    /// Der Rahmen gehoert dem VERSCHIEBEN-Werkzeug und nicht der Auswahl. Das ist
+    /// der Unterschied, an dem zwei gemeldete Fehler hingen: Ein Rahmen, der
+    /// erscheint, sobald irgendeine Ebene gewaehlt ist, sitzt zwangslaeufig
+    /// irgendwann an einer Stelle, an der niemand ihn erwartet - und ein Zug ins
+    /// Bild trifft dann die Ebene, die zuletzt angeklickt wurde, statt der, die
+    /// jemand bewegen wollte. Beides verschwindet, sobald der Rahmen eine Betriebsart
+    /// hat, die man sieht und abschalten kann.
+    ///
+    /// Ausgeblendet wird er ausserdem in drei Faellen, und jeder hat seinen Grund:
+    /// Ohne Bild gibt es nichts zu platzieren. Waehrend das Original gezeigt wird,
+    /// gehoert der Blick dem Vergleich. Und eine Korrektur oder Gruppe hat keine
+    /// eigene Flaeche - ein Rahmen um sie waere ein Rahmen um etwas, das es nicht
+    /// gibt.
     /// </summary>
     private void ShowPlacement()
     {
         var layer = Layers.Selection;
 
-        if (_frame is null || _showingOriginal || _picking ||
+        if (_frame is null || _showingOriginal || _tool != AtelierTool.Move ||
             layer is null || Layers.Visibility != System.Windows.Visibility.Visible ||
             layer.Content is LayerContent.Adjustment or LayerContent.Group ||
             !_sources.TryGetValue(layer.Source, out var source))

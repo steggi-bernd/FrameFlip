@@ -10,12 +10,13 @@
             <RowDefinition Height="Auto" />
         </Grid.RowDefinitions>
         <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="Auto" />
             <ColumnDefinition Width="*" />
             <ColumnDefinition Width="Auto" />
         </Grid.ColumnDefinitions>
 
         <!-- Kopfzeile: was offen ist, und womit gerechnet wird -->
-        <Grid Grid.Row="0" Grid.ColumnSpan="2" Margin="0,0,0,10">
+        <Grid Grid.Row="0" Grid.ColumnSpan="3" Margin="0,0,0,10">
             <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
                 <Button x:Name="OpenButton" Style="{StaticResource OverlayButton}"
                         Content="{DynamicResource S_OpenImage}" Click="OnOpenClicked" />
@@ -51,17 +52,42 @@
                            Style="{StaticResource DashLabel}" FontSize="9" />
                 <TextBlock x:Name="ViewText" VerticalAlignment="Center"
                            Style="{StaticResource DashLabel}" FontSize="9" />
+
+                <!--
+                    Was die Pipette zuletzt gelesen hat. In der Kopfzeile und nicht
+                    als Wolke am Zeiger: Ein Wert, den man ablesen will, will man
+                    meistens mit einem zweiten vergleichen, und dafuer muss der
+                    erste stehenbleiben.
+                -->
+                <TextBlock x:Name="PickText" VerticalAlignment="Center" Margin="14,0,0,0"
+                           Style="{StaticResource DashLabel}" FontSize="9"
+                           Foreground="{StaticResource AccentBrush}"
+                           Visibility="Collapsed" />
             </StackPanel>
         </Grid>
 
+        <!--
+            Die Werkzeugspalte: was die Maus im Bild tut.
+
+            Sie steht links, weil sie dort in jedem Programm steht, das eine hat -
+            und weil das Bild damit zwischen dem, was die Maus tut, und dem, woraus
+            das Bild besteht, liegt. Das ist keine Anordnung aus Gewohnheit, sondern
+            die Leserichtung des Vorgangs: Werkzeug, Bild, Aufbau.
+        -->
+        <local:ToolColumn x:Name="MouseTools" Grid.Row="1" Grid.Column="0"
+                          Margin="0,0,10,0" />
+
         <!-- Das Bild -->
-        <Border Grid.Row="1" Grid.Column="0" Background="#FF101010" CornerRadius="4"
+        <Border Grid.Row="1" Grid.Column="1" Background="#FF101010" CornerRadius="4"
                 ClipToBounds="True"
                 AllowDrop="True" Drop="OnImageFilesDropped" DragOver="OnImageFilesDragOver">
             <Grid>
                 <ScrollViewer x:Name="ImageScroll"
                               HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Auto"
-                              PanningMode="Both">
+                              PanningMode="Both"
+                              PreviewMouseDown="OnViewportDown"
+                              PreviewMouseMove="OnViewportMove"
+                              PreviewMouseUp="OnViewportUp">
                     <!--
                         Bild und Greifrahmen im selben Feld: Sie bekommen damit
                         dieselben Masse, und der Rahmen muss die Lage des Bildes
@@ -100,7 +126,7 @@
             "worauf wirkt der Regler?" beantwortet sich, ohne dass sie gestellt
             werden muss: auf das, was oben herauskommt.
         -->
-        <Border Grid.Row="1" Grid.Column="1" Width="300" Margin="12,0,0,0"
+        <Border Grid.Row="1" Grid.Column="2" Width="300" Margin="12,0,0,0"
                 Background="{StaticResource PanelBackground}"
                 BorderBrush="{StaticResource PanelBorder}" BorderThickness="1" CornerRadius="4">
             <Grid>
@@ -120,7 +146,7 @@
         </Border>
 
         <!-- Die Sequenz ausgeben -->
-        <Border x:Name="ExportBar" Grid.Row="2" Grid.ColumnSpan="2" Margin="0,12,0,0"
+        <Border x:Name="ExportBar" Grid.Row="2" Grid.ColumnSpan="3" Margin="0,12,0,0"
                 Background="{StaticResource PanelBackground}"
                 BorderBrush="{StaticResource PanelBorder}" BorderThickness="1" CornerRadius="4"
                 Padding="12,10" Visibility="Collapsed">

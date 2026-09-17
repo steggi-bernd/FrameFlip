@@ -793,4 +793,10 @@
     <sys:String x:Key="D_TermsAccepted">Agreed – outbound connections are now allowed.</sys:String>
     <sys:String x:Key="D_TermsDeclined">Not agreed – nothing leaves this machine.</sys:String>
     <sys:String x:Key="S_TermsMissing">Without agreeing to the terms of use, FrameFlip makes no outbound connection.</sys:String>
+    <sys:String x:Key="S_ToolMoveHint">Move (V) - moves, rotates and scales the selected layer. The frame in the picture belongs to this tool: it appears while the tool is chosen and is gone otherwise.</sys:String>
+    <sys:String x:Key="S_ToolSelectHint">Select (W) - clicking an object in the picture creates a cryptomatte. It picks an OBJECT and not an area: at frame 300 the mask sits wherever the object has moved to.</sys:String>
+    <sys:String x:Key="S_ToolCropHint">Crop (C) - drag the crop edges instead of typing them.</sys:String>
+    <sys:String x:Key="S_ToolHandHint">Hand (H) - pans the view. Dragging with the middle mouse button does the same anywhere, without switching tools.</sys:String>
+    <sys:String x:Key="S_ToolPickHint">Pick (I) - reads the value under the pointer.</sys:String>
+    <sys:String x:Key="S_PickReadout">read</sys:String>
 </ResourceDictionary>

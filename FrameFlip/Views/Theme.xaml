@@ -277,6 +277,20 @@
         </Setter>
     </Style>
 
+    <!--
+        Der Knopf der Werkzeugspalte: quadratisch, weil ein Zeichen darin steht und
+        keine Beschriftung. Alles andere kommt von OverlayToggle - die gewaehlte
+        Farbe, das Schweben, die Ecken. Ein eigener Entwurf haette dieselben drei
+        Zustaende noch einmal beschrieben und waere beim naechsten Farbwechsel
+        zurueckgeblieben.
+    -->
+    <Style x:Key="ToolButton" TargetType="ToggleButton" BasedOn="{StaticResource OverlayToggle}">
+        <Setter Property="Width" Value="34" />
+        <Setter Property="Height" Value="34" />
+        <Setter Property="MinWidth" Value="34" />
+        <Setter Property="Margin" Value="0,0,0,4" />
+    </Style>
+
     <!-- ================================================================ Regler
 
          Scrubber und Panelregler teilen sich denselben Aufbau: eine durchgehende

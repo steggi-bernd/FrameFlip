@@ -117,6 +117,7 @@ public sealed partial class AtelierPage : UserControl
 
         Layers.Changed += OnLayersChanged;
         Layers.PickMode += OnPickModeChanged;
+        MouseTools.ToolChanged += OnToolChanged;
         Layers.Editing += Bind;
         Layers.Thumbnail = Thumbnail;
 

@@ -36,6 +36,7 @@ public static class AtelierLayerInvariants
             APlainImageLayersToo(folder);
             EachLayerKeepsItsOwnTools(path);
             TheFrameOnlyGrabsWhenItShould(path);
+            TheToolDecidesWhatTheMouseDoes(path);
         }
         finally
         {
@@ -398,6 +399,109 @@ public static class AtelierLayerInvariants
             Check.Near(first.Adjustments!.Exposure, -2.0, 0.001,
                        "die Ebenen bleiben davon unberuehrt");
             Check.Near(second.Adjustments!.Exposure, 1.5, 0.001, "beide");
+        }
+        finally
+        {
+            window.Close();
+        }
+    }
+
+    /// <summary>
+    /// Das Werkzeug entscheidet, was die Maus im Bild tut - und sonst nichts.
+    ///
+    /// Zwei gemeldete Fehler hingen an derselben fehlenden Entscheidung: Der Rahmen
+    /// sass am falschen Platz, und ein Zug traf die falsche Ebene. Beides, weil der
+    /// Rahmen der AUSWAHL gehoerte statt einem Werkzeug - er war also immer da,
+    /// sobald irgendeine Ebene gewaehlt war, und niemand konnte ihn abstellen.
+    ///
+    /// Geprueft wird deshalb nicht, ob der Rahmen richtig sitzt, sondern ob er
+    /// UEBERHAUPT VERSCHWINDET, wenn ein anderes Werkzeug gilt. Das ist die
+    /// Eigenschaft, aus der die Behebung folgt; wo er sitzt, prueft der Test
+    /// darueber.
+    ///
+    /// Und nebenbei prueft dieser Test, dass die Spalte sich ueberhaupt laedt. Ein
+    /// Stil mit dem falschen Zieltyp faellt weder dem Uebersetzer noch der uebrigen
+    /// Reihe auf - er faellt erst auf, wenn jemand das Fenster oeffnet.
+    /// </summary>
+    private static void TheToolDecidesWhatTheMouseDoes(string path)
+    {
+        Check.Group("Das Werkzeug entscheidet, was die Maus tut");
+
+        var settings = new AppSettings();
+        var page = new AtelierPage(FrameDecoderRegistry.CreateDefault(() => null), settings, _ => { });
+
+        var window = new Window
+        {
+            Content = page,
+            Width = 1000,
+            Height = 800,
+            ShowInTaskbar = false,
+            WindowStyle = WindowStyle.None,
+            ShowActivated = false,
+            Left = -4000,
+            Top = -4000,
+        };
+
+        try
+        {
+            window.Show();
+            page.UpdateLayout();
+
+            var column = (ToolColumn)page.FindName("MouseTools");
+
+            Check.That(column is not null, "die Werkzeugspalte ist Teil der Seite");
+            if (column is null) return;
+
+            Check.That(column.Tool == AtelierTool.Move,
+                       "in der Grundstellung wird verschoben", $"{column.Tool}");
+
+            var frame = (PlacementAdorner)page.FindName("Placement");
+
+            page.Open(path);
+
+            var size = (System.Windows.Controls.TextBlock)page.FindName("SourceText");
+
+            if (!Pump(TimeSpan.FromSeconds(10), () => size.Text.Length > 0))
+            {
+                Check.That(false, "das Bild wird geladen");
+                return;
+            }
+
+            page.UpdateLayout();
+
+            Check.That(frame.IsHitTestVisible, "beim Verschieben faengt der Rahmen");
+
+            // Der Kern der Sache: ein anderes Werkzeug, und der Rahmen ist weg.
+            Check.That(page.HandleToolKey(System.Windows.Input.Key.H),
+                       "die Taste H waehlt ein Werkzeug");
+
+            page.UpdateLayout();
+
+            Check.That(column.Tool == AtelierTool.Hand, "naemlich die Hand", $"{column.Tool}");
+
+            Check.That(!frame.IsHitTestVisible,
+                       "und dann faengt der Rahmen nichts mehr - er gehoert dem Verschieben");
+
+            // Und zurueck, damit "weg" nicht heisst "kaputt".
+            Check.That(page.HandleToolKey(System.Windows.Input.Key.V), "V waehlt zurueck");
+
+            page.UpdateLayout();
+
+            Check.That(column.Tool == AtelierTool.Move, "wieder Verschieben", $"{column.Tool}");
+            Check.That(frame.IsHitTestVisible, "und der Rahmen ist wieder da");
+
+            // Eine Taste, die kein Werkzeug meint, muss durchgelassen werden - sonst
+            // schluckt das Atelier jede Tastatureingabe des Fensters.
+            Check.That(!page.HandleToolKey(System.Windows.Input.Key.Q),
+                       "eine fremde Taste geht weiter");
+
+            // Auswaehlen und Verschieben schliessen einander aus. Frueher konnten
+            // beide zugleich gelten, und dann war nicht zu sagen, was ein Klick tut.
+            Check.That(page.HandleToolKey(System.Windows.Input.Key.W), "W waehlt das Auswaehlen");
+
+            page.UpdateLayout();
+
+            Check.That(!frame.IsHitTestVisible, "beim Auswaehlen faengt der Rahmen nicht");
         }
         finally
         {

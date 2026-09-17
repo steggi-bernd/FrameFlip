@@ -2052,6 +2052,18 @@ public partial class MainWindow : Window
             }
             return;
         }
+        // Die Werkzeugspalte des Ateliers hoert auf V, W, C, H, I - dieselben
+        // Buchstaben wie anderswo, damit niemand sie neu lernen muss. Tastendruecke
+        // kommen im Fenster an und nicht auf der Seite, deshalb der Umweg hierher.
+        if (_page == "atelier" && Keyboard.Modifiers == ModifierKeys.None
+            && !OwnsNavigationKeys(e.OriginalSource as DependencyObject)
+            && _atelierPage is { } atelier && atelier.HandleToolKey(e.Key))
+        {
+            e.Handled = true;
+
+            return;
+        }
+
         if (_page != "dashboard" || Keyboard.Modifiers != ModifierKeys.None
             || OwnsNavigationKeys(e.OriginalSource as DependencyObject)) return;
 
