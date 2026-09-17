@@ -10,7 +10,7 @@ namespace FrameFlip.Imaging;
 /// laeuft hier ein anderer Weg:
 ///
 ///   1. Die ganze Kette bis hinter die Anzeigewerkzeuge, in einen Zwischenpuffer.
-///   2. Dieser Puffer weichgezeichnet - einmal, fuer alle Werkzeuge zusammen.
+///   2. Dieser Puffer weichgezeichnet - einmal je Radius, nicht einmal je Werkzeug.
 ///   3. Beides zusammen durch die oertlichen Werkzeuge, dann hinaus.
 ///
 /// Drei Puffer zu je drei Gleitkommawerten - Werte, Weichzeichnung und das Feld, ueber
@@ -72,22 +72,43 @@ public static class LocalPass
 
     /// <summary>
     /// Zeichnet den gefuellten Puffer weich und schickt ihn durch die Werkzeuge.
+    ///
+    /// Die Werkzeuge kommen in ihrer Reihenfolge und werden nach Radius in Gruppen
+    /// zusammengefasst - aufeinanderfolgende, nicht irgendwelche, damit die
+    /// Reihenfolge erhalten bleibt. Jede Gruppe zeichnet weich, was zu diesem
+    /// Zeitpunkt dasteht, und nicht, was am Anfang dastand: Die Schaerfe soll das
+    /// sehen, was die Rauschminderung vorher aufgeraeumt hat. Genau daran haengt,
+    /// dass die beiden zusammen etwas anderes ergeben als jede fuer sich - das
+    /// weggeraeumte Korn kommt mit der Schaerfe nicht zurueck.
     /// </summary>
-    /// <param name="reach">
-    /// Der Radius bei voller Aufloesung, bezogen auf 1080p. Umgerechnet wird hier,
-    /// weil hier die Bildgroesse bekannt ist: Derselbe Regler soll auf 4K dieselbe
-    /// Wirkung haben, und in Bildpunkten waere er dort ein Viertel so gross.
-    /// </param>
-    public static void Run(Scratch scratch, ILocalTool[] tools, int reach,
+    public static void Run(Scratch scratch, ILocalTool[] tools,
                            int gridWidth, int gridHeight, int imageWidth, int step)
     {
         if (tools.Length == 0) return;
 
-        int radius = RadiusFor(reach, imageWidth, step);
+        int count = gridWidth * gridHeight * 3;
+        int from = 0;
 
-        Array.Copy(scratch.Values, scratch.Blurred, gridWidth * gridHeight * 3);
-        Blur.Apply(scratch.Blurred, gridWidth, gridHeight, radius, scratch.Work);
+        while (from < tools.Length)
+        {
+            int radius = RadiusFor(tools[from].Radius, imageWidth, step);
 
+            int to = from + 1;
+            while (to < tools.Length && RadiusFor(tools[to].Radius, imageWidth, step) == radius) to++;
+
+            Array.Copy(scratch.Values, scratch.Blurred, count);
+            Blur.Apply(scratch.Blurred, gridWidth, gridHeight, radius, scratch.Work);
+
+            Apply(scratch, tools, from, to, gridWidth, gridHeight);
+
+            from = to;
+        }
+    }
+
+    /// <summary>Eine Gruppe von Werkzeugen ueber den ganzen Puffer.</summary>
+    private static void Apply(Scratch scratch, ILocalTool[] tools, int from, int to,
+                              int gridWidth, int gridHeight)
+    {
         var values = scratch.Values;
         var blurred = scratch.Blurred;
 
@@ -105,7 +126,7 @@ public static class LocalPass
 
                 float vr = values[at], vg = values[at + 1], vb = values[at + 2];
 
-                for (int t = 0; t < tools.Length; t++)
+                for (int t = from; t < to; t++)
                     tools[t].Apply(ref vr, ref vg, ref vb,
                                    blurred[at], blurred[at + 1], blurred[at + 2]);
 

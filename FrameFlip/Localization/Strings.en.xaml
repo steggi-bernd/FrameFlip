@@ -61,6 +61,17 @@
     <sys:String x:Key="S_ClarityAmount">Amount</sys:String>
     <sys:String x:Key="S_ClarityReach">Radius</sys:String>
     <sys:String x:Key="S_ClarityHint">Local contrast: it boosts what a pixel is against its surroundings and leaves flat areas alone. A large radius gives modelling, a small one gives sharpness. Negative takes contrast away.</sys:String>
+    <sys:String x:Key="S_LocalOnFinal">Local tools act on the finished picture, not on a single layer: they need a pixel's neighbourhood, and that is only settled once the stack has been composed.</sys:String>
+    <sys:String x:Key="S_Noise">Noise reduction</sys:String>
+    <sys:String x:Key="S_NoiseLuma">Luminance</sys:String>
+    <sys:String x:Key="S_NoiseColour">Colour</sys:String>
+    <sys:String x:Key="S_NoiseThreshold">Threshold</sys:String>
+    <sys:String x:Key="S_NoiseHint">Smooths where a pixel differs little from its surroundings and leaves edges alone. Colour takes far more than luminance does, because fine colour detail is rare. Against coarse noise from too few samples, only rendering helps.</sys:String>
+    <sys:String x:Key="S_Sharpen">Sharpen</sys:String>
+    <sys:String x:Key="S_SharpenAmount">Amount</sys:String>
+    <sys:String x:Key="S_SharpenRadius">Radius</sys:String>
+    <sys:String x:Key="S_SharpenThreshold">Threshold</sys:String>
+    <sys:String x:Key="S_SharpenHint">The same as clarity at a small radius — and on luminance only, so coloured edges do not get a coloured fringe. The threshold leaves fine noise alone instead of raising it first.</sys:String>
     <sys:String x:Key="S_NoLut">No table selected</sys:String>
     <sys:String x:Key="S_Strength">Strength</sys:String>
     <sys:String x:Key="S_PickLut">Choose a table</sys:String>

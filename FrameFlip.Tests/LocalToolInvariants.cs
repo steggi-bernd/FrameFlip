@@ -22,6 +22,15 @@ public static class LocalToolInvariants
         FlatStaysFlat();
         EdgesGetStronger();
         TheEndsAreSpared();
+        SharpFlatStaysFlat();
+        SharpEdges();
+        SharpKeepsTheHue();
+        SharpThreshold();
+        NoiseTakesGrainAway();
+        NoiseKeepsEdges();
+        ColourGoesFurther();
+        TheOrderIsFixed();
+        EachRadiusGetsItsOwn();
         NoToolMeansNoBuffer();
         TheGridMatchesTheFullPass();
         Persistence();
@@ -181,6 +190,262 @@ public static class LocalToolInvariants
         Check.That(over <= 1f, "und nichts laeuft ueber Weiss hinaus", $"{over:0.####}");
     }
 
+    // ---------------------------------------------------------------- Schaerfe
+
+    /// <summary>
+    /// Dieselbe Probe wie bei der Klarheit, aus demselben Grund.
+    ///
+    /// Sie ist bei der Schaerfe sogar noch wichtiger: Ihr Radius ist klein, und ein
+    /// Versatz von einem halben Bildpunkt faellt bei Radius zwei viel eher auf als
+    /// bei Radius vierzig.
+    /// </summary>
+    private static void SharpFlatStaysFlat()
+    {
+        Check.Group("Schaerfe laesst eine gleichmaessige Flaeche in Ruhe");
+
+        var frame = Flat(48, 32, 0.45f);
+
+        var without = Draw(frame, new GradingStack());
+        var sharp = Draw(frame, Sharp(2f, 2, 0f));
+
+        Check.That(Same(without, sharp), "voll aufgedreht und ohne Schwelle aendert sich nichts");
+    }
+
+    private static void SharpEdges()
+    {
+        Check.Group("Schaerfe zieht die Kante zusammen");
+
+        var frame = Halves(64, 32, 0.35f, 0.55f);
+
+        var plain = Draw(frame, new GradingStack());
+        var sharp = Draw(frame, Sharp(1.5f, 2, 0f));
+
+        int stride = 64 * 4;
+
+        // Unmittelbar an der Kante: links dunkler, rechts heller. Das ist der
+        // Ueberschwinger, den Schaerfe ausmacht.
+        int left = 16 * stride + 31 * 4 + 2;
+        int right = 16 * stride + 32 * 4 + 2;
+
+        Check.That(sharp[left] < plain[left], "links wird es dunkler",
+                   $"{sharp[left]} statt {plain[left]}");
+        Check.That(sharp[right] > plain[right], "rechts heller",
+                   $"{sharp[right]} statt {plain[right]}");
+
+        // Und nur dort: Fuenf Punkte weiter ist der Radius zu Ende.
+        int far = 16 * stride + 20 * 4 + 2;
+        Check.That(Math.Abs(sharp[far] - plain[far]) <= 1, "weiter weg bleibt es stehen",
+                   $"{sharp[far]} gegen {plain[far]}");
+    }
+
+    /// <summary>
+    /// Der Farbton bleibt.
+    ///
+    /// Geschaerft wird auf der Helligkeit, und derselbe Zuschlag geht auf alle drei
+    /// Kanaele. Je Kanal gerechnet liefen sie an einer farbigen Kante auseinander,
+    /// und um die Kante laege ein bunter Saum - der Fehler, den man an fremden
+    /// Bildern sieht, ohne ihn benennen zu koennen.
+    /// </summary>
+    private static void SharpKeepsTheHue()
+    {
+        Check.Group("Schaerfe laesst den Farbton, wo er ist");
+
+        var tool = new SharpenTool { Amount = 1.2f, Reach = 2, Threshold = 0f };
+        tool.Prepare();
+
+        float r = 0.60f, g = 0.40f, b = 0.30f;
+        float beforeRg = r - g, beforeGb = g - b;
+
+        // Die Umgebung ist dieselbe Farbe, nur dunkler - eine reine Helligkeitskante.
+        tool.Apply(ref r, ref g, ref b, 0.50f, 0.30f, 0.20f);
+
+        Check.Near(r - g, beforeRg, 1e-5, "der Abstand von Rot zu Gruen bleibt");
+        Check.Near(g - b, beforeGb, 1e-5, "der von Gruen zu Blau auch");
+        Check.That(r > 0.60f, "und heller ist es geworden", $"{r:0.###}");
+    }
+
+    private static void SharpThreshold()
+    {
+        Check.Group("Die Schwelle laesst feines Rauschen liegen");
+
+        var tool = new SharpenTool { Amount = 1f, Reach = 2, Threshold = 0.05f };
+        tool.Prepare();
+
+        // Ein kleiner Unterschied - so gross wie Korn.
+        float small = 0.505f, sg = 0.505f, sb = 0.505f;
+        tool.Apply(ref small, ref sg, ref sb, 0.5f, 0.5f, 0.5f);
+        Check.That(small - 0.505f < 0.002f, "ein Unterschied unter der Schwelle bleibt fast liegen",
+                   $"{(small - 0.505f):0.#####}");
+
+        // Ein grosser - eine Kante.
+        float large = 0.7f, lg = 0.7f, lb = 0.7f;
+        tool.Apply(ref large, ref lg, ref lb, 0.5f, 0.5f, 0.5f);
+        Check.That(large > 0.85f, "eine Kante darueber wird voll zugeschlagen", $"{large:0.###}");
+
+        // Ohne Schwelle wirkt auch das Kleine voll - sonst waere die Schwelle nicht
+        // der Grund, sondern etwas anderes.
+        var open = new SharpenTool { Amount = 1f, Reach = 2, Threshold = 0f };
+        open.Prepare();
+
+        float free = 0.505f, fg = 0.505f, fb = 0.505f;
+        open.Apply(ref free, ref fg, ref fb, 0.5f, 0.5f, 0.5f);
+        Check.Near(free, 0.51, 1e-4, "ohne Schwelle wird auch das Kleine verdoppelt");
+    }
+
+    // -------------------------------------------------------- Rauschminderung
+
+    private static void NoiseTakesGrainAway()
+    {
+        Check.Group("Rauschminderung nimmt Korn weg");
+
+        var frame = Grain(96, 96, 0.45f, 0.03f, colour: true, seed: 7);
+
+        var plain = Draw(frame, new GradingStack());
+        var cleaned = Draw(frame, Denoise(1f, 1f, 0.04f));
+
+        double before = Deviation(plain);
+        double after = Deviation(cleaned);
+
+        Check.That(after < before * 0.7, "die Streuung faellt deutlich",
+                   $"{before:0.0} auf {after:0.0}");
+
+        // Die Helligkeit bleibt dabei, wo sie war - geglaettet ist nicht abgedunkelt.
+        Check.Near(Average(cleaned), Average(plain), 1.5, "und das Bild bleibt gleich hell");
+    }
+
+    /// <summary>
+    /// Die Kante ueberlebt.
+    ///
+    /// Daran haengt der Unterschied zwischen Rauschminderung und Weichzeichnen:
+    /// Glaetten, wo nichts ist, und stehenlassen, wo etwas ist. Eine Weichzeichnung
+    /// nimmt beides mit, und dafuer braeuchte es kein eigenes Werkzeug.
+    /// </summary>
+    private static void NoiseKeepsEdges()
+    {
+        Check.Group("Die Kante ueberlebt die Rauschminderung");
+
+        var frame = Halves(64, 32, 0.30f, 0.60f);
+
+        var plain = Draw(frame, new GradingStack());
+        var cleaned = Draw(frame, Denoise(1f, 1f, 0.04f));
+
+        int stride = 64 * 4;
+        int left = 16 * stride + 31 * 4 + 2;
+        int right = 16 * stride + 32 * 4 + 2;
+
+        int before = plain[right] - plain[left];
+        int after = cleaned[right] - cleaned[left];
+
+        Check.That(after > before * 0.85, "der Sprung bleibt fast ganz stehen",
+                   $"{after} von {before}");
+    }
+
+    /// <summary>
+    /// Farbe wird haerter angefasst als Helligkeit.
+    ///
+    /// Bei gleichem Unterschied muss von der Farbe mehr verschwinden. Der Grund
+    /// steht am Werkzeug: Farbrauschen ist das haessliche, und feine Farbzeichnung
+    /// ist selten - beides zeigt in dieselbe Richtung.
+    /// </summary>
+    private static void ColourGoesFurther()
+    {
+        Check.Group("Farbe wird staerker geglaettet als Helligkeit");
+
+        var tool = new NoiseTool { Luminance = 1f, Colour = 1f, Threshold = 0.02f, Reach = 2 };
+        tool.Prepare();
+
+        // Ein reiner Helligkeitsunterschied: alle drei Kanaele gleich weit weg.
+        float lr = 0.53f, lg = 0.53f, lb = 0.53f;
+        tool.Apply(ref lr, ref lg, ref lb, 0.5f, 0.5f, 0.5f);
+        double lumaLeft = Math.Abs(lr - 0.5f) / 0.03f;
+
+        // Ein reiner Farbunterschied: derselbe Betrag, aber gegenlaeufig verteilt,
+        // sodass die Helligkeit gleich bleibt.
+        float cr = 0.53f, cg = 0.50f, cb = 0.47f;
+        tool.Apply(ref cr, ref cg, ref cb, 0.5f, 0.5f, 0.5f);
+        double colourLeft = Math.Abs(cr - 0.5f) / 0.03f;
+
+        Check.That(colourLeft < lumaLeft, "vom Farbunterschied bleibt weniger uebrig",
+                   $"{colourLeft:0.###} gegen {lumaLeft:0.###}");
+        Check.That(colourLeft < 0.25, "und zwar deutlich weniger", $"{colourLeft:0.###}");
+    }
+
+    // ------------------------------------------------- Reihenfolge und Gruppen
+
+    /// <summary>
+    /// Die Reihenfolge steht am Werkzeug, nicht in der Liste.
+    ///
+    /// Sonst entschiede darueber, in welcher Reihenfolge jemand an den Reglern war -
+    /// und zwei gleich eingestellte Rezepte saehen verschieden aus, ohne dass man
+    /// den Unterschied irgendwo ablesen koennte.
+    /// </summary>
+    private static void TheOrderIsFixed()
+    {
+        Check.Group("Die Reihenfolge der oertlichen Werkzeuge steht fest");
+
+        var stack = new GradingStack
+        {
+            Local =
+            {
+                new SharpenTool { Amount = 1f },
+                new ClarityTool { Amount = 0.5f },
+                new NoiseTool { Luminance = 0.5f },
+            },
+        };
+
+        var order = stack.Prepare().Local;
+
+        Check.That(order.Length == 3, "alle drei sind dabei", $"{order.Length}");
+        Check.That(order[0] is NoiseTool, "erst die Rauschminderung");
+        Check.That(order[1] is ClarityTool, "dann die Klarheit");
+        Check.That(order[2] is SharpenTool, "und zuletzt die Schaerfe");
+    }
+
+    /// <summary>
+    /// Jeder Radius bekommt seine eigene Weichzeichnung - und sie steht auf dem
+    /// Stand, den die vorigen Werkzeuge hinterlassen haben.
+    ///
+    /// Das ist der Grund, warum Rauschminderung und Schaerfe zusammen etwas anderes
+    /// ergeben als jede fuer sich: Die Schaerfe sieht das aufgeraeumte Bild, und das
+    /// weggenommene Korn kommt nicht zurueck. Teilten sich beide eine Weichzeichnung
+    /// vom Anfang, holte die Schaerfe genau das wieder hoch, was die
+    /// Rauschminderung gerade entfernt hat.
+    /// </summary>
+    private static void EachRadiusGetsItsOwn()
+    {
+        Check.Group("Jeder Radius bekommt seine eigene Unschaerfe");
+
+        const int width = 32, height = 24;
+
+        // Zwei Sonden: Die erste hebt alles um einen festen Betrag, die zweite
+        // schreibt nur auf, was sie zu sehen bekommt.
+        var first = new Probe(radius: 12, lift: 0.1f);
+        var second = new Probe(radius: 3, lift: 0f);
+
+        var scratch = new LocalPass.Scratch();
+        scratch.Hold(width * height);
+
+        for (int i = 0; i < width * height * 3; i++) scratch.Values[i] = 0.4f;
+
+        LocalPass.Run(scratch, new ILocalTool[] { first, second }, width, height, 1920, step: 1);
+
+        Check.Near(first.Seen, 0.4, 1e-4, "die erste sieht den Stand von vorher");
+        Check.Near(second.Seen, 0.5, 1e-4, "die zweite den, den die erste hinterlassen hat");
+
+        // Gleicher Radius heisst: eine Weichzeichnung fuer beide. Dann sieht die
+        // zweite denselben Stand wie die erste, obwohl die erste dazwischen etwas
+        // geaendert hat.
+        var one = new Probe(radius: 5, lift: 0.1f);
+        var two = new Probe(radius: 5, lift: 0f);
+
+        for (int i = 0; i < width * height * 3; i++) scratch.Values[i] = 0.4f;
+
+        LocalPass.Run(scratch, new ILocalTool[] { one, two }, width, height, 1920, step: 1);
+
+        Check.Near(one.Seen, 0.4, 1e-4, "bei gleichem Radius sehen beide dasselbe");
+        Check.Near(two.Seen, 0.4, 1e-4, "eine Weichzeichnung fuer die Gruppe");
+    }
+
     private static void NoToolMeansNoBuffer()
     {
         Check.Group("Ohne oertliches Werkzeug bleibt der gerade Weg");
@@ -198,11 +463,23 @@ public static class LocalToolInvariants
         Check.That(stack.Prepare().Local.Length == 1, "erst ein aufgedrehtes zaehlt");
         Check.That(!stack.IsNeutral, "und der Stapel nicht mehr");
 
-        // Der Radius, den die Weichzeichnung braucht, ist der groesste aller
-        // Werkzeuge - zwei Puffer waeren doppelt so teuer wie einer.
-        stack.Local.Add(new ClarityTool { Amount = 0.3f, Reach = 120 });
-        Check.That(stack.Prepare().Reach == 120, "der groesste Radius gilt",
-                   $"{stack.Prepare().Reach}");
+        // Auch eine Rauschminderung in Grundstellung zaehlt nicht mit - sie hat zwei
+        // Regler, und beide muessen unten stehen.
+        stack.Local.Add(new NoiseTool { Luminance = 0f, Colour = 0f });
+        Check.That(stack.Prepare().Local.Length == 1, "eine stumme Rauschminderung zaehlt nicht");
+
+        stack.Local[^1] = new NoiseTool { Colour = 0.4f };
+        Check.That(stack.Prepare().Local.Length == 2, "eine aufgedrehte schon");
+
+        // Jedes Werkzeug behaelt seinen eigenen Radius. Frueher galt hier der groesste
+        // fuer alle - das war richtig, solange die Klarheit allein hier stand, und
+        // machte aus der Schaerfe eine zweite Klarheit, sobald sie dazukam.
+        stack.Local.Add(new SharpenTool { Amount = 0.8f, Reach = 2 });
+
+        var radii = stack.Prepare().Local.Select(tool => tool.Radius).ToArray();
+        Check.That(radii.Length == 3, "drei Werkzeuge, drei Eintraege", $"{radii.Length}");
+        Check.That(radii[0] == 2 && radii[1] == 40 && radii[2] == 2,
+                   "jedes mit seinem eigenen Radius", string.Join(", ", radii));
     }
 
     /// <summary>
@@ -298,21 +575,157 @@ public static class LocalToolInvariants
         Draw(frame, clear);
         Draw(frame, plain);
 
+        // Alle drei zusammen sind der teuerste Fall: drei Radien, drei
+        // Weichzeichnungen.
+        var everything = new GradingStack
+        {
+            Local =
+            {
+                new NoiseTool { Luminance = 0.5f, Colour = 0.5f, Reach = 2 },
+                new ClarityTool { Amount = 0.6f, Reach = 40 },
+                new SharpenTool { Amount = 0.8f, Reach = 4 },
+            },
+        };
+
+        Draw(frame, everything);
+
         double without = Fastest(() => Draw(frame, plain));
         double with = Fastest(() => Draw(frame, clear));
+        double all = Fastest(() => Draw(frame, everything));
         double coarse = Fastest(() => Draw(frame, clear, ImageAdjustments.Neutral, step: 4));
+        double coarseAll = Fastest(() => Draw(frame, everything, ImageAdjustments.Neutral, step: 4));
 
         Console.WriteLine($"         1080p: ohne {without:0.0} ms, mit Klarheit {with:0.0} ms, " +
-                          $"beim Ziehen {coarse:0.0} ms");
+                          $"alle drei {all:0.0} ms");
+        Console.WriteLine($"         beim Ziehen: Klarheit {coarse:0.0} ms, alle drei {coarseAll:0.0} ms");
 
         Check.That(with < 400, "der volle Durchgang bleibt im Rahmen", $"{with:0.0} ms");
         Check.That(coarse < 40, "beim Ziehen bleibt es bedienbar", $"{coarse:0.0} ms");
+        Check.That(coarseAll < 60, "auch mit allen dreien", $"{coarseAll:0.0} ms");
     }
 
     // ------------------------------------------------------------------- Handwerk
 
     private static GradingStack Stack(float clarity)
         => new() { Local = { new ClarityTool { Amount = clarity, Reach = 40 } } };
+
+    private static GradingStack Sharp(float amount, int reach, float threshold)
+        => new() { Local = { new SharpenTool { Amount = amount, Reach = reach, Threshold = threshold } } };
+
+    private static GradingStack Denoise(float luminance, float colour, float threshold)
+        => new()
+        {
+            Local = { new NoiseTool { Luminance = luminance, Colour = colour, Threshold = threshold, Reach = 2 } },
+        };
+
+    /// <summary>
+    /// Ein Werkzeug, das nur aufschreibt, was es zu sehen bekommt - und wahlweise
+    /// den Wert anhebt, damit sich nachweisen laesst, auf welchem Stand die naechste
+    /// Weichzeichnung ansetzt.
+    /// </summary>
+    private sealed class Probe : ILocalTool
+    {
+        private readonly int _radius;
+        private readonly float _lift;
+
+        public Probe(int radius, float lift)
+        {
+            _radius = radius;
+            _lift = lift;
+        }
+
+        /// <summary>Die Umgebung, die das Werkzeug gesehen hat.</summary>
+        public float Seen { get; private set; }
+
+        public string Kind => "probe";
+
+        public LocalStage Stage => LocalStage.Contrast;
+
+        public bool IsNeutral => false;
+
+        public int Radius => _radius;
+
+        public void Prepare()
+        {
+        }
+
+        public void Apply(ref float r, ref float g, ref float b, float br, float bg, float bb)
+        {
+            Seen = br;
+
+            r += _lift;
+            g += _lift;
+            b += _lift;
+        }
+    }
+
+    /// <summary>Eine gleichmaessige Flaeche mit feinem Korn darauf.</summary>
+    private static FloatFrame Grain(int width, int height, float value, float amount,
+                                    bool colour, int seed)
+    {
+        int count = width * height;
+
+        var r = new float[count];
+        var g = new float[count];
+        var b = new float[count];
+
+        // Fest ausgesaet: Ein Test, der jedes Mal ein anderes Rauschen bekommt,
+        // schlaegt irgendwann einmal fehl und niemand weiss, warum.
+        var random = new Random(seed);
+
+        for (int i = 0; i < count; i++)
+        {
+            float shared = (float)(random.NextDouble() - 0.5) * 2f * amount;
+
+            r[i] = value + shared + Extra();
+            g[i] = value + shared + Extra();
+            b[i] = value + shared + Extra();
+
+            float Extra() => colour ? (float)(random.NextDouble() - 0.5) * 2f * amount : 0f;
+        }
+
+        return new FloatFrame
+        {
+            Width = width,
+            Height = height,
+            R = r,
+            G = g,
+            B = b,
+            A = Enumerable.Repeat(1f, count).ToArray(),
+            IsSceneReferred = false,
+        };
+    }
+
+    /// <summary>Die Streuung des Rotkanals - das Mass fuer Korn.</summary>
+    private static double Deviation(byte[] pixels)
+    {
+        double average = Average(pixels);
+        double sum = 0;
+        int count = 0;
+
+        for (int i = 2; i < pixels.Length; i += 4)
+        {
+            double difference = pixels[i] - average;
+            sum += difference * difference;
+            count++;
+        }
+
+        return Math.Sqrt(sum / Math.Max(1, count));
+    }
+
+    private static double Average(byte[] pixels)
+    {
+        double sum = 0;
+        int count = 0;
+
+        for (int i = 2; i < pixels.Length; i += 4)
+        {
+            sum += pixels[i];
+            count++;
+        }
+
+        return sum / Math.Max(1, count);
+    }
 
     private static byte[] Draw(FloatFrame frame, GradingStack stack,
                                ImageAdjustments? adjustments = null, int step = 1)

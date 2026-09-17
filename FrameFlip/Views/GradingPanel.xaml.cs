@@ -27,6 +27,9 @@ public partial class GradingPanel : UserControl
     private int _bandMode;
     private bool _filling;
 
+    /// <summary>Ob die Regler dem fertigen Bild gelten und nicht einer Ebene.</summary>
+    private bool _localOnImage = true;
+
     private CurvesTool _curves = new();
     private WhiteBalanceTool _whiteBalance = new();
     private LiftGammaGainTool _zones = new();
@@ -34,6 +37,8 @@ public partial class GradingPanel : UserControl
     private VibranceTool _vibrance = new();
     private LutTool _lut = new();
     private ClarityTool _clarity = new();
+    private SharpenTool _sharpen = new();
+    private NoiseTool _noise = new();
 
     private static readonly Color[] CurveColours =
     {
@@ -105,7 +110,33 @@ public partial class GradingPanel : UserControl
 
             TargetText.Foreground = (System.Windows.Media.Brush)FindResource(
                 value is null ? "MutedBrush" : "AccentBrush");
+
+            // Die oertlichen Werkzeuge gelten dem fertigen Bild. Eine Einstellungsebene
+            // sitzt mitten im Stapel und wird punktweise gerechnet; eine Nachbarschaft
+            // gibt es dort noch gar nicht. Sie an einer Ebene bedienbar zu lassen waere
+            // schlimmer als sie abzuschalten - der Regler bewegte sich, und das Bild
+            // nicht, und niemand faende heraus, warum.
+            bool onImage = value is null;
+
+            LocalOnFinalNote.Visibility = onImage ? Visibility.Collapsed : Visibility.Visible;
+
+            _localOnImage = onImage;
+            ApplyLocalEnabled();
         }
+    }
+
+    /// <summary>
+    /// Ob die oertlichen Abschnitte bedienbar sind. Zwei Gruende koennen sie
+    /// abschalten - der Gesamtschalter und eine ausgewaehlte Ebene -, und beide
+    /// muessen gelten, nicht der zuletzt gesetzte.
+    /// </summary>
+    private void ApplyLocalEnabled()
+    {
+        bool enabled = ToolsEnabled && _localOnImage;
+
+        NoiseBody.IsEnabled = enabled;
+        ClarityBody.IsEnabled = enabled;
+        SharpenBody.IsEnabled = enabled;
     }
 
     /// <summary>
@@ -140,12 +171,18 @@ public partial class GradingPanel : UserControl
         _lut = Take<LutTool>();
 
         // Die oertlichen Werkzeuge stehen in ihrer eigenen Liste - sie nehmen einen
-        // anderen Weg durch den Bildprozessor.
-        _clarity = Stack.Local.OfType<ClarityTool>().FirstOrDefault() ?? Add();
+        // anderen Weg durch den Bildprozessor. In welcher Reihenfolge sie dort
+        // liegen, ist gleichgueltig: Der Stapel sortiert sie nach ihrer Stufe.
+        _noise = TakeLocal<NoiseTool>();
+        _clarity = TakeLocal<ClarityTool>();
+        _sharpen = TakeLocal<SharpenTool>();
 
-        ClarityTool Add()
+        T TakeLocal<T>() where T : ILocalTool, new()
         {
-            var created = new ClarityTool();
+            var found = Stack.Local.OfType<T>().FirstOrDefault();
+            if (found is not null) return found;
+
+            var created = new T();
             Stack.Local.Add(created);
 
             return created;
@@ -194,7 +231,7 @@ public partial class GradingPanel : UserControl
             ZonesBody.IsEnabled = value;
             BandsBody.IsEnabled = value;
             LutBody.IsEnabled = value;
-            ClarityBody.IsEnabled = value;
+            ApplyLocalEnabled();
             VibranceSlider.IsEnabled = value;
         }
     }
@@ -379,6 +416,19 @@ public partial class GradingPanel : UserControl
             ClaritySlider.Value = Math.Clamp(_clarity.Amount, ClaritySlider.Minimum, ClaritySlider.Maximum);
             ClarityReachSlider.Value = Math.Clamp(_clarity.Reach,
                                                   ClarityReachSlider.Minimum, ClarityReachSlider.Maximum);
+
+            SharpenSlider.Value = Math.Clamp(_sharpen.Amount, SharpenSlider.Minimum, SharpenSlider.Maximum);
+            SharpenRadiusSlider.Value = Math.Clamp(_sharpen.Reach,
+                                                   SharpenRadiusSlider.Minimum, SharpenRadiusSlider.Maximum);
+            SharpenThresholdSlider.Value = Math.Clamp(_sharpen.Threshold,
+                                                      SharpenThresholdSlider.Minimum, SharpenThresholdSlider.Maximum);
+
+            NoiseLumaSlider.Value = Math.Clamp(_noise.Luminance,
+                                               NoiseLumaSlider.Minimum, NoiseLumaSlider.Maximum);
+            NoiseColourSlider.Value = Math.Clamp(_noise.Colour,
+                                                 NoiseColourSlider.Minimum, NoiseColourSlider.Maximum);
+            NoiseThresholdSlider.Value = Math.Clamp(_noise.Threshold,
+                                                    NoiseThresholdSlider.Minimum, NoiseThresholdSlider.Maximum);
         }
         finally
         {
@@ -436,6 +486,14 @@ public partial class GradingPanel : UserControl
         _clarity.Amount = (float)ClaritySlider.Value;
         _clarity.Reach = (int)Math.Round(ClarityReachSlider.Value);
 
+        _sharpen.Amount = (float)SharpenSlider.Value;
+        _sharpen.Reach = (int)Math.Round(SharpenRadiusSlider.Value);
+        _sharpen.Threshold = (float)SharpenThresholdSlider.Value;
+
+        _noise.Luminance = (float)NoiseLumaSlider.Value;
+        _noise.Colour = (float)NoiseColourSlider.Value;
+        _noise.Threshold = (float)NoiseThresholdSlider.Value;
+
         UpdateValues();
 
         // Beim Ziehen eines Reglers reicht die grobe Vorschau; das Loslassen meldet
@@ -472,6 +530,12 @@ public partial class GradingPanel : UserControl
         LutStrengthValue.Text = $"{LutStrengthSlider.Value:0.00}";
         ClarityValue.Text = $"{ClaritySlider.Value:+0.00;-0.00;0.00}";
         ClarityReachValue.Text = $"{ClarityReachSlider.Value:0}";
+        SharpenValue.Text = $"{SharpenSlider.Value:0.00}";
+        SharpenRadiusValue.Text = $"{SharpenRadiusSlider.Value:0}";
+        SharpenThresholdValue.Text = $"{SharpenThresholdSlider.Value:0.000}";
+        NoiseLumaValue.Text = $"{NoiseLumaSlider.Value:0.00}";
+        NoiseColourValue.Text = $"{NoiseColourSlider.Value:0.00}";
+        NoiseThresholdValue.Text = $"{NoiseThresholdSlider.Value:0.000}";
         UpdateZoneValues();
     }
 

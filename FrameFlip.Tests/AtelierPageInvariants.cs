@@ -136,11 +136,51 @@ public static class AtelierPageInvariants
         Check.That(panel.Stack.Local.OfType<ClarityTool>().Single().IsNeutral,
                    "ein Stapel ohne Klarheit laesst keine stehen");
 
+        // Alle drei oertlichen Werkzeuge kommen genau einmal vor - jedes bringt
+        // seine eigene Stufe mit, und der Stapel sortiert danach.
+        foreach (var kind in new[] { typeof(NoiseTool), typeof(ClarityTool), typeof(SharpenTool) })
+        {
+            int count = panel.Stack.Local.Count(tool => tool.GetType() == kind);
+            Check.That(count == 1, $"{kind.Name} steht genau einmal in der oertlichen Liste", $"{count}");
+        }
+
+        // An einer Ebene sind sie abgeschaltet. Sie wirken auf das fertige Bild; eine
+        // Einstellungsebene wird punktweise gerechnet, und eine Nachbarschaft gibt es
+        // dort nicht. Bedienbar zu bleiben waere schlimmer als abgeschaltet zu sein -
+        // der Regler liefe, und das Bild bliebe stehen.
+        var noiseBody = (System.Windows.FrameworkElement)panel.FindName("NoiseBody");
+        var clarityBody = (System.Windows.FrameworkElement)panel.FindName("ClarityBody");
+        var sharpenBody = (System.Windows.FrameworkElement)panel.FindName("SharpenBody");
+        var note = (System.Windows.FrameworkElement)panel.FindName("LocalOnFinalNote");
+
+        panel.Target = "eine Ebene";
+
+        Check.That(!noiseBody.IsEnabled && !clarityBody.IsEnabled && !sharpenBody.IsEnabled,
+                   "an einer Ebene sind die oertlichen Werkzeuge abgeschaltet");
+        Check.That(note.Visibility == System.Windows.Visibility.Visible,
+                   "und der Grund steht dabei");
+
+        panel.Target = null;
+
+        Check.That(noiseBody.IsEnabled && clarityBody.IsEnabled && sharpenBody.IsEnabled,
+                   "am fertigen Bild wieder an");
+        Check.That(note.Visibility != System.Windows.Visibility.Visible,
+                   "und der Hinweis verschwindet");
+
         // Abschalten und wieder an.
         panel.ToolsEnabled = false;
         Check.That(!panel.ToolsEnabled, "die Werkzeuge lassen sich abschalten");
         panel.ToolsEnabled = true;
         Check.That(panel.ToolsEnabled, "und wieder an");
+
+        // Zwei Gruende koennen die oertlichen Abschnitte sperren, und der zuletzt
+        // gesetzte darf nicht gewinnen: An einer Ebene bleiben sie gesperrt, auch
+        // wenn die Werkzeuge gerade eingeschaltet wurden.
+        panel.Target = "eine Ebene";
+        panel.ToolsEnabled = true;
+
+        Check.That(!clarityBody.IsEnabled, "die Ebenensperre ueberlebt den Gesamtschalter");
+        panel.Target = null;
 
         // Eine Messung durchreichen - das zeichnet Histogramm und Kurvenhintergrund.
         var histogram = new Histogram();

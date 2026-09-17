@@ -61,6 +61,17 @@
     <sys:String x:Key="S_ClarityAmount">Stärke</sys:String>
     <sys:String x:Key="S_ClarityReach">Radius</sys:String>
     <sys:String x:Key="S_ClarityHint">Örtlicher Kontrast: Er verstärkt, was ein Punkt gegenüber seiner Umgebung ist, und lässt gleichmäßige Flächen in Ruhe. Großer Radius gibt Plastizität, kleiner gibt Schärfe. Negativ nimmt Kontrast weg.</sys:String>
+    <sys:String x:Key="S_LocalOnFinal">Örtliche Werkzeuge wirken auf das fertige Bild, nicht auf eine einzelne Ebene: Sie brauchen die Nachbarschaft eines Punktes, und die steht erst fest, wenn der Stapel zusammengesetzt ist.</sys:String>
+    <sys:String x:Key="S_Noise">Rauschminderung</sys:String>
+    <sys:String x:Key="S_NoiseLuma">Helligkeit</sys:String>
+    <sys:String x:Key="S_NoiseColour">Farbe</sys:String>
+    <sys:String x:Key="S_NoiseThreshold">Schwelle</sys:String>
+    <sys:String x:Key="S_NoiseHint">Glättet, wo der Unterschied zur Umgebung klein ist, und lässt Kanten stehen. Farbe verträgt viel mehr als Helligkeit, weil feine Farbzeichnung selten ist. Gegen grobes Rauschen aus zu wenigen Abtastungen hilft nur rendern.</sys:String>
+    <sys:String x:Key="S_Sharpen">Schärfe</sys:String>
+    <sys:String x:Key="S_SharpenAmount">Stärke</sys:String>
+    <sys:String x:Key="S_SharpenRadius">Radius</sys:String>
+    <sys:String x:Key="S_SharpenThreshold">Schwelle</sys:String>
+    <sys:String x:Key="S_SharpenHint">Dasselbe wie Klarheit, nur mit kleinem Radius — und nur auf der Helligkeit, damit an farbigen Kanten kein bunter Saum entsteht. Die Schwelle lässt feines Rauschen liegen, statt es als Erstes hochzuholen.</sys:String>
     <sys:String x:Key="S_NoLut">Keine Tabelle gewaehlt</sys:String>
     <sys:String x:Key="S_Strength">Staerke</sys:String>
     <sys:String x:Key="S_PickLut">Tabelle waehlen</sys:String>

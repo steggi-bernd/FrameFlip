@@ -17,12 +17,15 @@ public sealed class GradingStack
     public List<IGradingTool> Tools { get; set; } = new();
 
     /// <summary>
-    /// Die Werkzeuge mit oertlicher Wirkung - Klarheit und was noch dazukommt.
+    /// Die Werkzeuge mit oertlicher Wirkung - Rauschminderung, Klarheit, Schaerfe.
     ///
     /// Eine eigene Liste und nicht dieselbe, weil sie einen anderen Weg nehmen: Sie
     /// brauchen einen Zwischenpuffer und einen zweiten Durchgang. Sie in dieselbe
     /// Kette zu haengen hiesse, jedes Bild durch diesen Puffer zu zwaengen, auch
     /// wenn gar keines von ihnen benutzt wird.
+    ///
+    /// Die Reihenfolge in dieser Liste bedeutet nichts - jedes Werkzeug bringt seine
+    /// Stufe mit, und <see cref="Prepare"/> sortiert danach.
     /// </summary>
     public List<ILocalTool> Local { get; set; } = new();
 
@@ -53,7 +56,11 @@ public sealed class GradingStack
             (tool.Stage == GradingStage.SceneLinear ? linear : display).Add(tool);
         }
 
-        foreach (var tool in Local)
+        // Sortiert, nicht in der Reihenfolge der Liste: Rauschminderung vor
+        // Klarheit vor Schaerfe. Wer in welcher Reihenfolge an den Reglern war, darf
+        // das Ergebnis nicht bestimmen - und die Reihenfolge, die hier steht, ist
+        // die einzige, die in beide Richtungen Sinn ergibt.
+        foreach (var tool in Local.OrderBy(t => t.Stage))
         {
             if (tool.IsNeutral) continue;
 
@@ -80,6 +87,17 @@ public sealed class GradingStack
     private static ILocalTool CopyLocal(ILocalTool tool) => tool switch
     {
         ClarityTool clarity => new ClarityTool { Amount = clarity.Amount, Reach = clarity.Reach },
+
+        SharpenTool sharpen => new SharpenTool
+        {
+            Amount = sharpen.Amount, Reach = sharpen.Reach, Threshold = sharpen.Threshold,
+        },
+
+        NoiseTool noise => new NoiseTool
+        {
+            Luminance = noise.Luminance, Colour = noise.Colour,
+            Threshold = noise.Threshold, Reach = noise.Reach,
+        },
 
         // Wie oben: Ein Werkzeug, das hier fehlt, wuerde geteilt statt kopiert.
         _ => throw new NotSupportedException($"Kein Kopierweg fuer {tool.GetType().Name}."),
@@ -121,22 +139,15 @@ public readonly struct PreparedGrading
     public IGradingTool[] Display { get; }
 
     /// <summary>
-    /// Die oertlichen Werkzeuge. Leer heisst: kein Zwischenpuffer, kein zweiter
-    /// Durchgang - und das ist der Normalfall.
+    /// Die oertlichen Werkzeuge, in ihrer festen Reihenfolge. Leer heisst: kein
+    /// Zwischenpuffer, kein zweiter Durchgang - und das ist der Normalfall.
+    ///
+    /// Den Radius bringt jedes selbst mit. Frueher stand hier der groesste fuer alle;
+    /// das war richtig, solange nur die Klarheit hier stand, und wurde falsch mit der
+    /// Schaerfe - zwei Werkzeuge, deren Radien um das Zwanzigfache auseinanderliegen,
+    /// koennen sich keine Weichzeichnung teilen.
     /// </summary>
     public ILocalTool[] Local { get; } = Array.Empty<ILocalTool>();
-
-    /// <summary>Der groesste Radius, den eines der Werkzeuge verlangt.</summary>
-    public int Reach
-    {
-        get
-        {
-            int reach = 0;
-            foreach (var tool in Local) reach = Math.Max(reach, tool.Radius);
-
-            return reach;
-        }
-    }
 
     public bool IsEmpty => SceneLinear.Length == 0 && Display.Length == 0 && Local.Length == 0;
 

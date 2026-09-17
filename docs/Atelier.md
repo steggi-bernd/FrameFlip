@@ -7,7 +7,7 @@ sequence and write it out. Layers, masks driven by render data, and a colour too
 aimed at Photoshop and Lightroom rather than at a node graph.
 
 **Status:** steps 1 to 7 are built and running; of step 8 the local path exists, with
-Clarity on it. Step 5 is complete —
+clarity, sharpening and noise reduction on it. Step 5 is complete —
 pass, adjustment, image and group layers, with order, duplication, opacity, colour,
 blend modes and clipping masks. Of step 6, masks are data-driven: cryptomatte, any
 pass, luminance and gradient; painted masks are not built. Where an earlier estimate or
@@ -565,10 +565,10 @@ at all; the rest is what makes it worth staying in.
 | Tool | Parameters | Notes |
 |---|---|---|
 | ~~**Clarity**~~ ★ **built** | amount, radius | midtone local contrast — unsharp mask at a large radius |
-| **Texture** | amount | the same at a small radius: surface detail without the halo — which is Clarity's radius slider turned down, not a second tool |
+| **Texture** | amount | the same at a small radius: surface detail without the halo — which is Sharpen's radius turned up, not a third tool |
 | **Dehaze** | amount | dark-channel prior. Also runs backwards, to add atmosphere |
-| **Sharpen** | amount, radius, threshold | unsharp mask; the threshold keeps noise out of it |
-| **Noise reduction** | luminance, colour, detail | for renders with the sample count cut short. The EXR's albedo and normal passes make this markedly better than it can be on a PNG |
+| ~~**Sharpen**~~ **built** | amount, radius, threshold | unsharp mask on luminance only; the threshold keeps noise out of it |
+| ~~**Noise reduction**~~ **built** | luminance, colour, threshold | for renders with the sample count cut short. Luminance and colour separately, because they deserve very different amounts |
 | **Bloom / Glare** ★ | threshold, radius, intensity | on HDR data this is finally correct, because the overbrights are real rather than clipped to white. On an 8-bit PNG the same filter is guesswork |
 | **Halation** | threshold, radius, tint | red-orange bleed around highlights; most of what reads as "filmic" |
 
@@ -576,10 +576,10 @@ at all; the rest is what makes it worth staying in.
 in, a pixel comes out, and tools chain without a buffer and without an ordering problem.
 The tools in this table cannot be said that way. They ask what it looks like *around* a
 pixel, and `IGradingTool` has promised them their own path since it was written. That
-path now exists, and Clarity runs on it:
+path now exists, and clarity, sharpening and noise reduction run on it:
 
 1. the whole chain into a scratch buffer, up to and including the display tools;
-2. that buffer blurred — once, for all local tools together;
+2. that buffer blurred — once per radius, not once per tool;
 3. value and blur together through the tools, then out.
 
 **Both values come from the same stage.** That is the correctness condition, and it is
@@ -620,6 +620,83 @@ converted where the frame size is known, so the same number means the same thing
 instead of a quarter of it. And clarity's weighting runs to zero at black and at white
 (`4b(1-b)`): without it the highlights blow and the shadows block up, precisely where
 there is no room left.
+
+#### One blur per radius — the assumption that broke first
+
+The first version blurred **once, at the largest radius any tool asked for**. That was
+correct while clarity stood there alone, and it was the first thing to fail when
+sharpening arrived: sharpening at radius forty is not sharpening, it is clarity again.
+So the tools are grouped by radius, in order, and each group blurs what is standing at
+that moment — not what stood at the start.
+
+That second half is not a detail. It is the reason noise reduction and sharpening
+together are worth more than either alone: sharpening sees the cleaned-up picture, so
+the grain that was just removed does not come back. Blurring once at the start and
+handing the same blur to both would have sharpening reach for exactly what noise
+reduction had put down. There is a test with two probe tools that reads back which
+blur each one was given.
+
+The order is fixed and does not follow the list: **noise reduction → clarity →
+sharpening.** Cleaning up first, because everything after it amplifies local differences
+and grain *is* a local difference. Sharpening last, because it should see the finished
+picture. Which slider somebody reached for first must not decide what comes out.
+
+#### Sharpening
+
+The same handle as clarity with a small radius, and three differences that each look
+minor on their own:
+
+It works **on luminance**, not per channel. At a coloured edge the three channels run
+apart by different amounts; sharpened per channel the colour moves, and every edge
+carries a coloured fringe. One increment on all three leaves the hue where it was — the
+test checks that the distances between the channels come out unchanged.
+
+It has a **threshold**, with a soft falloff rather than a cut. A hard cut would show up
+along a gradient as a step, exactly where the grain crosses the threshold.
+
+And it does **not** let go at the ends, unlike clarity. A specular edge lives at the
+white end; stopping there means stopping precisely where the picture is sharpest. It
+clamps, and that is all.
+
+#### Noise reduction
+
+Built from the same two numbers as everything here. Small difference to the
+surroundings: probably grain, so the value moves toward the blur. Large difference: an
+edge, so it stays. That is the bilateral filter's idea with one blur instead of a window
+per pixel, and the honest version of what it can do: **this is for fine grain over an
+otherwise finished picture.** A render with too few samples is blotchy in *large*
+patches, and from close up those look like content. Nothing here helps with that;
+rendering longer does.
+
+Luminance and colour are separated, and that is the part that earns its keep. Colour
+noise is the ugly kind — coloured blotches in a grey wall — and genuinely fine colour
+detail is rare. So colour takes a threshold four times as wide and can be smoothed far
+harder than luminance, without anyone missing anything.
+
+#### What the three of them cost, and one thing the preview cannot show
+
+| 1080p | every pixel | while a slider moves |
+|---|---|---|
+| no local tool | **29.9 ms** | — |
+| clarity | **62.5 ms** | **9.2 ms** |
+| all three, three different radii | **125.5 ms** | **14.7 ms** |
+
+Three radii mean three blurs, and that is what the full pass costs. While dragging it
+collapses, and not only because the grid is smaller: a radius of 2 and a radius of 4
+both land on 1 once the grid is a quarter of the picture, so they share a blur.
+
+Which is also the one thing to be honest about. A small radius **cannot be previewed
+truthfully on the coarse grid.** Radius 2 at quarter resolution becomes radius 1 on the
+grid, which is radius 4 in the picture — the drag preview oversharpens. The release
+recomputes at full resolution and the picture settles. Detail at a scale finer than the
+preview grid is not something a preview at that grid can show, and pretending otherwise
+would mean computing every pixel on every tick.
+
+**They act on the finished picture, not on a single layer.** An adjustment layer is
+computed pixel by pixel in the middle of the stack; a neighbourhood does not exist there
+yet. So the three sections are switched off while a layer is selected, with the reason
+written next to them — a slider that moves while the picture does not would be worse
+than one that is visibly unavailable.
 
 ### 7.4 Optics
 
@@ -667,6 +744,10 @@ multiplying that by an amount is not a look, it is an explosion. The second is t
 correctness condition above: value and blur must come from the same stage, and the stage
 where "flat" means flat to the eye is the display stage. The line above still describes
 the point-wise chain correctly; the local tools hang off its end.
+
+Among themselves they also run in a different order than the line suggests: **noise
+reduction, then clarity, then sharpening** — the cleaning up has to happen before
+anything amplifies local differences, because grain is one.
 
 ---
 
@@ -820,9 +901,11 @@ next one landing.
    the picture, and the selection holds for the whole sequence — the file names
    objects, and a name does not move.
 8. **The remaining tools from section 7**, in the order people ask for them. The
-   **local path is built** — the second pass the neighbourhood tools need — with Clarity
-   as the first tool on it. Sharpening, texture, noise reduction and glow are further
-   tools on that path rather than further mechanism, which is what the step was for.
+   **local path is built** — the second pass the neighbourhood tools need — and carries
+   ~~clarity~~, ~~sharpening~~ and ~~noise reduction~~. Building the second and third
+   tool on it is what showed up the one wrong assumption in the first: a single blur
+   for every tool. Glow and halation are further tools on that path rather than further
+   mechanism, which is what the step was for.
 
 Steps 1–4 are the product. 5–8 are what makes it uncontested.
 

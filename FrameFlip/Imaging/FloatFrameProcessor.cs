@@ -369,7 +369,7 @@ public static class FloatFrameProcessor
         });
 
         // --- weichzeichnen und durch die Werkzeuge ---
-        LocalPass.Run(scratch, tools, grading.Reach, gridWidth, rows.Length, width, step);
+        LocalPass.Run(scratch, tools, gridWidth, rows.Length, width, step);
 
         // --- zweiter Durchgang: hinausschreiben ---
         byte* target = (byte*)destination.ToPointer();
@@ -602,7 +602,7 @@ public static class FloatFrameProcessor
                 }
             });
 
-            LocalPass.Run(scratch, localTools, grading.Reach, width, height, width, step: 1);
+            LocalPass.Run(scratch, localTools, width, height, width, step: 1);
         }
 
         var shaded = scratch?.Values;
