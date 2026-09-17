@@ -730,10 +730,15 @@
                         ValueChanged="OnChanged" MouseDoubleClick="OnSliderReset" Tag="2" />
 
                 <!--
-                    Drei Muster. Das dritte laeuft auf einem anderen Weg als die
-                    beiden anderen - es ist kein Ortswerkzeug, sondern ein Durchgang
-                    ueber das ganze Bild. Hier steht es trotzdem daneben: Wer rastern
-                    will, sucht das Muster und nicht die Passart.
+                    ALLE Verfahren in EINER Liste.
+
+                    Sie standen eine Weile in zweien: erst die Art waehlen, dann bei
+                    der Fehlerdiffusion noch das Schema. Das spiegelte sauber, wie
+                    gerechnet wird - die ersten drei sind Ortswerkzeuge, die uebrigen
+                    Durchgaenge ueber das ganze Bild -, und genau das war der Fehler.
+                    Wer ein Raster sucht, sucht einen NAMEN und keine Passart;
+                    Atkinson steckte dadurch zwei Ebenen tief und war nicht zu finden,
+                    solange man nicht schon wusste, dass es ihn gibt.
                 -->
                 <ComboBox x:Name="DitherPatternBox" Style="{StaticResource OverlayCombo}"
                           HorizontalAlignment="Left" Width="180" Margin="0,10,0,0"
@@ -745,25 +750,7 @@
                                   Content="{DynamicResource S_DitherNoise}" />
                     <ComboBoxItem Style="{StaticResource OverlayComboItem}"
                                   Content="{DynamicResource S_DitherLines}" />
-                    <ComboBoxItem Style="{StaticResource OverlayComboItem}"
-                                  Content="{DynamicResource S_DitherDiffusion}" />
-                </ComboBox>
-
-                <!--
-                    Nur fuer das Linienraster. Sichtbar statt nur unwirksam: Ein
-                    Regler, der je nach Muster etwas tut oder nicht, ist schwerer zu
-                    verstehen als einer, der verschwindet.
-                -->
-                <!--
-                    Nur fuer die Fehlerdiffusion. Welches Schema gilt, aendert das
-                    Ergebnis mehr als jeder Regler daneben - Atkinson und Jarvis sehen
-                    einander nicht aehnlich.
-                -->
-                <ComboBox x:Name="DiffusionKernelBox" Style="{StaticResource OverlayCombo}"
-                          HorizontalAlignment="Left" Width="180" Margin="0,10,0,0"
-                          Visibility="Collapsed" SelectedIndex="0"
-                          SelectionChanged="OnDitherPattern"
-                          ToolTip="{DynamicResource S_DiffusionKernelHint}">
+                    <!-- Ab hier die Fehlerdiffusionen, beim Namen genannt. -->
                     <ComboBoxItem Style="{StaticResource OverlayComboItem}" Content="Floyd-Steinberg" />
                     <ComboBoxItem Style="{StaticResource OverlayComboItem}" Content="Atkinson" />
                     <ComboBoxItem Style="{StaticResource OverlayComboItem}" Content="Jarvis-Judice-Ninke" />
@@ -771,6 +758,12 @@
                     <ComboBoxItem Style="{StaticResource OverlayComboItem}" Content="Burkes" />
                     <ComboBoxItem Style="{StaticResource OverlayComboItem}" Content="Sierra" />
                 </ComboBox>
+
+                <!--
+                    Nur fuer das Linienraster. Sichtbar statt nur unwirksam: Ein
+                    Regler, der je nach Muster etwas tut oder nicht, ist schwerer zu
+                    verstehen als einer, der verschwindet.
+                -->
 
                 <Grid x:Name="DitherAngleHeader" Visibility="Collapsed" Margin="0,10,0,2">
                     <TextBlock Text="{DynamicResource S_DitherAngle}" Style="{StaticResource PanelLabel}" />
