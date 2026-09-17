@@ -1204,6 +1204,36 @@ public static class AtelierLayerInvariants
 
             Check.That(!frame.IsHitTestVisible, "beim Auswaehlen faengt der Rahmen nicht");
 
+            // Der Pinsel: dasselbe Element, dritter Modus. Ohne gemalte Maske an der
+            // gewaehlten Ebene faengt er NICHTS - ein Pinsel, der auf nichts malt und
+            // trotzdem die Maus nimmt, ist der unangenehmste Zustand von allen.
+            Check.That(page.HandleToolKey(System.Windows.Input.Key.B), "B waehlt den Pinsel");
+
+            page.UpdateLayout();
+
+            Check.That(column.Tool == AtelierTool.Brush, "naemlich den Pinsel", $"{column.Tool}");
+            Check.That(frame.Mode == AdornerMode.Paint, "und der Rahmen malt", $"{frame.Mode}");
+
+            Check.That(!frame.IsHitTestVisible,
+                       "ohne gemalte Maske faengt er nichts");
+
+            var chosen = ((LayerPanel)page.FindName("Layers")).Selection;
+
+            if (chosen is not null)
+            {
+                chosen.Mask.Kind = MaskKind.Painted;
+
+                page.HandleToolKey(System.Windows.Input.Key.V);
+                page.HandleToolKey(System.Windows.Input.Key.B);
+                page.UpdateLayout();
+
+                Check.That(frame.IsHitTestVisible,
+                           "mit gemalter Maske sehr wohl");
+            }
+
+            page.HandleToolKey(System.Windows.Input.Key.V);
+            page.UpdateLayout();
+
             // Zuschneiden benutzt DENSELBEN Rahmen wie das Verschieben, nur mit
             // anderen Griffen. Ein zweiter Rahmen daneben haette die Umrechnung ein
             // zweites Mal gebraucht, und zwei Umrechnungen laufen frueher oder

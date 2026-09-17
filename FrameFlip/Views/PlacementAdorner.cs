@@ -123,6 +123,12 @@ public sealed partial class PlacementAdorner : FrameworkElement
         // Ein durchsichtiges Rechteck ueber alles: Ohne es faellt die Maus durch.
         context.DrawRectangle(Background, null, new Rect(0, 0, ActualWidth, ActualHeight));
 
+        if (_mode == AdornerMode.Paint)
+        {
+            RenderPaint(context);
+            return;
+        }
+
         if (_transform is null || _canvasWidth <= 0) return;
 
         if (_mode == AdornerMode.Crop)
@@ -199,6 +205,12 @@ public sealed partial class PlacementAdorner : FrameworkElement
 
     protected override void OnMouseLeftButtonDown(MouseButtonEventArgs e)
     {
+        if (_mode == AdornerMode.Paint)
+        {
+            if (Canvas(e.GetPosition(this), out float px, out float py)) PaintDown(e, px, py);
+            return;
+        }
+
         if (_transform is null) return;
         if (!Canvas(e.GetPosition(this), out float x, out float y)) return;
 
@@ -241,6 +253,12 @@ public sealed partial class PlacementAdorner : FrameworkElement
 
     protected override void OnMouseMove(MouseEventArgs e)
     {
+        if (_mode == AdornerMode.Paint)
+        {
+            if (Canvas(e.GetPosition(this), out float px, out float py)) PaintMove(px, py);
+            return;
+        }
+
         if (_transform is null) return;
         if (!Canvas(e.GetPosition(this), out float x, out float y)) return;
 
@@ -280,6 +298,12 @@ public sealed partial class PlacementAdorner : FrameworkElement
 
     protected override void OnMouseLeftButtonUp(MouseButtonEventArgs e)
     {
+        if (_mode == AdornerMode.Paint)
+        {
+            PaintUp(e);
+            return;
+        }
+
         if (_mode == AdornerMode.Crop)
         {
             CropUp(e);

@@ -74,6 +74,15 @@
                             M3.5,11 C4.5,14.5 11.5,14.5 12.5,11" />
             </RadioButton>
 
+            <RadioButton x:Name="BrushTool" Style="{StaticResource ToolButton}"
+                         GroupName="AtelierTool" Tag="Brush" Checked="OnToolChecked"
+                         ToolTip="{DynamicResource S_ToolBrushHint}">
+                <Path Style="{StaticResource ToolIcon}"
+                      Data="M3,15 C3,12 4,11 6,10.5 L10.5,6 L13,8.5 L8.5,13
+                            C8,15 7,15.5 3,15 Z
+                            M10.5,6 L12.5,3.5 A1.6,1.6 0 0 1 15,6 L13,8.5" />
+            </RadioButton>
+
             <RadioButton x:Name="PickTool" Style="{StaticResource ToolButton}"
                          GroupName="AtelierTool" Tag="Pick" Checked="OnToolChecked"
                          ToolTip="{DynamicResource S_ToolPickHint}">

@@ -849,4 +849,12 @@
     <sys:String x:Key="S_GroupOptics">Optics</sys:String>
     <sys:String x:Key="S_GroupFilm">Film</sys:String>
     <sys:String x:Key="S_GroupTable">Table</sys:String>
+    <sys:String x:Key="S_ToolBrush">Brush</sys:String>
+    <sys:String x:Key="S_ToolBrushHint">Brush (B) - paints a mask by hand. Holding Alt takes it away again. The layer needs a painted mask for this; while painting the mask lies over the picture as a coloured wash, because otherwise you would only see its effect.</sys:String>
+    <sys:String x:Key="S_ToolBrushShort">Paints the selected layer's mask. Alt erases. Without a painted mask on the layer there is nothing to paint on.</sys:String>
+    <sys:String x:Key="S_MaskPainted">Painted</sys:String>
+    <sys:String x:Key="S_MaskLock">all frames</sys:String>
+    <sys:String x:Key="S_MaskLockHint">Locked, one painting applies to the whole sequence. Unlocked, each frame gets its own - then a single frame can be retouched without touching the others. On unlocking, the painting so far moves to the current frame rather than being discarded.</sys:String>
+    <sys:String x:Key="S_MaskLockedNote">One painting for every frame.</sys:String>
+    <sys:String x:Key="S_MaskLooseNote">A separate painting per frame - for single-frame retouching.</sys:String>
 </ResourceDictionary>

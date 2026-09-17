@@ -36,10 +36,23 @@ public partial class AtelierPage
     {
         var layer = Layers.Selection;
 
-        // Zwei Werkzeuge benutzen denselben Rahmen: Verschieben und Zuschneiden.
-        // Welches, sagt sein Modus - die Griffe sitzen an derselben Stelle und
-        // schreiben auf andere Werte.
-        Placement.Mode = _tool == AtelierTool.Crop ? AdornerMode.Crop : AdornerMode.Place;
+        // Drei Werkzeuge benutzen denselben Rahmen: Verschieben, Zuschneiden, Malen.
+        // Welches, sagt sein Modus - sie sitzen alle in derselben Flaeche und teilen
+        // sich die Umrechnung zwischen Schirm, Leinwand und Bildpunkt.
+        Placement.Mode = _tool switch
+        {
+            AtelierTool.Crop => AdornerMode.Crop,
+            AtelierTool.Brush => AdornerMode.Paint,
+            _ => AdornerMode.Place,
+        };
+
+        if (_tool == AtelierTool.Brush)
+        {
+            ShowBrush();
+            return;
+        }
+
+        Placement.Paint(null, 0, 0, false);
 
         if (_frame is null || _showingOriginal ||
             _tool is not (AtelierTool.Move or AtelierTool.Crop) ||
@@ -56,6 +69,47 @@ public partial class AtelierPage
         Placement.Track(layer.Place, source.Width, source.Height,
                         _frame.Width, _frame.Height,
                         Display.Stretch == System.Windows.Media.Stretch.Uniform);
+    }
+
+    /// <summary>
+    /// Haengt den Pinsel an die Maske der gewaehlten Ebene.
+    ///
+    /// Ohne gewaehlte Ebene oder ohne gemalte Maske gibt es nichts zu bemalen - dann
+    /// bleibt die Flaeche durchlaessig, statt Klicks zu schlucken. Ein Pinsel, der
+    /// auf nichts malt und trotzdem die Maus nimmt, ist der unangenehmste Zustand von
+    /// allen.
+    /// </summary>
+    private void ShowBrush()
+    {
+        var layer = Layers.Selection;
+
+        if (_frame is null || layer is null || layer.Mask.Kind != MaskKind.Painted)
+        {
+            Placement.Paint(null, 0, 0, false);
+            return;
+        }
+
+        var mask = layer.Mask.PaintOn(_number, _frame.Width, _frame.Height);
+
+        Placement.Paint(mask, _frame.Width, _frame.Height,
+                        Display.Stretch == System.Windows.Media.Stretch.Uniform);
+    }
+
+    /// <summary>
+    /// Es wurde gemalt.
+    ///
+    /// Beim Ziehen grob rechnen, beim Loslassen voll und festhalten - dieselbe
+    /// Zweiteilung wie bei jedem Regler. Der Schleier ueber dem Bild zeichnet sich
+    /// sofort; das Bild darunter zieht nach.
+    /// </summary>
+    private void OnPainted(bool interim)
+    {
+        var layer = Layers.Selection;
+        if (layer is null) return;
+
+        if (!interim) _settings.Layers = Layers.Stack;
+
+        Layers.PlaceMovedOutside(interim);
     }
 
     /// <summary>Die zuletzt gezogene Lage, die noch nicht gerechnet ist.</summary>

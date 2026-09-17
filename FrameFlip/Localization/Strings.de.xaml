@@ -849,4 +849,12 @@
     <sys:String x:Key="S_GroupOptics">Optik</sys:String>
     <sys:String x:Key="S_GroupFilm">Film</sys:String>
     <sys:String x:Key="S_GroupTable">Tabelle</sys:String>
+    <sys:String x:Key="S_ToolBrush">Pinsel</sys:String>
+    <sys:String x:Key="S_ToolBrushHint">Pinsel (B) - trägt eine Maske von Hand auf. Alt hält gedrückt nimmt wieder weg. Die Ebene braucht dafür eine gemalte Maske; die Maske liegt beim Malen als farbiger Schleier über dem Bild, sonst sähe man nur ihre Wirkung.</sys:String>
+    <sys:String x:Key="S_ToolBrushShort">Trägt die Maske der gewählten Ebene auf. Alt nimmt weg. Ohne gemalte Maske an der Ebene gibt es nichts zu bemalen.</sys:String>
+    <sys:String x:Key="S_MaskPainted">Gemalt</sys:String>
+    <sys:String x:Key="S_MaskLock">für alle Bilder</sys:String>
+    <sys:String x:Key="S_MaskLockHint">Gesperrt gilt ein Anstrich für die ganze Sequenz. Entsperrt gilt je Bild ein eigener — dann lässt sich ein einzelnes Bild retuschieren, ohne die anderen anzufassen. Beim Entsperren wandert der bisherige Anstrich auf das aktuelle Bild, statt verworfen zu werden.</sys:String>
+    <sys:String x:Key="S_MaskLockedNote">Ein Anstrich für alle Bilder.</sys:String>
+    <sys:String x:Key="S_MaskLooseNote">Je Bild ein eigener Anstrich — für Einzelbildretusche.</sys:String>
 </ResourceDictionary>

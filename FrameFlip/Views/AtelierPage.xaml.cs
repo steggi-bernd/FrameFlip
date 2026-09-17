@@ -136,6 +136,7 @@ public sealed partial class AtelierPage : UserControl
         Layers.Thumbnail = Thumbnail;
 
         Placement.Changed += OnPlacementDragged;
+        Placement.Painted += OnPainted;
 
         Bind(null);
 
@@ -202,6 +203,10 @@ public sealed partial class AtelierPage : UserControl
         // immer dasselbe Korn bekommen - in der Vorschau, im Export und auch dann,
         // wenn jemand spaeter nur einen Ausschnitt nachexportiert.
         _number = SequenceLink.NumberOf(path) ?? 0;
+
+        // Der Streifen braucht sie fuer die Sperre der gemalten Maske - er kennt
+        // keine Dateien und keine Sequenz, nur diese Zahl.
+        Layers.Number = _number;
         FileText.Text = Path.GetFileName(path);
         BusyBadge.Visibility = Visibility.Visible;
         EmptyHint.Visibility = Visibility.Collapsed;

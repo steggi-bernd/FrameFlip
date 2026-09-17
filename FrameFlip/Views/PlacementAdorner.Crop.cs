@@ -18,6 +18,9 @@ public enum AdornerMode
 
     /// <summary>Zuschneiden: an den Kanten der Ebene ziehen.</summary>
     Crop,
+
+    /// <summary>Malen: eine Maske von Hand auftragen.</summary>
+    Paint,
 }
 
 /// <summary>

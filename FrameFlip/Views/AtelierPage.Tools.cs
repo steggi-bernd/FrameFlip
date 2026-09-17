@@ -53,6 +53,7 @@ public partial class AtelierPage
             {
                 AtelierTool.Select or AtelierTool.Pick or AtelierTool.Crop => Cursors.Cross,
                 AtelierTool.Hand => Cursors.Hand,
+                AtelierTool.Brush => Cursors.None,
                 _ => null,
             };
 
@@ -85,6 +86,7 @@ public partial class AtelierPage
             Key.W => AtelierTool.Select,
             Key.C => AtelierTool.Crop,
             Key.H => AtelierTool.Hand,
+            Key.B => AtelierTool.Brush,
             Key.I => AtelierTool.Pick,
             _ => (AtelierTool?)null,
         };

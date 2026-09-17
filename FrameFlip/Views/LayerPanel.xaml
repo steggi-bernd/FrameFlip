@@ -282,6 +282,29 @@
                             Paar unter einer Ueberschrift ist beides in einem Blick da:
                             zwei Richtungen auf derselben Zahl.
                         -->
+                        <!--
+                            Die Sperre der gemalten Maske.
+
+                            Gesperrt gilt EIN Anstrich fuer alle Bilder; entsperrt je
+                            Bild ein eigener, und man kann ein einzelnes Bild
+                            retuschieren, ohne die anderen anzufassen.
+
+                            Nur gemalte Masken brauchen sie. Eine Kryptomatte passt
+                            sich von selbst an jedes Bild an - sie waehlt ein OBJEKT
+                            und keinen Ort -, und eine Helligkeitsmaske rechnet ohnehin
+                            je Bild neu. Statisch ist allein, was von Hand kam.
+                        -->
+                        <ToggleButton x:Name="MaskLockButton" Style="{StaticResource OverlayToggle}"
+                                      Visibility="Collapsed" HorizontalAlignment="Left"
+                                      Margin="0,8,0,0" Padding="8,1" FontSize="10"
+                                      Content="{DynamicResource S_MaskLock}"
+                                      Checked="OnMaskLockChanged" Unchecked="OnMaskLockChanged"
+                                      ToolTip="{DynamicResource S_MaskLockHint}" />
+
+                        <TextBlock x:Name="MaskLockNote" Visibility="Collapsed"
+                                   Margin="0,6,0,0" FontSize="10" TextWrapping="Wrap"
+                                   Foreground="{StaticResource MutedBrush}" />
+
                         <TextBlock x:Name="MatteGroup" Visibility="Collapsed"
                                    Margin="0,14,0,0" FontSize="10" FontWeight="SemiBold"
                                    Foreground="{StaticResource MutedBrush}"

@@ -54,6 +54,7 @@ public partial class LayerPanel : UserControl
         (MaskKind.Pass, "S_MaskPass"),
         (MaskKind.Gradient, "S_MaskGradient"),
         (MaskKind.Cryptomatte, "S_MaskCryptomatte"),
+        (MaskKind.Painted, "S_MaskPainted"),
     };
 
     /// <summary>
@@ -518,6 +519,62 @@ public partial class LayerPanel : UserControl
         PushToControls();
         UpdateButtons();
         Editing?.Invoke(EditedLayer);
+    }
+
+    /// <summary>
+    /// Die Sperre der gemalten Maske wurde umgelegt.
+    ///
+    /// Beim Entsperren wird der bisherige Anstrich dem AKTUELLEN Bild zugeschlagen,
+    /// statt ihn wegzuwerfen: Wer entsperrt, will meistens von dem weitermalen, was
+    /// schon da ist, und nicht bei null anfangen.
+    /// </summary>
+    private void OnMaskLockChanged(object sender, RoutedEventArgs e)
+    {
+        if (_filling || _selected is null) return;
+
+        var mask = _selected.Mask;
+        bool locked = MaskLockButton.IsChecked == true;
+
+        if (mask.PaintLocked && !locked && mask.Paint is { } had)
+        {
+            mask.PaintFrames[Number] = had;
+            mask.Paint = null;
+        }
+        else if (!mask.PaintLocked && locked)
+        {
+            mask.Paint = mask.PaintFor(Number)?.Clone();
+            mask.PaintFrames.Clear();
+        }
+
+        mask.PaintLocked = locked;
+
+        ShowMaskLock();
+        Raise(interim: false);
+    }
+
+    /// <summary>
+    /// Die Bildnummer, fuer die gerade gemalt wird - von der Seite gesetzt.
+    ///
+    /// Der Streifen kennt keine Dateien und keine Sequenz; er kennt eine Zahl. Das
+    /// reicht fuer die Sperre und haelt ihn frei von allem anderen.
+    /// </summary>
+    public int Number { get; set; }
+
+    /// <summary>Zeigt oder versteckt die Sperre, je nach Maskenart.</summary>
+    private void ShowMaskLock()
+    {
+        bool painted = _selected?.Mask.Kind == MaskKind.Painted;
+
+        MaskLockButton.Visibility = painted ? Visibility.Visible : Visibility.Collapsed;
+        MaskLockNote.Visibility = painted ? Visibility.Visible : Visibility.Collapsed;
+
+        if (!painted || _selected is null) return;
+
+        bool locked = _selected.Mask.PaintLocked;
+
+        MaskLockButton.IsChecked = locked;
+
+        MaskLockNote.Text = Strings.T(locked ? "S_MaskLockedNote" : "S_MaskLooseNote");
     }
 
     private void OnVisibilityClicked(object sender, RoutedEventArgs e)
@@ -1072,6 +1129,8 @@ public partial class LayerPanel : UserControl
         // Alpha "hier wurde nichts getroffen" - dort etwas wegzuschneiden loeschte
         // das Umgebungslicht.
         var matte = content == LayerContent.Image ? Visibility.Visible : Visibility.Collapsed;
+
+        ShowMaskLock();
 
         MatteGroup.Visibility = matte;
         MatteHeader.Visibility = matte;

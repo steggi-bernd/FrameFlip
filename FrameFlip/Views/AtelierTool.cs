@@ -38,6 +38,15 @@ public enum AtelierTool
     Hand,
 
     /// <summary>
+    /// Der Pinsel: eine Maske von Hand auftragen.
+    ///
+    /// Das einzige Werkzeug, mit dem sich "genau hier" sagen laesst. Alle anderen
+    /// Maskenarten sind abgeleitet - aus einer Helligkeit, einem Pass, einem Objekt -
+    /// und koennen die Frage deshalb nur ungefaehr beantworten.
+    /// </summary>
+    Brush,
+
+    /// <summary>
     /// Die Pipette: einen Wert ablesen.
     ///
     /// Der Fall, der sie rechtfertigt, ist nicht das Ablesen einer Farbe, sondern die

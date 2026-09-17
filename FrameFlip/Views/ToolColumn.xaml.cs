@@ -52,6 +52,7 @@ public partial class ToolColumn : UserControl
         AtelierTool.Select => SelectTool,
         AtelierTool.Crop => CropTool,
         AtelierTool.Hand => HandTool,
+        AtelierTool.Brush => BrushTool,
         AtelierTool.Pick => PickTool,
         _ => MoveTool,
     };
