@@ -92,6 +92,8 @@ static int RunAll()
     BrowseInvariants.Run();
     BrowseInvariants.Movies();
     DitherInvariants.Run();
+    DitherPipelineInvariants.Run();
+    DitherPanelInvariants.Run();
     RenderInvariants.Run();
     RenderServiceInvariants.Run();
     UploadInvariants.Run();

@@ -172,6 +172,17 @@ public partial class GradingPanel : UserControl
         ChromaticBody.IsEnabled = enabled;
         VignetteBody.IsEnabled = enabled;
         GrainBody.IsEnabled = enabled;
+
+        // Rastern gehoert hierher wie das Korn: Es ist eine Eigenschaft des fertigen
+        // BILDES und keine einer Ebene. Die Fehlerdiffusion laeuft ohnehin ueber den
+        // ganzen Rahmen, und ein Raster auf einer Ebene, ueber die danach noch etwas
+        // gelegt wird, waere keines mehr.
+        //
+        // Es hier zu vergessen war teuer: Der Abschnitt blieb bedienbar, waehrend
+        // eine Ebene gewaehlt war, schrieb in deren Stapel - und dort wird er nie
+        // gerechnet. Im Fenster sah das aus wie "hat keinen Effekt", und zwar bei
+        // jedem Verfahren gleichzeitig.
+        DitherBody.IsEnabled = enabled;
     }
 
     /// <summary>
