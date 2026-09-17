@@ -304,6 +304,88 @@
                        Foreground="{StaticResource MutedBrush}"
                        Text="{DynamicResource S_LocalOnFinal}" />
 
+            <!--
+                Glanz und Halation stehen vorn, weil sie zuerst rechnen - und zwar
+                vor der Sichtumwandlung, wo die Ueberhellen noch da sind.
+            -->
+            <Grid Margin="0,16,0,0">
+                <TextBlock Text="{DynamicResource S_Bloom}" Style="{StaticResource PanelHeading}" />
+                <Button Style="{StaticResource LinkButton}" HorizontalAlignment="Right"
+                        Content="+" Tag="BloomBody" Click="OnSectionToggled" />
+            </Grid>
+            <StackPanel x:Name="BloomBody" Visibility="Collapsed" Margin="0,6,0,0">
+                <Grid Margin="0,0,0,2">
+                    <TextBlock Text="{DynamicResource S_BloomAmount}" Style="{StaticResource PanelLabel}" />
+                    <TextBlock x:Name="BloomValue" Style="{StaticResource PanelValue}" />
+                </Grid>
+                <Slider x:Name="BloomSlider" Style="{StaticResource PanelSlider}"
+                        Minimum="0" Maximum="2" Value="0" SmallChange="0.05" LargeChange="0.2"
+                        ValueChanged="OnChanged" MouseDoubleClick="OnSliderReset" Tag="0" />
+
+                <Grid Margin="0,10,0,2">
+                    <TextBlock Text="{DynamicResource S_BloomThreshold}" Style="{StaticResource PanelLabel}" />
+                    <TextBlock x:Name="BloomThresholdValue" Style="{StaticResource PanelValue}" />
+                </Grid>
+                <Slider x:Name="BloomThresholdSlider" Style="{StaticResource PanelSlider}"
+                        Minimum="0.1" Maximum="4" Value="1" SmallChange="0.05" LargeChange="0.25"
+                        ValueChanged="OnChanged" MouseDoubleClick="OnSliderReset" Tag="1" />
+
+                <Grid Margin="0,10,0,2">
+                    <TextBlock Text="{DynamicResource S_BloomRadius}" Style="{StaticResource PanelLabel}" />
+                    <TextBlock x:Name="BloomRadiusValue" Style="{StaticResource PanelValue}" />
+                </Grid>
+                <Slider x:Name="BloomRadiusSlider" Style="{StaticResource PanelSlider}"
+                        Minimum="4" Maximum="200" Value="60" SmallChange="2" LargeChange="10"
+                        ValueChanged="OnChanged" MouseDoubleClick="OnSliderReset" Tag="60" />
+
+                <TextBlock Margin="0,8,0,0" FontSize="10" TextWrapping="Wrap"
+                           Foreground="{StaticResource MutedBrush}"
+                           Text="{DynamicResource S_BloomHint}" />
+            </StackPanel>
+
+            <Grid Margin="0,16,0,0">
+                <TextBlock Text="{DynamicResource S_Halation}" Style="{StaticResource PanelHeading}" />
+                <Button Style="{StaticResource LinkButton}" HorizontalAlignment="Right"
+                        Content="+" Tag="HalationBody" Click="OnSectionToggled" />
+            </Grid>
+            <StackPanel x:Name="HalationBody" Visibility="Collapsed" Margin="0,6,0,0">
+                <Grid Margin="0,0,0,2">
+                    <TextBlock Text="{DynamicResource S_HalationAmount}" Style="{StaticResource PanelLabel}" />
+                    <TextBlock x:Name="HalationValue" Style="{StaticResource PanelValue}" />
+                </Grid>
+                <Slider x:Name="HalationSlider" Style="{StaticResource PanelSlider}"
+                        Minimum="0" Maximum="2" Value="0" SmallChange="0.05" LargeChange="0.2"
+                        ValueChanged="OnChanged" MouseDoubleClick="OnSliderReset" Tag="0" />
+
+                <Grid Margin="0,10,0,2">
+                    <TextBlock Text="{DynamicResource S_HalationThreshold}" Style="{StaticResource PanelLabel}" />
+                    <TextBlock x:Name="HalationThresholdValue" Style="{StaticResource PanelValue}" />
+                </Grid>
+                <Slider x:Name="HalationThresholdSlider" Style="{StaticResource PanelSlider}"
+                        Minimum="0.1" Maximum="4" Value="1" SmallChange="0.05" LargeChange="0.25"
+                        ValueChanged="OnChanged" MouseDoubleClick="OnSliderReset" Tag="1" />
+
+                <Grid Margin="0,10,0,2">
+                    <TextBlock Text="{DynamicResource S_HalationRadius}" Style="{StaticResource PanelLabel}" />
+                    <TextBlock x:Name="HalationRadiusValue" Style="{StaticResource PanelValue}" />
+                </Grid>
+                <Slider x:Name="HalationRadiusSlider" Style="{StaticResource PanelSlider}"
+                        Minimum="2" Maximum="60" Value="12" SmallChange="1" LargeChange="5"
+                        ValueChanged="OnChanged" MouseDoubleClick="OnSliderReset" Tag="12" />
+
+                <Grid Margin="0,10,0,2">
+                    <TextBlock Text="{DynamicResource S_HalationTint}" Style="{StaticResource PanelLabel}" />
+                    <TextBlock x:Name="HalationTintValue" Style="{StaticResource PanelValue}" />
+                </Grid>
+                <Slider x:Name="HalationTintSlider" Style="{StaticResource PanelSlider}"
+                        Minimum="0" Maximum="1" Value="0.35" SmallChange="0.02" LargeChange="0.1"
+                        ValueChanged="OnChanged" MouseDoubleClick="OnSliderReset" Tag="0.35" />
+
+                <TextBlock Margin="0,8,0,0" FontSize="10" TextWrapping="Wrap"
+                           Foreground="{StaticResource MutedBrush}"
+                           Text="{DynamicResource S_HalationHint}" />
+            </StackPanel>
+
             <Grid Margin="0,16,0,0">
                 <TextBlock Text="{DynamicResource S_Noise}" Style="{StaticResource PanelHeading}" />
                 <Button Style="{StaticResource LinkButton}" HorizontalAlignment="Right"

@@ -73,12 +73,10 @@ public static class FloatFrameProcessor
 
         // Ein oertliches Werkzeug braucht die Nachbarschaft und damit einen zweiten
         // Durchgang. Ohne eines geht es den geraden Weg - und das ist der Normalfall.
-        var localTools = grading.Local ?? Array.Empty<ILocalTool>();
-
-        if (localTools.Length > 0)
+        if (grading.HasLocal)
         {
             ApplyLocal(frame, adjustments, view, grading, destination, destinationStride,
-                       step, overlays, localTools);
+                       step, overlays);
             return;
         }
 
@@ -204,6 +202,58 @@ public static class FloatFrameProcessor
     }
 
     /// <summary>
+    /// Der Teil des oertlichen Wegs, den beide Ausgaenge teilen: erst die
+    /// Lichtwerkzeuge, dann die Sichtumwandlung, dann die uebrigen.
+    ///
+    /// An einer Stelle und nicht zweimal abgeschrieben. Die Vorschau und der
+    /// Sechzehn-Bit-Ausgang muessen hier dasselbe rechnen - liefen sie auseinander,
+    /// saehe der Export anders aus als das, was beim Einstellen auf dem Schirm stand,
+    /// und das faende man erst am fertigen Film.
+    /// </summary>
+    /// <param name="split">
+    /// True, wenn der Puffer noch vor der Sichtumwandlung steht und sie hier
+    /// nachgeholt werden muss.
+    /// </param>
+    private static void RunLocal(ShadePlan plan, LocalPass.Scratch scratch, PreparedGrading grading,
+                                 int gridWidth, int gridHeight, int imageWidth, int step, bool split)
+    {
+        if (split)
+        {
+            LocalPass.Run(scratch, grading.LocalLight, gridWidth, gridHeight, imageWidth, step);
+
+            var values = scratch.Values;
+            var alpha = scratch.Alpha;
+
+            Parallel.For(0, gridHeight, new ParallelOptions
+            {
+                MaxDegreeOfParallelism = Math.Clamp(Environment.ProcessorCount, 1, 8),
+            },
+            gy =>
+            {
+                int row = gy * gridWidth;
+
+                for (int gx = 0; gx < gridWidth; gx++)
+                {
+                    int at = (row + gx) * 3;
+
+                    float vr = values[at], vg = values[at + 1], vb = values[at + 2];
+
+                    // Die Deckung liegt als Byte daneben. Fuer die Kanalansicht ist
+                    // das genau genug - sie zeigt ohnehin Bytes.
+                    ShadeDisplay(in plan, ref vr, ref vg, ref vb, alpha[row + gx] / 255f);
+
+                    values[at] = vr;
+                    values[at + 1] = vg;
+                    values[at + 2] = vb;
+                }
+            });
+        }
+
+        if (grading.Local.Length > 0)
+            LocalPass.Run(scratch, grading.Local, gridWidth, gridHeight, imageWidth, step);
+    }
+
+    /// <summary>
     /// Blaest ein Bytegitter auf die volle Bildgroesse auf - bilinear zwischen den
     /// Gitterpunkten.
     ///
@@ -316,7 +366,7 @@ public static class FloatFrameProcessor
     private static unsafe void ApplyLocal(FloatFrame frame, ImageAdjustments adjustments,
                                           IViewTransform view, PreparedGrading grading,
                                           IntPtr destination, int destinationStride,
-                                          int step, OverlayPlan[] overlays, ILocalTool[] tools)
+                                          int step, OverlayPlan[] overlays)
     {
         var plan = BuildPlan(adjustments, view, grading);
 
@@ -339,6 +389,12 @@ public static class FloatFrameProcessor
 
         int gridWidth = columns.Length;
 
+        // Mit Lichtwerkzeugen endet der erste Durchgang VOR der Sichtumwandlung; sie
+        // kommt dann im zweiten, nachdem Glanz und Halation ihr Licht verteilt haben.
+        // Ohne sie bleibt alles in einem Zug - ein zusaetzlicher Lauf ueber den
+        // Puffer kostet bei 4K rund dreihundert Megabyte hin und zurueck.
+        bool split = grading.LocalLight.Length > 0;
+
         // --- erster Durchgang: die Kette bis hinter die Anzeigewerkzeuge ---
         Parallel.For(0, rows.Length, new ParallelOptions
         {
@@ -357,7 +413,8 @@ public static class FloatFrameProcessor
                 float vr = r[i], vg = g[i], vb = b[i];
                 float va = a is null ? 1f : a[i];
 
-                Shade(in plan, ref vr, ref vg, ref vb, va);
+                if (split) ShadeLinear(in plan, ref vr, ref vg, ref vb);
+                else Shade(in plan, ref vr, ref vg, ref vb, va);
 
                 int at = (row + gx) * 3;
                 values[at] = vr;
@@ -369,7 +426,7 @@ public static class FloatFrameProcessor
         });
 
         // --- weichzeichnen und durch die Werkzeuge ---
-        LocalPass.Run(scratch, tools, gridWidth, rows.Length, width, step);
+        RunLocal(plan, scratch, grading, gridWidth, rows.Length, width, step, split);
 
         // --- zweiter Durchgang: hinausschreiben ---
         byte* target = (byte*)destination.ToPointer();
@@ -487,6 +544,19 @@ public static class FloatFrameProcessor
     /// </summary>
     private static void Shade(in ShadePlan plan, ref float vr, ref float vg, ref float vb, float alpha)
     {
+        ShadeLinear(in plan, ref vr, ref vg, ref vb);
+        ShadeDisplay(in plan, ref vr, ref vg, ref vb, alpha);
+    }
+
+    /// <summary>
+    /// Die Kette bis VOR die Sichtumwandlung. Heraus kommt lineares Licht, unbegrenzt.
+    ///
+    /// Getrennt, weil zwischen die beiden Haelften etwas passt: die Lichtwerkzeuge.
+    /// Glanz und Halation brauchen die Ueberhellen, und hinter der Umwandlung gibt es
+    /// die nicht mehr. Wer beides in einem Zug rechnet, kann dort nichts einschieben.
+    /// </summary>
+    private static void ShadeLinear(in ShadePlan plan, ref float vr, ref float vg, ref float vb)
+    {
         // --- lineare Seite ---
 
         if (plan.Gain != 1f)
@@ -512,7 +582,12 @@ public static class FloatFrameProcessor
 
         var linear = plan.Linear;
         for (int t = 0; t < linear.Length; t++) linear[t].Apply(ref vr, ref vg, ref vb);
+    }
 
+    /// <summary>Die Sichtumwandlung und alles dahinter.</summary>
+    private static void ShadeDisplay(in ShadePlan plan, ref float vr, ref float vg, ref float vb,
+                                     float alpha)
+    {
         // --- Sichtumwandlung: ab hier sind es Anzeigewerte von 0 bis 1 ---
 
         plan.View.Apply(ref vr, ref vg, ref vb);
@@ -571,16 +646,17 @@ public static class FloatFrameProcessor
 
         // Die oertlichen Werkzeuge brauchen auch hier ihren Puffer. Ohne sie bleibt
         // der Weg, der er war - ein Durchgang, kein Zwischenspeicher.
-        var localTools = grading.Local ?? Array.Empty<ILocalTool>();
-
         LocalPass.Scratch? scratch = null;
 
-        if (localTools.Length > 0)
+        if (grading.HasLocal)
         {
+            bool split = grading.LocalLight.Length > 0;
+
             scratch = new LocalPass.Scratch();
             scratch.Hold(width * height);
 
             var values = scratch.Values;
+            var opacity = scratch.Alpha;
 
             Parallel.For(0, height, new ParallelOptions
             {
@@ -593,16 +669,21 @@ public static class FloatFrameProcessor
                     int i = y * width + x;
 
                     float vr = r[i], vg = g[i], vb = b[i];
-                    Shade(in plan, ref vr, ref vg, ref vb, a is null ? 1f : a[i]);
+                    float va = a is null ? 1f : a[i];
+
+                    if (split) ShadeLinear(in plan, ref vr, ref vg, ref vb);
+                    else Shade(in plan, ref vr, ref vg, ref vb, va);
 
                     int at = i * 3;
                     values[at] = vr;
                     values[at + 1] = vg;
                     values[at + 2] = vb;
+
+                    opacity[i] = ToByte(Math.Clamp(va, 0f, 1f));
                 }
             });
 
-            LocalPass.Run(scratch, localTools, width, height, width, step: 1);
+            RunLocal(plan, scratch, grading, width, height, width, step: 1, split);
         }
 
         var shaded = scratch?.Values;

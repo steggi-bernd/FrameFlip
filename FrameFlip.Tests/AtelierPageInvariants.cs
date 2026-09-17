@@ -138,7 +138,11 @@ public static class AtelierPageInvariants
 
         // Alle drei oertlichen Werkzeuge kommen genau einmal vor - jedes bringt
         // seine eigene Stufe mit, und der Stapel sortiert danach.
-        foreach (var kind in new[] { typeof(NoiseTool), typeof(ClarityTool), typeof(SharpenTool) })
+        foreach (var kind in new[]
+                 {
+                     typeof(BloomTool), typeof(HalationTool),
+                     typeof(NoiseTool), typeof(ClarityTool), typeof(SharpenTool),
+                 })
         {
             int count = panel.Stack.Local.Count(tool => tool.GetType() == kind);
             Check.That(count == 1, $"{kind.Name} steht genau einmal in der oertlichen Liste", $"{count}");
@@ -148,6 +152,7 @@ public static class AtelierPageInvariants
         // Einstellungsebene wird punktweise gerechnet, und eine Nachbarschaft gibt es
         // dort nicht. Bedienbar zu bleiben waere schlimmer als abgeschaltet zu sein -
         // der Regler liefe, und das Bild bliebe stehen.
+        var bloomBody = (System.Windows.FrameworkElement)panel.FindName("BloomBody");
         var noiseBody = (System.Windows.FrameworkElement)panel.FindName("NoiseBody");
         var clarityBody = (System.Windows.FrameworkElement)panel.FindName("ClarityBody");
         var sharpenBody = (System.Windows.FrameworkElement)panel.FindName("SharpenBody");
@@ -155,14 +160,16 @@ public static class AtelierPageInvariants
 
         panel.Target = "eine Ebene";
 
-        Check.That(!noiseBody.IsEnabled && !clarityBody.IsEnabled && !sharpenBody.IsEnabled,
+        Check.That(!bloomBody.IsEnabled && !noiseBody.IsEnabled && !clarityBody.IsEnabled &&
+                   !sharpenBody.IsEnabled,
                    "an einer Ebene sind die oertlichen Werkzeuge abgeschaltet");
         Check.That(note.Visibility == System.Windows.Visibility.Visible,
                    "und der Grund steht dabei");
 
         panel.Target = null;
 
-        Check.That(noiseBody.IsEnabled && clarityBody.IsEnabled && sharpenBody.IsEnabled,
+        Check.That(bloomBody.IsEnabled && noiseBody.IsEnabled && clarityBody.IsEnabled &&
+                   sharpenBody.IsEnabled,
                    "am fertigen Bild wieder an");
         Check.That(note.Visibility != System.Windows.Visibility.Visible,
                    "und der Hinweis verschwindet");

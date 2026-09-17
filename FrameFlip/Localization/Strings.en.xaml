@@ -61,6 +61,17 @@
     <sys:String x:Key="S_ClarityAmount">Amount</sys:String>
     <sys:String x:Key="S_ClarityReach">Radius</sys:String>
     <sys:String x:Key="S_ClarityHint">Local contrast: it boosts what a pixel is against its surroundings and leaves flat areas alone. A large radius gives modelling, a small one gives sharpness. Negative takes contrast away.</sys:String>
+    <sys:String x:Key="S_Bloom">Glow</sys:String>
+    <sys:String x:Key="S_BloomAmount">Amount</sys:String>
+    <sys:String x:Key="S_BloomThreshold">Threshold</sys:String>
+    <sys:String x:Key="S_BloomRadius">Radius</sys:String>
+    <sys:String x:Key="S_BloomHint">Light spreading beyond its own edge. The threshold is in scene-linear light: 1 is a white surface, and above it sit lamps and speculars. That is why glow acts before the view transform — behind it, a lamp and the sun are both just white.</sys:String>
+    <sys:String x:Key="S_Halation">Halation</sys:String>
+    <sys:String x:Key="S_HalationAmount">Amount</sys:String>
+    <sys:String x:Key="S_HalationThreshold">Threshold</sys:String>
+    <sys:String x:Key="S_HalationRadius">Radius</sys:String>
+    <sys:String x:Key="S_HalationTint">Tint</sys:String>
+    <sys:String x:Key="S_HalationHint">The warm fringe around highlights: in film the light passes through the emulsion, reflects off the base and exposes it a second time. Tighter than glow and always warm — the tint runs from deep red into orange.</sys:String>
     <sys:String x:Key="S_LocalOnFinal">Local tools act on the finished picture, not on a single layer: they need a pixel's neighbourhood, and that is only settled once the stack has been composed.</sys:String>
     <sys:String x:Key="S_Noise">Noise reduction</sys:String>
     <sys:String x:Key="S_NoiseLuma">Luminance</sys:String>

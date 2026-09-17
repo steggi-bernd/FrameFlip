@@ -39,6 +39,8 @@ public partial class GradingPanel : UserControl
     private ClarityTool _clarity = new();
     private SharpenTool _sharpen = new();
     private NoiseTool _noise = new();
+    private BloomTool _bloom = new();
+    private HalationTool _halation = new();
 
     private static readonly Color[] CurveColours =
     {
@@ -134,6 +136,8 @@ public partial class GradingPanel : UserControl
     {
         bool enabled = ToolsEnabled && _localOnImage;
 
+        BloomBody.IsEnabled = enabled;
+        HalationBody.IsEnabled = enabled;
         NoiseBody.IsEnabled = enabled;
         ClarityBody.IsEnabled = enabled;
         SharpenBody.IsEnabled = enabled;
@@ -173,6 +177,8 @@ public partial class GradingPanel : UserControl
         // Die oertlichen Werkzeuge stehen in ihrer eigenen Liste - sie nehmen einen
         // anderen Weg durch den Bildprozessor. In welcher Reihenfolge sie dort
         // liegen, ist gleichgueltig: Der Stapel sortiert sie nach ihrer Stufe.
+        _bloom = TakeLocal<BloomTool>();
+        _halation = TakeLocal<HalationTool>();
         _noise = TakeLocal<NoiseTool>();
         _clarity = TakeLocal<ClarityTool>();
         _sharpen = TakeLocal<SharpenTool>();
@@ -423,6 +429,21 @@ public partial class GradingPanel : UserControl
             SharpenThresholdSlider.Value = Math.Clamp(_sharpen.Threshold,
                                                       SharpenThresholdSlider.Minimum, SharpenThresholdSlider.Maximum);
 
+            BloomSlider.Value = Math.Clamp(_bloom.Amount, BloomSlider.Minimum, BloomSlider.Maximum);
+            BloomThresholdSlider.Value = Math.Clamp(_bloom.Threshold,
+                                                    BloomThresholdSlider.Minimum, BloomThresholdSlider.Maximum);
+            BloomRadiusSlider.Value = Math.Clamp(_bloom.Reach,
+                                                 BloomRadiusSlider.Minimum, BloomRadiusSlider.Maximum);
+
+            HalationSlider.Value = Math.Clamp(_halation.Amount,
+                                              HalationSlider.Minimum, HalationSlider.Maximum);
+            HalationThresholdSlider.Value = Math.Clamp(_halation.Threshold,
+                                                       HalationThresholdSlider.Minimum, HalationThresholdSlider.Maximum);
+            HalationRadiusSlider.Value = Math.Clamp(_halation.Reach,
+                                                    HalationRadiusSlider.Minimum, HalationRadiusSlider.Maximum);
+            HalationTintSlider.Value = Math.Clamp(_halation.Tint,
+                                                  HalationTintSlider.Minimum, HalationTintSlider.Maximum);
+
             NoiseLumaSlider.Value = Math.Clamp(_noise.Luminance,
                                                NoiseLumaSlider.Minimum, NoiseLumaSlider.Maximum);
             NoiseColourSlider.Value = Math.Clamp(_noise.Colour,
@@ -490,6 +511,15 @@ public partial class GradingPanel : UserControl
         _sharpen.Reach = (int)Math.Round(SharpenRadiusSlider.Value);
         _sharpen.Threshold = (float)SharpenThresholdSlider.Value;
 
+        _bloom.Amount = (float)BloomSlider.Value;
+        _bloom.Threshold = (float)BloomThresholdSlider.Value;
+        _bloom.Reach = (int)Math.Round(BloomRadiusSlider.Value);
+
+        _halation.Amount = (float)HalationSlider.Value;
+        _halation.Threshold = (float)HalationThresholdSlider.Value;
+        _halation.Reach = (int)Math.Round(HalationRadiusSlider.Value);
+        _halation.Tint = (float)HalationTintSlider.Value;
+
         _noise.Luminance = (float)NoiseLumaSlider.Value;
         _noise.Colour = (float)NoiseColourSlider.Value;
         _noise.Threshold = (float)NoiseThresholdSlider.Value;
@@ -533,6 +563,13 @@ public partial class GradingPanel : UserControl
         SharpenValue.Text = $"{SharpenSlider.Value:0.00}";
         SharpenRadiusValue.Text = $"{SharpenRadiusSlider.Value:0}";
         SharpenThresholdValue.Text = $"{SharpenThresholdSlider.Value:0.000}";
+        BloomValue.Text = $"{BloomSlider.Value:0.00}";
+        BloomThresholdValue.Text = $"{BloomThresholdSlider.Value:0.00}";
+        BloomRadiusValue.Text = $"{BloomRadiusSlider.Value:0}";
+        HalationValue.Text = $"{HalationSlider.Value:0.00}";
+        HalationThresholdValue.Text = $"{HalationThresholdSlider.Value:0.00}";
+        HalationRadiusValue.Text = $"{HalationRadiusSlider.Value:0}";
+        HalationTintValue.Text = $"{HalationTintSlider.Value:0.00}";
         NoiseLumaValue.Text = $"{NoiseLumaSlider.Value:0.00}";
         NoiseColourValue.Text = $"{NoiseColourSlider.Value:0.00}";
         NoiseThresholdValue.Text = $"{NoiseThresholdSlider.Value:0.000}";

@@ -29,6 +29,12 @@ public static class LocalToolInvariants
         NoiseTakesGrainAway();
         NoiseKeepsEdges();
         ColourGoesFurther();
+        NothingBelowTheThreshold();
+        TheOverbrightsAreWhatGlows();
+        GlowOnlyAdds();
+        HalationIsWarm();
+        TheSidesAreSplit();
+        TheExportTakesTheSameWay();
         TheOrderIsFixed();
         EachRadiusGetsItsOwn();
         NoToolMeansNoBuffer();
@@ -370,6 +376,208 @@ public static class LocalToolInvariants
         Check.That(colourLeft < 0.25, "und zwar deutlich weniger", $"{colourLeft:0.###}");
     }
 
+    // ------------------------------------------------------ Glanz und Halation
+
+    /// <summary>
+    /// Unter der Schwelle geschieht nichts. Das ist das ganze Werkzeug.
+    ///
+    /// Ohne Schwelle waere Glanz das Bild, weichgezeichnet und dazugezaehlt - ein
+    /// Schleier ueber allem. Genau so sehen Nachbearbeitungen aus, die "weich"
+    /// aussehen sollen und stattdessen milchig sind.
+    /// </summary>
+    private static void NothingBelowTheThreshold()
+    {
+        Check.Group("Unter der Schwelle leuchtet nichts");
+
+        var frame = Halves(64, 48, 0.3f, 0.8f);
+
+        var plain = Draw(frame, new GradingStack());
+        var glow = Draw(frame, Glow(2f, 1f, 150));
+
+        Check.That(Same(plain, glow), "ein Bild ganz unter der Schwelle bleibt, wie es ist");
+
+        // Und darueber sehr wohl.
+        var bright = Halves(64, 48, 0.3f, 4f);
+
+        var plainBright = Draw(bright, new GradingStack());
+        var glowBright = Draw(bright, Glow(2f, 1f, 150));
+
+        Check.That(!Same(plainBright, glowBright), "mit einem Ueberhellen darin nicht mehr");
+    }
+
+    /// <summary>
+    /// Die Probe, um die es bei diesem Werkzeug geht.
+    ///
+    /// Eine Lampe und die Sonne sind auf der Anzeige beide weiss. Wenn der Glanz
+    /// hinter der Sichtumwandlung rechnete, waeren sie auch im Glanz gleich - und
+    /// das Werkzeug waere auf einem EXR keinen Deut besser als auf einem JPEG.
+    /// Zwei Bilder, die als Byte identisch sind und verschieden leuchten, sind der
+    /// Beweis, dass er davor rechnet.
+    /// </summary>
+    private static void TheOverbrightsAreWhatGlows()
+    {
+        Check.Group("Was ueberhell ist, leuchtet - und man sieht es nur davor");
+
+        var lamp = Spot(128, 128, 0f, 1f, 8);
+        var sun = Spot(128, 128, 0f, 8f, 8);
+
+        var plainLamp = Draw(lamp, new GradingStack());
+        var plainSun = Draw(sun, new GradingStack());
+
+        Check.That(Same(plainLamp, plainSun), "ohne Glanz sind beide Bilder dasselbe Byte fuer Byte");
+
+        var glowLamp = Draw(lamp, Glow(1f, 0.9f, 150));
+        var glowSun = Draw(sun, Glow(1f, 0.9f, 150));
+
+        Check.That(!Same(glowLamp, glowSun), "mit Glanz nicht mehr");
+
+        // Zwoelf Punkte neben dem Fleck - draussen, aber im Umkreis.
+        int at = (64 * 128 + 76) * 4 + 2;
+
+        Check.That(glowSun[at] > glowLamp[at] + 20, "die Sonne leuchtet weiter als die Lampe",
+                   $"{glowSun[at]} gegen {glowLamp[at]}");
+
+        Check.That(glowLamp[at] > plainLamp[at], "und auch die Lampe leuchtet ueberhaupt",
+                   $"{glowLamp[at]} statt {plainLamp[at]}");
+    }
+
+    private static void GlowOnlyAdds()
+    {
+        Check.Group("Glanz zaehlt dazu und nimmt nichts weg");
+
+        var frame = Spot(128, 128, 0.2f, 6f, 8);
+
+        var plain = Draw(frame, new GradingStack());
+        var glow = Draw(frame, Glow(1f, 1f, 150));
+
+        int darker = 0;
+
+        for (int i = 0; i < plain.Length; i++)
+        {
+            if (i % 4 == 3) continue;
+            if (glow[i] < plain[i]) darker++;
+        }
+
+        Check.That(darker == 0, "kein Bildpunkt wird dunkler", $"{darker} waeren es");
+    }
+
+    private static void HalationIsWarm()
+    {
+        Check.Group("Halation ist warm");
+
+        var frame = Spot(128, 128, 0f, 6f, 8);
+        var drawn = Draw(frame, Halo(1f, 0.9f, 150, tint: 0.35f));
+
+        // Neben dem Fleck, im Saum.
+        int at = (64 * 128 + 76) * 4;
+
+        int blue = drawn[at], green = drawn[at + 1], red = drawn[at + 2];
+
+        Check.That(red > green && green > blue, "der Saum ist rot ueber gruen ueber blau",
+                   $"r {red}, g {green}, b {blue}");
+        Check.That(red > 20, "und er ist ueberhaupt da", $"{red}");
+
+        // Die Faerbung verschiebt sich, aber sie bleibt warm.
+        var deep = new HalationTool { Amount = 1f, Threshold = 1f, Tint = 0f };
+        var orange = new HalationTool { Amount = 1f, Threshold = 1f, Tint = 1f };
+
+        deep.Prepare();
+        orange.Prepare();
+
+        float dr = 0f, dg = 0f, db = 0f;
+        deep.Apply(ref dr, ref dg, ref db, 1f, 1f, 1f);
+
+        float orr = 0f, og = 0f, ob = 0f;
+        orange.Apply(ref orr, ref og, ref ob, 1f, 1f, 1f);
+
+        Check.That(og > dg, "gegen eins wird es oranger", $"{og:0.###} gegen {dg:0.###}");
+        Check.That(dr > dg && orr > og, "und rot bleibt in beiden Faellen vorn");
+    }
+
+    /// <summary>
+    /// Die beiden Seiten kommen getrennt heraus.
+    ///
+    /// Der Bildprozessor rechnet sie an zwei verschiedenen Stellen - eine Liste
+    /// fuer beide hiesse, die Verzweigung in die innere Schleife zu tragen, und bei
+    /// 4K sind das 25 Millionen Mal.
+    /// </summary>
+    private static void TheSidesAreSplit()
+    {
+        Check.Group("Licht- und Anzeigeseite stehen getrennt");
+
+        var stack = new GradingStack
+        {
+            Local =
+            {
+                new SharpenTool { Amount = 1f },
+                new BloomTool { Amount = 0.5f },
+                new ClarityTool { Amount = 0.5f },
+                new HalationTool { Amount = 0.5f },
+                new NoiseTool { Colour = 0.5f },
+            },
+        };
+
+        var prepared = stack.Prepare();
+
+        Check.That(prepared.LocalLight.Length == 2, "zwei auf der Lichtseite",
+                   $"{prepared.LocalLight.Length}");
+        Check.That(prepared.LocalLight.All(tool => tool is BloomTool or HalationTool),
+                   "und es sind Glanz und Halation");
+
+        Check.That(prepared.Local.Length == 3, "drei auf der Anzeigeseite", $"{prepared.Local.Length}");
+        Check.That(prepared.Local[0] is NoiseTool && prepared.Local[1] is ClarityTool &&
+                   prepared.Local[2] is SharpenTool, "dort in ihrer festen Reihenfolge");
+
+        Check.That(prepared.HasLocal, "und der Stapel weiss, dass er den zweiten Weg braucht");
+        Check.That(!PreparedGrading.None.HasLocal, "ein leerer weiss das Gegenteil");
+
+        // Ein Lichtwerkzeug allein zaehlt auch.
+        var onlyLight = new GradingStack { Local = { new BloomTool { Amount = 0.5f } } };
+
+        Check.That(onlyLight.Prepare().HasLocal, "ein Glanz allein reicht dafuer");
+        Check.That(onlyLight.Prepare().Local.Length == 0, "und die Anzeigeseite bleibt leer");
+    }
+
+    /// <summary>
+    /// Der Sechzehn-Bit-Ausgang muss dasselbe zeigen wie die Vorschau.
+    ///
+    /// Er hat seinen eigenen ersten Durchgang - ein Bild ohne Gitter, Deckung als
+    /// Byte daneben -, und genau dort koennten die beiden Wege auseinanderlaufen.
+    /// Faende man das nicht hier, faende man es am fertigen Film: Der Export saehe
+    /// anders aus als das, was beim Einstellen auf dem Schirm stand.
+    /// </summary>
+    private static void TheExportTakesTheSameWay()
+    {
+        Check.Group("Der Export nimmt denselben Weg");
+
+        var frame = Spot(128, 128, 0.15f, 6f, 8);
+
+        var preview = Draw(frame, Glow(1f, 0.9f, 150));
+        var exported = Draw16(frame, Glow(1f, 0.9f, 150));
+
+        int worst = 0;
+
+        for (int i = 0; i < preview.Length; i += 4)
+        {
+            // Bgra gegen Rgba: der rote Kanal liegt verschieden.
+            int fromPreview = preview[i + 2];
+            int fromExport = exported[i / 4 * 4] >> 8;
+
+            worst = Math.Max(worst, Math.Abs(fromPreview - fromExport));
+        }
+
+        Check.That(worst <= 1, "Vorschau und Export stimmen bis auf die Rundung ueberein",
+                   $"groesster Unterschied {worst} von 255");
+
+        // Und unter der Schwelle geschieht auch dort nichts.
+        var flat = Halves(64, 48, 0.2f, 0.7f);
+
+        var plain = Draw16(flat, new GradingStack());
+        var glow = Draw16(flat, Glow(2f, 1f, 150));
+
+        Check.That(Same16(plain, glow), "unter der Schwelle bleibt auch der Export unberuehrt");
+    }
+
     // ------------------------------------------------- Reihenfolge und Gruppen
 
     /// <summary>
@@ -444,6 +652,19 @@ public static class LocalToolInvariants
 
         Check.Near(one.Seen, 0.4, 1e-4, "bei gleichem Radius sehen beide dasselbe");
         Check.Near(two.Seen, 0.4, 1e-4, "eine Weichzeichnung fuer die Gruppe");
+
+        // Ein Lichtwerkzeug bleibt trotz gleichen Radius fuer sich: Sein Eingang ist
+        // nicht der Wert, sondern das, was es daraus zieht. Kaeme es in dieselbe
+        // Gruppe, bekaeme das andere Werkzeug die Lichter statt des Bildes.
+        var extracting = new HighlightProbe(radius: 5);
+        var plain = new Probe(radius: 5, lift: 0f);
+
+        for (int i = 0; i < width * height * 3; i++) scratch.Values[i] = 0.4f;
+
+        LocalPass.Run(scratch, new ILocalTool[] { extracting, plain }, width, height, 1920, step: 1);
+
+        Check.Near(extracting.Seen, 0.1, 1e-4, "das Lichtwerkzeug sieht seinen eigenen Auszug");
+        Check.Near(plain.Seen, 0.4, 1e-4, "das andere weiterhin den Wert");
     }
 
     private static void NoToolMeansNoBuffer()
@@ -535,7 +756,12 @@ public static class LocalToolInvariants
 
         var stack = new GradingStack
         {
-            Local = { new ClarityTool { Amount = -0.45f, Reach = 77 } },
+            Local =
+            {
+                new ClarityTool { Amount = -0.45f, Reach = 77 },
+                new BloomTool { Amount = 0.8f, Threshold = 2.5f, Reach = 90 },
+                new HalationTool { Amount = 0.3f, Threshold = 1.5f, Reach = 9, Tint = 0.7f },
+            },
         };
 
         var read = JsonSerializer.Deserialize<GradingStack>(JsonSerializer.Serialize(stack));
@@ -554,6 +780,26 @@ public static class LocalToolInvariants
 
         Check.Near(copy.Local.OfType<ClarityTool>().First().Amount, -0.45, 1e-5,
                    "eine Kopie bewegt sich nicht mit");
+
+        // Die Lichtwerkzeuge genauso - jedes Werkzeug ohne Kopierweg wuerde geteilt
+        // statt kopiert, und der Fehler faellt erst auf, wenn eine festgehaltene
+        // Einstellung sich mitbewegt.
+        var glow = read.Local.OfType<BloomTool>().FirstOrDefault();
+        Check.That(glow is not null, "der Glanz ueberlebt auch");
+        if (glow is not null)
+        {
+            Check.Near(glow.Threshold, 2.5, 1e-5, "mit seiner Schwelle");
+            Check.That(glow.Reach == 90, "und seinem Radius", $"{glow.Reach}");
+        }
+
+        var halo = read.Local.OfType<HalationTool>().FirstOrDefault();
+        Check.That(halo is not null, "die Halation ebenso");
+        if (halo is not null) Check.Near(halo.Tint, 0.7, 1e-5, "mitsamt Faerbung");
+
+        var copiedGlow = copy.Local.OfType<BloomTool>().First();
+        stack.Local.OfType<BloomTool>().First().Amount = 0.1f;
+
+        Check.Near(copiedGlow.Amount, 0.8, 1e-5, "und auch dort bewegt die Kopie sich nicht mit");
     }
 
     /// <summary>
@@ -584,6 +830,7 @@ public static class LocalToolInvariants
                 new NoiseTool { Luminance = 0.5f, Colour = 0.5f, Reach = 2 },
                 new ClarityTool { Amount = 0.6f, Reach = 40 },
                 new SharpenTool { Amount = 0.8f, Reach = 4 },
+                new BloomTool { Amount = 0.5f, Reach = 60 },
             },
         };
 
@@ -596,12 +843,12 @@ public static class LocalToolInvariants
         double coarseAll = Fastest(() => Draw(frame, everything, ImageAdjustments.Neutral, step: 4));
 
         Console.WriteLine($"         1080p: ohne {without:0.0} ms, mit Klarheit {with:0.0} ms, " +
-                          $"alle drei {all:0.0} ms");
-        Console.WriteLine($"         beim Ziehen: Klarheit {coarse:0.0} ms, alle drei {coarseAll:0.0} ms");
+                          $"vier Werkzeuge ueber beide Seiten {all:0.0} ms");
+        Console.WriteLine($"         beim Ziehen: Klarheit {coarse:0.0} ms, alle vier {coarseAll:0.0} ms");
 
         Check.That(with < 400, "der volle Durchgang bleibt im Rahmen", $"{with:0.0} ms");
         Check.That(coarse < 40, "beim Ziehen bleibt es bedienbar", $"{coarse:0.0} ms");
-        Check.That(coarseAll < 60, "auch mit allen dreien", $"{coarseAll:0.0} ms");
+        Check.That(coarseAll < 60, "auch mit allen vieren", $"{coarseAll:0.0} ms");
     }
 
     // ------------------------------------------------------------------- Handwerk
@@ -611,6 +858,18 @@ public static class LocalToolInvariants
 
     private static GradingStack Sharp(float amount, int reach, float threshold)
         => new() { Local = { new SharpenTool { Amount = amount, Reach = reach, Threshold = threshold } } };
+
+    private static GradingStack Glow(float amount, float threshold, int reach)
+        => new() { Local = { new BloomTool { Amount = amount, Threshold = threshold, Reach = reach } } };
+
+    private static GradingStack Halo(float amount, float threshold, int reach, float tint)
+        => new()
+        {
+            Local =
+            {
+                new HalationTool { Amount = amount, Threshold = threshold, Reach = reach, Tint = tint },
+            },
+        };
 
     private static GradingStack Denoise(float luminance, float colour, float threshold)
         => new()
@@ -657,6 +916,72 @@ public static class LocalToolInvariants
             g += _lift;
             b += _lift;
         }
+    }
+
+    /// <summary>
+    /// Ein Werkzeug, das seinen eigenen Auszug bekommt - hier schlicht ein Viertel
+    /// des Werts, damit sich nachweisen laesst, dass die Weichzeichnung davon
+    /// ausgeht und nicht vom Wert.
+    ///
+    /// Seine Stufe ist Contrast und nicht Light, weil der Test den Durchgang direkt
+    /// ruft; die Stufe entscheidet erst im Stapel ueber die Seite.
+    /// </summary>
+    private sealed class HighlightProbe : IHighlightTool
+    {
+        private readonly int _radius;
+
+        public HighlightProbe(int radius) => _radius = radius;
+
+        public float Seen { get; private set; }
+
+        public string Kind => "highlight-probe";
+
+        public LocalStage Stage => LocalStage.Contrast;
+
+        public bool IsNeutral => false;
+
+        public int Radius => _radius;
+
+        public void Prepare()
+        {
+        }
+
+        public void Extract(ref float r, ref float g, ref float b)
+        {
+            r *= 0.25f;
+            g *= 0.25f;
+            b *= 0.25f;
+        }
+
+        public void Apply(ref float r, ref float g, ref float b, float br, float bg, float bb)
+            => Seen = br;
+    }
+
+    /// <summary>Ein heller Fleck in der Mitte einer dunklen Flaeche.</summary>
+    private static FloatFrame Spot(int width, int height, float background, float value, int size)
+    {
+        int count = width * height;
+        var values = new float[count];
+
+        Array.Fill(values, background);
+
+        int left = width / 2 - size / 2;
+        int top = height / 2 - size / 2;
+
+        for (int y = top; y < top + size; y++)
+            for (int x = left; x < left + size; x++)
+                values[y * width + x] = value;
+
+        return new FloatFrame
+        {
+            Width = width,
+            Height = height,
+            R = values,
+            G = (float[])values.Clone(),
+            B = (float[])values.Clone(),
+            A = Enumerable.Repeat(1f, count).ToArray(),
+            IsSceneReferred = false,
+        };
     }
 
     /// <summary>Eine gleichmaessige Flaeche mit feinem Korn darauf.</summary>
@@ -749,6 +1074,43 @@ public static class LocalToolInvariants
         }
 
         return pixels;
+    }
+
+    /// <summary>Dasselbe Bild ueber den Sechzehn-Bit-Ausgang, als Rgba64.</summary>
+    private static ushort[] Draw16(FloatFrame frame, GradingStack stack)
+    {
+        int stride = frame.Width * 8;
+        var pixels = new byte[stride * frame.Height];
+
+        var buffer = Marshal.AllocHGlobal(pixels.Length);
+
+        try
+        {
+            FloatFrameProcessor.ApplyRgba64(frame, ImageAdjustments.Neutral,
+                                            new StandardViewTransform(), stack.Prepare(),
+                                            buffer, stride);
+
+            Marshal.Copy(buffer, pixels, 0, pixels.Length);
+        }
+        finally
+        {
+            Marshal.FreeHGlobal(buffer);
+        }
+
+        var values = new ushort[pixels.Length / 2];
+        Buffer.BlockCopy(pixels, 0, values, 0, pixels.Length);
+
+        return values;
+    }
+
+    private static bool Same16(ushort[] first, ushort[] second)
+    {
+        if (first.Length != second.Length) return false;
+
+        for (int i = 0; i < first.Length; i++)
+            if (first[i] != second[i]) return false;
+
+        return true;
     }
 
     private static bool Same(byte[] first, byte[] second)

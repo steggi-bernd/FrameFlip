@@ -7,7 +7,7 @@ sequence and write it out. Layers, masks driven by render data, and a colour too
 aimed at Photoshop and Lightroom rather than at a node graph.
 
 **Status:** steps 1 to 7 are built and running; of step 8 the local path exists, with
-clarity, sharpening and noise reduction on it. Step 5 is complete —
+clarity, sharpening, noise reduction, glow and halation on it. Step 5 is complete —
 pass, adjustment, image and group layers, with order, duplication, opacity, colour,
 blend modes and clipping masks. Of step 6, masks are data-driven: cryptomatte, any
 pass, luminance and gradient; painted masks are not built. Where an earlier estimate or
@@ -569,18 +569,22 @@ at all; the rest is what makes it worth staying in.
 | **Dehaze** | amount | dark-channel prior. Also runs backwards, to add atmosphere |
 | ~~**Sharpen**~~ **built** | amount, radius, threshold | unsharp mask on luminance only; the threshold keeps noise out of it |
 | ~~**Noise reduction**~~ **built** | luminance, colour, threshold | for renders with the sample count cut short. Luminance and colour separately, because they deserve very different amounts |
-| **Bloom / Glare** ★ | threshold, radius, intensity | on HDR data this is finally correct, because the overbrights are real rather than clipped to white. On an 8-bit PNG the same filter is guesswork |
-| **Halation** | threshold, radius, tint | red-orange bleed around highlights; most of what reads as "filmic" |
+| ~~**Bloom / Glare**~~ ★ **built** | threshold, radius, amount | on HDR data this is finally correct, because the overbrights are real rather than clipped to white. On an 8-bit PNG the same filter is guesswork — and the claim is now a test |
+| ~~**Halation**~~ **built** | threshold, radius, amount, tint | red-orange bleed around highlights; most of what reads as "filmic" |
 
 **The second path — built.** Everything else in section 7 is *point-wise*: a pixel goes
 in, a pixel comes out, and tools chain without a buffer and without an ordering problem.
 The tools in this table cannot be said that way. They ask what it looks like *around* a
 pixel, and `IGradingTool` has promised them their own path since it was written. That
-path now exists, and clarity, sharpening and noise reduction run on it:
+path now exists, and five tools run on it:
 
-1. the whole chain into a scratch buffer, up to and including the display tools;
-2. that buffer blurred — once per radius, not once per tool;
-3. value and blur together through the tools, then out.
+1. the chain into a scratch buffer — as far as the view transform;
+2. **there** the tools that need the overbrights: glow and halation;
+3. the view transform and the display tools, in the same buffer;
+4. there the rest — noise reduction, clarity, sharpening — then out.
+
+Each of those two stops blurs the buffer once per radius and hands every tool its pixel
+together with that blur.
 
 **Both values come from the same stage.** That is the correctness condition, and it is
 the whole reason the buffer is a buffer rather than a second read of something earlier.
@@ -692,6 +696,50 @@ recomputes at full resolution and the picture settles. Detail at a scale finer t
 preview grid is not something a preview at that grid can show, and pretending otherwise
 would mean computing every pixel on every tick.
 
+#### Glow and halation — and why they sit on the other side
+
+These two are the reason the path has two stops instead of one. Everything else here
+happens *to a picture*; these two happen *to light*. A lamp and the sun are both white
+on screen — behind the view transform there is no way to tell whether the file said 1
+or 500. That difference is precisely what glow is: the sun dazzles, the lamp does not.
+So they run **before** the view transform, on unbounded scene-linear values, which is
+also where they happen physically: scattering in the lens, and in film, light passing
+through the emulsion and reflecting off the base.
+
+This is the one place in Atelier where the EXR earns its keep most plainly, and there
+is a test that states it as a claim rather than an intention: two frames, one with a
+patch at 1.0 and one at 8.0, are **byte-for-byte identical** once drawn — both patches
+are white. Turn on glow and they are not. On an 8-bit source the same filter is
+guesswork; here it is arithmetic.
+
+What gets blurred is therefore **not the picture** but what lies above the threshold.
+Blurring the picture and adding it back is a veil over everything — probably the single
+most common way a "soft" grade turns milky instead. The threshold is in scene-linear
+light, where 1 is a white surface and everything above it is a lamp or a specular, so
+the number means something; in display values it would not, because up there everything
+is 1. Because their input is a different one, the highlight tools never share a blur,
+not even with each other at the same radius.
+
+Halation is the same mechanism with a tighter radius and a warm tint, because red light
+penetrates the emulsion deepest. The tint runs from deep red to orange and **not** freely:
+a green halation is not halation but a colour error, and a control offering it would be
+claiming something untrue about what is being imitated.
+
+One thing to know rather than to fix: a single firefly from a render cut short — one
+pixel at 1e6 — becomes a large soft blob here. That is not miscomputed, it is correct;
+that is what a very bright light looks like. Whoever does not want the blob has to get
+rid of the firefly, not of the glow.
+
+| 1080p | every pixel | while a slider moves |
+|---|---|---|
+| no local tool | **31.7 ms** | — |
+| clarity | **63.2 ms** | **9.9 ms** |
+| four tools across both stops | **173.8 ms** | **18.9 ms** |
+
+The full pass costs one blur per radius plus, when a light tool is in play, a second run
+over the buffer for the view transform — without one, the chain stays fused into a
+single pass, as it was.
+
 **They act on the finished picture, not on a single layer.** An adjustment layer is
 computed pixel by pixel in the middle of the stack; a neighbourhood does not exist there
 yet. So the three sections are switched off while a layer is selected, with the reason
@@ -735,18 +783,24 @@ Anyone who wants a different order uses a second adjustment layer. That is what 
 stack is for, and it is a better answer than a configurable pipeline.
 
 **One correction to this order, from building it.** The local tools do not sit in the
-middle of that line; they run at the end, after the view transform and the display
-tools, on values between 0 and 1. Two reasons, and the first only became clear with the
-code in front of me: local contrast means *this pixel against its neighbours*, and in
-scene-linear the neighbourhood of a bright pixel is dominated by whatever overbright
-sits next to it — a value of 60 in a neighbourhood of 0.2 is a difference of 59.8, and
-multiplying that by an amount is not a look, it is an explosion. The second is the
-correctness condition above: value and blur must come from the same stage, and the stage
-where "flat" means flat to the eye is the display stage. The line above still describes
-the point-wise chain correctly; the local tools hang off its end.
+middle of that line. They sit at **two** points of it, and which one is not a matter of
+taste:
 
-Among themselves they also run in a different order than the line suggests: **noise
-reduction, then clarity, then sharpening** — the cleaning up has to happen before
+*Clarity, sharpening and noise reduction run at the end*, after the view transform and
+the display tools, on values between 0 and 1. Two reasons, and the first only became
+clear with the code in front of me: local contrast means *this pixel against its
+neighbours*, and in scene-linear the neighbourhood of a bright pixel is dominated by
+whatever overbright sits next to it — a value of 60 in a neighbourhood of 0.2 is a
+difference of 59.8, and multiplying that by an amount is not a look, it is an explosion.
+The second is the correctness condition above: value and blur must come from the same
+stage, and the stage where "flat" means flat to the eye is the display stage.
+
+*Glow and halation run before the view transform*, for the opposite reason: they are
+scattered light, and they need the overbrights that the transform throws away. Behind
+it, a lamp and the sun are the same white.
+
+Among themselves the display-side three run in a different order than the line suggests:
+**noise reduction, then clarity, then sharpening** — the cleaning up has to happen before
 anything amplifies local differences, because grain is one.
 
 ---
@@ -771,6 +825,13 @@ enough once there is a stack.
 
 Scopes measure the graded image, as the histogram already does — the diagram should
 show what the eye is seeing.
+
+**One gap, stated rather than hidden:** the measurement runs the point-wise chain, not
+the local one. A histogram taken with glow or clarity switched on shows the picture
+*without* them. For clarity that is a rounding error; for glow it is not, because glow
+genuinely raises the highlights. Closing it means running the measurement through the
+buffer as well, which doubles what a measurement costs — worth doing, and worth doing
+deliberately rather than by accident.
 
 ---
 
@@ -902,10 +963,11 @@ next one landing.
    objects, and a name does not move.
 8. **The remaining tools from section 7**, in the order people ask for them. The
    **local path is built** — the second pass the neighbourhood tools need — and carries
-   ~~clarity~~, ~~sharpening~~ and ~~noise reduction~~. Building the second and third
-   tool on it is what showed up the one wrong assumption in the first: a single blur
-   for every tool. Glow and halation are further tools on that path rather than further
-   mechanism, which is what the step was for.
+   ~~clarity~~, ~~sharpening~~, ~~noise reduction~~, ~~glow~~ and ~~halation~~. Each new
+   tool found one wrong assumption in the one before: sharpening found the single blur
+   for every radius, and glow found the single stop — it has to run before the view
+   transform, where the overbrights still exist. Dehaze and texture are what remain, and
+   both are tools rather than mechanism.
 
 Steps 1–4 are the product. 5–8 are what makes it uncontested.
 

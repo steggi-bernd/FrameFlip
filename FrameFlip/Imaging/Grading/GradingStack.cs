@@ -47,6 +47,7 @@ public sealed class GradingStack
         var linear = new List<IGradingTool>();
         var display = new List<IGradingTool>();
         var local = new List<ILocalTool>();
+        var light = new List<ILocalTool>();
 
         foreach (var tool in Tools)
         {
@@ -65,10 +66,15 @@ public sealed class GradingStack
             if (tool.IsNeutral) continue;
 
             tool.Prepare();
-            local.Add(tool);
+
+            // Dieselbe Aufteilung wie oben, und aus demselben Grund: Die eine Haelfte
+            // rechnet vor der Sichtumwandlung, die andere dahinter. Die Seite folgt
+            // aus der Stufe - der Schnitt liegt hinter dem Licht.
+            (tool.Stage == LocalStage.Light ? light : local).Add(tool);
         }
 
-        return new PreparedGrading(linear.ToArray(), display.ToArray(), local.ToArray());
+        return new PreparedGrading(linear.ToArray(), display.ToArray(),
+                                   local.ToArray(), light.ToArray());
     }
 
     /// <summary>
@@ -99,6 +105,17 @@ public sealed class GradingStack
             Threshold = noise.Threshold, Reach = noise.Reach,
         },
 
+        BloomTool bloom => new BloomTool
+        {
+            Amount = bloom.Amount, Threshold = bloom.Threshold, Reach = bloom.Reach,
+        },
+
+        HalationTool halation => new HalationTool
+        {
+            Amount = halation.Amount, Threshold = halation.Threshold,
+            Reach = halation.Reach, Tint = halation.Tint,
+        },
+
         // Wie oben: Ein Werkzeug, das hier fehlt, wuerde geteilt statt kopiert.
         _ => throw new NotSupportedException($"Kein Kopierweg fuer {tool.GetType().Name}."),
     };
@@ -127,11 +144,13 @@ public sealed class GradingStack
 /// </summary>
 public readonly struct PreparedGrading
 {
-    public PreparedGrading(IGradingTool[] sceneLinear, IGradingTool[] display, ILocalTool[] local)
+    public PreparedGrading(IGradingTool[] sceneLinear, IGradingTool[] display,
+                           ILocalTool[] local, ILocalTool[]? light = null)
     {
         SceneLinear = sceneLinear;
         Display = display;
         Local = local;
+        LocalLight = light ?? Array.Empty<ILocalTool>();
     }
 
     public IGradingTool[] SceneLinear { get; }
@@ -149,7 +168,20 @@ public readonly struct PreparedGrading
     /// </summary>
     public ILocalTool[] Local { get; } = Array.Empty<ILocalTool>();
 
-    public bool IsEmpty => SceneLinear.Length == 0 && Display.Length == 0 && Local.Length == 0;
+    /// <summary>
+    /// Die oertlichen Werkzeuge VOR der Sichtumwandlung - Glanz und Halation.
+    ///
+    /// Sie stehen getrennt, weil sie an einer anderen Stelle des Bildwegs laufen und
+    /// nicht, weil sie anders gerechnet wuerden. Dort sind die Werte noch unbegrenzt,
+    /// und genau darauf beruhen sie: Hinter der Umwandlung ist eine Lampe von der
+    /// Sonne nicht mehr zu unterscheiden.
+    /// </summary>
+    public ILocalTool[] LocalLight { get; } = Array.Empty<ILocalTool>();
+
+    /// <summary>True, wenn ueberhaupt ein oertliches Werkzeug dabei ist.</summary>
+    public bool HasLocal => Local.Length > 0 || LocalLight.Length > 0;
+
+    public bool IsEmpty => SceneLinear.Length == 0 && Display.Length == 0 && !HasLocal;
 
     public static readonly PreparedGrading None =
         new(Array.Empty<IGradingTool>(), Array.Empty<IGradingTool>(), Array.Empty<ILocalTool>());

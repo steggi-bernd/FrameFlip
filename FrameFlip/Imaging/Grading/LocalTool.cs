@@ -27,6 +27,8 @@ namespace FrameFlip.Imaging.Grading;
 [JsonDerivedType(typeof(ClarityTool), ClarityTool.KindName)]
 [JsonDerivedType(typeof(SharpenTool), SharpenTool.KindName)]
 [JsonDerivedType(typeof(NoiseTool), NoiseTool.KindName)]
+[JsonDerivedType(typeof(BloomTool), BloomTool.KindName)]
+[JsonDerivedType(typeof(HalationTool), HalationTool.KindName)]
 public interface ILocalTool
 {
     /// <summary>Kennung fuer die Speicherung. Bleibt stabil, auch wenn der Anzeigename wechselt.</summary>
@@ -64,18 +66,51 @@ public interface ILocalTool
 /// <summary>
 /// Die Reihenfolge der oertlichen Werkzeuge. Fest, und aus einem Grund.
 ///
-/// Rauschen zuerst: Was danach kommt, verstaerkt oertliche Unterschiede, und Rauschen
-/// IST ein oertlicher Unterschied. Wer erst schaerft und dann entrauscht, hat das
-/// Rauschen vorher gross gemacht und nimmt hinterher das Bild mit weg.
+/// Die Reihe laeuft durch die Sichtumwandlung hindurch: <see cref="Light"/> steht
+/// davor, alles andere dahinter. Die Seite ist damit keine zweite Angabe, die zur
+/// Stufe passen muss, sondern folgt aus ihr - zwei Angaben liefen irgendwann
+/// auseinander, und das faellt erst auf, wenn ein Werkzeug am falschen Ort rechnet.
+///
+/// Licht zuerst, und zwar VOR der Sichtumwandlung: Glanz und Halation sind Licht,
+/// das ueber seine Kante hinaus streut. Das geschieht in der Linse und im Film,
+/// bevor irgendeine Kennlinie darauf angewandt wird - und es braucht die Ueberhellen,
+/// die es hinter der Umwandlung nicht mehr gibt.
+///
+/// Rauschen als Naechstes: Was danach kommt, verstaerkt oertliche Unterschiede, und
+/// Rauschen IST ein oertlicher Unterschied. Wer erst schaerft und dann entrauscht,
+/// hat das Rauschen vorher gross gemacht und nimmt hinterher das Bild mit weg.
 ///
 /// Schaerfe zuletzt: Sie arbeitet auf dem, was am Ende dasteht, und sieht damit auch,
 /// was die Klarheit vorher getan hat.
 /// </summary>
 public enum LocalStage
 {
-    Denoise = 0,
-    Contrast = 1,
-    Detail = 2,
+    /// <summary>Vor der Sichtumwandlung, in linearem Licht: Glanz und Halation.</summary>
+    Light = 0,
+
+    Denoise = 1,
+    Contrast = 2,
+    Detail = 3,
+}
+
+/// <summary>
+/// Ein oertliches Werkzeug, das nicht den Wert weichzeichnet, sondern etwas daraus
+/// Gewonnenes: die Lichter oberhalb einer Schwelle.
+///
+/// Der Unterschied ist wesentlich genug fuer eine eigene Schnittstelle. Glanz ist
+/// nicht "das Bild weichgezeichnet und dazugezaehlt" - das waere ein Schleier ueber
+/// allem. Es ist das, was HELL genug ist, weichgezeichnet und dazugezaehlt; die
+/// Schwelle ist das ganze Werkzeug. Und weil der Eingang der Weichzeichnung damit
+/// ein anderer ist, kann sich ein solches Werkzeug die Weichzeichnung mit keinem
+/// anderen teilen - auch nicht bei gleichem Radius.
+/// </summary>
+public interface IHighlightTool : ILocalTool
+{
+    /// <summary>
+    /// Holt aus einem Bildpunkt heraus, was weichgezeichnet werden soll. Laeuft auf
+    /// einer Kopie - der Wert selbst bleibt, wo er ist.
+    /// </summary>
+    void Extract(ref float r, ref float g, ref float b);
 }
 
 /// <summary>
@@ -337,6 +372,162 @@ public sealed class NoiseTool : ILocalTool
         r = Math.Clamp(br + luma * keepLuma + cr * keepColour, 0f, 1f);
         g = Math.Clamp(bg + luma * keepLuma + cg * keepColour, 0f, 1f);
         b = Math.Clamp(bb + luma * keepLuma + cb * keepColour, 0f, 1f);
+    }
+}
+
+/// <summary>
+/// Glanz: das Licht, das ueber seine Kante hinaus leuchtet.
+///
+/// Es ist das erste Werkzeug, das VOR der Sichtumwandlung rechnet, und das ist der
+/// ganze Punkt. Eine Lampe und die Sonne sind auf der Anzeige beide weiss - hinter
+/// der Umwandlung ist nicht mehr zu unterscheiden, ob dort 1 stand oder 500. Genau
+/// dieser Unterschied ist aber der Glanz: Die Sonne blendet, die Lampe nicht. Auf
+/// einem 8-Bit-Bild ist derselbe Filter geraten; auf einem EXR ist er gerechnet.
+///
+/// Weichgezeichnet wird deshalb nicht das Bild, sondern das, was ueber der Schwelle
+/// liegt. Ohne Schwelle waere es ein Schleier ueber allem - vermutlich der
+/// haeufigste Fehler in Nachbearbeitungen, die "weich" aussehen sollen und
+/// stattdessen milchig sind.
+///
+/// Was man wissen muss: Ein einzelner Ausreisser aus einem zu kurz gerechneten
+/// Rendern - ein Punkt mit 1e6 - wird hier zu einem grossen Fleck. Das ist nicht
+/// falsch gerechnet, sondern richtig: So sieht ein sehr helles Licht aus. Wer den
+/// Fleck nicht will, muss den Ausreisser loswerden, nicht den Glanz.
+/// </summary>
+public sealed class BloomTool : IHighlightTool
+{
+    public const string KindName = "bloom";
+
+    public string Kind => KindName;
+
+    public LocalStage Stage => LocalStage.Light;
+
+    /// <summary>0 bis 2. Wie viel von dem gestreuten Licht dazukommt.</summary>
+    public float Amount { get; set; }
+
+    /// <summary>
+    /// Ab welcher Helligkeit gestreut wird - in linearem Szenenlicht, nicht in
+    /// Anzeigewerten.
+    ///
+    /// Eins ist die brauchbare Ausgangslage: Das ist eine weisse Flaeche, und was
+    /// darueber liegt, ist eine Lichtquelle oder eine Spiegelung. Eine Zahl in
+    /// Anzeigewerten waere hier sinnlos, weil dort alles Helle auf 1 liegt.
+    /// </summary>
+    public float Threshold { get; set; } = 1f;
+
+    /// <summary>Der Radius in Bildpunkten, bezogen auf 1080p. Gross - Glanz ist weit.</summary>
+    public int Reach { get; set; } = 60;
+
+    [JsonIgnore]
+    public bool IsNeutral => Amount < 0.005f;
+
+    [JsonIgnore]
+    public int Radius => Math.Clamp(Reach, 4, 300);
+
+    private float _amount;
+    private float _threshold;
+
+    public void Prepare()
+    {
+        _amount = Math.Clamp(Amount, 0f, 2f);
+        _threshold = MathF.Max(0f, Threshold);
+    }
+
+    public void Extract(ref float r, ref float g, ref float b)
+    {
+        // Je Kanal und nicht ueber die Helligkeit: Eine rote Lampe soll rot
+        // ueberstrahlen.
+        r = MathF.Max(0f, r - _threshold);
+        g = MathF.Max(0f, g - _threshold);
+        b = MathF.Max(0f, b - _threshold);
+    }
+
+    public void Apply(ref float r, ref float g, ref float b, float br, float bg, float bb)
+    {
+        // Dazugezaehlt, nicht gemischt. Gestreutes Licht kommt HINZU - es nimmt dem
+        // Punkt, auf den es faellt, nichts weg.
+        r += br * _amount;
+        g += bg * _amount;
+        b += bb * _amount;
+    }
+}
+
+/// <summary>
+/// Halation: der warme Saum um die Lichter.
+///
+/// Derselbe Vorgang wie der Glanz und doch ein anderer: Im Film geht das Licht durch
+/// die Schicht hindurch, wird an der Traegerfolie zurueckgeworfen und belichtet von
+/// hinten noch einmal. Rotes Licht dringt am tiefsten ein, also ist der Saum rot bis
+/// orange. Enger als der Glanz und immer warm - das ist das meiste von dem, was an
+/// einem Bild "nach Film" aussieht.
+///
+/// Die Faerbung laesst sich verschieben, aber nicht frei waehlen: von tiefem Rot bis
+/// ins Orange. Ein gruener Saum waere keine Halation, sondern ein Farbfehler, und ein
+/// Regler, der ihn anbietet, behauptete etwas Falsches ueber das, was hier
+/// nachgebildet wird.
+/// </summary>
+public sealed class HalationTool : IHighlightTool
+{
+    public const string KindName = "halation";
+
+    private const float LumaR = 0.2126f;
+    private const float LumaG = 0.7152f;
+    private const float LumaB = 0.0722f;
+
+    public string Kind => KindName;
+
+    public LocalStage Stage => LocalStage.Light;
+
+    /// <summary>0 bis 2.</summary>
+    public float Amount { get; set; }
+
+    /// <summary>Ab welcher Helligkeit, in linearem Szenenlicht - wie beim Glanz.</summary>
+    public float Threshold { get; set; } = 1f;
+
+    /// <summary>Der Radius in Bildpunkten, bezogen auf 1080p. Enger als der Glanz.</summary>
+    public int Reach { get; set; } = 12;
+
+    /// <summary>0 ist tiefes Rot, 1 ist Orange. Dazwischen wird gemischt.</summary>
+    public float Tint { get; set; } = 0.35f;
+
+    [JsonIgnore]
+    public bool IsNeutral => Amount < 0.005f;
+
+    [JsonIgnore]
+    public int Radius => Math.Clamp(Reach, 2, 200);
+
+    private float _amount;
+    private float _threshold;
+    private float _tintR, _tintG, _tintB;
+
+    public void Prepare()
+    {
+        _amount = Math.Clamp(Amount, 0f, 2f);
+        _threshold = MathF.Max(0f, Threshold);
+
+        float tint = Math.Clamp(Tint, 0f, 1f);
+
+        _tintR = 1f;
+        _tintG = 0.12f + (0.55f - 0.12f) * tint;
+        _tintB = 0.04f + (0.20f - 0.04f) * tint;
+    }
+
+    public void Extract(ref float r, ref float g, ref float b)
+    {
+        r = MathF.Max(0f, r - _threshold);
+        g = MathF.Max(0f, g - _threshold);
+        b = MathF.Max(0f, b - _threshold);
+    }
+
+    public void Apply(ref float r, ref float g, ref float b, float br, float bg, float bb)
+    {
+        // Die Farbe des Saums kommt vom Film, nicht vom Licht: Wieviel zurueckkommt,
+        // haengt von der Menge ab, welche Farbe es hat, von der Schicht.
+        float light = (LumaR * br + LumaG * bg + LumaB * bb) * _amount;
+
+        r += light * _tintR;
+        g += light * _tintG;
+        b += light * _tintB;
     }
 }
 

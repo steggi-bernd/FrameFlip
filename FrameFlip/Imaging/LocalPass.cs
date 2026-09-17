@@ -9,9 +9,13 @@ namespace FrameFlip.Imaging;
 /// Punkt nach dem anderen gerechnet und gleich hinausgeschrieben wird. Deshalb
 /// laeuft hier ein anderer Weg:
 ///
-///   1. Die ganze Kette bis hinter die Anzeigewerkzeuge, in einen Zwischenpuffer.
-///   2. Dieser Puffer weichgezeichnet - einmal je Radius, nicht einmal je Werkzeug.
-///   3. Beides zusammen durch die oertlichen Werkzeuge, dann hinaus.
+///   1. Die Kette in einen Zwischenpuffer - erst bis vor die Sichtumwandlung.
+///   2. Dort die Lichtwerkzeuge, die die Ueberhellen brauchen: Glanz und Halation.
+///   3. Sichtumwandlung und Anzeigewerkzeuge, im selben Puffer.
+///   4. Dort die uebrigen, die ein festes Weiss brauchen.
+///
+/// Weichgezeichnet wird einmal je Radius, nicht einmal je Werkzeug - ausser bei den
+/// Lichtwerkzeugen, deren Eingang ein anderer ist.
 ///
 /// Drei Puffer zu je drei Gleitkommawerten - Werte, Weichzeichnung und das Feld, ueber
 /// das der Kastenfilter laeuft: bei 1080p rund fuenfundsiebzig Megabyte, bei 4K rund
@@ -91,18 +95,52 @@ public static class LocalPass
 
         while (from < tools.Length)
         {
-            int radius = RadiusFor(tools[from].Radius, imageWidth, step);
+            var first = tools[from];
+            int radius = RadiusFor(first.Radius, imageWidth, step);
 
             int to = from + 1;
-            while (to < tools.Length && RadiusFor(tools[to].Radius, imageWidth, step) == radius) to++;
 
-            Array.Copy(scratch.Values, scratch.Blurred, count);
+            // Ein Lichtwerkzeug bleibt fuer sich: Sein Eingang ist nicht der Wert,
+            // sondern das, was es daraus zieht. Zwei Schwellen ergeben zwei
+            // Eingaenge, und die lassen sich nicht zusammenlegen.
+            if (first is not IHighlightTool)
+            {
+                while (to < tools.Length && tools[to] is not IHighlightTool &&
+                       RadiusFor(tools[to].Radius, imageWidth, step) == radius) to++;
+            }
+
+            Fill(scratch, first, gridWidth, gridHeight);
             Blur.Apply(scratch.Blurred, gridWidth, gridHeight, radius, scratch.Work);
 
             Apply(scratch, tools, from, to, gridWidth, gridHeight);
 
             from = to;
         }
+    }
+
+    /// <summary>Legt den Eingang der Weichzeichnung an.</summary>
+    private static void Fill(Scratch scratch, ILocalTool tool, int gridWidth, int gridHeight)
+    {
+        Array.Copy(scratch.Values, scratch.Blurred, gridWidth * gridHeight * 3);
+
+        if (tool is not IHighlightTool highlights) return;
+
+        var blurred = scratch.Blurred;
+
+        Parallel.For(0, gridHeight, new ParallelOptions
+        {
+            MaxDegreeOfParallelism = Math.Clamp(Environment.ProcessorCount, 1, 8),
+        },
+        gy =>
+        {
+            int row = gy * gridWidth * 3;
+
+            for (int gx = 0; gx < gridWidth; gx++)
+            {
+                int at = row + gx * 3;
+                highlights.Extract(ref blurred[at], ref blurred[at + 1], ref blurred[at + 2]);
+            }
+        });
     }
 
     /// <summary>Eine Gruppe von Werkzeugen ueber den ganzen Puffer.</summary>
