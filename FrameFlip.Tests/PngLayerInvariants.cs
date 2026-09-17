@@ -33,8 +33,61 @@ public static class PngLayerInvariants
         }
 
         EveryFileReads(folder);
+        SixteenBitArrivesLikeEightBit(folder);
         TransparentStaysTransparent(folder);
         OpaqueStaysOpaque(folder);
+    }
+
+    /// <summary>
+    /// Sechzehn Bit muss dasselbe ergeben wie acht Bit.
+    ///
+    /// Die Dateien 10 und 11 tragen DIESELBE Deckung - die eine mit sechzehn Bit je
+    /// Kanal, die andere mit acht. Beide laufen durch Windows' Decoder und werden
+    /// dabei auf Bgra32 gebracht, aber ueber verschiedene Wege: acht Bit geht
+    /// durch, sechzehn Bit durch einen Formatwandler.
+    ///
+    /// Geprueft wird die Deckung und nicht die Farbe: Bei der Farbe ist ein Unterschied
+    /// von einer Stufe Rundung, bei der Deckung ist er ein Fehler. Und es ist die
+    /// Deckung, an der alles haengt - eine Ebene, deren Schleier statt bei 6 von 255
+    /// bei 60 ankommt, zeigt den Muell darunter zehnfach.
+    /// </summary>
+    private static void SixteenBitArrivesLikeEightBit(string folder)
+    {
+        Check.Group("Sechzehn Bit kommt an wie acht Bit");
+
+        var tief = Read(folder, "10_sechzehn_bit_mit_deckung.png");
+        var flach = Read(folder, "11_verschraenkt.png");
+
+        if (tief is null || flach is null || tief.A is null || flach.A is null) return;
+
+        double worst = 0;
+        double sum = 0;
+
+        for (int i = 0; i < tief.A.Length; i++)
+        {
+            double step = Math.Abs(tief.A[i] - flach.A[i]) * 255.0;
+
+            worst = Math.Max(worst, step);
+            sum += step;
+        }
+
+        double mean = sum / tief.A.Length;
+
+        Console.WriteLine($"         Deckung: groesster Unterschied {worst:0.0} von 255, " +
+                          $"im Mittel {mean:0.00}");
+
+        Check.That(worst <= 1.5, "die Deckung kommt gleich an", $"{worst:0.0} von 255");
+
+        // Und die Farbe ebenso - dort ist mehr Spielraum, aber nicht beliebig viel.
+        double colour = 0;
+
+        for (int i = 0; i < tief.R.Length; i++)
+        {
+            colour = Math.Max(colour, Math.Abs(Srgb.Encode(tief.R[i]) -
+                                               Srgb.Encode(flach.R[i])) * 255.0);
+        }
+
+        Console.WriteLine($"         Farbe:   groesster Unterschied {colour:0.0} von 255");
     }
 
     /// <summary>

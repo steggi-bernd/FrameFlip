@@ -30,6 +30,7 @@ public static class StackReproInvariants
         TheWholeReportedStack(folder);
         ScreenOverBlack(folder);
         ByTheNumbersOfTheRealFiles();
+        TheBaseImageIsAPass(folder);
     }
 
     /// <summary>
@@ -229,6 +230,79 @@ public static class StackReproInvariants
             Check.That(noise < 2.0, $"bei Schrittweite {step} rauscht die Ecke nicht",
                        $"{noise:0.00}");
         }
+    }
+
+    /// <summary>
+    /// Das GRUNDBILD - und die Deckung, die dort niemand beachtet.
+    ///
+    /// Im Atelier ist die unterste Ebene das Bild selbst, und sie ist ein Pass. Fuer
+    /// einen Pass gilt im Composer ausdruecklich: Deckung nicht anwenden. Das ist fuer
+    /// eine EXR richtig - dort heisst Deckung null "hier wurde nichts getroffen", und
+    /// die Farbe daneben ist trotzdem echt.
+    ///
+    /// Fuer eine PNG ist es falsch. Dort heisst Deckung null "hier ist nichts", und
+    /// darunter steht in den meisten Dateien, was zufaellig im Puffer stand.
+    ///
+    /// Geprueft wird mit genau der Datei, die Muell unter der Deckung traegt.
+    /// </summary>
+    private static void TheBaseImageIsAPass(string folder)
+    {
+        Check.Group("Das Grundbild und seine Deckung");
+
+        var dirty = Read(folder, "02_freigestellt_muell_unter_deckung.png");
+        if (dirty is null) return;
+
+        // Als Grundbild - also als Pass, so wie das Atelier es oeffnet.
+        var asBase = new LayerStack
+        {
+            Layers = { new ImageLayer { Content = LayerContent.Pass, Source = "", Name = "Bild" } },
+        };
+
+        var drawnBase = Draw(asBase, new Dictionary<string, FloatFrame>(StringComparer.Ordinal)
+        {
+            [""] = dirty,
+        });
+
+        // Und dieselbe Datei als Bildebene ueber Schwarz.
+        var black = Read(folder, "00_grund_schwarz.png");
+        if (black is null || drawnBase is null) return;
+
+        var asLayer = new LayerStack
+        {
+            Layers =
+            {
+                new ImageLayer { Content = LayerContent.Pass, Source = "", Name = "Bild" },
+                new ImageLayer
+                {
+                    Content = LayerContent.Image, Source = "figur", Name = "Figur",
+                    Mode = BlendMode.Normal,
+                },
+            },
+        };
+
+        var drawnLayer = Draw(asLayer, new Dictionary<string, FloatFrame>(StringComparer.Ordinal)
+        {
+            [""] = black,
+            ["figur"] = dirty,
+        });
+
+        if (drawnLayer is null) return;
+
+        double asBaseNoise = Noise(drawnBase, dirty.Width, 2, 2, 40);
+        double asLayerNoise = Noise(drawnLayer, dirty.Width, 2, 2, 40);
+
+        Console.WriteLine($"         dieselbe Datei als Grundbild: {asBaseNoise:0.00}");
+        Console.WriteLine($"         dieselbe Datei als Ebene:     {asLayerNoise:0.00}");
+
+        Check.That(asLayerNoise < 1.0, "als Ebene bleibt sie ruhig", $"{asLayerNoise:0.00}");
+
+        Check.That(asBaseNoise < 1.0,
+                   "und als Grundbild ebenfalls - ihre Deckung gilt auch dort",
+                   $"{asBaseNoise:0.00} Stufen zwischen Nachbarn");
+
+        Check.That(Math.Abs(asBaseNoise - asLayerNoise) < 1.0,
+                   "es macht keinen Unterschied, ob eine Datei Bild oder Ebene ist",
+                   $"{asBaseNoise:0.00} gegen {asLayerNoise:0.00}");
     }
 
     /// <summary>

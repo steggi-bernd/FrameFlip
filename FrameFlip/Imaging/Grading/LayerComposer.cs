@@ -74,7 +74,17 @@ public static class LayerComposer
 
         // Eine einzelne unveraenderte Ebene ist das Bild selbst. Sie durchzureichen
         // spart bei 4K rund hundert Megabyte und eine Kopie.
-        if (used.Count == 1 && used[0].Kind == StepKind.Layer &&
+        //
+        // Nicht aber, wenn sie freigestellt ist und nicht aus einer EXR kommt. Dann
+        // muesste ihre Deckung angewandt werden, und auf diesem Weg tut es niemand:
+        // Was hier zurueckgegeben wird, geht unveraendert an die Anzeige. Genau daran
+        // hing der lange gesuchte Fehler - eine freigestellte PNG als BILD geoeffnet
+        // zeigte den Muell unter ihrer Deckung, dieselbe Datei als EBENE nicht.
+        bool bare = used[0].Frame is null ||
+                    used[0].Frame!.IsSceneReferred ||
+                    !used[0].Frame!.HasMatte;
+
+        if (used.Count == 1 && used[0].Kind == StepKind.Layer && bare &&
             used[0].Layer.IsNeutral && used[0].Layer.LiesOnBlack)
         {
             return used[0].Frame!;
@@ -366,11 +376,29 @@ public static class LayerComposer
                         // Deckung steht in den meisten Dateien, was zufaellig im
                         // Puffer stand, und ohne Deckung wird genau das gezeigt.
                         //
-                        // Nur bei BILDebenen. Bei einem Pass heisst Deckung null
-                        // "hier wurde nichts getroffen", und die Farbe daneben ist
-                        // trotzdem echt - das Umgebungslicht steht dort. Einen Pass
-                        // mit seinem Alpha zu multiplizieren loeschte den Himmel.
-                        if (plan.Content == LayerContent.Image && frame.A is not null)
+                        // Nicht bei einem Pass aus einer EXR. Dort heisst Deckung
+                        // null "hier wurde nichts getroffen", und die Farbe daneben
+                        // ist trotzdem echt - das Umgebungslicht steht dort. Einen
+                        // solchen Pass mit seinem Alpha zu multiplizieren loeschte
+                        // den Himmel.
+                        //
+                        // Bei allem anderen SCHON - und das schliesst das Grundbild
+                        // ein. Das war der Fehler, der lange gesucht wurde: Die
+                        // unterste Ebene im Atelier ist ein Pass, und eine PNG, die
+                        // als Bild geoeffnet wird, ist damit auch einer. Ihre
+                        // Freistellung galt dann nicht, und unter der Freistellung
+                        // steht in den meisten Dateien, was zufaellig im Puffer
+                        // stand. Dieselbe Datei war als EBENE still und als BILD ein
+                        // Rauschteppich - gemessen 0,00 gegen 83,78 Stufen.
+                        //
+                        // Unterschieden wird nicht nach der Art der Ebene, sondern
+                        // nach der Herkunft des Feldes: Was aus einer EXR kommt,
+                        // traegt Licht und meint es so; was ueber Windows' Decoder
+                        // kam, ist ein Bild und hat eine Maske.
+                        bool matte = plan.Content == LayerContent.Image ||
+                                     !frame.IsSceneReferred;
+
+                        if (matte && frame.A is not null)
                         {
                             ownAlpha = frame.A[i];
                             hasOwnAlpha = true;

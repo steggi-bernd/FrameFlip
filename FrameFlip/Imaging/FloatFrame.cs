@@ -56,6 +56,53 @@ public sealed class FloatFrame
     /// <summary>Gemerkte Spanne, siehe <see cref="MaskRange"/>.</summary>
     private (float Low, float High)? _range;
 
+    /// <summary>Gemerkt, siehe <see cref="HasMatte"/>.</summary>
+    private bool? _matte;
+
+    /// <summary>
+    /// Ob dieses Feld eine Freistellung traegt - also irgendwo weniger als voll deckt.
+    ///
+    /// Gebraucht an einer einzigen Stelle, aber dort entscheidet es alles: Der
+    /// Composer reicht eine einzelne unveraenderte Ebene durch, statt sie zu
+    /// kopieren - bei 4K spart das hundert Megabyte. Nur darf er das nicht, wenn die
+    /// Datei freigestellt ist: Dann wird nie jemand ihre Deckung anwenden, und unter
+    /// der Deckung steht in den meisten Dateien, was zufaellig im Puffer stand.
+    ///
+    /// Jeder vierte Bildpunkt in beiden Richtungen, mit sofortigem Abbruch - dieselbe
+    /// Abwaegung wie bei <see cref="MaskRange"/>. Eine Freistellung, die kein
+    /// Viererraster trifft, waere kleiner als vier Bildpunkte und damit keine.
+    /// </summary>
+    public bool HasMatte
+    {
+        get
+        {
+            if (_matte is { } known) return known;
+
+            bool found = false;
+
+            if (A is not null)
+            {
+                for (int y = 0; y < Height && !found; y += 4)
+                {
+                    int row = y * Width;
+
+                    for (int x = 0; x < Width; x += 4)
+                    {
+                        if (A[row + x] < 0.999f)
+                        {
+                            found = true;
+                            break;
+                        }
+                    }
+                }
+            }
+
+            _matte = found;
+
+            return found;
+        }
+    }
+
     /// <summary>
     /// Die Spanne der Werte dieses Passes - gebraucht, wenn er als Maske dient.
     ///
