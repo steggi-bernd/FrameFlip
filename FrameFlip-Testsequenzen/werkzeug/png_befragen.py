@@ -207,8 +207,16 @@ def vormultipliziert(rgb, a):
     geschrieben wird beides. Wer das verwechselt, rechnet die Deckung zweimal oder
     gar nicht hinein, und "gar nicht" heisst: der Muell steht in voller Staerke da.
     """
-    hell = rgb.max(axis=2).astype(np.int32)
-    ueber = np.count_nonzero(hell > a.astype(np.int32) + 2)
+    # Nur dort pruefen, wo die Deckung nicht voll ist. Bei Deckung 255 kann kein
+    # Kanal heller sein als sie, und die Probe saehe ueberall vormultipliziert aus -
+    # auch bei einer Datei, die gar keine Freistellung hat.
+    teil = (a > 0) & (a < 255)
+
+    if np.count_nonzero(teil) < 100:
+        return
+
+    hell = rgb.max(axis=2).astype(np.int32)[teil]
+    ueber = np.count_nonzero(hell > a.astype(np.int32)[teil] + 2)
 
     anteil = ueber / hell.size
 
