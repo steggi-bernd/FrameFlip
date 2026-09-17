@@ -33,6 +33,10 @@ public static class LocalToolInvariants
         TheOverbrightsAreWhatGlows();
         GlowOnlyAdds();
         HalationIsWarm();
+        TheVeilIsFoundInTheDarkChannel();
+        WhiteStaysWhiteWhenTheHazeGoes();
+        TextureWorksWhereClarityLetsGo();
+        TextureGoesBothWays();
         TheSidesAreSplit();
         TheExportTakesTheSameWay();
         TheOrderIsFixed();
@@ -513,20 +517,25 @@ public static class LocalToolInvariants
                 new BloomTool { Amount = 0.5f },
                 new ClarityTool { Amount = 0.5f },
                 new HalationTool { Amount = 0.5f },
+                new TextureTool { Amount = 0.5f },
                 new NoiseTool { Colour = 0.5f },
+                new DehazeTool { Amount = 0.5f },
             },
         };
 
         var prepared = stack.Prepare();
 
-        Check.That(prepared.LocalLight.Length == 2, "zwei auf der Lichtseite",
+        Check.That(prepared.LocalLight.Length == 3, "drei auf der Lichtseite",
                    $"{prepared.LocalLight.Length}");
-        Check.That(prepared.LocalLight.All(tool => tool is BloomTool or HalationTool),
-                   "und es sind Glanz und Halation");
+        Check.That(prepared.LocalLight[0] is DehazeTool,
+                   "der Dunst zuerst - ein Schleier, der erst leuchtet, leuchtet immer noch");
+        Check.That(prepared.LocalLight.Skip(1).All(tool => tool is BloomTool or HalationTool),
+                   "dahinter Glanz und Halation");
 
-        Check.That(prepared.Local.Length == 3, "drei auf der Anzeigeseite", $"{prepared.Local.Length}");
+        Check.That(prepared.Local.Length == 4, "vier auf der Anzeigeseite", $"{prepared.Local.Length}");
         Check.That(prepared.Local[0] is NoiseTool && prepared.Local[1] is ClarityTool &&
-                   prepared.Local[2] is SharpenTool, "dort in ihrer festen Reihenfolge");
+                   prepared.Local[2] is TextureTool && prepared.Local[3] is SharpenTool,
+                   "dort in ihrer festen Reihenfolge");
 
         Check.That(prepared.HasLocal, "und der Stapel weiss, dass er den zweiten Weg braucht");
         Check.That(!PreparedGrading.None.HasLocal, "ein leerer weiss das Gegenteil");
@@ -536,6 +545,158 @@ public static class LocalToolInvariants
 
         Check.That(onlyLight.Prepare().HasLocal, "ein Glanz allein reicht dafuer");
         Check.That(onlyLight.Prepare().Local.Length == 0, "und die Anzeigeseite bleibt leer");
+    }
+
+    // ------------------------------------------------------- Dunst und Textur
+
+    /// <summary>
+    /// Der Schleier wird ueber den dunklen Kanal geschaetzt.
+    ///
+    /// Die Annahme: An fast jeder Stelle eines Bildes liegt einer der drei Kanaele
+    /// nahe null. Wo auch das Dunkelste noch hell ist, liegt Dunst darueber. Der
+    /// Auszug muss deshalb das Kleinste der drei nehmen - naehme er die Helligkeit,
+    /// haette eine saftig rote Flaeche denselben Schleier wie eine milchige.
+    /// </summary>
+    private static void TheVeilIsFoundInTheDarkChannel()
+    {
+        Check.Group("Der Dunst sucht im dunklen Kanal");
+
+        var tool = new DehazeTool { Amount = 1f, Reach = 80 };
+        tool.Prepare();
+
+        // Eine kraeftige Farbe: Ein Kanal liegt tief, also ist dort kein Schleier.
+        float r = 0.9f, g = 0.2f, b = 0.05f;
+        tool.Extract(ref r, ref g, ref b);
+
+        Check.Near(r, 0.05, 1e-5, "der Auszug nimmt das Kleinste der drei");
+        Check.That(r == g && g == b, "und setzt alle drei gleich - der Schleier ist eine Menge");
+
+        // Eine milchige Flaeche: Auch das Dunkelste ist hell.
+        float mr = 0.7f, mg = 0.75f, mb = 0.8f;
+        tool.Extract(ref mr, ref mg, ref mb);
+
+        Check.Near(mr, 0.7, 1e-5, "bei einer milchigen Flaeche steht er hoch");
+
+        // Und im Bild: Ein Feld, das nur aus Schleier besteht, hat danach nichts mehr.
+        var veil = Flat(64, 48, 0.25f);
+
+        var plain = Draw(veil, new GradingStack());
+        var cleared = Draw(veil, Haze(1f, 200));
+
+        Check.That(plain[2] > 100, "das Feld ist vorher grau", $"{plain[2]}");
+        Check.That(cleared[2] < 8, "und danach schwarz - es war nichts darin als Dunst",
+                   $"{cleared[2]}");
+    }
+
+    /// <summary>
+    /// Weiss bleibt Weiss. Das ist die Probe auf die Rechnung.
+    ///
+    /// Abgezogen wird der Schleier, und dann wird durch das geteilt, was uebrig
+    /// bleibt - denn was durch den Dunst kam, kam geschwaecht an. Wer nur abzieht,
+    /// macht das Bild dunkler statt klarer, und das Weiss waere hinterher grau.
+    /// </summary>
+    private static void WhiteStaysWhiteWhenTheHazeGoes()
+    {
+        Check.Group("Weiss bleibt weiss, und der Kontrast kommt zurueck");
+
+        var tool = new DehazeTool { Amount = 1f };
+        tool.Prepare();
+
+        float wr = 1f, wg = 1f, wb = 1f;
+        tool.Apply(ref wr, ref wg, ref wb, 0.2f, 0.2f, 0.2f);
+
+        Check.Near(wr, 1.0, 1e-5, "eine weisse Flaeche bleibt weiss");
+
+        // Zwei Werte mit demselben Schleier: Ihr Abstand muss groesser werden.
+        float lowR = 0.4f, lowG = 0.4f, lowB = 0.4f;
+        tool.Apply(ref lowR, ref lowG, ref lowB, 0.2f, 0.2f, 0.2f);
+
+        float highR = 0.6f, highG = 0.6f, highB = 0.6f;
+        tool.Apply(ref highR, ref highG, ref highB, 0.2f, 0.2f, 0.2f);
+
+        Check.Near(lowR, 0.25, 1e-5, "der dunklere faellt");
+        Check.Near(highR, 0.5, 1e-5, "der hellere auch, aber weniger");
+        Check.That(highR - lowR > 0.2f, "und der Abstand zwischen ihnen waechst",
+                   $"{(highR - lowR):0.###} statt 0,2");
+    }
+
+    /// <summary>
+    /// Die Begruendung dafuer, dass Textur ein eigenes Werkzeug ist.
+    ///
+    /// Im Entwurf stand, sie sei die Klarheit mit kleinem Radius. Das stimmt in der
+    /// Mitte und wird an den Enden falsch: Die Gewichtung der Klarheit laeuft bei
+    /// Schwarz und Weiss auf null, und genau dort liegen helle Haut und dunkler
+    /// Stoff - die Flaechen, um die es bei Textur ueberhaupt geht.
+    /// </summary>
+    private static void TextureWorksWhereClarityLetsGo()
+    {
+        Check.Group("Textur wirkt dort, wo die Klarheit loslaesst");
+
+        var clarity = new ClarityTool { Amount = 1f, Reach = 8 };
+        var texture = new TextureTool { Amount = 1f, Reach = 8 };
+
+        clarity.Prepare();
+        texture.Prepare();
+
+        // Hoch oben, wo eine helle Flaeche liegt: eine dunkle Stelle darin, damit
+        // die Begrenzung bei Weiss die Messung nicht abschneidet.
+        float cr = 0.95f, cg = 0.95f, cb = 0.95f;
+        clarity.Apply(ref cr, ref cg, ref cb, 0.97f, 0.97f, 0.97f);
+
+        float tr = 0.95f, tg = 0.95f, tb = 0.95f;
+        texture.Apply(ref tr, ref tg, ref tb, 0.97f, 0.97f, 0.97f);
+
+        double fromClarity = Math.Abs(cr - 0.95);
+        double fromTexture = Math.Abs(tr - 0.95);
+
+        Check.That(fromClarity < 0.005, "die Klarheit tut dort fast nichts",
+                   $"{fromClarity:0.####}");
+        Check.That(fromTexture > 0.015, "die Textur sehr wohl", $"{fromTexture:0.####}");
+        Check.That(fromTexture > fromClarity * 5, "um ein Vielfaches",
+                   $"{fromTexture:0.####} gegen {fromClarity:0.####}");
+
+        // In der Mitte sind sie sich einig - dort ist die Klarheit voll da.
+        float mr = 0.55f, mg = 0.55f, mb = 0.55f;
+        clarity.Apply(ref mr, ref mg, ref mb, 0.5f, 0.5f, 0.5f);
+
+        float nr = 0.55f, ng = 0.55f, nb = 0.55f;
+        texture.Apply(ref nr, ref ng, ref nb, 0.5f, 0.5f, 0.5f);
+
+        Check.That(Math.Abs(mr - nr) < 0.02f, "in den Mitten liegen sie nah beieinander",
+                   $"{mr:0.###} gegen {nr:0.###}");
+    }
+
+    private static void TextureGoesBothWays()
+    {
+        Check.Group("Textur geht in beide Richtungen");
+
+        var frame = Flat(48, 32, 0.5f);
+
+        var plain = Draw(frame, new GradingStack());
+        var strong = Draw(frame, Texture(1f, 8));
+
+        Check.That(Same(plain, strong), "eine gleichmaessige Flaeche bleibt in Ruhe");
+
+        var tool = new TextureTool { Amount = -1f, Reach = 8 };
+        tool.Prepare();
+
+        // Negativ wandert der Wert auf die Umgebung zu.
+        float r = 0.6f, g = 0.6f, b = 0.6f;
+        tool.Apply(ref r, ref g, ref b, 0.5f, 0.5f, 0.5f);
+
+        Check.Near(r, 0.5, 1e-5, "negativ glaettet sie bis auf die Umgebung");
+
+        // Und der Farbton bleibt, wie bei der Schaerfe - gerechnet wird auf der
+        // Helligkeit.
+        var up = new TextureTool { Amount = 0.8f, Reach = 8 };
+        up.Prepare();
+
+        float ur = 0.6f, ug = 0.45f, ub = 0.3f;
+        float beforeRg = ur - ug;
+
+        up.Apply(ref ur, ref ug, ref ub, 0.5f, 0.35f, 0.2f);
+
+        Check.Near(ur - ug, beforeRg, 1e-5, "der Abstand der Kanaele bleibt");
     }
 
     /// <summary>
@@ -761,6 +922,8 @@ public static class LocalToolInvariants
                 new ClarityTool { Amount = -0.45f, Reach = 77 },
                 new BloomTool { Amount = 0.8f, Threshold = 2.5f, Reach = 90 },
                 new HalationTool { Amount = 0.3f, Threshold = 1.5f, Reach = 9, Tint = 0.7f },
+                new DehazeTool { Amount = 0.6f, Reach = 120 },
+                new TextureTool { Amount = -0.7f, Reach = 14 },
             },
         };
 
@@ -795,6 +958,14 @@ public static class LocalToolInvariants
         var halo = read.Local.OfType<HalationTool>().FirstOrDefault();
         Check.That(halo is not null, "die Halation ebenso");
         if (halo is not null) Check.Near(halo.Tint, 0.7, 1e-5, "mitsamt Faerbung");
+
+        var haze = read.Local.OfType<DehazeTool>().FirstOrDefault();
+        Check.That(haze is not null, "der Dunst auch");
+        if (haze is not null) Check.That(haze.Reach == 120, "mit seinem Radius", $"{haze.Reach}");
+
+        var texture = read.Local.OfType<TextureTool>().FirstOrDefault();
+        Check.That(texture is not null, "und die Textur");
+        if (texture is not null) Check.Near(texture.Amount, -0.7, 1e-5, "mitsamt Vorzeichen");
 
         var copiedGlow = copy.Local.OfType<BloomTool>().First();
         stack.Local.OfType<BloomTool>().First().Amount = 0.1f;
@@ -831,6 +1002,8 @@ public static class LocalToolInvariants
                 new ClarityTool { Amount = 0.6f, Reach = 40 },
                 new SharpenTool { Amount = 0.8f, Reach = 4 },
                 new BloomTool { Amount = 0.5f, Reach = 60 },
+                new DehazeTool { Amount = 0.4f, Reach = 80 },
+                new TextureTool { Amount = 0.4f, Reach = 8 },
             },
         };
 
@@ -843,12 +1016,12 @@ public static class LocalToolInvariants
         double coarseAll = Fastest(() => Draw(frame, everything, ImageAdjustments.Neutral, step: 4));
 
         Console.WriteLine($"         1080p: ohne {without:0.0} ms, mit Klarheit {with:0.0} ms, " +
-                          $"vier Werkzeuge ueber beide Seiten {all:0.0} ms");
-        Console.WriteLine($"         beim Ziehen: Klarheit {coarse:0.0} ms, alle vier {coarseAll:0.0} ms");
+                          $"alle sechs ueber beide Seiten {all:0.0} ms");
+        Console.WriteLine($"         beim Ziehen: Klarheit {coarse:0.0} ms, alle sechs {coarseAll:0.0} ms");
 
         Check.That(with < 400, "der volle Durchgang bleibt im Rahmen", $"{with:0.0} ms");
         Check.That(coarse < 40, "beim Ziehen bleibt es bedienbar", $"{coarse:0.0} ms");
-        Check.That(coarseAll < 60, "auch mit allen vieren", $"{coarseAll:0.0} ms");
+        Check.That(coarseAll < 80, "auch mit allen sechsen", $"{coarseAll:0.0} ms");
     }
 
     // ------------------------------------------------------------------- Handwerk
@@ -858,6 +1031,12 @@ public static class LocalToolInvariants
 
     private static GradingStack Sharp(float amount, int reach, float threshold)
         => new() { Local = { new SharpenTool { Amount = amount, Reach = reach, Threshold = threshold } } };
+
+    private static GradingStack Haze(float amount, int reach)
+        => new() { Local = { new DehazeTool { Amount = amount, Reach = reach } } };
+
+    private static GradingStack Texture(float amount, int reach)
+        => new() { Local = { new TextureTool { Amount = amount, Reach = reach } } };
 
     private static GradingStack Glow(float amount, float threshold, int reach)
         => new() { Local = { new BloomTool { Amount = amount, Threshold = threshold, Reach = reach } } };
@@ -926,7 +1105,7 @@ public static class LocalToolInvariants
     /// Seine Stufe ist Contrast und nicht Light, weil der Test den Durchgang direkt
     /// ruft; die Stufe entscheidet erst im Stapel ueber die Seite.
     /// </summary>
-    private sealed class HighlightProbe : IHighlightTool
+    private sealed class HighlightProbe : IExtractTool
     {
         private readonly int _radius;
 

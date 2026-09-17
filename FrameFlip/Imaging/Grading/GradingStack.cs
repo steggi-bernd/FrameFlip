@@ -70,7 +70,7 @@ public sealed class GradingStack
             // Dieselbe Aufteilung wie oben, und aus demselben Grund: Die eine Haelfte
             // rechnet vor der Sichtumwandlung, die andere dahinter. Die Seite folgt
             // aus der Stufe - der Schnitt liegt hinter dem Licht.
-            (tool.Stage == LocalStage.Light ? light : local).Add(tool);
+            (tool.Stage <= LocalStage.Light ? light : local).Add(tool);
         }
 
         return new PreparedGrading(linear.ToArray(), display.ToArray(),
@@ -98,6 +98,10 @@ public sealed class GradingStack
         {
             Amount = sharpen.Amount, Reach = sharpen.Reach, Threshold = sharpen.Threshold,
         },
+
+        DehazeTool dehaze => new DehazeTool { Amount = dehaze.Amount, Reach = dehaze.Reach },
+
+        TextureTool texture => new TextureTool { Amount = texture.Amount, Reach = texture.Reach },
 
         NoiseTool noise => new NoiseTool
         {

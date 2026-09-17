@@ -100,12 +100,12 @@ public static class LocalPass
 
             int to = from + 1;
 
-            // Ein Lichtwerkzeug bleibt fuer sich: Sein Eingang ist nicht der Wert,
-            // sondern das, was es daraus zieht. Zwei Schwellen ergeben zwei
-            // Eingaenge, und die lassen sich nicht zusammenlegen.
-            if (first is not IHighlightTool)
+            // Ein Werkzeug mit eigenem Auszug bleibt fuer sich: Sein Eingang ist
+            // nicht der Wert, sondern das, was es daraus zieht. Zwei Auszuege ergeben
+            // zwei Eingaenge, und die lassen sich nicht zusammenlegen.
+            if (first is not IExtractTool)
             {
-                while (to < tools.Length && tools[to] is not IHighlightTool &&
+                while (to < tools.Length && tools[to] is not IExtractTool &&
                        RadiusFor(tools[to].Radius, imageWidth, step) == radius) to++;
             }
 
@@ -123,7 +123,7 @@ public static class LocalPass
     {
         Array.Copy(scratch.Values, scratch.Blurred, gridWidth * gridHeight * 3);
 
-        if (tool is not IHighlightTool highlights) return;
+        if (tool is not IExtractTool extracting) return;
 
         var blurred = scratch.Blurred;
 
@@ -138,7 +138,7 @@ public static class LocalPass
             for (int gx = 0; gx < gridWidth; gx++)
             {
                 int at = row + gx * 3;
-                highlights.Extract(ref blurred[at], ref blurred[at + 1], ref blurred[at + 2]);
+                extracting.Extract(ref blurred[at], ref blurred[at + 1], ref blurred[at + 2]);
             }
         });
     }

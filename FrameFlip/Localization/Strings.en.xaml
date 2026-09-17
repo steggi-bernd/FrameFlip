@@ -61,6 +61,14 @@
     <sys:String x:Key="S_ClarityAmount">Amount</sys:String>
     <sys:String x:Key="S_ClarityReach">Radius</sys:String>
     <sys:String x:Key="S_ClarityHint">Local contrast: it boosts what a pixel is against its surroundings and leaves flat areas alone. A large radius gives modelling, a small one gives sharpness. Negative takes contrast away.</sys:String>
+    <sys:String x:Key="S_Dehaze">Dehaze</sys:String>
+    <sys:String x:Key="S_DehazeAmount">Amount</sys:String>
+    <sys:String x:Key="S_DehazeRadius">Radius</sys:String>
+    <sys:String x:Key="S_DehazeHint">Takes away the veil the air adds between subject and camera. It is estimated from the darkest colour channel: where even the darkest is still bright, there is haze over it. White stays white. Adding fog needs distance and belongs to depth haze.</sys:String>
+    <sys:String x:Key="S_Texture">Texture</sys:String>
+    <sys:String x:Key="S_TextureAmount">Amount</sys:String>
+    <sys:String x:Key="S_TextureRadius">Radius</sys:String>
+    <sys:String x:Key="S_TextureHint">Surface detail, in both directions. Unlike clarity it does not let go at the ends — bright skin and dark cloth live exactly there. Unlike sharpening it can run backwards without taking the edges with it.</sys:String>
     <sys:String x:Key="S_Bloom">Glow</sys:String>
     <sys:String x:Key="S_BloomAmount">Amount</sys:String>
     <sys:String x:Key="S_BloomThreshold">Threshold</sys:String>

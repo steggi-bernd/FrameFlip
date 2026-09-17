@@ -61,6 +61,14 @@
     <sys:String x:Key="S_ClarityAmount">Stärke</sys:String>
     <sys:String x:Key="S_ClarityReach">Radius</sys:String>
     <sys:String x:Key="S_ClarityHint">Örtlicher Kontrast: Er verstärkt, was ein Punkt gegenüber seiner Umgebung ist, und lässt gleichmäßige Flächen in Ruhe. Großer Radius gibt Plastizität, kleiner gibt Schärfe. Negativ nimmt Kontrast weg.</sys:String>
+    <sys:String x:Key="S_Dehaze">Dunst</sys:String>
+    <sys:String x:Key="S_DehazeAmount">Stärke</sys:String>
+    <sys:String x:Key="S_DehazeRadius">Radius</sys:String>
+    <sys:String x:Key="S_DehazeHint">Zieht den Schleier ab, den die Luft zwischen Gegenstand und Kamera hinzufügt. Geschätzt wird er über den dunkelsten Farbkanal: Wo auch das Dunkelste noch hell ist, liegt Dunst darüber. Weiß bleibt weiß. Nebel hinzuzufügen braucht die Entfernung und gehört zum Tiefendunst.</sys:String>
+    <sys:String x:Key="S_Texture">Textur</sys:String>
+    <sys:String x:Key="S_TextureAmount">Stärke</sys:String>
+    <sys:String x:Key="S_TextureRadius">Radius</sys:String>
+    <sys:String x:Key="S_TextureHint">Die Zeichnung einer Oberfläche, in beide Richtungen. Anders als die Klarheit lässt sie an den Enden nicht los — helle Haut und dunkler Stoff liegen genau dort. Anders als die Schärfe kann sie rückwärts, ohne die Kanten mitzunehmen.</sys:String>
     <sys:String x:Key="S_Bloom">Glanz</sys:String>
     <sys:String x:Key="S_BloomAmount">Stärke</sys:String>
     <sys:String x:Key="S_BloomThreshold">Schwelle</sys:String>

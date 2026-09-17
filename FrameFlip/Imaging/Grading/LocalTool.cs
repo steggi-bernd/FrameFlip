@@ -29,6 +29,8 @@ namespace FrameFlip.Imaging.Grading;
 [JsonDerivedType(typeof(NoiseTool), NoiseTool.KindName)]
 [JsonDerivedType(typeof(BloomTool), BloomTool.KindName)]
 [JsonDerivedType(typeof(HalationTool), HalationTool.KindName)]
+[JsonDerivedType(typeof(DehazeTool), DehazeTool.KindName)]
+[JsonDerivedType(typeof(TextureTool), TextureTool.KindName)]
 public interface ILocalTool
 {
     /// <summary>Kennung fuer die Speicherung. Bleibt stabil, auch wenn der Anzeigename wechselt.</summary>
@@ -71,40 +73,52 @@ public interface ILocalTool
 /// Stufe passen muss, sondern folgt aus ihr - zwei Angaben liefen irgendwann
 /// auseinander, und das faellt erst auf, wenn ein Werkzeug am falschen Ort rechnet.
 ///
-/// Licht zuerst, und zwar VOR der Sichtumwandlung: Glanz und Halation sind Licht,
-/// das ueber seine Kante hinaus streut. Das geschieht in der Linse und im Film,
-/// bevor irgendeine Kennlinie darauf angewandt wird - und es braucht die Ueberhellen,
-/// die es hinter der Umwandlung nicht mehr gibt.
+/// Dunst zuerst, und zwar VOR der Sichtumwandlung: Er ist Licht, das auf dem Weg zur
+/// Kamera dazugekommen ist, und es abzuziehen muss geschehen, solange die Werte noch
+/// Lichtmengen sind. Danach das Licht, das ueber seine Kante hinaus streut - Glanz und
+/// Halation. Auch das geschieht in der Linse und im Film, bevor irgendeine Kennlinie
+/// darauf angewandt wird, und es braucht die Ueberhellen, die es hinter der Umwandlung
+/// nicht mehr gibt. Dass der Dunst davor liegt, hat denselben Grund wie alles hier:
+/// Ein Schleier, der erst leuchtet und dann abgezogen wird, leuchtet immer noch.
 ///
 /// Rauschen als Naechstes: Was danach kommt, verstaerkt oertliche Unterschiede, und
 /// Rauschen IST ein oertlicher Unterschied. Wer erst schaerft und dann entrauscht,
 /// hat das Rauschen vorher gross gemacht und nimmt hinterher das Bild mit weg.
 ///
-/// Schaerfe zuletzt: Sie arbeitet auf dem, was am Ende dasteht, und sieht damit auch,
-/// was die Klarheit vorher getan hat.
+/// Dann Klarheit, Textur, Schaerfe - von der groben zur feinen Zeichnung. Die Schaerfe
+/// zuletzt, weil sie auf dem arbeitet, was am Ende dasteht.
 /// </summary>
 public enum LocalStage
 {
-    /// <summary>Vor der Sichtumwandlung, in linearem Licht: Glanz und Halation.</summary>
-    Light = 0,
+    /// <summary>Vor der Sichtumwandlung: der Schleier, bevor er leuchtet.</summary>
+    Haze = 0,
 
-    Denoise = 1,
-    Contrast = 2,
-    Detail = 3,
+    /// <summary>Vor der Sichtumwandlung, in linearem Licht: Glanz und Halation.</summary>
+    Light = 1,
+
+    // Ab hier hinter der Sichtumwandlung. Der Schnitt liegt hinter Light - wer eine
+    // Stufe dazwischenschiebt, verschiebt damit auch die Seite, auf der sie rechnet.
+    Denoise = 2,
+    Contrast = 3,
+    Texture = 4,
+    Detail = 5,
 }
 
 /// <summary>
 /// Ein oertliches Werkzeug, das nicht den Wert weichzeichnet, sondern etwas daraus
-/// Gewonnenes: die Lichter oberhalb einer Schwelle.
+/// Gewonnenes.
 ///
 /// Der Unterschied ist wesentlich genug fuer eine eigene Schnittstelle. Glanz ist
 /// nicht "das Bild weichgezeichnet und dazugezaehlt" - das waere ein Schleier ueber
 /// allem. Es ist das, was HELL genug ist, weichgezeichnet und dazugezaehlt; die
-/// Schwelle ist das ganze Werkzeug. Und weil der Eingang der Weichzeichnung damit
-/// ein anderer ist, kann sich ein solches Werkzeug die Weichzeichnung mit keinem
-/// anderen teilen - auch nicht bei gleichem Radius.
+/// Schwelle ist das ganze Werkzeug. Der Dunst zieht etwas ganz anderes heraus, den
+/// dunklen Kanal, und sucht damit genau den Schleier, den der Glanz nicht sein will.
+///
+/// Weil der Eingang der Weichzeichnung damit ein anderer ist, kann sich ein solches
+/// Werkzeug die Weichzeichnung mit keinem anderen teilen - auch nicht bei gleichem
+/// Radius.
 /// </summary>
-public interface IHighlightTool : ILocalTool
+public interface IExtractTool : ILocalTool
 {
     /// <summary>
     /// Holt aus einem Bildpunkt heraus, was weichgezeichnet werden soll. Laeuft auf
@@ -394,7 +408,7 @@ public sealed class NoiseTool : ILocalTool
 /// falsch gerechnet, sondern richtig: So sieht ein sehr helles Licht aus. Wer den
 /// Fleck nicht will, muss den Ausreisser loswerden, nicht den Glanz.
 /// </summary>
-public sealed class BloomTool : IHighlightTool
+public sealed class BloomTool : IExtractTool
 {
     public const string KindName = "bloom";
 
@@ -466,7 +480,7 @@ public sealed class BloomTool : IHighlightTool
 /// Regler, der ihn anbietet, behauptete etwas Falsches ueber das, was hier
 /// nachgebildet wird.
 /// </summary>
-public sealed class HalationTool : IHighlightTool
+public sealed class HalationTool : IExtractTool
 {
     public const string KindName = "halation";
 
@@ -528,6 +542,157 @@ public sealed class HalationTool : IHighlightTool
         r += light * _tintR;
         g += light * _tintG;
         b += light * _tintB;
+    }
+}
+
+/// <summary>
+/// Dunst: das Licht, das auf dem Weg zur Kamera dazugekommen ist.
+///
+/// Zwischen einem Gegenstand und der Kamera liegt Luft, und die streut Licht in den
+/// Strahlengang hinein. Was ankommt, ist deshalb nicht der Gegenstand, sondern der
+/// Gegenstand plus ein Schleier - und je weiter weg, desto mehr Schleier. Deshalb
+/// werden ferne Berge blass und blaeulich, waehrend der Zaun im Vordergrund seine
+/// Farbe behaelt.
+///
+/// Geschaetzt wird der Schleier ueber den DUNKLEN KANAL: An fast jeder Stelle eines
+/// Bildes gibt es einen Farbkanal, der nahe null liegt - ein Schatten, eine
+/// gesaettigte Farbe, eine dunkle Flaeche. Wo das nicht mehr so ist, wo also auch
+/// das Dunkelste noch hell ist, liegt Schleier darueber. Das ist die Annahme, auf
+/// der alles hier beruht, und sie ist erstaunlich tragfaehig.
+///
+/// Weichgezeichnet wird dieser dunkle Kanal, weil der Schleier eine langsam
+/// veraenderliche Groesse ist: Dunst hat keine Kanten. Abgezogen wird er nicht nur,
+/// sondern auch herausgeteilt - was durch den Dunst kam, kam GESCHWAECHT an, und die
+/// Division holt den Kontrast zurueck. Weiss bleibt dabei weiss, das ist die Probe.
+///
+/// Was das Werkzeug nicht tut: Dunst hinzufuegen. Eine geschaetzte Groesse laesst
+/// sich nur dort umkehren, wo sie etwas gefunden hat - in einem klaren Bild ist
+/// nichts zu verstaerken. Nebel dazuzugeben braucht die Entfernung, und die steht im
+/// Tiefenpass; das gehoert zum Tiefendunst und nicht hierher.
+/// </summary>
+public sealed class DehazeTool : IExtractTool
+{
+    public const string KindName = "dehaze";
+
+    /// <summary>
+    /// Wie weit die Durchlaessigkeit mindestens heruntergehen darf.
+    ///
+    /// Ohne diese Grenze teilt ein sehr dunstiges Bild bei voller Staerke durch fast
+    /// null, und heraus kommt nicht Kontrast, sondern Rauschen mit Farben.
+    /// </summary>
+    private const float ThinnestVeil = 0.1f;
+
+    public string Kind => KindName;
+
+    public LocalStage Stage => LocalStage.Haze;
+
+    /// <summary>0 bis 1. Wie viel von dem geschaetzten Schleier abgezogen wird.</summary>
+    public float Amount { get; set; }
+
+    /// <summary>
+    /// Der Radius in Bildpunkten, bezogen auf 1080p. Gross, denn Dunst hat keine
+    /// Kanten - und ein zu kleiner Radius zoege die Zeichnung selbst als Schleier ab.
+    /// </summary>
+    public int Reach { get; set; } = 80;
+
+    [JsonIgnore]
+    public bool IsNeutral => Amount < 0.005f;
+
+    [JsonIgnore]
+    public int Radius => Math.Clamp(Reach, 8, 300);
+
+    private float _amount;
+
+    public void Prepare() => _amount = Math.Clamp(Amount, 0f, 1f);
+
+    public void Extract(ref float r, ref float g, ref float b)
+    {
+        // Der dunkle Kanal: das Wenigste, was an dieser Stelle ankommt. Alle drei
+        // bekommen denselben Wert - der Schleier ist eine Menge, keine Farbe.
+        float dark = MathF.Min(r, MathF.Min(g, b));
+
+        r = dark;
+        g = dark;
+        b = dark;
+    }
+
+    public void Apply(ref float r, ref float g, ref float b, float br, float bg, float bb)
+    {
+        // Alle drei Kanaele tragen denselben Wert - der Auszug hat sie gleichgesetzt.
+        float veil = Math.Clamp(br * _amount, 0f, 1f - ThinnestVeil);
+        if (veil <= 0f) return;
+
+        float transmission = 1f - veil;
+
+        r = MathF.Max(0f, (r - veil) / transmission);
+        g = MathF.Max(0f, (g - veil) / transmission);
+        b = MathF.Max(0f, (b - veil) / transmission);
+    }
+}
+
+/// <summary>
+/// Textur: die Zeichnung einer Oberflaeche, in beide Richtungen.
+///
+/// Im Entwurf stand, dies sei kein eigenes Werkzeug, sondern die Klarheit mit
+/// kleinem Radius. Beim Bauen stellte sich das als falsch heraus, und zwar aus zwei
+/// Gruenden, die beide in den vorhandenen Werkzeugen stecken:
+///
+/// Die Klarheit laesst an den Enden los - ihre Gewichtung laeuft bei Schwarz und
+/// Weiss auf null. Fuer oertlichen Kontrast ist das richtig; fuer Oberflaechen ist es
+/// genau verkehrt, denn helle Haut und dunkler Stoff liegen an genau diesen Enden,
+/// und dort taete die Klarheit nichts.
+///
+/// Und die Schaerfe kann nicht rueckwaerts. Ihre Schwelle laesst kleine Unterschiede
+/// liegen, was beim Anheben stimmt und beim Wegnehmen falsch herum zeigt: Negativ
+/// geglaettet wuerde sie die Kanten weichzeichnen und das Korn stehenlassen.
+///
+/// Was bleibt, ist eine Rechnung, die dieselbe ist wie die der Schaerfe, ohne
+/// Schwelle, mit Vorzeichen und mit groesserem Radius. Im Gebrauch sind das zwei
+/// verschiedene Werkzeuge, und deshalb stehen sie als zwei da.
+/// </summary>
+public sealed class TextureTool : ILocalTool
+{
+    public const string KindName = "texture";
+
+    private const float LumaR = 0.2126f;
+    private const float LumaG = 0.7152f;
+    private const float LumaB = 0.0722f;
+
+    public string Kind => KindName;
+
+    public LocalStage Stage => LocalStage.Texture;
+
+    /// <summary>-1 bis 1. Negativ nimmt Oberflaechenzeichnung weg, ohne Kanten zu ruehren.</summary>
+    public float Amount { get; set; }
+
+    /// <summary>
+    /// Der Radius in Bildpunkten, bezogen auf 1080p. Zwischen Schaerfe und Klarheit -
+    /// dort liegt die Zeichnung, die eine Oberflaeche ausmacht.
+    /// </summary>
+    public int Reach { get; set; } = 8;
+
+    [JsonIgnore]
+    public bool IsNeutral => MathF.Abs(Amount) < 0.005f;
+
+    [JsonIgnore]
+    public int Radius => Math.Clamp(Reach, 2, 60);
+
+    private float _amount;
+
+    public void Prepare() => _amount = Math.Clamp(Amount, -1f, 1f);
+
+    public void Apply(ref float r, ref float g, ref float b, float br, float bg, float bb)
+    {
+        // Auf der Helligkeit, aus demselben Grund wie bei der Schaerfe: Je Kanal
+        // gerechnet wandert an einer farbigen Kante die Farbe.
+        float difference = LumaR * (r - br) + LumaG * (g - bg) + LumaB * (b - bb);
+        if (difference == 0f) return;
+
+        float add = difference * _amount;
+
+        r = Math.Clamp(r + add, 0f, 1f);
+        g = Math.Clamp(g + add, 0f, 1f);
+        b = Math.Clamp(b + add, 0f, 1f);
     }
 }
 

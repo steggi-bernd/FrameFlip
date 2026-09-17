@@ -305,9 +305,36 @@
                        Text="{DynamicResource S_LocalOnFinal}" />
 
             <!--
-                Glanz und Halation stehen vorn, weil sie zuerst rechnen - und zwar
-                vor der Sichtumwandlung, wo die Ueberhellen noch da sind.
+                Dunst, Glanz und Halation stehen vorn, weil sie zuerst rechnen - und
+                zwar vor der Sichtumwandlung, wo die Werte noch Lichtmengen sind.
             -->
+            <Grid Margin="0,16,0,0">
+                <TextBlock Text="{DynamicResource S_Dehaze}" Style="{StaticResource PanelHeading}" />
+                <Button Style="{StaticResource LinkButton}" HorizontalAlignment="Right"
+                        Content="+" Tag="DehazeBody" Click="OnSectionToggled" />
+            </Grid>
+            <StackPanel x:Name="DehazeBody" Visibility="Collapsed" Margin="0,6,0,0">
+                <Grid Margin="0,0,0,2">
+                    <TextBlock Text="{DynamicResource S_DehazeAmount}" Style="{StaticResource PanelLabel}" />
+                    <TextBlock x:Name="DehazeValue" Style="{StaticResource PanelValue}" />
+                </Grid>
+                <Slider x:Name="DehazeSlider" Style="{StaticResource PanelSlider}"
+                        Minimum="0" Maximum="1" Value="0" SmallChange="0.02" LargeChange="0.1"
+                        ValueChanged="OnChanged" MouseDoubleClick="OnSliderReset" Tag="0" />
+
+                <Grid Margin="0,10,0,2">
+                    <TextBlock Text="{DynamicResource S_DehazeRadius}" Style="{StaticResource PanelLabel}" />
+                    <TextBlock x:Name="DehazeRadiusValue" Style="{StaticResource PanelValue}" />
+                </Grid>
+                <Slider x:Name="DehazeRadiusSlider" Style="{StaticResource PanelSlider}"
+                        Minimum="8" Maximum="200" Value="80" SmallChange="2" LargeChange="10"
+                        ValueChanged="OnChanged" MouseDoubleClick="OnSliderReset" Tag="80" />
+
+                <TextBlock Margin="0,8,0,0" FontSize="10" TextWrapping="Wrap"
+                           Foreground="{StaticResource MutedBrush}"
+                           Text="{DynamicResource S_DehazeHint}" />
+            </StackPanel>
+
             <Grid Margin="0,16,0,0">
                 <TextBlock Text="{DynamicResource S_Bloom}" Style="{StaticResource PanelHeading}" />
                 <Button Style="{StaticResource LinkButton}" HorizontalAlignment="Right"
@@ -449,6 +476,33 @@
                 <TextBlock Margin="0,8,0,0" FontSize="10" TextWrapping="Wrap"
                            Foreground="{StaticResource MutedBrush}"
                            Text="{DynamicResource S_ClarityHint}" />
+            </StackPanel>
+
+            <Grid Margin="0,16,0,0">
+                <TextBlock Text="{DynamicResource S_Texture}" Style="{StaticResource PanelHeading}" />
+                <Button Style="{StaticResource LinkButton}" HorizontalAlignment="Right"
+                        Content="+" Tag="TextureBody" Click="OnSectionToggled" />
+            </Grid>
+            <StackPanel x:Name="TextureBody" Visibility="Collapsed" Margin="0,6,0,0">
+                <Grid Margin="0,0,0,2">
+                    <TextBlock Text="{DynamicResource S_TextureAmount}" Style="{StaticResource PanelLabel}" />
+                    <TextBlock x:Name="TextureValue" Style="{StaticResource PanelValue}" />
+                </Grid>
+                <Slider x:Name="TextureSlider" Style="{StaticResource PanelSlider}"
+                        Minimum="-1" Maximum="1" Value="0" SmallChange="0.02" LargeChange="0.1"
+                        ValueChanged="OnChanged" MouseDoubleClick="OnSliderReset" Tag="0" />
+
+                <Grid Margin="0,10,0,2">
+                    <TextBlock Text="{DynamicResource S_TextureRadius}" Style="{StaticResource PanelLabel}" />
+                    <TextBlock x:Name="TextureRadiusValue" Style="{StaticResource PanelValue}" />
+                </Grid>
+                <Slider x:Name="TextureRadiusSlider" Style="{StaticResource PanelSlider}"
+                        Minimum="2" Maximum="40" Value="8" SmallChange="1" LargeChange="4"
+                        ValueChanged="OnChanged" MouseDoubleClick="OnSliderReset" Tag="8" />
+
+                <TextBlock Margin="0,8,0,0" FontSize="10" TextWrapping="Wrap"
+                           Foreground="{StaticResource MutedBrush}"
+                           Text="{DynamicResource S_TextureHint}" />
             </StackPanel>
 
             <Grid Margin="0,16,0,0">

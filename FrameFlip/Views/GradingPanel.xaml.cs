@@ -41,6 +41,8 @@ public partial class GradingPanel : UserControl
     private NoiseTool _noise = new();
     private BloomTool _bloom = new();
     private HalationTool _halation = new();
+    private DehazeTool _dehaze = new();
+    private TextureTool _texture = new();
 
     private static readonly Color[] CurveColours =
     {
@@ -136,10 +138,12 @@ public partial class GradingPanel : UserControl
     {
         bool enabled = ToolsEnabled && _localOnImage;
 
+        DehazeBody.IsEnabled = enabled;
         BloomBody.IsEnabled = enabled;
         HalationBody.IsEnabled = enabled;
         NoiseBody.IsEnabled = enabled;
         ClarityBody.IsEnabled = enabled;
+        TextureBody.IsEnabled = enabled;
         SharpenBody.IsEnabled = enabled;
     }
 
@@ -177,10 +181,12 @@ public partial class GradingPanel : UserControl
         // Die oertlichen Werkzeuge stehen in ihrer eigenen Liste - sie nehmen einen
         // anderen Weg durch den Bildprozessor. In welcher Reihenfolge sie dort
         // liegen, ist gleichgueltig: Der Stapel sortiert sie nach ihrer Stufe.
+        _dehaze = TakeLocal<DehazeTool>();
         _bloom = TakeLocal<BloomTool>();
         _halation = TakeLocal<HalationTool>();
         _noise = TakeLocal<NoiseTool>();
         _clarity = TakeLocal<ClarityTool>();
+        _texture = TakeLocal<TextureTool>();
         _sharpen = TakeLocal<SharpenTool>();
 
         T TakeLocal<T>() where T : ILocalTool, new()
@@ -429,6 +435,15 @@ public partial class GradingPanel : UserControl
             SharpenThresholdSlider.Value = Math.Clamp(_sharpen.Threshold,
                                                       SharpenThresholdSlider.Minimum, SharpenThresholdSlider.Maximum);
 
+            DehazeSlider.Value = Math.Clamp(_dehaze.Amount, DehazeSlider.Minimum, DehazeSlider.Maximum);
+            DehazeRadiusSlider.Value = Math.Clamp(_dehaze.Reach,
+                                                  DehazeRadiusSlider.Minimum, DehazeRadiusSlider.Maximum);
+
+            TextureSlider.Value = Math.Clamp(_texture.Amount,
+                                             TextureSlider.Minimum, TextureSlider.Maximum);
+            TextureRadiusSlider.Value = Math.Clamp(_texture.Reach,
+                                                   TextureRadiusSlider.Minimum, TextureRadiusSlider.Maximum);
+
             BloomSlider.Value = Math.Clamp(_bloom.Amount, BloomSlider.Minimum, BloomSlider.Maximum);
             BloomThresholdSlider.Value = Math.Clamp(_bloom.Threshold,
                                                     BloomThresholdSlider.Minimum, BloomThresholdSlider.Maximum);
@@ -511,6 +526,12 @@ public partial class GradingPanel : UserControl
         _sharpen.Reach = (int)Math.Round(SharpenRadiusSlider.Value);
         _sharpen.Threshold = (float)SharpenThresholdSlider.Value;
 
+        _dehaze.Amount = (float)DehazeSlider.Value;
+        _dehaze.Reach = (int)Math.Round(DehazeRadiusSlider.Value);
+
+        _texture.Amount = (float)TextureSlider.Value;
+        _texture.Reach = (int)Math.Round(TextureRadiusSlider.Value);
+
         _bloom.Amount = (float)BloomSlider.Value;
         _bloom.Threshold = (float)BloomThresholdSlider.Value;
         _bloom.Reach = (int)Math.Round(BloomRadiusSlider.Value);
@@ -563,6 +584,10 @@ public partial class GradingPanel : UserControl
         SharpenValue.Text = $"{SharpenSlider.Value:0.00}";
         SharpenRadiusValue.Text = $"{SharpenRadiusSlider.Value:0}";
         SharpenThresholdValue.Text = $"{SharpenThresholdSlider.Value:0.000}";
+        DehazeValue.Text = $"{DehazeSlider.Value:0.00}";
+        DehazeRadiusValue.Text = $"{DehazeRadiusSlider.Value:0}";
+        TextureValue.Text = $"{TextureSlider.Value:+0.00;-0.00;0.00}";
+        TextureRadiusValue.Text = $"{TextureRadiusSlider.Value:0}";
         BloomValue.Text = $"{BloomSlider.Value:0.00}";
         BloomThresholdValue.Text = $"{BloomThresholdSlider.Value:0.00}";
         BloomRadiusValue.Text = $"{BloomRadiusSlider.Value:0}";

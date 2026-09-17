@@ -6,8 +6,8 @@ A second mode inside FrameFlip: grade one frame, then apply that grade to the wh
 sequence and write it out. Layers, masks driven by render data, and a colour toolset
 aimed at Photoshop and Lightroom rather than at a node graph.
 
-**Status:** steps 1 to 7 are built and running; of step 8 the local path exists, with
-clarity, sharpening, noise reduction, glow and halation on it. Step 5 is complete —
+**Status:** steps 1 to 7 are built and running; of step 8, section 7.3 is complete —
+seven tools on the local path. Step 5 is complete —
 pass, adjustment, image and group layers, with order, duplication, opacity, colour,
 blend modes and clipping masks. Of step 6, masks are data-driven: cryptomatte, any
 pass, luminance and gradient; painted masks are not built. Where an earlier estimate or
@@ -565,8 +565,8 @@ at all; the rest is what makes it worth staying in.
 | Tool | Parameters | Notes |
 |---|---|---|
 | ~~**Clarity**~~ ★ **built** | amount, radius | midtone local contrast — unsharp mask at a large radius |
-| **Texture** | amount | the same at a small radius: surface detail without the halo — which is Sharpen's radius turned up, not a third tool |
-| **Dehaze** | amount | dark-channel prior. Also runs backwards, to add atmosphere |
+| ~~**Texture**~~ **built** | amount, radius | surface detail, both directions. I had written that this was Clarity at a small radius and not a tool of its own; building it proved me wrong — see below |
+| ~~**Dehaze**~~ **built** | amount, radius | dark-channel prior, on the light side. It does not run backwards — see below |
 | ~~**Sharpen**~~ **built** | amount, radius, threshold | unsharp mask on luminance only; the threshold keeps noise out of it |
 | ~~**Noise reduction**~~ **built** | luminance, colour, threshold | for renders with the sample count cut short. Luminance and colour separately, because they deserve very different amounts |
 | ~~**Bloom / Glare**~~ ★ **built** | threshold, radius, amount | on HDR data this is finally correct, because the overbrights are real rather than clipped to white. On an 8-bit PNG the same filter is guesswork — and the claim is now a test |
@@ -730,15 +730,67 @@ pixel at 1e6 — becomes a large soft blob here. That is not miscomputed, it is 
 that is what a very bright light looks like. Whoever does not want the blob has to get
 rid of the firefly, not of the glow.
 
-| 1080p | every pixel | while a slider moves |
-|---|---|---|
-| no local tool | **31.7 ms** | — |
-| clarity | **63.2 ms** | **9.9 ms** |
-| four tools across both stops | **173.8 ms** | **18.9 ms** |
-
 The full pass costs one blur per radius plus, when a light tool is in play, a second run
 over the buffer for the view transform — without one, the chain stays fused into a
-single pass, as it was.
+single pass, as it was. The numbers are below, once, for all seven.
+
+#### Dehaze — and the direction it does not run
+
+Between a subject and the camera there is air, and air scatters light *into* the path.
+What arrives is therefore not the subject but the subject plus a veil, and the further
+away, the more veil. That is why distant hills go pale while the fence in front keeps
+its colour.
+
+The veil is estimated from the **dark channel**: almost everywhere in a picture, one of
+the three channels sits near zero — a shadow, a saturated colour, a dark surface. Where
+that stops being true, where even the darkest is still bright, something is lying over
+it. That is the whole assumption, and it carries surprisingly far. It also fits this
+machinery exactly: the tool says what goes into the blur, and here that is
+`min(r, g, b)` instead of the highlights above a threshold. The interface that glow
+introduced for "what gets blurred" turned out to be the general one, so it is now named
+for that rather than for highlights.
+
+It is blurred at a large radius because haze has no edges, and it is subtracted **and
+divided out**: what came through the haze arrived weakened, and the division brings the
+contrast back. White stays white — that is the check, and it is a test:
+`(1 - 0.2) / (1 - 0.2) = 1`.
+
+The row in the table above used to say "also runs backwards, to add atmosphere". It does
+not, and the reason is worth stating: an estimated quantity can only be reversed where it
+found something. In a clear picture there is no veil to amplify, so pulling the slider
+negative would do almost nothing precisely when someone wants fog most. Adding fog needs
+distance, and distance is in the Z pass — that belongs to **Depth haze** in section 7.5,
+which has the data for it.
+
+#### Texture — where I was wrong
+
+Two commits ago this document said Texture was Clarity at a small radius and not a tool
+of its own. Building the others showed that up, and the reason is in the two tools that
+were supposed to cover it:
+
+**Clarity lets go at the ends.** Its weighting runs to zero at black and at white, which
+is right for local contrast and exactly wrong for surfaces — bright skin and dark cloth
+live at those ends, and that is where texture is wanted. There is a test for the
+difference: at 0.95 against a 0.97 surround, clarity moves the value by 0.002 and texture
+by 0.02.
+
+**Sharpening cannot run backwards.** Its threshold leaves small differences alone, which
+is right when adding and points the wrong way when taking away: negative, it would smooth
+the edges and leave the grain.
+
+What is left is the same arithmetic as sharpening — luminance, no tone weighting —
+without the threshold, with a sign, and at a middle radius. In use that is a different
+tool, so it stands as one.
+
+| 1080p | every pixel | while a slider moves |
+|---|---|---|
+| no local tool | **25.2 ms** | — |
+| clarity | **72.0 ms** | **12.0 ms** |
+| all six, six different radii | **289.0 ms** | **27.8 ms** |
+
+Six tools at six radii is six blurs, and that is a stack nobody needs; the number is
+here because it is the ceiling. What matters is the middle column against the right one:
+the full pass runs when a slider is let go, the coarse one while it moves.
 
 **They act on the finished picture, not on a single layer.** An adjustment layer is
 computed pixel by pixel in the middle of the stack; a neighbourhood does not exist there
@@ -795,9 +847,12 @@ difference of 59.8, and multiplying that by an amount is not a look, it is an ex
 The second is the correctness condition above: value and blur must come from the same
 stage, and the stage where "flat" means flat to the eye is the display stage.
 
-*Glow and halation run before the view transform*, for the opposite reason: they are
-scattered light, and they need the overbrights that the transform throws away. Behind
-it, a lamp and the sun are the same white.
+*Dehaze, glow and halation run before the view transform*, for the opposite reason: they
+are all about light rather than about a picture. Glow and halation need the overbrights
+that the transform throws away — behind it, a lamp and the sun are the same white. Dehaze
+subtracts light that was added on the way to the camera, and a veil that has been through
+a tone curve is no longer a quantity of light. Among the three, dehaze goes first: a veil
+that glows first and is subtracted afterwards is still glowing.
 
 Among themselves the display-side three run in a different order than the line suggests:
 **noise reduction, then clarity, then sharpening** — the cleaning up has to happen before
@@ -963,11 +1018,14 @@ next one landing.
    objects, and a name does not move.
 8. **The remaining tools from section 7**, in the order people ask for them. The
    **local path is built** — the second pass the neighbourhood tools need — and carries
-   ~~clarity~~, ~~sharpening~~, ~~noise reduction~~, ~~glow~~ and ~~halation~~. Each new
-   tool found one wrong assumption in the one before: sharpening found the single blur
-   for every radius, and glow found the single stop — it has to run before the view
-   transform, where the overbrights still exist. Dehaze and texture are what remain, and
-   both are tools rather than mechanism.
+   ~~clarity~~, ~~sharpening~~, ~~noise reduction~~, ~~glow~~, ~~halation~~, ~~dehaze~~
+   and ~~texture~~ — **section 7.3 is complete**. Each new tool found one wrong assumption
+   in the one before: sharpening found the single blur for every radius, glow found the
+   single stop — it has to run before the view transform, where the overbrights still
+   exist — and dehaze generalised "the highlights above a threshold" into "whatever the
+   tool says goes into the blur". Texture found a wrong sentence in this document. What
+   remains of section 7 is 7.4 optics and 7.5 render data, and those need no new
+   machinery.
 
 Steps 1–4 are the product. 5–8 are what makes it uncontested.
 
