@@ -15,6 +15,23 @@ public enum PassNeed
 {
     /// <summary>Entfernung je Bildpunkt - Depth, Z oder ersatzweise Mist.</summary>
     Depth,
+
+    /// <summary>Bewegung je Bildpunkt - der Vektorpass mit vier Kanaelen.</summary>
+    Motion,
+}
+
+/// <summary>
+/// Die Reihenfolge der Werkzeuge mit Renderdaten.
+///
+/// Bewegung vor Schaerfe: Die Verschluszeit sammelt ueber die Zeit, das Objektiv
+/// zeichnet, was in diesem Augenblick ankommt. Beides zugleich ist das Richtige und
+/// hinterher nicht mehr zu trennen; von den beiden moeglichen Reihenfolgen ist diese
+/// die, die bei einem Gegenstand in der Schaerfeebene stimmt.
+/// </summary>
+public enum DataStage
+{
+    Motion = 0,
+    Focus = 1,
 }
 
 /// <summary>
@@ -32,6 +49,7 @@ public enum PassNeed
 [JsonPolymorphic(TypeDiscriminatorPropertyName = "kind",
                  UnknownDerivedTypeHandling = JsonUnknownDerivedTypeHandling.FailSerialization)]
 [JsonDerivedType(typeof(DepthFieldTool), DepthFieldTool.KindName)]
+[JsonDerivedType(typeof(MotionBlurTool), MotionBlurTool.KindName)]
 public interface IDataTool
 {
     /// <summary>Kennung fuer die Speicherung. Bleibt stabil, auch wenn der Anzeigename wechselt.</summary>
@@ -39,6 +57,9 @@ public interface IDataTool
 
     /// <summary>Welche Renderdaten gebraucht werden.</summary>
     PassNeed Needs { get; }
+
+    /// <summary>Wann das Werkzeug an der Reihe ist - die Liste entscheidet nicht.</summary>
+    DataStage Stage { get; }
 
     /// <summary>True, wenn nichts zu rechnen ist.</summary>
     bool IsNeutral { get; }
@@ -93,6 +114,8 @@ public sealed class DepthFieldTool : IDataTool
     public string Kind => KindName;
 
     public PassNeed Needs => PassNeed.Depth;
+
+    public DataStage Stage => DataStage.Focus;
 
     /// <summary>0 bis 1. Wie weit die Blende geoeffnet ist.</summary>
     public float Aperture { get; set; }
@@ -205,6 +228,212 @@ public sealed class DepthFieldTool : IDataTool
 }
 
 /// <summary>
+/// Nachtraegliche Bewegungsunschaerfe.
+///
+/// Der Vektorpass sagt je Bildpunkt, wo derselbe Gegenstand im vorigen Bild WAR und
+/// wo er im naechsten SEIN WIRD - in Bildpunkten. Damit laesst sich nachtraeglich
+/// verschmieren, was sich bewegt hat, ohne das Bild noch einmal zu rechnen. Ein
+/// Rendern mit echter Bewegungsunschaerfe kostet ein Vielfaches an Abtastungen; hier
+/// kostet es einen Durchgang.
+///
+/// Gesammelt wird entlang der Strecke, die der Punkt waehrend der Verschlusszeit
+/// zurueckgelegt hat: vom halben Rueckwaertsvektor bis zum halben Vorwaertsvektor.
+/// Der Verschluss steht dabei fuer den Anteil der Bildzeit, in dem er offen war -
+/// eins heisst "die ganze Zeit", ein Halb entspricht 180 Grad und ist das, was eine
+/// Filmkamera tut.
+///
+/// UND ES IST EINE NAEHERUNG, mit demselben benennbaren Fehler wie die
+/// Tiefenschaerfe: Ein bewegter Gegenstand verschmiert in sich, aber nicht ueber
+/// seine Kante hinaus. Dahinter liegt Hintergrund, der stillsteht und deshalb von
+/// sich selbst sammelt - was der Gegenstand im Voruebergehen verdeckt haette, steht
+/// nicht in der Datei. Bewegte Kanten bleiben dadurch schaerfer, als sie sein
+/// sollten. Wer das braucht, rendert die Bewegungsunschaerfe.
+///
+/// Die Y-Achse wird umgedreht. Blender rechnet Bildschirmkoordinaten von unten nach
+/// oben, die Zeilen eines Bildes laufen von oben nach unten. Ohne das Umdrehen zoege
+/// die Unschaerfe senkrecht in die falsche Richtung - und zwar nur senkrecht, was
+/// beim ersten Hinsehen aussieht wie ein Fehler im Vektorpass.
+/// </summary>
+public sealed class MotionBlurTool : IDataTool
+{
+    public const string KindName = "motion-blur";
+
+    /// <summary>Weiter zu gehen waere kein Verschluss mehr, sondern ein Effekt.</summary>
+    private const float LongestShutter = 2f;
+
+    public string Kind => KindName;
+
+    public PassNeed Needs => PassNeed.Motion;
+
+    public DataStage Stage => DataStage.Motion;
+
+    /// <summary>
+    /// Der Anteil der Bildzeit, in dem der Verschluss offen ist.
+    ///
+    /// Ein Halb sind 180 Grad - die uebliche Wahl beim Film, und das, was Blender
+    /// beim Rendern voreinstellt. Null heisst: aus.
+    /// </summary>
+    public float Shutter { get; set; }
+
+    /// <summary>
+    /// Wie oft entlang der Strecke abgetastet wird.
+    ///
+    /// Zu wenige, und eine schnelle Bewegung wird zu einer Reihe von Geisterbildern
+    /// statt zu einer Spur. Die noetige Zahl haengt an der Laenge der Strecke, nicht
+    /// am Geschmack - deshalb steht hier eine Zahl und kein Regler mit Prozenten.
+    /// </summary>
+    public int Samples { get; set; } = 12;
+
+    [JsonIgnore]
+    public bool IsNeutral => Shutter < 0.005f;
+
+    private float _shutter;
+    private int _samples;
+
+    public void Prepare()
+    {
+        _shutter = Math.Clamp(Shutter, 0f, LongestShutter);
+        _samples = Math.Clamp(Samples, 2, 48);
+    }
+
+    public void Run(LocalPass.Scratch scratch, FloatFrame data, int[] columns, int[] rows,
+                    int imageWidth, int step)
+    {
+        int gridWidth = columns.Length;
+        int gridHeight = rows.Length;
+
+        var source = scratch.Values;
+        var target = scratch.Work;
+
+        var alpha = scratch.Alpha;
+        var alphaTarget = scratch.AlphaWork;
+
+        var backX = data.R;
+        var backY = data.G;
+        var frontX = data.B;
+
+        // Ohne vierten Kanal gibt es nur den halben Vorwaertsvektor. Dann wird die
+        // Bewegung des vorigen Bildes gespiegelt - das ist bei gleichfoermiger
+        // Bewegung genau richtig und bei einer Wendung zu lang, aber es ist besser
+        // als eine Richtung, die zur Haelfte fehlt.
+        var frontY = data.A;
+
+        int dataWidth = data.Width;
+        int dataHeight = data.Height;
+
+        float shutter = _shutter;
+        int samples = _samples;
+        float share = 1f / samples;
+
+        Parallel.For(0, gridHeight, new ParallelOptions
+        {
+            MaxDegreeOfParallelism = Math.Clamp(Environment.ProcessorCount, 1, 8),
+        },
+        gy =>
+        {
+            int line = Math.Min(rows[gy], dataHeight - 1) * dataWidth;
+            int row = gy * gridWidth;
+
+            for (int gx = 0; gx < gridWidth; gx++)
+            {
+                int at = line + Math.Min(columns[gx], dataWidth - 1);
+
+                // In Gitterpunkten, nicht in Bildpunkten: Beim Reglerzug ist das
+                // Gitter groeber, und die Strecke wird es mit.
+                float backDx = Finite(backX[at]) / step;
+                float backDy = -Finite(backY[at]) / step;
+
+                float frontDx = frontY is null ? -backDx : Finite(frontX[at]) / step;
+                float frontDy = frontY is null ? -backDy : -Finite(frontY[at]) / step;
+
+                int out0 = (row + gx) * 3;
+
+                // Steht der Punkt still, bleibt er, wie er ist - und das ist der
+                // Normalfall in fast jedem Bild.
+                if (MathF.Abs(backDx) + MathF.Abs(backDy) + MathF.Abs(frontDx) + MathF.Abs(frontDy) < 0.01f)
+                {
+                    target[out0] = source[out0];
+                    target[out0 + 1] = source[out0 + 1];
+                    target[out0 + 2] = source[out0 + 2];
+                    alphaTarget[row + gx] = alpha[row + gx];
+
+                    continue;
+                }
+
+                float sumR = 0f, sumG = 0f, sumB = 0f, sumA = 0f;
+
+                for (int i = 0; i < samples; i++)
+                {
+                    // Von -0,5 bis +0,5 der Verschlusszeit.
+                    float when = (samples == 1 ? 0f : i / (float)(samples - 1) - 0.5f) * shutter;
+
+                    float dx = when < 0f ? backDx * -when : frontDx * when;
+                    float dy = when < 0f ? backDy * -when : frontDy * when;
+
+                    Sample(source, alpha, gx + dx, gy + dy, gridWidth, gridHeight,
+                           out float sr, out float sg, out float sb, out float sa);
+
+                    sumR += sr;
+                    sumG += sg;
+                    sumB += sb;
+                    sumA += sa;
+                }
+
+                target[out0] = sumR * share;
+                target[out0 + 1] = sumG * share;
+                target[out0 + 2] = sumB * share;
+
+                alphaTarget[row + gx] = (byte)Math.Clamp(MathF.Round(sumA * share), 0f, 255f);
+            }
+        });
+
+        scratch.Values = target;
+        scratch.Work = source;
+
+        scratch.Alpha = alphaTarget;
+        scratch.AlphaWork = alpha;
+    }
+
+    /// <summary>Nicht jede Zahl in einem Vektorpass ist eine Bewegung.</summary>
+    private static float Finite(float value) => float.IsFinite(value) ? value : 0f;
+
+    private static void Sample(float[] source, byte[] alpha, float x, float y,
+                               int width, int height,
+                               out float r, out float g, out float b, out float a)
+    {
+        int x0 = (int)MathF.Floor(x);
+        int y0 = (int)MathF.Floor(y);
+
+        float tx = x - x0;
+        float ty = y - y0;
+
+        int left = Math.Clamp(x0, 0, width - 1);
+        int right = Math.Clamp(x0 + 1, 0, width - 1);
+        int top = Math.Clamp(y0, 0, height - 1);
+        int bottom = Math.Clamp(y0 + 1, 0, height - 1);
+
+        int topLeft = (top * width + left) * 3;
+        int topRight = (top * width + right) * 3;
+        int bottomLeft = (bottom * width + left) * 3;
+        int bottomRight = (bottom * width + right) * 3;
+
+        r = Mix(Mix(source[topLeft], source[topRight], tx),
+                Mix(source[bottomLeft], source[bottomRight], tx), ty);
+
+        g = Mix(Mix(source[topLeft + 1], source[topRight + 1], tx),
+                Mix(source[bottomLeft + 1], source[bottomRight + 1], tx), ty);
+
+        b = Mix(Mix(source[topLeft + 2], source[topRight + 2], tx),
+                Mix(source[bottomLeft + 2], source[bottomRight + 2], tx), ty);
+
+        a = Mix(Mix(alpha[top * width + left], alpha[top * width + right], tx),
+                Mix(alpha[bottom * width + left], alpha[bottom * width + right], tx), ty);
+    }
+
+    private static float Mix(float from, float to, float at) => from + (to - from) * at;
+}
+
+/// <summary>
 /// Sucht zu einem Bedarf den Pass, der ihn in DIESER Datei deckt.
 ///
 /// An einer Stelle und nicht bei jedem Aufrufer, weil die Liste der Namen eine
@@ -215,6 +444,7 @@ public sealed class DepthFieldTool : IDataTool
 public static class FramePasses
 {
     private static readonly string[] DepthNames = { "Depth", "Z", "Mist" };
+    private static readonly string[] MotionNames = { "Vector", "Motion", "Speed" };
 
     /// <summary>
     /// Liest zu jedem Werkzeug seinen Pass. Fehlt er, bleibt der Platz leer und das
@@ -242,12 +472,16 @@ public static class FramePasses
     {
         if (passes.Count == 0) return null;
 
-        // Bisher gibt es nur einen Bedarf. Die Verzweigung steht trotzdem hier und
-        // nicht beim Aufrufer - der naechste Bedarf soll eine Zeile kosten.
-        var names = need == PassNeed.Depth ? DepthNames : Array.Empty<string>();
+        var names = need == PassNeed.Depth ? DepthNames : MotionNames;
+
+        // Eine Entfernung ist eine Groesse je Bildpunkt, eine Bewegung eine Richtung.
+        // Die Unterscheidung ist nicht kosmetisch: Ein dreikanaliger Pass namens
+        // "Depth" waere etwas anderes als der Tiefenpass, und ein einkanaliger namens
+        // "Vector" enthielte keine Richtung.
+        bool grey = need == PassNeed.Depth;
 
         foreach (string wanted in names)
-            if (ExrPasses.Find(passes, wanted) is { } pass && pass.Grey) return pass.Name;
+            if (ExrPasses.Find(passes, wanted) is { } pass && pass.Grey == grey) return pass.Name;
 
         return null;
     }

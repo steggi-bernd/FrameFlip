@@ -97,15 +97,16 @@ public partial class AtelierPage
         var needed = reads.Select(r => r.Key).ToList();
         var missing = reads.Where(r => r.Key.Length > 0 && !_sources.ContainsKey(r.Key)).ToList();
 
-        // Die Werkzeuge koennen einen Pass verlangen, den keine Ebene liest - die
-        // Tiefenschaerfe braucht die Entfernung. Er wird auf demselben Weg geholt und
-        // in demselben Vorrat gehalten; sonst gaebe es zwei Wege zu derselben Datei.
-        string? datum = DataPass();
-        if (datum is not null) needed.Add(datum);
+        // Die Werkzeuge koennen Passe verlangen, die keine Ebene liest - die
+        // Tiefenschaerfe die Entfernung, die Bewegungsunschaerfe den Vektorpass. Sie
+        // werden auf demselben Weg geholt und in demselben Vorrat gehalten; sonst
+        // gaebe es zwei Wege zu derselben Datei.
+        var data = DataPasses();
+        needed.AddRange(data);
 
-        bool datumMissing = datum is not null && !_sources.ContainsKey(datum);
+        var dataMissing = data.Where(name => !_sources.ContainsKey(name)).ToList();
 
-        if (missing.Count == 0 && !datumMissing)
+        if (missing.Count == 0 && dataMissing.Count == 0)
         {
             DropStale(needed);
             Refresh(interim: false, recompose: true);
@@ -124,10 +125,10 @@ public partial class AtelierPage
                 if (frame is not null) found[read.Key] = frame;
             }
 
-            if (datumMissing && datum is not null)
+            foreach (string name in dataMissing)
             {
-                var frame = FloatFrame.FromExrPass(path, datum);
-                if (frame is not null) found[datum] = frame;
+                var frame = FloatFrame.FromExrPass(path, name);
+                if (frame is not null) found[name] = frame;
             }
 
             return found;
@@ -163,23 +164,27 @@ public partial class AtelierPage
     /// paar Versuchen zwei Gigabyte im Speicher.
     /// </summary>
     /// <summary>
-    /// Welcher Pass die Renderdaten liefert, oder null.
+    /// Welche Passe die Werkzeuge verlangen.
     ///
     /// Gefragt wird der FERTIGE Stapel und nicht der, den der Streifen gerade zeigt:
     /// Die Werkzeuge mit Renderdaten gelten dem ganzen Bild, wie die oertlichen auch.
     /// </summary>
-    private string? DataPass()
-        => _finalGrading.Data.Length > 0
-            ? FramePasses.NameFor(PassNeed.Depth, _passes)
-            : null;
+    private List<string> DataPasses()
+    {
+        var names = new List<string>();
+
+        foreach (var tool in _finalGrading.Data)
+            if (FramePasses.NameFor(tool.Needs, _passes) is { } name && !names.Contains(name))
+                names.Add(name);
+
+        return names;
+    }
 
     /// <summary>Die Passe der Ebenen und die der Werkzeuge zusammen.</summary>
     private List<string> NeededPasses()
     {
         var needed = Layers.Stack.NeededSources().ToList();
-
-        string? datum = DataPass();
-        if (datum is not null) needed.Add(datum);
+        needed.AddRange(DataPasses());
 
         return needed;
     }

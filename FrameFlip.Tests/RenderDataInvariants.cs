@@ -22,6 +22,8 @@ public static class RenderDataInvariants
         TheFocusStaysSharp();
         TheBackgroundGoesSoft();
         ItGrowsWithTheInverse();
+        TheSmearFollowsTheVector();
+        StillThingsStayStill();
         ThePassIsFound();
         Persistence();
         WhatItCosts();
@@ -150,6 +152,89 @@ public static class RenderDataInvariants
                    $"nah {close:0.0}, fern {far:0.0}");
     }
 
+    // ------------------------------------------------- Bewegungsunschaerfe
+
+    /// <summary>
+    /// Die Spur laeuft in der Richtung des Vektors - und die Y-Achse ist gedreht.
+    ///
+    /// Blender rechnet Bildschirmkoordinaten von unten nach oben, die Zeilen eines
+    /// Bildes laufen von oben nach unten. Wer das vergisst, bekommt eine Unschaerfe,
+    /// die senkrecht in die falsche Richtung zieht - waagerecht aber stimmt, und
+    /// genau diese Haelfte-richtig-Haelfte-falsch sieht aus wie ein Fehler im
+    /// Vektorpass.
+    /// </summary>
+    private static void TheSmearFollowsTheVector()
+    {
+        Check.Group("Die Spur laeuft in die Richtung des Vektors");
+
+        // Ein heller Fleck auf Schwarz: Wohin er sich zieht, ist abzaehlbar.
+        var frame = Spot(128, 128, 64, 64, 4);
+
+        // Waagerecht nach rechts: Der Punkt WAR acht Punkte weiter links.
+        var sideways = Vector(128, 128, -8f, 0f);
+        var drawn = Draw(frame, Blur(1f), new FloatFrame?[] { sideways });
+
+        // Der Fleck liegt auf 62 bis 65, die halbe Strecke ist vier Punkte lang -
+        // die Spur reicht also von 58 bis 69. Gemessen wird innerhalb davon.
+        int left = At(128, 59, 64);
+        int right = At(128, 68, 64);
+
+        Check.That(drawn[left] > 0, "die Spur reicht nach links", $"{drawn[left]}");
+        Check.That(drawn[right] > 0, "und nach rechts", $"{drawn[right]}");
+
+        // Senkrecht: Ein Vektor mit positivem Y zeigt bei Blender nach OBEN, also zu
+        // kleineren Zeilennummern.
+        var upright = Vector(128, 128, 0f, 8f);
+        var vertical = Draw(frame, Blur(1f), new FloatFrame?[] { upright });
+
+        int above = At(128, 64, 59);
+        int aside = At(128, 59, 64);
+
+        Check.That(vertical[above] > 0, "senkrecht zieht sie nach oben", $"{vertical[above]}");
+        Check.That(vertical[aside] == 0, "und nicht zur Seite", $"{vertical[aside]}");
+    }
+
+    /// <summary>
+    /// Was stillsteht, bleibt Byte fuer Byte stehen.
+    ///
+    /// Das ist der Normalfall in fast jedem Bild, und es ist zugleich die Probe
+    /// darauf, dass wirklich der Vektor entscheidet: Eine Unschaerfe, die auch ohne
+    /// Bewegung etwas tut, waere eine Weichzeichnung mit zusaetzlichen Schritten.
+    /// </summary>
+    private static void StillThingsStayStill()
+    {
+        Check.Group("Was stillsteht, bleibt stehen");
+
+        var frame = Checker(128, 128, 0.1f, 0.9f, 8);
+
+        var plain = Draw(frame, new GradingStack());
+        var still = Draw(frame, Blur(1f), new FloatFrame?[] { Vector(128, 128, 0f, 0f) });
+
+        Check.That(Same(plain, still), "ohne Bewegung aendert sich nichts");
+
+        // Und ohne Vektorpass ebenfalls nicht.
+        var without = Draw(frame, Blur(1f), data: null);
+        Check.That(Same(plain, without), "ohne Vektorpass auch nicht");
+
+        // Eine halbe Bewegung in einer Bildhaelfte laesst die andere in Ruhe.
+        var half = Vector(128, 128, -10f, 0f, onlyRight: true);
+        var mixed = Draw(frame, Blur(1f), new FloatFrame?[] { half });
+
+        int quiet = 0, moved = 0;
+
+        for (int y = 0; y < 128; y++)
+        {
+            for (int x = 0; x < 50; x++)
+                if (mixed[At(128, x, y)] != plain[At(128, x, y)]) quiet++;
+
+            for (int x = 78; x < 128; x++)
+                if (mixed[At(128, x, y)] != plain[At(128, x, y)]) moved++;
+        }
+
+        Check.That(quiet == 0, "die stehende Haelfte ist unveraendert", $"{quiet} Punkte");
+        Check.That(moved > 1000, "die bewegte nicht", $"{moved} Punkte");
+    }
+
     /// <summary>
     /// Welcher Pass die Tiefe traegt, entscheidet sich beim Lesen.
     ///
@@ -228,21 +313,88 @@ public static class RenderDataInvariants
 
         Draw(frame, stack, data);
 
+        var moving = new GradingStack { Data = { new MotionBlurTool { Shutter = 0.5f, Samples = 16 } } };
+        var vectors = new FloatFrame?[] { Vector(1920, 1080, -12f, 4f) };
+
+        Draw(frame, moving, vectors);
+
         double without = Fastest(() => Draw(frame, plain));
         double with = Fastest(() => Draw(frame, stack, data));
         double coarse = Fastest(() => Draw(frame, stack, data, step: 4));
+        double motion = Fastest(() => Draw(frame, moving, vectors));
+        double motionCoarse = Fastest(() => Draw(frame, moving, vectors, step: 4));
 
         Console.WriteLine($"         1080p: ohne {without:0.0} ms, mit Tiefenschaerfe {with:0.0} ms, " +
                           $"beim Ziehen {coarse:0.0} ms");
+        Console.WriteLine($"         1080p: Bewegung ueber alles {motion:0.0} ms, " +
+                          $"beim Ziehen {motionCoarse:0.0} ms");
 
         Check.That(with < 500, "der volle Durchgang bleibt im Rahmen", $"{with:0.0} ms");
         Check.That(coarse < 60, "beim Ziehen bleibt es bedienbar", $"{coarse:0.0} ms");
+        Check.That(motionCoarse < 80, "auch mit Bewegung ueber dem ganzen Bild",
+                   $"{motionCoarse:0.0} ms");
     }
 
     // ------------------------------------------------------------------- Handwerk
 
     private static GradingStack Focus(float aperture, float focus)
         => new() { Data = { new DepthFieldTool { Aperture = aperture, Focus = focus } } };
+
+    private static GradingStack Blur(float shutter)
+        => new() { Data = { new MotionBlurTool { Shutter = shutter, Samples = 16 } } };
+
+    /// <summary>
+    /// Ein Vektorpass mit einer einzigen Bewegung: X und Y sagen, wo der Punkt im
+    /// vorigen Bild war, Z und W, wo er im naechsten sein wird.
+    /// </summary>
+    private static FloatFrame Vector(int width, int height, float dx, float dy,
+                                     bool onlyRight = false)
+    {
+        int count = width * height;
+
+        var back = new float[count];
+        var backY = new float[count];
+        var front = new float[count];
+        var frontY = new float[count];
+
+        for (int y = 0; y < height; y++)
+        {
+            for (int x = 0; x < width; x++)
+            {
+                if (onlyRight && x < width / 2) continue;
+
+                int i = y * width + x;
+
+                back[i] = dx;
+                backY[i] = dy;
+                front[i] = -dx;
+                frontY[i] = -dy;
+            }
+        }
+
+        return new FloatFrame
+        {
+            Width = width,
+            Height = height,
+            R = back,
+            G = backY,
+            B = front,
+            A = frontY,
+            IsSceneReferred = false,
+        };
+    }
+
+    /// <summary>Ein heller Fleck auf Schwarz.</summary>
+    private static FloatFrame Spot(int width, int height, int centreX, int centreY, int size)
+    {
+        var values = new float[width * height];
+
+        for (int y = centreY - size / 2; y < centreY + size / 2; y++)
+            for (int x = centreX - size / 2; x < centreX + size / 2; x++)
+                values[y * width + x] = 1f;
+
+        return Frame(width, height, values);
+    }
 
     private static IReadOnlyList<ExrPass> Passes(params string[] names)
         => names.Select(n => new ExrPass(n, n + ".V", n + ".V", n + ".V", null, Grey: true)).ToArray();

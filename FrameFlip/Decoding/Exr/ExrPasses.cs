@@ -102,9 +102,16 @@ public static class ExrPasses
 
             // Normalen, Positionen, Bewegungsvektoren. Als Farbe zu zeigen ist die
             // uebliche Darstellung und beantwortet die Frage, was darin steht.
+            //
+            // W gehoert dazu, wenn es da ist: Der Bewegungspass fuehrt VIER Kanaele -
+            // X und Y sagen, wo ein Punkt im vorigen Bild war, Z und W, wo er im
+            // naechsten sein wird. Wer nur die ersten drei nimmt, verliert die Haelfte
+            // der zweiten Angabe und merkt es erst, wenn die Bewegungsunschaerfe
+            // schief zieht.
             if (Has("X") && Has("Y") && Has("Z"))
             {
-                passes.Add(new ExrPass(group, Full("X"), Full("Y"), Full("Z"), null, Grey: false));
+                passes.Add(new ExrPass(group, Full("X"), Full("Y"), Full("Z"),
+                                       Has("W") ? Full("W") : null, Grey: false));
                 continue;
             }
 

@@ -61,6 +61,10 @@
     <sys:String x:Key="S_ClarityAmount">Amount</sys:String>
     <sys:String x:Key="S_ClarityReach">Radius</sys:String>
     <sys:String x:Key="S_ClarityHint">Local contrast: it boosts what a pixel is against its surroundings and leaves flat areas alone. A large radius gives modelling, a small one gives sharpness. Negative takes contrast away.</sys:String>
+    <sys:String x:Key="S_Motion">Motion blur</sys:String>
+    <sys:String x:Key="S_MotionShutter">Shutter</sys:String>
+    <sys:String x:Key="S_MotionSamples">Samples</sys:String>
+    <sys:String x:Key="S_MotionHint">Needs the Vector pass in the file. Shutter is the share of the frame time it was open — a half is 180 degrees, as in film. This too is an approximation: a moving object smears within itself but not beyond its edge, because what it would have covered in passing is not in the file.</sys:String>
     <sys:String x:Key="S_DepthField">Depth of field</sys:String>
     <sys:String x:Key="S_DepthAperture">Aperture</sys:String>
     <sys:String x:Key="S_DepthFocus">Focus</sys:String>

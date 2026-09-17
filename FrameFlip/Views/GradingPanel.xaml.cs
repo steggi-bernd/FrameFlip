@@ -48,6 +48,7 @@ public partial class GradingPanel : UserControl
     private DistortionTool _distortion = new();
     private ChromaticTool _chromatic = new();
     private DepthFieldTool _depth = new();
+    private MotionBlurTool _motion = new();
 
     private static readonly Color[] CurveColours =
     {
@@ -153,6 +154,7 @@ public partial class GradingPanel : UserControl
         ClarityBody.IsEnabled = enabled;
         TextureBody.IsEnabled = enabled;
         SharpenBody.IsEnabled = enabled;
+        MotionBody.IsEnabled = enabled;
         DepthBody.IsEnabled = enabled;
         DistortionBody.IsEnabled = enabled;
         ChromaticBody.IsEnabled = enabled;
@@ -224,6 +226,7 @@ public partial class GradingPanel : UserControl
         _chromatic = TakeGeometry<ChromaticTool>();
 
         // Und die fuenfte: die Werkzeuge, die Renderdaten brauchen.
+        _motion = TakeData<MotionBlurTool>();
         _depth = TakeData<DepthFieldTool>();
 
         T TakeLocal<T>() where T : ILocalTool, new()
@@ -505,6 +508,11 @@ public partial class GradingPanel : UserControl
             SharpenThresholdSlider.Value = Math.Clamp(_sharpen.Threshold,
                                                       SharpenThresholdSlider.Minimum, SharpenThresholdSlider.Maximum);
 
+            MotionShutterSlider.Value = Math.Clamp(_motion.Shutter,
+                                                   MotionShutterSlider.Minimum, MotionShutterSlider.Maximum);
+            MotionSamplesSlider.Value = Math.Clamp(_motion.Samples,
+                                                   MotionSamplesSlider.Minimum, MotionSamplesSlider.Maximum);
+
             DepthApertureSlider.Value = Math.Clamp(_depth.Aperture,
                                                    DepthApertureSlider.Minimum, DepthApertureSlider.Maximum);
             DepthFocusSlider.Value = Math.Clamp(FocusAt(_depth.Focus),
@@ -626,6 +634,9 @@ public partial class GradingPanel : UserControl
         _sharpen.Reach = (int)Math.Round(SharpenRadiusSlider.Value);
         _sharpen.Threshold = (float)SharpenThresholdSlider.Value;
 
+        _motion.Shutter = (float)MotionShutterSlider.Value;
+        _motion.Samples = (int)Math.Round(MotionSamplesSlider.Value);
+
         _depth.Aperture = (float)DepthApertureSlider.Value;
         _depth.Focus = FocusFrom(DepthFocusSlider.Value);
 
@@ -702,6 +713,8 @@ public partial class GradingPanel : UserControl
         SharpenValue.Text = $"{SharpenSlider.Value:0.00}";
         SharpenRadiusValue.Text = $"{SharpenRadiusSlider.Value:0}";
         SharpenThresholdValue.Text = $"{SharpenThresholdSlider.Value:0.000}";
+        MotionShutterValue.Text = $"{MotionShutterSlider.Value:0.00}";
+        MotionSamplesValue.Text = $"{MotionSamplesSlider.Value:0}";
         DepthApertureValue.Text = $"{DepthApertureSlider.Value:0.00}";
         DepthFocusValue.Text = FocusFrom(DepthFocusSlider.Value) is var metres && metres < 10
             ? $"{metres:0.00}"

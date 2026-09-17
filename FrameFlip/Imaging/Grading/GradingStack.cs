@@ -124,7 +124,9 @@ public sealed class GradingStack
 
         var data = new List<IDataTool>();
 
-        foreach (var tool in Data)
+        // Sortiert wie alles andere auch: Bewegung vor Schaerfe, und nicht in der
+        // Reihenfolge, in der jemand an den Reglern war.
+        foreach (var tool in Data.OrderBy(t => t.Stage))
         {
             if (tool.IsNeutral) continue;
 
@@ -156,6 +158,8 @@ public sealed class GradingStack
     private static IDataTool CopyData(IDataTool tool) => tool switch
     {
         DepthFieldTool depth => new DepthFieldTool { Aperture = depth.Aperture, Focus = depth.Focus },
+
+        MotionBlurTool motion => new MotionBlurTool { Shutter = motion.Shutter, Samples = motion.Samples },
 
         // Wie oben: Ein Werkzeug, das hier fehlt, wuerde geteilt statt kopiert.
         _ => throw new NotSupportedException($"Kein Kopierweg fuer {tool.GetType().Name}."),

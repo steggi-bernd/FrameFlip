@@ -158,9 +158,11 @@ public static class AtelierPageInvariants
         }
 
         // Die fuenfte Liste: was Renderdaten braucht.
-        Check.That(panel.Stack.Data.Count(tool => tool is DepthFieldTool) == 1,
-                   "die Tiefenschaerfe steht genau einmal in der Datenliste",
-                   $"{panel.Stack.Data.Count}");
+        foreach (var kind in new[] { typeof(MotionBlurTool), typeof(DepthFieldTool) })
+        {
+            int count = panel.Stack.Data.Count(tool => tool.GetType() == kind);
+            Check.That(count == 1, $"{kind.Name} steht genau einmal in der Datenliste", $"{count}");
+        }
 
         // Und die vierte Liste - die Werkzeuge, die Bildpunkte verschieben.
         foreach (var kind in new[] { typeof(DistortionTool), typeof(ChromaticTool) })
@@ -173,6 +175,7 @@ public static class AtelierPageInvariants
         // Einstellungsebene wird punktweise gerechnet, und eine Nachbarschaft gibt es
         // dort nicht. Bedienbar zu bleiben waere schlimmer als abgeschaltet zu sein -
         // der Regler liefe, und das Bild bliebe stehen.
+        var motionBody = (System.Windows.FrameworkElement)panel.FindName("MotionBody");
         var depthBody = (System.Windows.FrameworkElement)panel.FindName("DepthBody");
         var distortionBody = (System.Windows.FrameworkElement)panel.FindName("DistortionBody");
         var vignetteBody = (System.Windows.FrameworkElement)panel.FindName("VignetteBody");
@@ -190,7 +193,7 @@ public static class AtelierPageInvariants
         Check.That(!dehazeBody.IsEnabled && !bloomBody.IsEnabled && !noiseBody.IsEnabled &&
                    !clarityBody.IsEnabled && !textureBody.IsEnabled && !sharpenBody.IsEnabled &&
                    !vignetteBody.IsEnabled && !grainBody.IsEnabled && !distortionBody.IsEnabled &&
-                   !depthBody.IsEnabled,
+                   !depthBody.IsEnabled && !motionBody.IsEnabled,
                    "an einer Ebene sind die oertlichen Werkzeuge abgeschaltet");
         Check.That(note.Visibility == System.Windows.Visibility.Visible,
                    "und der Grund steht dabei");
@@ -200,7 +203,7 @@ public static class AtelierPageInvariants
         Check.That(dehazeBody.IsEnabled && bloomBody.IsEnabled && noiseBody.IsEnabled &&
                    clarityBody.IsEnabled && textureBody.IsEnabled && sharpenBody.IsEnabled &&
                    vignetteBody.IsEnabled && grainBody.IsEnabled && distortionBody.IsEnabled &&
-                   depthBody.IsEnabled,
+                   depthBody.IsEnabled && motionBody.IsEnabled,
                    "am fertigen Bild wieder an");
         Check.That(note.Visibility != System.Windows.Visibility.Visible,
                    "und der Hinweis verschwindet");

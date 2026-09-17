@@ -6,9 +6,8 @@ A second mode inside FrameFlip: grade one frame, then apply that grade to the wh
 sequence and write it out. Layers, masks driven by render data, and a colour toolset
 aimed at Photoshop and Lightroom rather than at a node graph.
 
-**Status:** steps 1 to 7 are built and running; of step 8, sections 7.3 and 7.4 are
-complete and 7.5 is all but one row — twelve tools across five kinds of pass. Step 5 is
-complete —
+**Status:** steps 1 to 7 are built and running, and **section 7 is complete** — thirteen
+tools across five kinds of pass. Step 5 is complete —
 pass, adjustment, image and group layers, with order, duplication, opacity, colour,
 blend modes and clipping masks. Of step 6, masks are data-driven: cryptomatte, any
 pass, luminance and gradient; painted masks are not built. Where an earlier estimate or
@@ -891,7 +890,7 @@ The buffer path therefore now reads, in the order light actually takes:
 
 ```
   exposure → linear tools → vignette
-  → [distortion, fringing] → depth of field → dehaze → glow → halation
+  → [distortion, fringing] → motion blur → depth of field → dehaze → glow → halation
   → grain → view transform → display tools
   → noise reduction → clarity → texture → sharpening
 ```
@@ -904,7 +903,7 @@ The buffer path therefore now reads, in the order light actually takes:
 | ~~**AO multiply**~~ **reachable** | amount | the AO pass as a layer in Multiply, at the opacity you want. That is exactly `lerp(1, ao, amount)` — see below |
 | ~~**Depth haze**~~ **reachable** | near, far, colour, density | an adjustment layer with a depth mask: near and far are the mask's black and white point, colour and density are the layer's tint and exposure — see below |
 | ~~**Post depth of field**~~ **built** | focus distance, aperture | from Depth, Z or Mist. Approximate at edges, and honest about it — see below. No bokeh shape: that needs a real gather |
-| **Post motion blur** | shutter, samples | from the Vector pass. The one row left in section 7 |
+| ~~**Post motion blur**~~ **built** | shutter, samples | from the Vector pass. One assumption in it is still unverified against a real render — see below |
 | **Cryptomatte picker** ★ | click to add/remove | not a correction — the mask source of section 6, listed here because it is what people will come for |
 
 **Three of these were already there, and saying so is the point.** Light mixing arrived
@@ -914,6 +913,46 @@ haze is an adjustment layer with a depth mask, which has been possible since dep
 a mask source. Building three more sliders that do what the stack already does would add
 surface without adding reach — the same conclusion the Texture row reached, only this time
 it held up.
+
+#### Post motion blur — and the one thing still unverified
+
+The Vector pass says, per pixel, where the same surface was in the previous frame and
+where it will be in the next, in pixels. That is enough to smear afterwards what moved,
+without rendering again — and rendering motion blur properly costs a multiple of the
+samples, while this costs one pass.
+
+It gathers along the path the point travelled while the shutter was open: from half the
+backward vector to half the forward one. The shutter is the share of the frame time the
+shutter was open; a half is 180 degrees, which is what a film camera does and what
+Blender defaults to.
+
+Building it found a quiet gap in the pass reader. **A vector pass has four channels** —
+X and Y for the previous frame, Z and W for the next — and the grouping only knew about
+X, Y and Z, so W was dropped. A three-channel group keeps its fourth channel now. Without
+it the forward half of the motion is missing a coordinate, and the smear pulls
+diagonally for no visible reason.
+
+Same approximation as the depth of field, with the same nameable failure: a moving object
+smears *within itself* but not beyond its edge. Behind it is background that stands still
+and therefore gathers from itself — what the object would have covered in passing is not
+in the file. Moving edges stay sharper than they should.
+
+**And one thing is not verified.** Blender computes screen coordinates from the bottom
+up; image rows run from the top down, so the Y component has to be flipped. That is what
+the code does, and it is what the documentation says, but it has not been checked against
+a real render — there is no sequence with a Vector pass in the test material here. If the
+flip were wrong, the blur would pull the wrong way vertically and correctly horizontally,
+which looks like a fault in the pass rather than in the reader. A short render with the
+Vector pass switched on would settle it in a minute, and until then this sentence stands
+here rather than being quietly assumed.
+
+| 1080p, every pixel moving | |
+|---|---|
+| shutter open, sixteen samples | **113 ms** |
+| while a slider moves | **11 ms** |
+
+That is the worst case: a whole picture in motion. Where nothing moves, nothing is
+gathered — a still pixel is copied, and that is most of most pictures.
 
 #### Post depth of field — the fifth kind of tool
 
@@ -1169,11 +1208,11 @@ next one landing.
    single stop — it has to run before the view transform, where the overbrights still
    exist — and dehaze generalised "the highlights above a threshold" into "whatever the
    tool says goes into the blur". Texture found a wrong sentence in this document. What
-   remains of section 7 is one row: post motion blur. 7.4 brought two more kinds of tool —
-   one that needs the *place* of a pixel (vignette, grain) and one that *moves* pixels
-   (distortion, fringing) — and 7.5 brought the fifth: one that needs a *pass of the file*
-   beside the picture. Three of 7.5's rows turned out to be reachable through the layer
-   stack already, which is what a stack is for.
+   **is complete.** 7.4 brought two more kinds of tool — one that needs the *place* of a
+   pixel (vignette, grain) and one that *moves* pixels (distortion, fringing) — and 7.5
+   brought the fifth: one that needs a *pass of the file* beside the picture. Three of
+   7.5's rows turned out to be reachable through the layer stack already, which is what a
+   stack is for.
 
 Steps 1–4 are the product. 5–8 are what makes it uncontested.
 
