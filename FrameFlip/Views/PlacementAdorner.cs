@@ -172,6 +172,28 @@ public sealed class PlacementAdorner : FrameworkElement
         if (_transform is null) return;
         if (!Canvas(e.GetPosition(this), out float x, out float y)) return;
 
+        // Doppelklick auf die Flaeche setzt die Platzierung zurueck: mittig, volle
+        // Groesse, ungedreht.
+        //
+        // Es gibt den Knopf dafuer schon, aber er steht im Ebenenstreifen neben der
+        // Ueberschrift "Platzierung", und dieser Abschnitt ist zugeklappt. Wer eine
+        // Ebene verschoben hat und sie zurueckhaben will, sucht dort, wo er sie
+        // verschoben hat - im Bild. Derselbe Griff, an der Stelle, an der die Frage
+        // aufkommt.
+        if (e.ClickCount == 2 &&
+            PlacementDrag.HandleAt(Box(), x, y, (float)Reach()) != DragHandle.None)
+        {
+            Cancel();
+
+            _transform = new LayerTransform();
+            Changed?.Invoke(_transform, false);
+
+            e.Handled = true;
+            InvalidateVisual();
+
+            return;
+        }
+
         _drag = PlacementDrag.Begin(_transform, Box(), x, y, (float)Reach());
 
         if (!_drag.IsActive) return;

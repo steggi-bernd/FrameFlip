@@ -21,6 +21,7 @@ public static class LayerInvariants
         ClippingStaysWithItsLayer();
         MissingAndMismatched();
         PassThroughIsFree();
+        HiddenLayersKeepTheirSource();
         Persistence();
     }
 
@@ -440,6 +441,57 @@ public static class LayerInvariants
     /// Der Stapel wird gespeichert. Was sich nicht lesen laesst, ist verloren - und
     /// zwar stillschweigend, was die unangenehmere Art ist.
     /// </summary>
+    /// <summary>
+    /// Eine ausgeblendete Ebene wird nicht GELESEN, aber ihre Quelle wird BEHALTEN.
+    ///
+    /// Die beiden Fragen waren einmal dieselbe, und das machte aus dem Auge eine
+    /// Ladeaufforderung: Ausblenden warf die gelesene Datei weg, Einblenden musste
+    /// sie neu von der Platte holen, und bis dahin blieb die Ebene unsichtbar,
+    /// obwohl das Auge offen war. Bei 4K ist das eine spuerbare Pause.
+    /// </summary>
+    private static void HiddenLayersKeepTheirSource()
+    {
+        Check.Group("Ausgeblendet heisst nicht vergessen");
+
+        var stack = new LayerStack
+        {
+            Layers =
+            {
+                new ImageLayer { Content = LayerContent.Pass, Source = "" },
+                new ImageLayer { Content = LayerContent.Pass, Source = "ViewLayer.GlossDir" },
+                new ImageLayer { Content = LayerContent.Image, Source = @"C:ilder\glanz.png", Visible = false },
+            },
+        };
+
+        var gelesen = stack.Reads().Select(r => r.Key).ToList();
+        var genannt = stack.NamedSources();
+
+        Check.That(!gelesen.Contains(@"C:ilder\glanz.png"),
+                   "eine ausgeblendete Ebene wird nicht gelesen");
+        Check.That(genannt.Contains(@"C:ilder\glanz.png"),
+                   "ihre Quelle bleibt trotzdem genannt");
+
+        Check.That(genannt.Contains("ViewLayer.GlossDir"), "und die sichtbaren erst recht");
+
+        // Auch in Gruppen hinein, und auch die Quellen von Masken.
+        var gruppe = new ImageLayer { Content = LayerContent.Group, Visible = false };
+
+        gruppe.Children.Add(new ImageLayer
+        {
+            Content = LayerContent.Pass,
+            Source = "ViewLayer.Emit",
+            Mask = new LayerMask { Kind = MaskKind.Pass, Source = "ViewLayer.Depth" },
+        });
+
+        stack.Layers.Add(gruppe);
+
+        var tiefer = stack.NamedSources();
+
+        Check.That(tiefer.Contains("ViewLayer.Emit"),
+                   "eine Ebene in einer ausgeblendeten Gruppe zaehlt mit");
+        Check.That(tiefer.Contains("ViewLayer.Depth"), "und ihre Maske auch");
+    }
+
     private static void Persistence()
     {
         Check.Group("Der Stapel ueberlebt das Speichern");

@@ -278,6 +278,44 @@ public sealed class LayerStack
     /// Maske, die still nichts tut - der unangenehmste Fehler, weil das Bild
     /// aussieht, als waere die Maske falsch eingestellt.
     /// </summary>
+    /// <summary>
+    /// Die Quellen, die der Stapel ueberhaupt nennt - auch die der ausgeblendeten
+    /// Ebenen.
+    ///
+    /// Das ist bewusst MEHR als <see cref="Reads"/>. Gelesen wird nur, was sichtbar
+    /// ist; ein 4K-Pass sind hundert Megabyte, und einen fuer eine ausgeblendete
+    /// Ebene zu holen waere Verschwendung. BEHALTEN wird dagegen alles, was der
+    /// Stapel nennt.
+    ///
+    /// Der Unterschied ist nicht akademisch. Vorher waren beide Fragen dieselbe, und
+    /// damit warf das Ausblenden einer Ebene ihre gelesene Quelle weg. Beim
+    /// Einblenden musste sie neu von der Platte kommen - die Ebene blieb so lange
+    /// unsichtbar, ihre Miniatur verschwand, und wer schnell zweimal klickte, sah
+    /// zwei verschiedene Bilder. Das Auge ist ein Schalter und keine Ladeaufforderung.
+    /// </summary>
+    public IReadOnlyList<string> NamedSources()
+    {
+        var names = new List<string>();
+
+        Walk(Layers);
+
+        return names;
+
+        void Walk(IEnumerable<ImageLayer> layers)
+        {
+            foreach (var layer in layers)
+            {
+                if (layer.Source.Length > 0 && !names.Contains(layer.Source, StringComparer.Ordinal))
+                    names.Add(layer.Source);
+
+                foreach (string source in layer.Mask.Sources())
+                    if (!names.Contains(source, StringComparer.Ordinal)) names.Add(source);
+
+                if (layer.Content == LayerContent.Group) Walk(layer.Children);
+            }
+        }
+    }
+
     public IReadOnlyList<string> NeededSources()
         => Reads().Select(r => r.Key).ToList();
 

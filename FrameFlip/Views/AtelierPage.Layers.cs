@@ -94,7 +94,6 @@ public partial class AtelierPage
         }
 
         var reads = Layers.Stack.Reads();
-        var needed = reads.Select(r => r.Key).ToList();
         var missing = reads.Where(r => r.Key.Length > 0 && !_sources.ContainsKey(r.Key)).ToList();
 
         // Die Werkzeuge koennen Passe verlangen, die keine Ebene liest - die
@@ -102,13 +101,11 @@ public partial class AtelierPage
         // werden auf demselben Weg geholt und in demselben Vorrat gehalten; sonst
         // gaebe es zwei Wege zu derselben Datei.
         var data = DataPasses();
-        needed.AddRange(data);
-
         var dataMissing = data.Where(name => !_sources.ContainsKey(name)).ToList();
 
         if (missing.Count == 0 && dataMissing.Count == 0)
         {
-            DropStale(needed);
+            DropStale(NeededPasses());
             Refresh(interim: false, recompose: true);
             return;
         }
@@ -185,10 +182,18 @@ public partial class AtelierPage
         return names;
     }
 
-    /// <summary>Die Passe der Ebenen und die der Werkzeuge zusammen.</summary>
+    /// <summary>
+    /// Was behalten werden darf: alles, was der Stapel nennt, und die Passe der
+    /// Werkzeuge.
+    ///
+    /// Genannt und nicht gelesen - der Unterschied entscheidet darueber, ob das
+    /// Ausblenden einer Ebene ihre Quelle wegwirft. Sie beim naechsten Einblenden
+    /// wieder von der Platte zu holen kostet bei 4K eine spuerbare Pause, in der die
+    /// Ebene unsichtbar bleibt, obwohl das Auge schon offen ist.
+    /// </summary>
     private List<string> NeededPasses()
     {
-        var needed = Layers.Stack.NeededSources().ToList();
+        var needed = Layers.Stack.NamedSources().ToList();
         needed.AddRange(DataPasses());
 
         return needed;
