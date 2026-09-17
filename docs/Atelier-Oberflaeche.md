@@ -195,7 +195,71 @@ project is needed to reproduce any of it, which is the point.
 
 ---
 
-## 8. The order this should be built in
+## 8. The filter gallery
+
+This started as a bug. A cut-out PNG shown without its matte revealed the colour hidden
+under the transparency — real image data, in the picture's own palette, in a place
+nobody expects it. That is the family Photoshop calls a filter gallery and the rest of
+the world calls glitch art, and it turns out FrameFlip is unusually well placed to host
+it.
+
+**Why it fits.** Four of the five pass kinds already exist. Three of the four effects
+land on one of them without inventing anything:
+
+| Effect | Pass kind | Why that one |
+|---|---|---|
+| Dither — Bayer, blue noise, Floyd–Steinberg | place-aware (`IOpticsTool`) | the threshold comes from *where* the pixel is |
+| Wave glitch, displacement mapping | pixel-moving (`IGeometryTool`) | reads from a displaced position, exactly like the lens tools |
+| Reveal what is under the matte | the composer | a switch, not a filter — it is the bug, inverted |
+| **Pixel sorting** | **none of them** | see below |
+
+**The one that does not fit.** Pixel sorting re-orders whole *runs* along a row or a
+column. It is neither point-wise nor a neighbourhood, and it cannot be done in the grid
+preview the other tools share, because a coarse grid changes which pixels are in a run
+and therefore changes the result rather than approximating it. It needs a sixth pass
+kind — a run pass — and it needs to be honest about being slow. That is real work and
+should not be smuggled in as "one more filter".
+
+**What makes it worth doing here rather than in Photoshop.** Every tool in the stack
+already takes a mask, and a mask here can be a cryptomatte, a depth pass or a vector
+pass. That makes sentences sayable that Photoshop cannot say:
+
+- sort only the pixels belonging to *this object*
+- displace by the **normal** pass, so the distortion follows the geometry
+- dither only what lies further away than twelve metres
+- reveal the hidden colour only inside the character's matte
+
+The original question was "can a cryptomatte decide where it shows". The answer is that
+this is the only reason to build it at all. A procedural filter driven by a slider
+exists in fifty programs; one driven by render data exists in none of them.
+
+**References worth reading — and not copying.** FrameFlip carries no third-party
+packages, so these are sources for the *algorithms*, to be reimplemented. Licences must
+be checked before reading, not after:
+
+- Pixel sorting: [ndarray-pixel-sort](https://github.com/hughsk/ndarray-pixel-sort)
+  (MIT) is the most compact statement of Kim Asendorf's original technique;
+  [a-gratton/PixelSort](https://github.com/a-gratton/PixelSort) (MIT) is a readable
+  full implementation; [volfegan/PixelGlitch](https://github.com/volfegan/PixelGlitch)
+  is useful less as code than as a catalogue of which variants are worth having.
+- Dithering: [robertkist/libdither](https://github.com/robertkist/libdither) is the most
+  complete catalogue anywhere — Floyd–Steinberg, Bayer 2×2 through 32×32, blue noise;
+  [makew0rld/dither](https://github.com/makew0rld/dither) is MPL-2.0, which is
+  file-level copyleft, so read the description and not the files;
+  [didder](https://github.com/makew0rld/didder) is worth having installed as a second
+  opinion to test our own output against.
+- **Avoid:** GEGL is LGPL and G'MIC is CeCILL. Reading either and then writing the same
+  thing in C# is a risk that a hobby project does not need to take.
+
+**Where it lives.** Not in a modal dialog. Photoshop's Filter Gallery is a window you
+enter and leave, and that is a historical accident from a time when a filter could not
+be undone. Here every effect is already a row in a stack with a mask and a blend mode,
+and a glitch belongs in that stack like everything else. The gallery is a *section of
+the tool list*, not a place you go.
+
+---
+
+## 9. The order this should be built in
 
 1. **The bugs in section 7.** They are cheap, they are independent of any redesign, and
    every one of them makes the current build feel unfinished.
@@ -206,8 +270,18 @@ project is needed to reproduce any of it, which is the point.
    tool's frame, which fixes bugs 3 and 4 by construction rather than by patching.
 4. **The right column** (section 5), stage 1: splitters, tabs, memory, layers moved to
    the bottom.
-5. **Tear-off windows**, stage 2, if the second monitor turns out to matter.
+5. **The filter gallery** (section 8), and in this order: the matte switch first,
+   because it is three lines and it is the effect that started this; then dither and
+   displacement, which need nothing new; then pixel sorting, which needs a sixth pass
+   kind and deserves to be decided on its own merits rather than carried in by the
+   other three.
+6. **Tear-off windows**, stage 3, if the second monitor turns out to matter.
 
 Steps 1 and 2 are worth doing whatever happens to the rest. Step 3 is the one that
-changes how the program feels. Steps 4 and 5 are comfort, and comfort is worth less
-than a mouse that does what it looks like it does.
+changes how the program feels. Step 4 is comfort, and comfort is worth less than a
+mouse that does what it looks like it does.
+
+Step 5 is the only one that adds something the program cannot do at all today, and it
+is deliberately last — not because it matters least, but because a gallery of
+procedural effects without a tool column is a list of sliders, and a mask that cannot
+be drawn with the mouse is a mask nobody will use.
