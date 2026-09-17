@@ -17,8 +17,9 @@ namespace FrameFlip.Imaging.Grading;
 public readonly struct OverlayPlan
 {
     public OverlayPlan(FloatFrame frame, LayerPlacement placement, BlendMode mode, float opacity,
-                       float sr, float sg, float sb)
+                       float sr, float sg, float sb, float matteFloor)
     {
+        MatteFloor = matteFloor;
         Frame = frame;
         Placement = placement;
         Mode = mode;
@@ -32,6 +33,9 @@ public readonly struct OverlayPlan
     public readonly LayerPlacement Placement;
     public readonly BlendMode Mode;
     public readonly float Opacity, ScaleR, ScaleG, ScaleB;
+
+    /// <summary>Ab welcher Deckung die Ebene als vorhanden gilt - siehe ImageLayer.</summary>
+    public readonly float MatteFloor;
 }
 
 /// <summary>Bereitet die obenauf liegenden Ebenen vor und traegt sie auf.</summary>
@@ -68,7 +72,8 @@ public static class Overlays
                 LayerPlacement.Prepare(layer.Place, frame.Width, frame.Height, width, height),
                 layer.Mode,
                 Math.Clamp(layer.Opacity, 0f, 1f),
-                gain * layer.Tint.R, gain * layer.Tint.G, gain * layer.Tint.B));
+                gain * layer.Tint.R, gain * layer.Tint.G, gain * layer.Tint.B,
+                layer.MatteFloor));
         }
 
         return plans.Count == 0 ? None : plans.ToArray();
@@ -91,7 +96,8 @@ public static class Overlays
             plan.Placement.Sample(plan.Frame, u, v,
                                   out float or_, out float og, out float ob, out float oa);
 
-            float opacity = plan.Opacity * Math.Clamp(oa, 0f, 1f) * covered;
+            float opacity = plan.Opacity * covered *
+                            Math.Clamp(ImageLayer.CleanMatte(oa, plan.MatteFloor), 0f, 1f);
             if (opacity <= 0f) continue;
 
             Blending.Mix(plan.Mode, opacity, r, g, b,

@@ -28,6 +28,86 @@ public static class StackReproInvariants
         PlacedCutoutStaysClean(folder);
         ScreenOnTopStaysClean(folder);
         TheWholeReportedStack(folder);
+        ScreenOverBlack(folder);
+    }
+
+    /// <summary>
+    /// Der Versuch, den der Nutzer selbst gefunden hat: eine freigestellte Ebene
+    /// DUPLIZIERT, auf Negativ multiplizieren gestellt und ueber die durchsichtige
+    /// Stelle der anderen geschoben - auf Schwarz.
+    ///
+    /// Auf Schwarz zeigt sich jede Verunreinigung, weil nichts sie ueberdeckt: Ein
+    /// Anteil von vier Tausendstel steht dort noch als Byte elf. Und Screen laesst
+    /// nie etwas dunkler werden, also bleibt alles stehen, was hineinkommt.
+    ///
+    /// Die zwei Faelle trennen die Frage: Eine Datei mit Deckung GENAU NULL darf
+    /// nichts durchlassen - tut sie es doch, ist es ein Fehler im Programm. Eine
+    /// Datei, deren Deckung im Hintergrund ein paar Stufen ueber null liegt, LAESST
+    /// rechnerisch etwas durch, und dann liegt es an der Datei.
+    /// </summary>
+    private static void ScreenOverBlack(string folder)
+    {
+        Check.Group("Negativ multiplizieren auf Schwarz");
+
+        var black = Read(folder, "00_grund_schwarz.png");
+        var clean = Read(folder, "02_freigestellt_muell_unter_deckung.png");
+        var dirty = Read(folder, "14_fast_durchsichtig_mit_rauschen.png");
+
+        if (black is null || clean is null || dirty is null) return;
+
+        double Build(FloatFrame layer, float matte = 0f)
+        {
+            var stack = Base(black);
+
+            // Zwei Figurenebenen uebereinander, eine davon verschoben.
+            stack.Layers.Add(new ImageLayer
+            {
+                Content = LayerContent.Image, Source = "figur", Name = "Figur",
+                Mode = BlendMode.Normal, MatteFloor = matte,
+            });
+
+            stack.Layers.Add(new ImageLayer
+            {
+                Content = LayerContent.Image, Source = "figur", Name = "Figur 2",
+                Mode = BlendMode.Normal, MatteFloor = matte,
+                Place = new LayerTransform { OffsetY = 0.03f },
+            });
+
+            // Und die dritte auf Screen, nach oben geschoben.
+            stack.Layers.Add(new ImageLayer
+            {
+                Content = LayerContent.Image, Source = "figur", Name = "Screen",
+                Mode = BlendMode.Screen, MatteFloor = matte,
+                Place = new LayerTransform { OffsetY = -0.12f },
+            });
+
+            var drawn = Draw(stack, Sources(black, ("figur", layer)));
+
+            return drawn is null ? 0 : Noise(drawn, black.Width, 2, 2, 40);
+        }
+
+        double exact = Build(clean);
+        double faint = Build(dirty);
+
+        Console.WriteLine($"         Deckung genau null: {exact:0.00}   " +
+                          $"Deckung knapp ueber null: {faint:0.00}");
+
+        Check.That(exact < 1.0,
+                   "bei Deckung genau null kommt nichts durch - auch nicht auf Screen",
+                   $"{exact:0.00} Stufen zwischen Nachbarn");
+
+        Check.That(faint > 4.0,
+                   "bei Deckung knapp ueber null sehr wohl - und das ist die Datei, nicht das Programm",
+                   $"{faint:0.00} Stufen zwischen Nachbarn");
+
+        // Und dagegen gibt es den Regler: Was unter der eingestellten Deckung liegt,
+        // gilt als nicht vorhanden.
+        double cleaned = Build(dirty, matte: 0.04f);
+
+        Console.WriteLine($"         mit gesaeuberter Deckung (10/255): {cleaned:0.00}");
+
+        Check.That(cleaned < 1.0, "mit gesaeuberter Deckung ist es wieder weg",
+                   $"{cleaned:0.00} Stufen zwischen Nachbarn");
     }
 
     /// <summary>Eine VERSCHOBENE freigestellte Ebene darf den Untergrund nicht rauschen lassen.</summary>

@@ -188,7 +188,7 @@ public static class LayerComposer
                                 gain * layer.Tint.R, gain * layer.Tint.G, gain * layer.Tint.B, clipped,
                                 layer.Mask, maskKind, maskFrame, maskLevels, maskIds,
                                 layer.Content, grade, used[i].Kind, placed, placement,
-                                maskFloor, maskSpan);
+                                maskFloor, maskSpan, layer.MatteFloor);
         }
 
         // Die Gitterpunkte einmal aufschreiben, statt sie je Bildpunkt auszurechnen.
@@ -389,8 +389,11 @@ public static class LayerComposer
                                                 inGroup ? gb : vb);
 
                     // Die eigene Deckung wirkt wie eine Maske: Sie macht die
-                    // Deckkraft oertlich. Dieselbe Stelle, dieselbe Regel.
-                    if (hasOwnAlpha) opacity *= Math.Clamp(ownAlpha, 0f, 1f);
+                    // Deckkraft oertlich. Dieselbe Stelle, dieselbe Regel - und
+                    // dieselbe Stelle, an der ein Schleier im Alphakanal gesaeubert
+                    // wird, falls jemand das eingestellt hat.
+                    if (hasOwnAlpha)
+                        opacity *= Math.Clamp(ImageLayer.CleanMatte(ownAlpha, plan.MatteFloor), 0f, 1f);
 
                     if (inGroup)
                     {
@@ -651,8 +654,9 @@ public static class LayerComposer
                     FloatFrame[]? maskLevels, float[]? maskIds,
                     LayerContent content, LayerGrade grade, StepKind step,
                     bool placed, LayerPlacement placement,
-                    float maskFloor, float maskSpan)
+                    float maskFloor, float maskSpan, float matteFloor)
         {
+            MatteFloor = matteFloor;
             MaskFloor = maskFloor;
             MaskSpan = maskSpan;
             Content = content;
@@ -705,6 +709,7 @@ public static class LayerComposer
         public readonly bool MaskInvert;
         public readonly float MaskLow, MaskHigh, MaskSoftness;
         public readonly float MaskFloor, MaskSpan;
+        public readonly float MatteFloor;
         public readonly float GradientCos, GradientSin, GradientFrom, GradientTo;
     }
 }

@@ -922,6 +922,7 @@ public partial class LayerPanel : UserControl
         if (_filling || !IsLoaded || _selected is null) return;
 
         _selected.Opacity = (float)OpacitySlider.Value;
+        _selected.MatteFloor = (float)MatteSlider.Value;
         _selected.Exposure = (float)LayerExposureSlider.Value;
 
         UpdateValues();
@@ -966,6 +967,8 @@ public partial class LayerPanel : UserControl
             ModeBox.SelectedIndex = Math.Max(0, mode);
 
             OpacitySlider.Value = Math.Clamp(_selected.Opacity, OpacitySlider.Minimum, OpacitySlider.Maximum);
+            MatteSlider.Value = Math.Clamp(_selected.MatteFloor,
+                                           MatteSlider.Minimum, MatteSlider.Maximum);
             LayerExposureSlider.Value = Math.Clamp(_selected.Exposure,
                                                    LayerExposureSlider.Minimum, LayerExposureSlider.Maximum);
 
@@ -990,6 +993,10 @@ public partial class LayerPanel : UserControl
     private void UpdateValues()
     {
         OpacityValue.Text = $"{OpacitySlider.Value:0.00}";
+
+        // In Stufen von 255 statt in Anteilen: Wer eine Datei befragt, bekommt die
+        // Deckung in Stufen genannt, und die beiden Zahlen sollen dieselben sein.
+        MatteValue.Text = $"{MatteSlider.Value * 255:0} / 255";
         LayerExposureValue.Text = LayerExposureSlider.Value == 0
             ? "0"
             : $"{LayerExposureSlider.Value:+0.00;-0.00}";
@@ -1018,6 +1025,14 @@ public partial class LayerPanel : UserControl
         bool placeable = content is LayerContent.Pass or LayerContent.Image;
 
         PlaceHeader.Visibility = placeable ? Visibility.Visible : Visibility.Collapsed;
+
+        // Die Deckung saeubern kann nur, wer eine mitbringt. Bei einem Pass heisst
+        // Alpha "hier wurde nichts getroffen" - dort etwas wegzuschneiden loeschte
+        // das Umgebungslicht.
+        var matte = content == LayerContent.Image ? Visibility.Visible : Visibility.Collapsed;
+
+        MatteHeader.Visibility = matte;
+        MatteSlider.Visibility = matte;
         PlaceBody.Visibility = placeable && PlaceFoldButton.Content as string == "−"
             ? Visibility.Visible : Visibility.Collapsed;
 

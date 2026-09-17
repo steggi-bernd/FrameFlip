@@ -174,7 +174,19 @@ def main():
 
     schreibe("13_wasserzeichen_muell_unter_deckung.png", zeichen, marke)
 
-    # 14. Ein Grund-Bild ohne Deckung, auf das sich alles legen laesst.
+    # 14. Der heikelste Fall: Die Deckung ist im Hintergrund nicht NULL, sondern
+    #     ein paar Stufen darueber - und schwankt. So kommen Renderer und manche
+    #     Exportwege aus Photoshop heraus. Vier von 255 lassen den Muell darunter
+    #     mit Byte elf durch, und auf Schwarz sieht man das sofort.
+    fast = np.random.default_rng(11).integers(0, 7, (H, W)).astype(np.float32) / 255.0
+    fast = np.maximum(fast, a)
+
+    schleier = rgb.copy()
+    schleier[a < 0.5] = rauschen[a < 0.5]
+
+    schreibe("14_fast_durchsichtig_mit_rauschen.png", schleier, fast)
+
+    # 15. Ein Grund-Bild ohne Deckung, auf das sich alles legen laesst.
     grund = np.dstack([
         np.full((H, W), 40, np.uint8),
         np.full((H, W), 60, np.uint8),
@@ -184,6 +196,10 @@ def main():
     grund[(x // 80 + y // 80) % 2 == 0] = (70, 95, 130)
 
     schreibe("00_grundbild.png", grund)
+
+    # 16. Und ein schwarzes Grundbild - der Fall, in dem jede Verunreinigung
+    #     sichtbar wird, weil nichts sie ueberdeckt.
+    schreibe("00_grund_schwarz.png", np.zeros((H, W, 3), np.uint8))
 
 
 if __name__ == "__main__":

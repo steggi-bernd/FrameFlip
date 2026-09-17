@@ -192,6 +192,8 @@
     <sys:String x:Key="S_MoveLayerDown">Nach unten</sys:String>
     <sys:String x:Key="S_BlendMode">Mischung</sys:String>
     <sys:String x:Key="S_Opacity">Deckkraft</sys:String>
+    <sys:String x:Key="S_Matte">Deckung säubern</sys:String>
+    <sys:String x:Key="S_MatteHint">Freigestellt heisst in einer Datei selten: Deckung genau null. Ein Entrauscher, ein Glanz im Compositing oder ein Export ueber ein Programm, das zwischendurch auf etwas legt, hinterlaesst im Hintergrund einen Schleier von wenigen Stufen - und darunter steht in den meisten Dateien Muell. Vier von 255 stehen auf Schwarz noch als Byte elf. Dieser Regler schneidet den Schleier weg.</sys:String>
     <sys:String x:Key="S_LayerTint">Farbe</sys:String>
     <sys:String x:Key="S_LayerColour">Bild</sys:String>
     <sys:String x:Key="S_SinglePass">Dieses Format führt nur ein Bild – Passe gibt es nur in einer Multilayer-EXR. Schichten geht trotzdem: dasselbe Bild verdoppeln und auf Multiplizieren stellen.</sys:String>

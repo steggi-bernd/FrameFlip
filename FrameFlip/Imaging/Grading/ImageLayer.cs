@@ -110,6 +110,44 @@ public sealed class ImageLayer
     public bool Visible { get; set; } = true;
 
     /// <summary>
+    /// Ab welcher Deckung eine Bildebene ueberhaupt als vorhanden gilt. 0 heisst:
+    /// so wie die Datei es sagt.
+    ///
+    /// Gebraucht, weil "freigestellt" in einer Datei selten "Deckung genau null"
+    /// heisst. Ein Entrauscher, der ueber den Alphakanal mitlaeuft, ein Glanz im
+    /// Compositing, ein Export ueber ein Programm, das zwischendurch auf etwas
+    /// legt - all das hinterlaesst im Hintergrund einen Schleier von wenigen Stufen.
+    /// Und unter diesem Schleier steht in den meisten Dateien Muell.
+    ///
+    /// Vier von 255 klingen nach nichts und sind es nicht: Auf Schwarz stehen sie
+    /// noch als Byte elf, und wenn der Muell darunter rauscht, rauscht das Bild.
+    /// Auf "Negativ multiplizieren" faellt es am meisten auf, weil dort nichts
+    /// dunkler werden kann - was hineinkommt, bleibt.
+    ///
+    /// Gerechnet wird nicht mit einem Schnitt, sondern mit einer Spanne: Was unter
+    /// dem Wert liegt, wird null, der Rest wird wieder auf ganz gezogen. Ein
+    /// Schnitt allein liesse die weiche Kante um den Betrag springen.
+    /// </summary>
+    public float MatteFloor { get; set; }
+
+    /// <summary>
+    /// Die gesaeuberte Deckung eines Bildpunktes.
+    ///
+    /// An einer Stelle, weil zwei Wege sie brauchen: der Composer fuer die Ebenen im
+    /// Stapel und die Auftragung fuer die, die obenauf liegen. Zwei Fassungen
+    /// derselben Spanne liefen beim naechsten Griff auseinander, und der Unterschied
+    /// waere ein Saum, den es nur in einem der beiden Wege gibt.
+    /// </summary>
+    public static float CleanMatte(float alpha, float floor)
+    {
+        if (floor <= 0f) return alpha;
+
+        float span = 1f - Math.Clamp(floor, 0f, 0.9f);
+
+        return Math.Clamp((alpha - floor) / span, 0f, 1f);
+    }
+
+    /// <summary>
     /// Wie die Ebene auf die darunter wirkt. Add ist die Grundstellung, weil
     /// Renderpasse additiv zerlegt sind: Alle Passe auf Add ergeben wieder das
     /// Bild, das Blender gerendert hat.
@@ -228,6 +266,7 @@ public sealed class ImageLayer
         Mask = Mask.Clone(),
         Content = Content,
         FollowSequence = FollowSequence,
+        MatteFloor = MatteFloor,
         Place = Place.Clone(),
         OnTop = OnTop,
         Children = Children.Select(c => c.Clone()).ToList(),
