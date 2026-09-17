@@ -292,6 +292,21 @@
     </Style>
 
     <!--
+        Eine Kachel der Farbspalte.
+
+        Breit genug fuer einen Namen, schmal genug fuer zwei Spalten. Alles andere
+        kommt von OverlayToggle - die gewaehlte Farbe und das Schweben -, damit eine
+        Kachel sich anfuehlt wie jeder andere Schalter im Programm.
+    -->
+    <Style x:Key="ToolTile" TargetType="ToggleButton" BasedOn="{StaticResource OverlayToggle}">
+        <Setter Property="Width" Value="128" />
+        <Setter Property="Height" Value="30" />
+        <Setter Property="MinWidth" Value="128" />
+        <Setter Property="FontSize" Value="10" />
+        <Setter Property="Margin" Value="0,0,5,5" />
+    </Style>
+
+    <!--
         Der Kopf eines Abschnitts in der rechten Spalte.
 
         Er tut zwei Dinge auf einmal, und beide waren gewuenscht: Er sagt, wo ein

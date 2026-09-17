@@ -6,6 +6,7 @@
     <Grid>
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
             <RowDefinition Height="*" />
         </Grid.RowDefinitions>
 
@@ -25,8 +26,28 @@
                        Text="{DynamicResource S_ToolsTargetImage}" />
         </Border>
 
-    <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+    <!--
+        Die Reiter. Sie folgen dem Rechenweg und nicht dem Alphabet - dieselbe
+        Reihenfolge, in der auch gerechnet wird, und damit nebenbei die Antwort auf
+        die Frage, worauf ein Regler eigentlich wirkt.
+
+        Ausserhalb der Bildlaufflaeche: Ein Reiter, der beim Rollen verschwindet,
+        beantwortet die Frage "wo bin ich hier" genau dann nicht mehr, wenn sie
+        aufkommt.
+    -->
+    <Border Grid.Row="1" Padding="14,8,14,6"
+            BorderBrush="{StaticResource PanelBorder}" BorderThickness="0,0,0,1">
+        <WrapPanel x:Name="Tabs" />
+    </Border>
+
+    <ScrollViewer Grid.Row="2" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
         <StackPanel Margin="14,12,14,14">
+
+            <!--
+                Die Kacheln des gewaehlten Reiters. Alle auf einen Blick, und die,
+                die etwas tun, treten hervor - ein zugeklapptes Fach konnte das nie.
+            -->
+            <WrapPanel x:Name="Tiles" Margin="0,0,0,10" />
 
             <!-- Verteilung -->
             <Grid Margin="0,0,0,4">

@@ -95,7 +95,11 @@ public partial class GradingPanel : UserControl
             wheel.Released += () => Raise(interim: false);
         }
 
-        Loaded += (_, _) => PushToControls();
+        Loaded += (_, _) =>
+        {
+            BuildTiles();
+            PushToControls();
+        };
     }
 
     /// <summary>
@@ -939,6 +943,8 @@ public partial class GradingPanel : UserControl
         DitherValue.Text = $"{DitherSlider.Value:0.00}";
         DitherLevelsValue.Text = $"{DitherLevelsSlider.Value:0}";
         DitherSizeValue.Text = $"{DitherSizeSlider.Value:0}";
+        ShowActive();
+
         DitherPixelsValue.Text = $"{DitherPixelsSlider.Value:0}";
         DitherPixelsTallValue.Text = $"{DitherPixelsTallSlider.Value:0}";
         DitherHueValue.Text = $"{DitherHueSlider.Value:0}\u00b0";

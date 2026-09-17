@@ -1,29 +1,32 @@
 using System.Windows;
+using System.Windows.Controls;
 using System.Windows.Controls.Primitives;
+using FrameFlip.Imaging;
+using FrameFlip.Imaging.Grading;
 using FrameFlip.Views;
 
 namespace FrameFlip.Tests;
 
 /// <summary>
-/// Die Farbspalte in Gruppen.
+/// Die Farbspalte als Reiter mit Kacheln.
 ///
-/// Einundzwanzig Abschnitte in einer Liste sind keine Liste mehr, sondern ein
-/// Schacht: Wer die Vignette sucht, rollt an siebzehn Dingen vorbei, die er nicht
-/// gesucht hat. Fuenf Gruppen bilden den Rechenweg ab, und das ist dieselbe
-/// Reihenfolge, in der auch gerechnet wird.
+/// Einundzwanzig aufklappbare Faecher untereinander waren ein Schacht: Wer die
+/// Vignette suchte, rollte an siebzehn Dingen vorbei, die er nicht gesucht hatte -
+/// und sah dabei von keinem einzigen, ob es gerade etwas tut. Ein zugeklapptes Fach
+/// sieht aus wie ein zugeklapptes Fach, ob die Vignette nun steht oder nicht.
 ///
-/// Geprueft wird die eine Eigenschaft, an der so etwas scheitert: Eine Gruppe muss
-/// den Stand ihrer Abschnitte ZURUECKGEBEN, wenn sie wieder aufgeht. Wer eine Gruppe
-/// zumacht und wieder auf, will den Stand von vorher und nicht einen Streifen aus
-/// zwanzig offenen Abschnitten.
+/// Geprueft werden deshalb genau die drei Zusagen, die Kacheln machen: Ein Reiter
+/// zeigt seine und nur seine Werkzeuge. Ausgeschrieben steht immer GENAU EINES. Und
+/// eine Kachel, deren Werkzeug etwas tut, sieht anders aus als eine, deren Werkzeug
+/// nichts tut - das ist der eigentliche Gewinn, und er laesst sich messen.
 /// </summary>
 public static class GradingGroupInvariants
 {
-    public static void Run() => AGroupHidesAndRemembers();
+    public static void Run() => TilesShowWhatIsThereAndWhatIsOn();
 
-    private static void AGroupHidesAndRemembers()
+    private static void TilesShowWhatIsThereAndWhatIsOn()
     {
-        Check.Group("Die Farbspalte klappt in Gruppen");
+        Check.Group("Die Farbspalte: Reiter und Kacheln");
 
         var panel = new GradingPanel();
 
@@ -44,59 +47,79 @@ public static class GradingGroupInvariants
             window.Show();
             panel.UpdateLayout();
 
+            var tabs = (WrapPanel)panel.FindName("Tabs");
+            var tiles = (WrapPanel)panel.FindName("Tiles");
+
+            Check.That(tabs is not null && tiles is not null, "Reiterleiste und Kachelfeld sind da");
+            if (tabs is null || tiles is null) return;
+
+            Check.That(tabs.Children.Count == 5, "fuenf Reiter", $"{tabs.Children.Count}");
+
+            // Der erste Reiter steht offen und zeigt seine fuenf Werkzeuge.
+            Check.That(tiles.Children.Count == 5,
+                       "die Grundkorrektur zeigt fuenf Kacheln", $"{tiles.Children.Count}");
+
+            // Genau ein Abschnitt ist ausgeschrieben.
+            int open = 0;
+
             foreach (string name in new[]
-                     { "GroupBasic", "GroupDehaze", "GroupMotion", "GroupDither", "GroupLut" })
+                     {
+                         "BasicBody", "CurveBody", "WhiteBalanceBody", "ZonesBody", "BandsBody",
+                         "DehazeBody", "BloomBody", "VignetteBody", "DitherBody", "GrainBody",
+                     })
             {
-                Check.That(panel.FindName(name) is ToggleButton, $"{name} ist da");
+                if (panel.FindName(name) is FrameworkElement shown &&
+                    shown.Visibility == Visibility.Visible)
+                {
+                    open++;
+                }
             }
 
-            var group = (ToggleButton)panel.FindName("GroupMotion");
-            var head = (FrameworkElement)panel.FindName("VignetteHead");
+            Check.That(open == 1, "und genau ein Abschnitt steht ausgeschrieben", $"{open}");
+
+            // Ein anderer Reiter zeigt andere Kacheln - und den ersten seiner eigenen.
+            var optics = tabs.Children.OfType<ToggleButton>()
+                             .First(b => (string)b.Tag == "S_GroupOptics");
+
+            optics.IsChecked = true;
+            panel.UpdateLayout();
+
+            Check.That(tiles.Children.Count == 5, "die Optik zeigt fuenf Kacheln",
+                       $"{tiles.Children.Count}");
+
+            var basic = (FrameworkElement)panel.FindName("BasicBody");
+
+            Check.That(basic.Visibility != Visibility.Visible,
+                       "und die Grundkorrektur ist damit nicht mehr ausgeschrieben");
+
+            // Eine Kachel waehlen schreibt ihren Abschnitt aus - und nur ihren.
+            var vignette = tiles.Children.OfType<ToggleButton>()
+                                .First(b => (string)b.Tag == "Vignette");
+
+            vignette.IsChecked = true;
+            panel.UpdateLayout();
+
             var body = (FrameworkElement)panel.FindName("VignetteBody");
+            var motion = (FrameworkElement)panel.FindName("MotionBody");
 
-            if (group is null || head is null || body is null)
-            {
-                Check.That(false, "die Optikgruppe kennt die Vignette");
-                return;
-            }
+            Check.That(body.Visibility == Visibility.Visible, "die gewaehlte Kachel schreibt aus");
+            Check.That(motion.Visibility != Visibility.Visible, "und die daneben nicht mehr");
 
-            // Der Benutzer klappt einen Abschnitt auf.
-            body.Visibility = Visibility.Visible;
+            // Und der Gewinn, um den es ging: Eine Kachel, deren Werkzeug etwas tut,
+            // sieht anders aus als eine, deren Werkzeug nichts tut.
+            double quiet = vignette.Opacity;
 
-            group.IsChecked = false;
+            panel.Stack.Optics.OfType<VignetteTool>().First().Amount = 0.5f;
+
+            panel.Load(panel.Adjustments, panel.Stack);
             panel.UpdateLayout();
 
-            Check.That(head.Visibility != Visibility.Visible,
-                       "zugeklappt ist die Ueberschrift des Abschnitts weg");
+            var again = ((WrapPanel)panel.FindName("Tiles")).Children.OfType<ToggleButton>()
+                        .First(b => (string)b.Tag == "Vignette");
 
-            Check.That(body.Visibility != Visibility.Visible, "und sein Inhalt auch");
-
-            group.IsChecked = true;
-            panel.UpdateLayout();
-
-            Check.That(head.Visibility == Visibility.Visible, "aufgeklappt steht sie wieder da");
-
-            Check.That(body.Visibility == Visibility.Visible,
-                       "und der Abschnitt ist so offen wie vorher");
-
-            // Und die Gegenprobe: Ein Abschnitt, der zu war, bleibt zu.
-            var closed = (FrameworkElement)panel.FindName("DistortionBody");
-
-            closed.Visibility = Visibility.Collapsed;
-
-            group.IsChecked = false;
-            panel.UpdateLayout();
-            group.IsChecked = true;
-            panel.UpdateLayout();
-
-            Check.That(closed.Visibility != Visibility.Visible,
-                       "ein zugeklappter Abschnitt geht davon nicht auf");
-
-            // Eine andere Gruppe darf davon nichts mitbekommen.
-            var other = (FrameworkElement)panel.FindName("GrainHead");
-
-            Check.That(other.Visibility == Visibility.Visible,
-                       "und eine andere Gruppe bleibt unberuehrt");
+            Check.That(again.Opacity > quiet,
+                       "eine Kachel, deren Werkzeug etwas tut, tritt hervor",
+                       $"{again.Opacity:0.00} gegen {quiet:0.00}");
         }
         finally
         {
