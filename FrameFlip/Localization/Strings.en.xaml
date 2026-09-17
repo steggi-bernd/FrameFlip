@@ -192,7 +192,7 @@
     <sys:String x:Key="S_MoveLayerDown">Move down</sys:String>
     <sys:String x:Key="S_BlendMode">Blend mode</sys:String>
     <sys:String x:Key="S_Opacity">Opacity</sys:String>
-    <sys:String x:Key="S_Matte">Clean the matte</sys:String>
+    <sys:String x:Key="S_Matte">Cut away the veil</sys:String>
     <sys:String x:Key="S_MatteHint">In a file, “cut out” rarely means “alpha exactly zero”. A denoiser, a glow in compositing, or an export through a program that composites on the way leaves a haze of a few steps in the background — and underneath most files carry garbage. Four out of 255 still shows as byte eleven on black. This slider cuts the haze away.</sys:String>
     <sys:String x:Key="S_LayerTint">Colour</sys:String>
     <sys:String x:Key="S_LayerColour">Image</sys:String>
@@ -819,6 +819,15 @@
     <sys:String x:Key="S_UseAsFocusHint">Sets the depth of field's focus to the distance just read. Without a picker all you have is a slider in metres and guesswork - and you are guessing at a number you cannot read anywhere.</sys:String>
     <sys:String x:Key="S_FocusSet">Focused at</sys:String>
     <sys:String x:Key="S_NoDepthTool">Depth of field has to be switched on for this - it lives under Optics.</sys:String>
-    <sys:String x:Key="S_Reveal">Under the matte</sys:String>
+    <sys:String x:Key="S_Reveal">Show what is hidden</sys:String>
     <sys:String x:Key="S_RevealHint">Shows what sits in the file's transparent areas - usually the unmasked original, render noise, or remnants of the layer below. At 0 the layer is cleanly cut out, at 100% it covers everywhere. This layer's MASK decides where it shows: a cryptomatte picks an object, a depth pass picks a distance. A cleanly premultiplied file carries black there - then nothing happens.</sys:String>
+    <sys:String x:Key="S_MatteGroup">Matte</sys:String>
+    <sys:String x:Key="S_MatteGroupHint">Two sliders on the same number, pulling opposite ways: the upper one cuts away what is barely there - against the grey veil that hides garbage. The lower one pulls coverage towards full and shows that same garbage on purpose.</sys:String>
+    <sys:String x:Key="S_Dither">Dither</sys:String>
+    <sys:String x:Key="S_DitherAmount">Amount</sys:String>
+    <sys:String x:Key="S_DitherLevels">Levels per channel</sys:String>
+    <sys:String x:Key="S_DitherSize">Cell size</sys:String>
+    <sys:String x:Key="S_DitherNoise">random</sys:String>
+    <sys:String x:Key="S_DitherNoiseHint">Random instead of ordered: grainy rather than a crosshatch. The threshold is still tied to the position - the same spot gets the same one every pass, otherwise the picture would shimmer while you drag a slider.</sys:String>
+    <sys:String x:Key="S_DitherHint">Brings the picture down to a few levels per channel without breaking it into flat areas: the threshold depends on where the pixel is, the step wanders across the surface, and the eye averages it back together. There is no Floyd-Steinberg error diffusion here - that passes the rounding error to its neighbours and would have to walk the pixels in order. Anything above white is left alone.</sys:String>
 </ResourceDictionary>

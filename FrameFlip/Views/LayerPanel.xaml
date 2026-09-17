@@ -274,7 +274,21 @@
                             nichts getroffen", und die Farbe daneben ist trotzdem
                             echt.
                         -->
-                        <Grid x:Name="MatteHeader" Margin="0,10,0,2" Visibility="Collapsed">
+                        <!--
+                            Eine gemeinsame Ueberschrift ueber beide.
+
+                            Einzeln waren die Namen nicht einzuordnen - sie sagten,
+                            WORAN gedreht wird, und nicht, was dabei passiert. Als
+                            Paar unter einer Ueberschrift ist beides in einem Blick da:
+                            zwei Richtungen auf derselben Zahl.
+                        -->
+                        <TextBlock x:Name="MatteGroup" Visibility="Collapsed"
+                                   Margin="0,14,0,0" FontSize="10" FontWeight="SemiBold"
+                                   Foreground="{StaticResource MutedBrush}"
+                                   Text="{DynamicResource S_MatteGroup}"
+                                   ToolTip="{DynamicResource S_MatteGroupHint}" />
+
+                        <Grid x:Name="MatteHeader" Margin="0,6,0,2" Visibility="Collapsed">
                             <TextBlock Text="{DynamicResource S_Matte}" Style="{StaticResource PanelLabel}" />
                             <TextBlock x:Name="MatteValue" Style="{StaticResource PanelValue}" />
                         </Grid>

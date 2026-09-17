@@ -23,6 +23,7 @@ namespace FrameFlip.Imaging.Grading;
                  UnknownDerivedTypeHandling = JsonUnknownDerivedTypeHandling.FailSerialization)]
 [JsonDerivedType(typeof(VignetteTool), VignetteTool.KindName)]
 [JsonDerivedType(typeof(GrainTool), GrainTool.KindName)]
+[JsonDerivedType(typeof(DitherTool), DitherTool.KindName)]
 public interface IOpticsTool
 {
     /// <summary>Kennung fuer die Speicherung. Bleibt stabil, auch wenn der Anzeigename wechselt.</summary>

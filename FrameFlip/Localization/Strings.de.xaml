@@ -192,7 +192,7 @@
     <sys:String x:Key="S_MoveLayerDown">Nach unten</sys:String>
     <sys:String x:Key="S_BlendMode">Mischung</sys:String>
     <sys:String x:Key="S_Opacity">Deckkraft</sys:String>
-    <sys:String x:Key="S_Matte">Deckung säubern</sys:String>
+    <sys:String x:Key="S_Matte">Schleier wegschneiden</sys:String>
     <sys:String x:Key="S_MatteHint">Freigestellt heisst in einer Datei selten: Deckung genau null. Ein Entrauscher, ein Glanz im Compositing oder ein Export ueber ein Programm, das zwischendurch auf etwas legt, hinterlaesst im Hintergrund einen Schleier von wenigen Stufen - und darunter steht in den meisten Dateien Muell. Vier von 255 stehen auf Schwarz noch als Byte elf. Dieser Regler schneidet den Schleier weg.</sys:String>
     <sys:String x:Key="S_LayerTint">Farbe</sys:String>
     <sys:String x:Key="S_LayerColour">Bild</sys:String>
@@ -819,6 +819,15 @@
     <sys:String x:Key="S_UseAsFocusHint">Setzt die Scharfstellung der Tiefenschärfe auf die abgelesene Entfernung. Ohne Pipette bleibt nur ein Regler in Metern und Probieren — und probiert wird an einer Zahl, die man nirgends ablesen kann.</sys:String>
     <sys:String x:Key="S_FocusSet">Scharfgestellt auf</sys:String>
     <sys:String x:Key="S_NoDepthTool">Dafür muss die Tiefenschärfe eingeschaltet sein — sie steht unter Optik.</sys:String>
-    <sys:String x:Key="S_Reveal">Unter der Freistellung</sys:String>
+    <sys:String x:Key="S_Reveal">Verborgenes zeigen</sys:String>
     <sys:String x:Key="S_RevealHint">Zeigt, was in den durchsichtigen Stellen der Datei steht — meist das unmaskierte Original, Renderrauschen oder Reste der Ebene darunter. Bei 0 ist die Ebene sauber freigestellt, bei 100 % deckt sie überall. Die MASKE dieser Ebene bestimmt, wo es erscheint: eine Kryptomatte wählt ein Objekt, ein Tiefenpass eine Entfernung. Eine sauber vormultiplizierte Datei trägt dort Schwarz — dann passiert nichts.</sys:String>
+    <sys:String x:Key="S_MatteGroup">Freistellung</sys:String>
+    <sys:String x:Key="S_MatteGroupHint">Zwei Regler an derselben Zahl, in entgegengesetzte Richtungen: Der obere schneidet weg, was kaum noch da ist — gegen den grauen Schleier, unter dem Müll sitzt. Der untere zieht die Deckung zum Vollen und zeigt genau diesen Müll absichtlich.</sys:String>
+    <sys:String x:Key="S_Dither">Rastern</sys:String>
+    <sys:String x:Key="S_DitherAmount">Stärke</sys:String>
+    <sys:String x:Key="S_DitherLevels">Stufen je Kanal</sys:String>
+    <sys:String x:Key="S_DitherSize">Rasterpunkt</sys:String>
+    <sys:String x:Key="S_DitherNoise">zufällig</sys:String>
+    <sys:String x:Key="S_DitherNoiseHint">Zufällig statt geordnet: körnig statt als Kreuzmuster. Die Schwelle ist dabei fest an die Stelle gebunden — dieselbe Stelle bekommt in jedem Durchgang dieselbe, sonst flimmerte das Bild schon beim Ziehen an einem Regler.</sys:String>
+    <sys:String x:Key="S_DitherHint">Bringt das Bild auf wenige Stufen je Kanal, ohne dass es in Flächen zerfällt: Die Schwelle hängt von der Stelle ab, der Umsprung wandert über die Fläche, und das Auge mittelt ihn wieder zusammen. Fehlerdiffusion nach Floyd-Steinberg gibt es hier nicht — die reicht den Rundungsfehler an die Nachbarn weiter und müsste die Bildpunkte der Reihe nach abarbeiten. Über Weiß wird nicht gerastert.</sys:String>
 </ResourceDictionary>

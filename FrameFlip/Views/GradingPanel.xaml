@@ -693,6 +693,57 @@
                            Text="{DynamicResource S_VignetteHint}" />
             </StackPanel>
 
+            <!--
+                Rastern. Steht NACH dem Korn, weil es dort auch gerechnet wird: Ein
+                Korn hinterher braeuchte Zwischenwerte, die es nach dem Rastern nicht
+                mehr gibt - es wuerde die Stufen wieder verwischen und damit genau das
+                aufheben, wofuer jemand gerastert hat.
+            -->
+            <Grid Margin="0,16,0,0">
+                <TextBlock Text="{DynamicResource S_Dither}" Style="{StaticResource PanelHeading}" />
+                <Button Style="{StaticResource LinkButton}" HorizontalAlignment="Right"
+                        Content="+" Tag="DitherBody" Click="OnSectionToggled" />
+            </Grid>
+            <StackPanel x:Name="DitherBody" Visibility="Collapsed" Margin="0,6,0,0">
+                <Grid Margin="0,0,0,2">
+                    <TextBlock Text="{DynamicResource S_DitherAmount}" Style="{StaticResource PanelLabel}" />
+                    <TextBlock x:Name="DitherValue" Style="{StaticResource PanelValue}" />
+                </Grid>
+                <Slider x:Name="DitherSlider" Style="{StaticResource PanelSlider}"
+                        Minimum="0" Maximum="1" Value="0" SmallChange="0.02" LargeChange="0.1"
+                        ValueChanged="OnChanged" MouseDoubleClick="OnSliderReset" Tag="0" />
+
+                <Grid Margin="0,10,0,2">
+                    <TextBlock Text="{DynamicResource S_DitherLevels}" Style="{StaticResource PanelLabel}" />
+                    <TextBlock x:Name="DitherLevelsValue" Style="{StaticResource PanelValue}" />
+                </Grid>
+                <Slider x:Name="DitherLevelsSlider" Style="{StaticResource PanelSlider}"
+                        Minimum="2" Maximum="32" Value="6" SmallChange="1" LargeChange="4"
+                        ValueChanged="OnChanged" MouseDoubleClick="OnSliderReset" Tag="6" />
+
+                <Grid Margin="0,10,0,2">
+                    <TextBlock Text="{DynamicResource S_DitherSize}" Style="{StaticResource PanelLabel}" />
+                    <TextBlock x:Name="DitherSizeValue" Style="{StaticResource PanelValue}" />
+                </Grid>
+                <Slider x:Name="DitherSizeSlider" Style="{StaticResource PanelSlider}"
+                        Minimum="1" Maximum="8" Value="2" SmallChange="1" LargeChange="2"
+                        ValueChanged="OnChanged" MouseDoubleClick="OnSliderReset" Tag="2" />
+
+                <!--
+                    Zwei Muster, ein Schalter. Eine Auswahlliste fuer zwei Eintraege
+                    kostet einen Klick mehr und sagt nicht mehr aus.
+                -->
+                <ToggleButton x:Name="DitherNoiseButton" Style="{StaticResource OverlayToggle}"
+                              HorizontalAlignment="Left" Margin="0,10,0,0" Padding="8,1" FontSize="10"
+                              Content="{DynamicResource S_DitherNoise}"
+                              Checked="OnDitherPattern" Unchecked="OnDitherPattern"
+                              ToolTip="{DynamicResource S_DitherNoiseHint}" />
+
+                <TextBlock Margin="0,8,0,0" FontSize="10" TextWrapping="Wrap"
+                           Foreground="{StaticResource MutedBrush}"
+                           Text="{DynamicResource S_DitherHint}" />
+            </StackPanel>
+
             <Grid Margin="0,16,0,0">
                 <TextBlock Text="{DynamicResource S_Grain}" Style="{StaticResource PanelHeading}" />
                 <Button Style="{StaticResource LinkButton}" HorizontalAlignment="Right"

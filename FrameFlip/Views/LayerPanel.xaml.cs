@@ -1073,6 +1073,7 @@ public partial class LayerPanel : UserControl
         // das Umgebungslicht.
         var matte = content == LayerContent.Image ? Visibility.Visible : Visibility.Collapsed;
 
+        MatteGroup.Visibility = matte;
         MatteHeader.Visibility = matte;
         MatteSlider.Visibility = matte;
         RevealHeader.Visibility = matte;

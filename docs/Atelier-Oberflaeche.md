@@ -208,7 +208,7 @@ land on one of them without inventing anything:
 
 | Effect | Pass kind | Why that one |
 |---|---|---|
-| Dither — Bayer, blue noise, Floyd–Steinberg | place-aware (`IOpticsTool`) | the threshold comes from *where* the pixel is |
+| ~~Dither~~ | place-aware (`IOpticsTool`) | **built.** Ordered (Bayer 8×8, built by recursive doubling rather than written out as 64 numbers) and random, with levels, cell size and amount. **Floyd–Steinberg is not there and will not be**: error diffusion hands the rounding error to the neighbours below and right, so it has to walk the pixels in order — which rules out both the threads and the coarse preview grid. Saying so is more honest than shipping an approximation under its name. The test that matters is not "does it quantise" but "does an 8×8 cell keep its average brightness": within 0.02 at 2, 3 and 6 levels. |
 | Wave glitch, displacement mapping | pixel-moving (`IGeometryTool`) | reads from a displaced position, exactly like the lens tools |
 | ~~Reveal what is under the matte~~ | the composer | **built.** A per-layer amount, 0 to 100%, that lifts the layer's own coverage towards full. Off, the layer is cleanly cut out; at 100% it covers everywhere and whatever sits under its transparency is in the picture. Measured on the test file: 0.00 steps of neighbour noise off, 62.61 at half, 83.78 full. The layer's existing mask decides *where* — so a cryptomatte already steers it, which was the whole point. And the limit is in the test too, because it should surprise nobody: a cleanly premultiplied file carries black under its matte, and then nothing happens. The effect needs material. |
 | **Pixel sorting** | **none of them** | see below |

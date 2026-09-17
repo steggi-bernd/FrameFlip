@@ -45,6 +45,7 @@ public partial class GradingPanel : UserControl
     private TextureTool _texture = new();
     private VignetteTool _vignette = new();
     private GrainTool _grain = new();
+    private DitherTool _dither = new();
     private DistortionTool _distortion = new();
     private ChromaticTool _chromatic = new();
     private DepthFieldTool _depth = new();
@@ -241,6 +242,7 @@ public partial class GradingPanel : UserControl
         // anderer Weg durch den Bildprozessor.
         _vignette = TakeOptics<VignetteTool>();
         _grain = TakeOptics<GrainTool>();
+        _dither = TakeOptics<DitherTool>();
 
         // Und die vierte Liste: die Werkzeuge, die Bildpunkte verschieben.
         _distortion = TakeGeometry<DistortionTool>();
@@ -556,6 +558,14 @@ public partial class GradingPanel : UserControl
             VignetteFeatherSlider.Value = Math.Clamp(_vignette.Feather,
                                                      VignetteFeatherSlider.Minimum, VignetteFeatherSlider.Maximum);
 
+            DitherSlider.Value = Math.Clamp(_dither.Amount,
+                                            DitherSlider.Minimum, DitherSlider.Maximum);
+            DitherLevelsSlider.Value = Math.Clamp(_dither.Levels,
+                                                  DitherLevelsSlider.Minimum, DitherLevelsSlider.Maximum);
+            DitherSizeSlider.Value = Math.Clamp(_dither.Size,
+                                                DitherSizeSlider.Minimum, DitherSizeSlider.Maximum);
+            DitherNoiseButton.IsChecked = _dither.Pattern == DitherPattern.Noise;
+
             GrainSlider.Value = Math.Clamp(_grain.Amount, GrainSlider.Minimum, GrainSlider.Maximum);
             GrainSizeSlider.Value = Math.Clamp(_grain.Size,
                                                GrainSizeSlider.Minimum, GrainSizeSlider.Maximum);
@@ -608,6 +618,19 @@ public partial class GradingPanel : UserControl
     /// Regler erst sein Minimum, und schon das loest eine Aenderung aus. Die weiter
     /// unten stehenden Regler gibt es dann noch nicht.
     /// </summary>
+    /// <summary>
+    /// Das Rastermuster hat gewechselt.
+    ///
+    /// Ein eigener Weg, weil ein Schalter keinen Zahlenwert meldet - sonst waere es
+    /// derselbe: einsammeln, was in den Bedienelementen steht, und weitergeben.
+    /// </summary>
+    private void OnDitherPattern(object sender, RoutedEventArgs e)
+    {
+        if (_filling || !IsLoaded) return;
+
+        OnChanged(sender, new RoutedPropertyChangedEventArgs<double>(0, 0));
+    }
+
     private void OnChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
     {
         if (_filling || !IsLoaded) return;
@@ -670,6 +693,13 @@ public partial class GradingPanel : UserControl
         _vignette.Midpoint = (float)VignetteMidpointSlider.Value;
         _vignette.Roundness = (float)VignetteRoundnessSlider.Value;
         _vignette.Feather = (float)VignetteFeatherSlider.Value;
+
+        _dither.Amount = (float)DitherSlider.Value;
+        _dither.Levels = (int)Math.Round(DitherLevelsSlider.Value);
+        _dither.Size = (int)Math.Round(DitherSizeSlider.Value);
+        _dither.Pattern = DitherNoiseButton.IsChecked == true
+            ? DitherPattern.Noise
+            : DitherPattern.Ordered;
 
         _grain.Amount = (float)GrainSlider.Value;
         _grain.Size = (int)Math.Round(GrainSizeSlider.Value);
@@ -747,6 +777,10 @@ public partial class GradingPanel : UserControl
         VignetteMidpointValue.Text = $"{VignetteMidpointSlider.Value:0.00}";
         VignetteRoundnessValue.Text = $"{VignetteRoundnessSlider.Value:+0.00;-0.00;0.00}";
         VignetteFeatherValue.Text = $"{VignetteFeatherSlider.Value:0.00}";
+        DitherValue.Text = $"{DitherSlider.Value:0.00}";
+        DitherLevelsValue.Text = $"{DitherLevelsSlider.Value:0}";
+        DitherSizeValue.Text = $"{DitherSizeSlider.Value:0}";
+
         GrainValue.Text = $"{GrainSlider.Value:0.00}";
         GrainSizeValue.Text = $"{GrainSizeSlider.Value:0}";
         GrainRoughnessValue.Text = $"{GrainRoughnessSlider.Value:0.00}";

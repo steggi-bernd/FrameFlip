@@ -189,6 +189,12 @@ public sealed class GradingStack
             Roughness = grain.Roughness, Colour = grain.Colour,
         },
 
+        DitherTool dither => new DitherTool
+        {
+            Amount = dither.Amount, Levels = dither.Levels,
+            Pattern = dither.Pattern, Size = dither.Size,
+        },
+
         // Wie oben: Ein Werkzeug, das hier fehlt, wuerde geteilt statt kopiert.
         _ => throw new NotSupportedException($"Kein Kopierweg fuer {tool.GetType().Name}."),
     };
