@@ -880,11 +880,24 @@ public partial class LayerPanel : UserControl
     /// Die unterste Ebene kann sich an nichts anschneiden - dort tut der Knopf
     /// nichts, und er sagt es auch, indem er gesperrt bleibt.
     /// </summary>
-    private void OnClipClicked(object sender, RoutedEventArgs e)
+    /// <summary>
+    /// Die Schnittmaske: Diese Ebene gilt nur fuer die EINE Zeile darunter.
+    ///
+    /// Ein Schalter und kein Knopf, weil sie eine Eigenschaft der Ebene ist und kein
+    /// Befehl. Ein Knopf, der sie umlegt, ohne zu zeigen, wie sie steht, laesst einen
+    /// jedes Mal im Bild nachsehen - und das Bild sagt es nur, wenn die Ebene gerade
+    /// etwas tut.
+    ///
+    /// Der Pfeil zeigt nach UNTEN, weil genau das die Aussage ist: nach unten
+    /// gebunden, und zwar an eine einzige Ebene. Dieselbe Schreibweise wie in
+    /// Photoshop, und sie sagt in einem Zeichen, was sonst ein Satz waere.
+    /// </summary>
+    private void OnClipChanged(object sender, RoutedEventArgs e)
     {
-        if (_selected is null || Stack.Layers.IndexOf(_selected) <= 0) return;
+        if (_filling || _selected is null) return;
+        if (Stack.Layers.IndexOf(_selected) <= 0) return;
 
-        _selected.Clipped = !_selected.Clipped;
+        _selected.Clipped = ClipButton.IsChecked == true;
 
         Rebuild();
         Raise(interim: false);
@@ -1166,7 +1179,20 @@ public partial class LayerPanel : UserControl
         DownButton.IsEnabled = at > 0;
 
         ClipButton.IsEnabled = at > 0 && content != LayerContent.Group;
-        ClipButton.Opacity = ClipButton.IsEnabled && _selected!.Clipped ? 1.0 : 0.55;
+
+        // Der Zustand kommt aus der Ebene und nicht aus dem Schalter - sonst zeigte
+        // er nach einem Wechsel der Auswahl noch den der vorigen.
+        bool clipping = ClipButton.IsEnabled && _selected!.Clipped;
+
+        if (ClipButton.IsChecked != clipping)
+        {
+            bool was = _filling;
+
+            _filling = true;
+
+            try { ClipButton.IsChecked = clipping; }
+            finally { _filling = was; }
+        }
 
         IndentButton.IsEnabled = TargetGroup() is not null;
         OutdentButton.IsEnabled = owner is not null && !ReferenceEquals(owner, Stack.Layers);

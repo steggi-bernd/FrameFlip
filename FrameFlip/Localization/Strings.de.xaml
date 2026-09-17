@@ -858,4 +858,9 @@
     <sys:String x:Key="S_MaskLockedNote">Ein Anstrich für alle Bilder.</sys:String>
     <sys:String x:Key="S_MaskLooseNote">Je Bild ein eigener Anstrich — für Einzelbildretusche.</sys:String>
     <sys:String x:Key="S_MaskLayerName">Maske</sys:String>
+    <sys:String x:Key="S_BrushSize">Größe</sys:String>
+    <sys:String x:Key="S_BrushHardness">Härte</sys:String>
+    <sys:String x:Key="S_BrushFlow">Stärke</sys:String>
+    <sys:String x:Key="S_BrushOpacity">Deckkraft</sys:String>
+    <sys:String x:Key="S_BrushHint">Stärke und Deckkraft sind nicht dasselbe: Die eine sagt, wieviel EIN Strich aufträgt, die andere, wo auch zehn Striche aufhören. Bei Deckkraft 0,3 bleibt die Maske knapp bei einem Drittel, so oft man auch darübergeht. Alt gedrückt halten nimmt weg.</sys:String>
 </ResourceDictionary>

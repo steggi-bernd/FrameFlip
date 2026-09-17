@@ -17,6 +17,55 @@
         <TextBlock x:Name="ToolHint" Margin="0,4,0,0" FontSize="10" TextWrapping="Wrap"
                    Foreground="{StaticResource MutedBrush}" />
 
+        <!--
+            Der Pinsel. Vier Zahlen, und jede beantwortet eine eigene Frage: wie
+            gross, wie hart die Kante, wie schnell es aufbaut, und wie weit es
+            ueberhaupt gehen darf.
+
+            Staerke und Deckkraft sind nicht dasselbe, auch wenn sie sich aehnlich
+            anfuehlen: Die eine sagt, wieviel EIN Strich auftraegt, die andere, wo
+            auch zehn Striche aufhoeren. Ohne die zweite laeuft jede weiche Maske
+            frueher oder spaeter voll.
+        -->
+        <StackPanel x:Name="BrushBody" Visibility="Collapsed" Margin="0,10,0,0">
+
+            <Grid Margin="0,0,0,2">
+                <TextBlock Text="{DynamicResource S_BrushSize}" Style="{StaticResource PanelLabel}" />
+                <TextBlock x:Name="BrushSizeValue" Style="{StaticResource PanelValue}" />
+            </Grid>
+            <Slider x:Name="BrushSizeSlider" Style="{StaticResource PanelSlider}"
+                    Minimum="2" Maximum="400" Value="40" SmallChange="2" LargeChange="20"
+                    ValueChanged="OnBrushChanged" MouseDoubleClick="OnBrushReset" Tag="40" />
+
+            <Grid Margin="0,10,0,2">
+                <TextBlock Text="{DynamicResource S_BrushHardness}" Style="{StaticResource PanelLabel}" />
+                <TextBlock x:Name="BrushHardnessValue" Style="{StaticResource PanelValue}" />
+            </Grid>
+            <Slider x:Name="BrushHardnessSlider" Style="{StaticResource PanelSlider}"
+                    Minimum="0" Maximum="1" Value="0.5" SmallChange="0.02" LargeChange="0.1"
+                    ValueChanged="OnBrushChanged" MouseDoubleClick="OnBrushReset" Tag="0.5" />
+
+            <Grid Margin="0,10,0,2">
+                <TextBlock Text="{DynamicResource S_BrushFlow}" Style="{StaticResource PanelLabel}" />
+                <TextBlock x:Name="BrushFlowValue" Style="{StaticResource PanelValue}" />
+            </Grid>
+            <Slider x:Name="BrushFlowSlider" Style="{StaticResource PanelSlider}"
+                    Minimum="0.02" Maximum="1" Value="0.7" SmallChange="0.02" LargeChange="0.1"
+                    ValueChanged="OnBrushChanged" MouseDoubleClick="OnBrushReset" Tag="0.7" />
+
+            <Grid Margin="0,10,0,2">
+                <TextBlock Text="{DynamicResource S_BrushOpacity}" Style="{StaticResource PanelLabel}" />
+                <TextBlock x:Name="BrushOpacityValue" Style="{StaticResource PanelValue}" />
+            </Grid>
+            <Slider x:Name="BrushOpacitySlider" Style="{StaticResource PanelSlider}"
+                    Minimum="0.05" Maximum="1" Value="1" SmallChange="0.02" LargeChange="0.1"
+                    ValueChanged="OnBrushChanged" MouseDoubleClick="OnBrushReset" Tag="1" />
+
+            <TextBlock Margin="0,8,0,0" FontSize="10" TextWrapping="Wrap"
+                       Foreground="{StaticResource MutedBrush}"
+                       Text="{DynamicResource S_BrushHint}" />
+        </StackPanel>
+
         <!-- Was die Pipette gelesen hat -->
         <StackPanel x:Name="PickBody" Visibility="Collapsed" Margin="0,10,0,0">
 

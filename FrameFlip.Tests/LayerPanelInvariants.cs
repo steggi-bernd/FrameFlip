@@ -289,18 +289,35 @@ public static class LayerPanelInvariants
             },
         });
 
-        var clip = (Button)panel.FindName("ClipButton");
-        Check.That(clip.IsEnabled, "auf der oberen Ebene geht es");
+        // Ein SCHALTER und kein Knopf: Die Schnittmaske ist eine Eigenschaft der
+        // Ebene, und wer sie nicht ablesen kann, sieht bei jedem Wechsel der Auswahl
+        // im Bild nach.
+        var clip = (System.Windows.Controls.Primitives.ToggleButton)panel.FindName("ClipButton");
 
-        Click(panel, "ClipButton");
+        Check.That(clip.IsEnabled, "auf der oberen Ebene geht es");
+        Check.That(clip.IsChecked != true, "und steht zunaechst offen");
+
+        clip.IsChecked = true;
         Check.That(panel.Stack.Layers[1].Clipped, "und setzt die Schnittmaske");
 
-        Click(panel, "ClipButton");
-        Check.That(!panel.Stack.Layers[1].Clipped, "noch einmal nimmt sie wieder zurueck");
+        clip.IsChecked = false;
+        Check.That(!panel.Stack.Layers[1].Clipped, "umgelegt nimmt sie wieder zurueck");
+
+        // Und er zeigt, was an der Ebene steht - nicht, was zuletzt geklickt wurde.
+        panel.Stack.Layers[1].Clipped = true;
+        Select(panel, panel.Stack.Layers[0]);
+        Select(panel, panel.Stack.Layers[1]);
+
+        Check.That(clip.IsChecked == true,
+                   "und liest den Stand aus der Ebene, nicht aus sich selbst");
+
+        panel.Stack.Layers[1].Clipped = false;
+        Select(panel, panel.Stack.Layers[0]);
+        Select(panel, panel.Stack.Layers[1]);
 
         // Nach ganz unten geschoben kann sie sich an nichts mehr anschneiden.
         Click(panel, "DownButton");
-        Check.That(!clip.IsEnabled, "auf der untersten Ebene ist der Knopf gesperrt");
+        Check.That(!clip.IsEnabled, "auf der untersten Ebene ist er gesperrt");
     }
 
     /// <summary>
@@ -484,7 +501,7 @@ public static class LayerPanelInvariants
         // Eine Gruppe laesst sich nicht anschneiden - sie ist keine Ebene, an die
         // sich etwas anschneidet.
         Select(panel, group);
-        var clip = (Button)panel.FindName("ClipButton");
+        var clip = (System.Windows.Controls.Primitives.ToggleButton)panel.FindName("ClipButton");
         Check.That(!clip.IsEnabled, "eine Gruppe nimmt keine Schnittmaske");
     }
 

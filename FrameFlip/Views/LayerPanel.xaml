@@ -186,9 +186,9 @@
                             Ein Farbpass ist ein Faktor seines Lichtpasses und nicht
                             des ganzen Stapels darunter.
                         -->
-                        <Button x:Name="ClipButton" Style="{StaticResource StripButton}"
-                                Content="↳" Click="OnClipClicked"
-                                ToolTip="{DynamicResource S_ClipLayer}" />
+                        <ToggleButton x:Name="ClipButton" Style="{StaticResource StripToggle}"
+                                      Content="↓" Checked="OnClipChanged" Unchecked="OnClipChanged"
+                                      ToolTip="{DynamicResource S_ClipLayer}" />
                     </StackPanel>
 
                     <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">

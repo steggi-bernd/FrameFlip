@@ -1,5 +1,6 @@
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Controls.Primitives;
 using FrameFlip.Localization;
 
 namespace FrameFlip.Views;
@@ -24,6 +25,48 @@ public partial class PropertiesPanel : UserControl
 
     /// <summary>Jemand moechte die gelesene Entfernung als Scharfstellung.</summary>
     public event Action<float>? FocusWanted;
+
+    /// <summary>Eine Pinseleinstellung hat sich geaendert.</summary>
+    public event Action? BrushChanged;
+
+    /// <summary>Der Pinselradius in Bildpunkten.</summary>
+    public float BrushRadius => (float)BrushSizeSlider.Value / 2f;
+
+    /// <summary>Wie hart die Kante ist. 0 ist ein Verlauf, 1 eine Scheibe.</summary>
+    public float BrushHardness => (float)BrushHardnessSlider.Value;
+
+    /// <summary>Wie schnell ein Strich auftraegt.</summary>
+    public float BrushFlow => (float)BrushFlowSlider.Value;
+
+    /// <summary>Bis wohin ein Strich ueberhaupt auftraegt.</summary>
+    public float BrushOpacity => (float)BrushOpacitySlider.Value;
+
+    private void OnBrushChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
+    {
+        if (!IsLoaded) return;
+
+        ShowBrushValues();
+        BrushChanged?.Invoke();
+    }
+
+    /// <summary>Doppelklick stellt einen Regler zurueck - wie ueberall sonst auch.</summary>
+    private void OnBrushReset(object sender, System.Windows.Input.MouseButtonEventArgs e)
+    {
+        if (sender is not Slider slider || slider.Tag is not string tag) return;
+        if (!double.TryParse(tag, System.Globalization.CultureInfo.InvariantCulture, out double back))
+            return;
+
+        slider.Value = back;
+        e.Handled = true;
+    }
+
+    private void ShowBrushValues()
+    {
+        BrushSizeValue.Text = $"{BrushSizeSlider.Value:0}";
+        BrushHardnessValue.Text = $"{BrushHardnessSlider.Value:0.00}";
+        BrushFlowValue.Text = $"{BrushFlowSlider.Value:0.00}";
+        BrushOpacityValue.Text = $"{BrushOpacitySlider.Value:0.00}";
+    }
 
     private float? _depth;
 
@@ -51,6 +94,10 @@ public partial class PropertiesPanel : UserControl
         });
 
         PickBody.Visibility = tool == AtelierTool.Pick ? Visibility.Visible : Visibility.Collapsed;
+
+        BrushBody.Visibility = tool == AtelierTool.Brush ? Visibility.Visible : Visibility.Collapsed;
+
+        if (tool == AtelierTool.Brush) ShowBrushValues();
 
         if (tool != AtelierTool.Pick) FocusNote.Visibility = Visibility.Collapsed;
     }

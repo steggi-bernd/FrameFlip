@@ -132,8 +132,14 @@ public sealed class PaintedMask
     /// <paramref name="value"/> ist 1 zum Auftragen und 0 zum Wegnehmen. Aufgetragen
     /// wird das MAXIMUM und weggenommen das Minimum: So baut ein zweiter Strich ueber
     /// demselben Ort nichts weiter auf, und ein Radiergang loescht wirklich.
+    ///
+    /// <paramref name="hardness"/> sagt, wie weit der volle Kern reicht: 0 ist ein
+    /// Verlauf von der Mitte bis zum Rand, 1 eine Scheibe mit Kante. <paramref
+    /// name="opacity"/> ist die Grenze, bis zu der ein Strich ueberhaupt auftraegt -
+    /// bei 0,3 bleibt die Maske auch nach zehn Strichen bei knapp einem Drittel.
     /// </summary>
-    public void Stroke(float imageX, float imageY, float imageRadius, float value, float flow)
+    public void Stroke(float imageX, float imageY, float imageRadius, float value, float flow,
+                       float hardness = 0.5f, float opacity = 1f)
     {
         var cover = Cover();
 
@@ -146,7 +152,7 @@ public sealed class PaintedMask
         int y0 = Math.Max(0, (int)MathF.Floor(cy - radius));
         int y1 = Math.Min(Height - 1, (int)MathF.Ceiling(cy + radius));
 
-        float inner = radius * 0.5f;
+        float inner = radius * Math.Clamp(hardness, 0f, 1f);
 
         for (int y = y0; y <= y1; y++)
         {
@@ -166,7 +172,7 @@ public sealed class PaintedMask
                 if (strength <= 0f) continue;
 
                 int at = y * Width + x;
-                float want = value * 255f;
+                float want = value * Math.Clamp(opacity, 0f, 1f) * 255f;
 
                 cover[at] = value > 0.5f
                     ? (byte)MathF.Max(cover[at], cover[at] + (want - cover[at]) * strength)

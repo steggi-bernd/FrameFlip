@@ -39,8 +39,14 @@ public sealed partial class PlacementAdorner
     /// <summary>Der Pinselradius in Bildpunkten der Leinwand.</summary>
     public float BrushRadius { get; set; } = 40f;
 
-    /// <summary>Wie stark ein Strich auftraegt. 0 bis 1.</summary>
+    /// <summary>Wie schnell ein Strich auftraegt. 0 bis 1.</summary>
     public float BrushFlow { get; set; } = 0.7f;
+
+    /// <summary>Wie hart die Kante ist. 0 ist ein Verlauf, 1 eine Scheibe.</summary>
+    public float BrushHardness { get; set; } = 0.5f;
+
+    /// <summary>Bis wohin ein Strich ueberhaupt auftraegt. 0 bis 1.</summary>
+    public float BrushOpacity { get; set; } = 1f;
 
     /// <summary>Es wurde gemalt. <c>interim</c> heisst: der Strich laeuft noch.</summary>
     public event Action<bool>? Painted;
@@ -173,7 +179,8 @@ public sealed partial class PlacementAdorner
 
         _lastStroke = new Point(x, y);
 
-        _mask.Stroke(x, y, BrushRadius, _erasing ? 0f : 1f, BrushFlow);
+        _mask.Stroke(x, y, BrushRadius, _erasing ? 0f : 1f, BrushFlow,
+                     BrushHardness, BrushOpacity);
 
         MaskChanged();
         Painted?.Invoke(true);
@@ -219,7 +226,8 @@ public sealed partial class PlacementAdorner
             float t = (float)s / steps;
 
             _mask.Stroke((float)(_lastStroke.X + dx * t), (float)(_lastStroke.Y + dy * t),
-                         BrushRadius, _erasing ? 0f : 1f, BrushFlow);
+                         BrushRadius, _erasing ? 0f : 1f, BrushFlow,
+                         BrushHardness, BrushOpacity);
         }
 
         _lastStroke = new Point(x, y);

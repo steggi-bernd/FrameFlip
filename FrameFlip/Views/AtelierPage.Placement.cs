@@ -100,6 +100,8 @@ public partial class AtelierPage
 
             Display.Cursor = System.Windows.Input.Cursors.None;
 
+            UseBrushSettings();
+
             return;
         }
 
@@ -112,6 +114,25 @@ public partial class AtelierPage
         // werden kann. Ihn vorher auszublenden hiesse, ihn auch dort wegzunehmen, wo
         // der Ring gar nicht erscheint.
         Display.Cursor = System.Windows.Input.Cursors.None;
+
+        UseBrushSettings();
+    }
+
+    /// <summary>
+    /// Uebernimmt die Pinseleinstellungen aus der Eigenschaftsspalte.
+    ///
+    /// Sie leben dort und nicht an der Ebene, weil sie zum WERKZEUG gehoeren: Sie
+    /// gelten weiter, wenn man die Ebene wechselt, und waeren an der Ebene Zahlen,
+    /// die bei jedem Klick woanders verschwinden.
+    /// </summary>
+    private void UseBrushSettings()
+    {
+        Placement.BrushRadius = Properties.BrushRadius;
+        Placement.BrushHardness = Properties.BrushHardness;
+        Placement.BrushFlow = Properties.BrushFlow;
+        Placement.BrushOpacity = Properties.BrushOpacity;
+
+        Placement.InvalidateVisual();
     }
 
     /// <summary>

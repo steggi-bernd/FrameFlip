@@ -410,6 +410,20 @@
     </Style>
 
     <!--
+        Derselbe flache Knopf, aber mit Zustand.
+        
+        Gebraucht fuer die Schnittmaske: Sie ist kein Befehl, sondern eine
+        Eigenschaft der Ebene, und ein Knopf, der sie umlegt, ohne zu zeigen, wie sie
+        steht, laesst einen jedes Mal im Bild nachsehen.
+    -->
+    <Style x:Key="StripToggle" TargetType="ToggleButton" BasedOn="{StaticResource OverlayToggle}">
+        <Setter Property="Width" Value="26" />
+        <Setter Property="Height" Value="24" />
+        <Setter Property="MinWidth" Value="26" />
+        <Setter Property="FontSize" Value="12" />
+    </Style>
+
+    <!--
         Karomuster hinter einer Miniatur: Damit sieht eine freigestellte Ebene in der
         Liste auch freigestellt aus. Auf einem einfarbigen Grund ist "durchsichtig"
         von "genau dieser Farbe" nicht zu unterscheiden, und das ist bei einer Liste
