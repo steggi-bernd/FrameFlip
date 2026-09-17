@@ -136,8 +136,23 @@ def main():
     schreibe("08_graustufen_mit_deckung.png", grau, a, mode="LA")
 
     # 9. Palette mit einer durchsichtigen Farbe - wieder ein anderer Farbtyp.
+    #
+    # Die Umwandlung belegt die Indizes 0 bis 254; 255 bleibt frei und wird als der
+    # durchsichtige erklaert. Er muss dann aber auch BENUTZT werden - sonst steht im
+    # Kopf der Datei eine Transparenz, die kein einziger Bildpunkt hat, und die Datei
+    # prueft nichts. Genau das war sie eine Weile lang.
     palette = Image.fromarray(rgb.astype(np.uint8), "RGB").convert(
         "P", palette=Image.ADAPTIVE, colors=255)
+
+    indizes = np.array(palette)
+    indizes[a < 0.5] = 255
+
+    # Die Farbtafel muss auf 256 Eintraege wachsen, sonst liegt der durchsichtige
+    # Index ausserhalb und die Transparenz faellt beim Schreiben still weg.
+    tafel = list(palette.getpalette())[:765] + [0, 0, 0]
+
+    palette = Image.fromarray(indizes, "P")
+    palette.putpalette(tafel)
     palette.save(ziel("09_palette_mit_transparenz.png"), transparency=255)
     print("   09_palette_mit_transparenz.png")
 

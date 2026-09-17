@@ -302,8 +302,8 @@ public static class LayerComposer
                     // mit dem ersten und uebersah den zweiten.
                     if (!inGroup && open)
                     {
-                        Blending.Mix(groupMode, groupOpacity, vr, vg, vb, gr, gg, gb,
-                                     out vr, out vg, out vb);
+                        Blend(groupMode, groupDisplay, groupOpacity, vr, vg, vb, gr, gg, gb,
+                              out vr, out vg, out vb);
                         open = false;
                     }
 

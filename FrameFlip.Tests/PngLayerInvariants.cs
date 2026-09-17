@@ -72,11 +72,18 @@ public static class PngLayerInvariants
         var ground = Read(folder, "00_grundbild.png");
         if (ground is null) return;
 
+        // ALLE Arten, nicht nur die mit acht Bit. Palette, Graustufen, sechzehn Bit
+        // und verschraenkt nehmen im Decoder je einen anderen Weg, und ein Alphakanal,
+        // der auf einem davon falsch ankommt, faellt nur dort auf.
         foreach (string name in new[]
                  {
                      "02_freigestellt_muell_unter_deckung.png",
                      "03_freigestellt_schwarz_unter_deckung.png",
                      "05_freigestellt_harte_kante.png",
+                     "08_graustufen_mit_deckung.png",
+                     "09_palette_mit_transparenz.png",
+                     "10_sechzehn_bit_mit_deckung.png",
+                     "11_verschraenkt.png",
                      "13_wasserzeichen_muell_unter_deckung.png",
                  })
         {
@@ -100,6 +107,38 @@ public static class PngLayerInvariants
 
             Check.That(worst == 0, $"{Path.GetFileNameWithoutExtension(name)}: der Untergrund bleibt",
                        $"groesste Abweichung {worst} von 255");
+        }
+
+        // Und die eine Datei, die NICHT byteweise stehenbleiben darf.
+        //
+        // Ihr durchsichtiger Bereich ist absichtlich nicht ganz durchsichtig - ein paar
+        // Stufen Deckung, wie sie eine Freistellung aus der Hand hinterlaesst. Dass
+        // davon etwas ankommt, ist richtig; sie hier zu den anderen zu stellen war mein
+        // Fehler und nicht der des Programms. Was geprueft wird, ist die Groesse: Ein
+        // paar Stufen sind die Datei, dreissig waeren die Rechnung.
+        var faint = Read(folder, "14_fast_durchsichtig_mit_rauschen.png");
+
+        if (faint is not null)
+        {
+            var composed = Compose(ground, faint,
+                                   Path.Combine(folder, "14_fast_durchsichtig_mit_rauschen.png"));
+
+            if (composed is not null)
+            {
+                int worst = 0;
+
+                foreach (var (x, y) in new[] { (2, 2), (ground.Width - 3, 2), (2, ground.Height - 3) })
+                {
+                    int i = y * ground.Width + x;
+
+                    worst = Math.Max(worst, (int)MathF.Round(
+                        MathF.Abs(composed.R[i] - ground.R[i]) * 255f));
+                }
+
+                Check.That(worst <= 8,
+                           "die absichtlich unsaubere Datei laesst wenig durch, nicht viel",
+                           $"groesste Abweichung {worst} von 255");
+            }
         }
     }
 

@@ -55,7 +55,7 @@ public static class StackReproInvariants
 
         if (black is null || clean is null || dirty is null) return;
 
-        double Build(FloatFrame layer, float matte = 0f)
+        double Build(FloatFrame layer, float matte = 0f, bool display = false)
         {
             var stack = Base(black);
 
@@ -63,13 +63,13 @@ public static class StackReproInvariants
             stack.Layers.Add(new ImageLayer
             {
                 Content = LayerContent.Image, Source = "figur", Name = "Figur",
-                Mode = BlendMode.Normal, MatteFloor = matte,
+                Mode = BlendMode.Normal, MatteFloor = matte, BlendInDisplay = display,
             });
 
             stack.Layers.Add(new ImageLayer
             {
                 Content = LayerContent.Image, Source = "figur", Name = "Figur 2",
-                Mode = BlendMode.Normal, MatteFloor = matte,
+                Mode = BlendMode.Normal, MatteFloor = matte, BlendInDisplay = display,
                 Place = new LayerTransform { OffsetY = 0.03f },
             });
 
@@ -77,7 +77,7 @@ public static class StackReproInvariants
             stack.Layers.Add(new ImageLayer
             {
                 Content = LayerContent.Image, Source = "figur", Name = "Screen",
-                Mode = BlendMode.Screen, MatteFloor = matte,
+                Mode = BlendMode.Screen, MatteFloor = matte, BlendInDisplay = display,
                 Place = new LayerTransform { OffsetY = -0.12f },
             });
 
@@ -108,6 +108,17 @@ public static class StackReproInvariants
 
         Check.That(cleaned < 1.0, "mit gesaeuberter Deckung ist es wieder weg",
                    $"{cleaned:0.00} Stufen zwischen Nachbarn");
+
+        // Und der andere Weg: derselbe Stapel, aber im Anzeigeraum gemischt. Das ist
+        // die Probe darauf, dass der Schalter nicht nur in der Mischformel ankommt,
+        // sondern durch den ganzen Composer - vier Stellen mischen dort.
+        double photoshop = Build(dirty, display: true);
+
+        Console.WriteLine($"         im Anzeigeraum gemischt: {photoshop:0.00}");
+
+        Check.That(photoshop < faint / 2,
+                   "im Anzeigeraum kommt deutlich weniger durch",
+                   $"{photoshop:0.00} gegen {faint:0.00}");
     }
 
     /// <summary>Eine VERSCHOBENE freigestellte Ebene darf den Untergrund nicht rauschen lassen.</summary>
