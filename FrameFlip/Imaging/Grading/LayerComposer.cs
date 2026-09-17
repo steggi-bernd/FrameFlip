@@ -188,7 +188,7 @@ public static class LayerComposer
                                 gain * layer.Tint.R, gain * layer.Tint.G, gain * layer.Tint.B, clipped,
                                 layer.Mask, maskKind, maskFrame, maskLevels, maskIds,
                                 layer.Content, grade, used[i].Kind, placed, placement,
-                                maskFloor, maskSpan, layer.MatteFloor);
+                                maskFloor, maskSpan, layer.MatteFloor, layer.BlendInDisplay);
         }
 
         // Die Gitterpunkte einmal aufschreiben, statt sie je Bildpunkt auszurechnen.
@@ -231,6 +231,7 @@ public static class LayerComposer
                 // Schnittmaske in Photoshop wirkt.
                 float gr = 0f, gg = 0f, gb = 0f;
                 var groupMode = BlendMode.Normal;
+                bool groupDisplay = false;
                 float groupOpacity = 1f;
                 bool open = false;
 
@@ -245,8 +246,8 @@ public static class LayerComposer
                         // Eine Schnittgruppe darf keine Gruppengrenze ueberschreiten.
                         if (open)
                         {
-                            Blending.Mix(groupMode, groupOpacity, vr, vg, vb, gr, gg, gb,
-                                         out vr, out vg, out vb);
+                            Blend(groupMode, groupDisplay, groupOpacity, vr, vg, vb, gr, gg, gb,
+                                  out vr, out vg, out vb);
                             open = false;
                         }
 
@@ -283,8 +284,8 @@ public static class LayerComposer
                             : plan.Opacity * Factor(in plan, x, y, width, height, i,
                                                     vr, vg, vb, br, bg, bb);
 
-                        Blending.Mix(plan.Mode, groupFactor, br, bg, bb, vr, vg, vb,
-                                     out vr, out vg, out vb);
+                        Blend(plan.Mode, plan.Display, groupFactor, br, bg, bb, vr, vg, vb,
+                              out vr, out vg, out vb);
 
                         continue;
                     }
@@ -397,8 +398,8 @@ public static class LayerComposer
 
                     if (inGroup)
                     {
-                        Blending.Mix(plan.Mode, opacity, gr, gg, gb, lr, lg, lb,
-                                     out gr, out gg, out gb);
+                        Blend(plan.Mode, plan.Display, opacity, gr, gg, gb, lr, lg, lb,
+                              out gr, out gg, out gb);
                     }
                     else
                     {
@@ -406,6 +407,7 @@ public static class LayerComposer
                         gg = lg;
                         gb = lb;
                         groupMode = plan.Mode;
+                        groupDisplay = plan.Display;
 
                         // Die Gruppe fuehrt die Deckkraft ihres Traegers mit, und
                         // damit auch dessen Maske: Erst wenn die Gruppe geschlossen
@@ -429,8 +431,8 @@ public static class LayerComposer
                 }
 
                 if (open)
-                    Blending.Mix(groupMode, groupOpacity, vr, vg, vb, gr, gg, gb,
-                                 out vr, out vg, out vb);
+                    Blend(groupMode, groupDisplay, groupOpacity, vr, vg, vb, gr, gg, gb,
+                          out vr, out vg, out vb);
 
                 r[i] = vr;
                 g[i] = vg;
@@ -583,6 +585,24 @@ public static class LayerComposer
     /// man beim Hinsehen stellt.
     /// </param>
     /// <param name="ur">Was an dieser Stelle schon darunter liegt.</param>
+    /// <summary>
+    /// Mischt - in linearem Licht oder im Anzeigeraum, je nachdem, was die Ebene sagt.
+    ///
+    /// An einer Stelle, weil der Composer an vier Stellen mischt: je Ebene, beim
+    /// Schliessen einer Gruppe, beim Auftragen einer Gruppe und am Ende. Vier
+    /// Verzweigungen waeren vier Gelegenheiten, eine davon zu vergessen.
+    /// </summary>
+    private static void Blend(BlendMode mode, bool display, float opacity,
+                              float ur, float ug, float ub,
+                              float or_, float og, float ob,
+                              out float r, out float g, out float b)
+    {
+        if (display)
+            Blending.MixDisplay(mode, opacity, ur, ug, ub, or_, og, ob, out r, out g, out b);
+        else
+            Blending.Mix(mode, opacity, ur, ug, ub, or_, og, ob, out r, out g, out b);
+    }
+
     private static float Factor(in Plan plan, int x, int y, int width, int height, int i,
                                 float lr, float lg, float lb,
                                 float ur, float ug, float ub)
@@ -654,8 +674,9 @@ public static class LayerComposer
                     FloatFrame[]? maskLevels, float[]? maskIds,
                     LayerContent content, LayerGrade grade, StepKind step,
                     bool placed, LayerPlacement placement,
-                    float maskFloor, float maskSpan, float matteFloor)
+                    float maskFloor, float maskSpan, float matteFloor, bool display)
         {
+            Display = display;
             MatteFloor = matteFloor;
             MaskFloor = maskFloor;
             MaskSpan = maskSpan;
@@ -710,6 +731,9 @@ public static class LayerComposer
         public readonly float MaskLow, MaskHigh, MaskSoftness;
         public readonly float MaskFloor, MaskSpan;
         public readonly float MatteFloor;
+
+        /// <summary>Ob diese Ebene im Anzeigeraum mischt - siehe ImageLayer.</summary>
+        public readonly bool Display;
         public readonly float GradientCos, GradientSin, GradientFrom, GradientTo;
     }
 }

@@ -178,6 +178,18 @@
             <StackPanel x:Name="LayerTools" Margin="0,10,0,0">
                 <Grid Margin="0,0,0,2">
                     <TextBlock Text="{DynamicResource S_BlendMode}" Style="{StaticResource PanelLabel}" />
+
+                    <!--
+                        Der Schalter steht NEBEN der Mischung, weil er zu ihr gehoert:
+                        Er sagt nicht, was gemischt wird, sondern worin. Ein eigener
+                        Abschnitt weiter unten liesse die beiden Fragen getrennt
+                        aussehen, und sie sind es nicht.
+                    -->
+                    <ToggleButton x:Name="BlendSpaceButton" Style="{StaticResource OverlayToggle}"
+                                  HorizontalAlignment="Right" Padding="6,1" FontSize="10"
+                                  Content="{DynamicResource S_BlendSpace}"
+                                  ToolTip="{DynamicResource S_BlendSpaceHint}"
+                                  Click="OnBlendSpaceChanged" />
                 </Grid>
                 <ComboBox x:Name="ModeBox" Style="{StaticResource OverlayCombo}"
                           SelectionChanged="OnModeChanged" />

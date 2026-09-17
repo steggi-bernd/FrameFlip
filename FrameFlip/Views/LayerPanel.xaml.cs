@@ -969,6 +969,7 @@ public partial class LayerPanel : UserControl
             OpacitySlider.Value = Math.Clamp(_selected.Opacity, OpacitySlider.Minimum, OpacitySlider.Maximum);
             MatteSlider.Value = Math.Clamp(_selected.MatteFloor,
                                            MatteSlider.Minimum, MatteSlider.Maximum);
+            BlendSpaceButton.IsChecked = _selected.BlendInDisplay;
             LayerExposureSlider.Value = Math.Clamp(_selected.Exposure,
                                                    LayerExposureSlider.Minimum, LayerExposureSlider.Maximum);
 
@@ -1140,6 +1141,20 @@ public partial class LayerPanel : UserControl
         _selected.Place = new LayerTransform();
 
         PushToControls();
+        Raise(interim: false);
+    }
+
+    /// <summary>
+    /// Der Schalter fuer den Raum, in dem diese Ebene mischt.
+    ///
+    /// Er wirkt sofort und vollstaendig - es gibt nichts daran einzustellen, nur
+    /// zwei Antworten auf die Frage "ist diese Ebene Licht oder ein Bild".
+    /// </summary>
+    private void OnBlendSpaceChanged(object sender, RoutedEventArgs e)
+    {
+        if (_filling || _selected is null) return;
+
+        _selected.BlendInDisplay = BlendSpaceButton.IsChecked == true;
         Raise(interim: false);
     }
 

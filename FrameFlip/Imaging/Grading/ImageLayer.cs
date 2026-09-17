@@ -131,6 +131,23 @@ public sealed class ImageLayer
     public float MatteFloor { get; set; }
 
     /// <summary>
+    /// Ob diese Ebene im ANZEIGERAUM gemischt wird statt in linearem Licht.
+    ///
+    /// Falsch ist die Voreinstellung und der Normalfall: Passe sind Licht, und Licht
+    /// mischt sich linear. Wahr ist der Weg, den Photoshop geht - und der ist fuer
+    /// eine Bildebene ueber einer Bildebene oft der erwartete.
+    ///
+    /// Der Unterschied faellt bei SCHWACHEN Beitraegen auf. Lineares Licht heisst
+    /// dekodieren, mischen, wieder kodieren; die sRGB-Kurve staucht die Tiefen und
+    /// die Rueckkodierung dehnt sie. Ein Beitrag mit kleiner Deckung kommt dadurch
+    /// ungefaehr zehnmal heller heraus - weshalb ein Alphakanal, der nicht genau
+    /// null ist, hier rauscht und in Photoshop nicht.
+    ///
+    /// Der Preis steht am Werkzeug: Diese Mischung kennt kein Weiss darueber.
+    /// </summary>
+    public bool BlendInDisplay { get; set; }
+
+    /// <summary>
     /// Die gesaeuberte Deckung eines Bildpunktes.
     ///
     /// An einer Stelle, weil zwei Wege sie brauchen: der Composer fuer die Ebenen im
@@ -267,6 +284,7 @@ public sealed class ImageLayer
         Content = Content,
         FollowSequence = FollowSequence,
         MatteFloor = MatteFloor,
+        BlendInDisplay = BlendInDisplay,
         Place = Place.Clone(),
         OnTop = OnTop,
         Children = Children.Select(c => c.Clone()).ToList(),

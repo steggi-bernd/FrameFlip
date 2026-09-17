@@ -388,6 +388,17 @@ What that costs, stated plainly:
   white, where its usual formula `a + b − ab` turns negative: two passes at 3 would
   give −3, a black image. The product term is capped at 1, so the result keeps rising
   instead of collapsing.
+- **Colour dodge and burn, linear burn, linear light, vivid light, pin light and
+  exclusion** joined them later, when it turned out that people putting pictures over
+  pictures miss them immediately. They all reference white, so they take the same
+  borrowed pivot.
+- **Subtract and Divide** are the opposite case: they make *more* sense in linear light
+  than in gamma, because taking away or dividing a quantity of light is arithmetic on
+  light. Negative light does not exist, hence the floor at zero.
+- **Hue, saturation, colour and luminosity** cannot be computed channel by channel at
+  all — "the hue of the upper layer" is a statement about the triple. They take the
+  borrowed white too, and the invariant that guards them is their own name: luminosity
+  must leave the result with the upper layer's luminance, colour with the lower one's.
 - **Overlay, Soft Light and Hard Light** genuinely need a white point to pivot around,
   and linear light has none. They borrow one: `x / (x + 0.18)` maps black to 0, middle
   grey to exactly 0.5 and infinity to 1, the Photoshop formula runs there unchanged,
@@ -427,6 +438,21 @@ and a glow *is* light. It is a reason for the **matte cleanup** on an image laye
 lies below a set alpha counts as absent. And it is a reason to write the factor down
 here, because "a little different" is what the person who wrote it believed until a
 picture arrived.
+
+**And it is the reason each layer now chooses its own space.** A layer can be told to
+blend *in display space*, exactly as Photoshop does: encode, mix, decode. Under white it
+matches Photoshop byte for byte — there is a test that walks the combinations and checks
+`a + (b - a)·opacity` on the byte. What it costs is stated at the control: that blend has
+no white above it, so whatever lies beneath is clipped on the way in. Right for a picture
+over a picture, wrong for a pass over a pass — which is why it is a switch on the layer
+and not a setting for the program.
+
+The formulas exist once. `OnDisplay` holds Photoshop's arithmetic on values from 0 to 1;
+the linear path calls it through the borrowed white for every mode that needs a pivot,
+and computes the rest directly. Two copies would have drifted — they nearly had: the
+layers that sit *on top* were already working on display values and calling the linear
+entry point, which mapped them through the borrowed transform a second time. A watermark
+set to Overlay sat next to where it belonged, and it looked like a fault in the file.
 
 In exchange, everything works on values above white — and those are the reason EXR is
 read at all.

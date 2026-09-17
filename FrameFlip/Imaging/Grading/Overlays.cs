@@ -100,13 +100,13 @@ public static class Overlays
                             Math.Clamp(ImageLayer.CleanMatte(oa, plan.MatteFloor), 0f, 1f);
             if (opacity <= 0f) continue;
 
-            Blending.Mix(plan.Mode, opacity, r, g, b,
-                         or_ * plan.ScaleR, og * plan.ScaleG, ob * plan.ScaleB,
-                         out r, out g, out b);
-
-            r = Math.Clamp(r, 0f, 1f);
-            g = Math.Clamp(g, 0f, 1f);
-            b = Math.Clamp(b, 0f, 1f);
+            // Die Anzeigefassung: Hier sind die Werte laengst Anzeigewerte. Die
+            // lineare Fassung bildete sie fuer die Kontrastmischungen ein zweites Mal
+            // ab - ein Wasserzeichen auf Ineinanderkopieren sass daneben, und es sah
+            // aus wie ein Fehler der Vorlage.
+            Blending.MixOn(plan.Mode, opacity, r, g, b,
+                           or_ * plan.ScaleR, og * plan.ScaleG, ob * plan.ScaleB,
+                           out r, out g, out b);
         }
     }
 
