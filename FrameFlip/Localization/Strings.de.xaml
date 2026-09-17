@@ -61,6 +61,18 @@
     <sys:String x:Key="S_ClarityAmount">Stärke</sys:String>
     <sys:String x:Key="S_ClarityReach">Radius</sys:String>
     <sys:String x:Key="S_ClarityHint">Örtlicher Kontrast: Er verstärkt, was ein Punkt gegenüber seiner Umgebung ist, und lässt gleichmäßige Flächen in Ruhe. Großer Radius gibt Plastizität, kleiner gibt Schärfe. Negativ nimmt Kontrast weg.</sys:String>
+    <sys:String x:Key="S_Vignette">Vignette</sys:String>
+    <sys:String x:Key="S_VignetteAmount">Stärke</sys:String>
+    <sys:String x:Key="S_VignetteMidpoint">Ansatz</sys:String>
+    <sys:String x:Key="S_VignetteRoundness">Rundung</sys:String>
+    <sys:String x:Key="S_VignetteFeather">Weichheit</sys:String>
+    <sys:String x:Key="S_VignetteHint">Der Randabfall einer Linse. Sie multipliziert das Licht und wirkt vor der Sichtumwandlung — deshalb braucht sie keinen Lichterschutz: Eine Lampe bleibt weiß, statt zur grauen Scheibe zu werden. Rundung geht von der Raute über den Kreis zum Rechteck.</sys:String>
+    <sys:String x:Key="S_Grain">Filmkorn</sys:String>
+    <sys:String x:Key="S_GrainAmount">Stärke</sys:String>
+    <sys:String x:Key="S_GrainSize">Korngröße</sys:String>
+    <sys:String x:Key="S_GrainRoughness">Rauheit</sys:String>
+    <sys:String x:Key="S_GrainColour">Farbe</sys:String>
+    <sys:String x:Key="S_GrainHint">Das einzige Werkzeug, das sich je Bild ändern muss — sonst ist es kein Korn, sondern Schmutz auf der Linse. Der Wurf kommt aus der Bildnummer im Dateinamen, nicht aus der Stelle im Lauf: Bild 47 bekommt immer dasselbe Korn.</sys:String>
     <sys:String x:Key="S_Dehaze">Dunst</sys:String>
     <sys:String x:Key="S_DehazeAmount">Stärke</sys:String>
     <sys:String x:Key="S_DehazeRadius">Radius</sys:String>
@@ -80,7 +92,7 @@
     <sys:String x:Key="S_HalationRadius">Radius</sys:String>
     <sys:String x:Key="S_HalationTint">Färbung</sys:String>
     <sys:String x:Key="S_HalationHint">Der warme Saum um die Lichter: Im Film geht das Licht durch die Schicht, wird an der Trägerfolie zurückgeworfen und belichtet noch einmal. Enger als der Glanz und immer warm — die Färbung läuft von tiefem Rot ins Orange.</sys:String>
-    <sys:String x:Key="S_LocalOnFinal">Örtliche Werkzeuge wirken auf das fertige Bild, nicht auf eine einzelne Ebene: Sie brauchen die Nachbarschaft eines Punktes, und die steht erst fest, wenn der Stapel zusammengesetzt ist.</sys:String>
+    <sys:String x:Key="S_LocalOnFinal">Diese Werkzeuge wirken auf das fertige Bild, nicht auf eine einzelne Ebene. Die örtlichen brauchen die Nachbarschaft eines Punktes, und die steht erst fest, wenn der Stapel zusammengesetzt ist. Vignette und Korn gehören zur Kamera und nicht zu einer Ebene in ihr.</sys:String>
     <sys:String x:Key="S_Noise">Rauschminderung</sys:String>
     <sys:String x:Key="S_NoiseLuma">Helligkeit</sys:String>
     <sys:String x:Key="S_NoiseColour">Farbe</sys:String>

@@ -251,7 +251,8 @@ public static class GradeVideo
         {
             fixed (byte* target = pixels)
                 FloatFrameProcessor.Apply(frame, request.Adjustments, view, grading,
-                                          (IntPtr)target, stride, step: 1, overlays);
+                                          (IntPtr)target, stride, step: 1, overlays,
+                                          SequenceLink.NumberOf(path) ?? 0);
         }
 
         return pixels;

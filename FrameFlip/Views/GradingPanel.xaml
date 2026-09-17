@@ -540,6 +540,97 @@
                            Text="{DynamicResource S_SharpenHint}" />
             </StackPanel>
 
+            <!--
+                Vignette und Korn: die dritte Art Werkzeug. Sie brauchen keinen
+                Zwischenpuffer, wohl aber den ORT eines Bildpunktes - und stehen
+                deshalb weder bei den punktweisen noch bei den oertlichen.
+            -->
+            <Grid Margin="0,16,0,0">
+                <TextBlock Text="{DynamicResource S_Vignette}" Style="{StaticResource PanelHeading}" />
+                <Button Style="{StaticResource LinkButton}" HorizontalAlignment="Right"
+                        Content="+" Tag="VignetteBody" Click="OnSectionToggled" />
+            </Grid>
+            <StackPanel x:Name="VignetteBody" Visibility="Collapsed" Margin="0,6,0,0">
+                <Grid Margin="0,0,0,2">
+                    <TextBlock Text="{DynamicResource S_VignetteAmount}" Style="{StaticResource PanelLabel}" />
+                    <TextBlock x:Name="VignetteValue" Style="{StaticResource PanelValue}" />
+                </Grid>
+                <Slider x:Name="VignetteSlider" Style="{StaticResource PanelSlider}"
+                        Minimum="-1" Maximum="1" Value="0" SmallChange="0.02" LargeChange="0.1"
+                        ValueChanged="OnChanged" MouseDoubleClick="OnSliderReset" Tag="0" />
+
+                <Grid Margin="0,10,0,2">
+                    <TextBlock Text="{DynamicResource S_VignetteMidpoint}" Style="{StaticResource PanelLabel}" />
+                    <TextBlock x:Name="VignetteMidpointValue" Style="{StaticResource PanelValue}" />
+                </Grid>
+                <Slider x:Name="VignetteMidpointSlider" Style="{StaticResource PanelSlider}"
+                        Minimum="0" Maximum="1" Value="0.5" SmallChange="0.02" LargeChange="0.1"
+                        ValueChanged="OnChanged" MouseDoubleClick="OnSliderReset" Tag="0.5" />
+
+                <Grid Margin="0,10,0,2">
+                    <TextBlock Text="{DynamicResource S_VignetteRoundness}" Style="{StaticResource PanelLabel}" />
+                    <TextBlock x:Name="VignetteRoundnessValue" Style="{StaticResource PanelValue}" />
+                </Grid>
+                <Slider x:Name="VignetteRoundnessSlider" Style="{StaticResource PanelSlider}"
+                        Minimum="-1" Maximum="1" Value="0" SmallChange="0.02" LargeChange="0.1"
+                        ValueChanged="OnChanged" MouseDoubleClick="OnSliderReset" Tag="0" />
+
+                <Grid Margin="0,10,0,2">
+                    <TextBlock Text="{DynamicResource S_VignetteFeather}" Style="{StaticResource PanelLabel}" />
+                    <TextBlock x:Name="VignetteFeatherValue" Style="{StaticResource PanelValue}" />
+                </Grid>
+                <Slider x:Name="VignetteFeatherSlider" Style="{StaticResource PanelSlider}"
+                        Minimum="0.02" Maximum="1" Value="0.5" SmallChange="0.02" LargeChange="0.1"
+                        ValueChanged="OnChanged" MouseDoubleClick="OnSliderReset" Tag="0.5" />
+
+                <TextBlock Margin="0,8,0,0" FontSize="10" TextWrapping="Wrap"
+                           Foreground="{StaticResource MutedBrush}"
+                           Text="{DynamicResource S_VignetteHint}" />
+            </StackPanel>
+
+            <Grid Margin="0,16,0,0">
+                <TextBlock Text="{DynamicResource S_Grain}" Style="{StaticResource PanelHeading}" />
+                <Button Style="{StaticResource LinkButton}" HorizontalAlignment="Right"
+                        Content="+" Tag="GrainBody" Click="OnSectionToggled" />
+            </Grid>
+            <StackPanel x:Name="GrainBody" Visibility="Collapsed" Margin="0,6,0,0">
+                <Grid Margin="0,0,0,2">
+                    <TextBlock Text="{DynamicResource S_GrainAmount}" Style="{StaticResource PanelLabel}" />
+                    <TextBlock x:Name="GrainValue" Style="{StaticResource PanelValue}" />
+                </Grid>
+                <Slider x:Name="GrainSlider" Style="{StaticResource PanelSlider}"
+                        Minimum="0" Maximum="1" Value="0" SmallChange="0.02" LargeChange="0.1"
+                        ValueChanged="OnChanged" MouseDoubleClick="OnSliderReset" Tag="0" />
+
+                <Grid Margin="0,10,0,2">
+                    <TextBlock Text="{DynamicResource S_GrainSize}" Style="{StaticResource PanelLabel}" />
+                    <TextBlock x:Name="GrainSizeValue" Style="{StaticResource PanelValue}" />
+                </Grid>
+                <Slider x:Name="GrainSizeSlider" Style="{StaticResource PanelSlider}"
+                        Minimum="1" Maximum="12" Value="2" SmallChange="1" LargeChange="2"
+                        ValueChanged="OnChanged" MouseDoubleClick="OnSliderReset" Tag="2" />
+
+                <Grid Margin="0,10,0,2">
+                    <TextBlock Text="{DynamicResource S_GrainRoughness}" Style="{StaticResource PanelLabel}" />
+                    <TextBlock x:Name="GrainRoughnessValue" Style="{StaticResource PanelValue}" />
+                </Grid>
+                <Slider x:Name="GrainRoughnessSlider" Style="{StaticResource PanelSlider}"
+                        Minimum="0" Maximum="1" Value="0.4" SmallChange="0.02" LargeChange="0.1"
+                        ValueChanged="OnChanged" MouseDoubleClick="OnSliderReset" Tag="0.4" />
+
+                <Grid Margin="0,10,0,2">
+                    <TextBlock Text="{DynamicResource S_GrainColour}" Style="{StaticResource PanelLabel}" />
+                    <TextBlock x:Name="GrainColourValue" Style="{StaticResource PanelValue}" />
+                </Grid>
+                <Slider x:Name="GrainColourSlider" Style="{StaticResource PanelSlider}"
+                        Minimum="0" Maximum="1" Value="0.2" SmallChange="0.02" LargeChange="0.1"
+                        ValueChanged="OnChanged" MouseDoubleClick="OnSliderReset" Tag="0.2" />
+
+                <TextBlock Margin="0,8,0,0" FontSize="10" TextWrapping="Wrap"
+                           Foreground="{StaticResource MutedBrush}"
+                           Text="{DynamicResource S_GrainHint}" />
+            </StackPanel>
+
             <!-- Tabelle -->
             <Grid Margin="0,16,0,0">
                 <TextBlock Text="{DynamicResource S_Lut}" Style="{StaticResource PanelHeading}" />

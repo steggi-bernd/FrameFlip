@@ -61,6 +61,18 @@
     <sys:String x:Key="S_ClarityAmount">Amount</sys:String>
     <sys:String x:Key="S_ClarityReach">Radius</sys:String>
     <sys:String x:Key="S_ClarityHint">Local contrast: it boosts what a pixel is against its surroundings and leaves flat areas alone. A large radius gives modelling, a small one gives sharpness. Negative takes contrast away.</sys:String>
+    <sys:String x:Key="S_Vignette">Vignette</sys:String>
+    <sys:String x:Key="S_VignetteAmount">Amount</sys:String>
+    <sys:String x:Key="S_VignetteMidpoint">Midpoint</sys:String>
+    <sys:String x:Key="S_VignetteRoundness">Roundness</sys:String>
+    <sys:String x:Key="S_VignetteFeather">Feather</sys:String>
+    <sys:String x:Key="S_VignetteHint">A lens falling off towards the edges. It multiplies light and acts before the view transform — which is why it needs no highlight protection: a lamp stays white instead of turning into a grey disc. Roundness runs from diamond through circle to rectangle.</sys:String>
+    <sys:String x:Key="S_Grain">Film grain</sys:String>
+    <sys:String x:Key="S_GrainAmount">Amount</sys:String>
+    <sys:String x:Key="S_GrainSize">Size</sys:String>
+    <sys:String x:Key="S_GrainRoughness">Roughness</sys:String>
+    <sys:String x:Key="S_GrainColour">Colour</sys:String>
+    <sys:String x:Key="S_GrainHint">The one tool that has to change per frame — otherwise it is not grain but dirt on the lens. The throw comes from the frame number in the file name, not from the position in the run: frame 47 always gets the same grain.</sys:String>
     <sys:String x:Key="S_Dehaze">Dehaze</sys:String>
     <sys:String x:Key="S_DehazeAmount">Amount</sys:String>
     <sys:String x:Key="S_DehazeRadius">Radius</sys:String>
@@ -80,7 +92,7 @@
     <sys:String x:Key="S_HalationRadius">Radius</sys:String>
     <sys:String x:Key="S_HalationTint">Tint</sys:String>
     <sys:String x:Key="S_HalationHint">The warm fringe around highlights: in film the light passes through the emulsion, reflects off the base and exposes it a second time. Tighter than glow and always warm — the tint runs from deep red into orange.</sys:String>
-    <sys:String x:Key="S_LocalOnFinal">Local tools act on the finished picture, not on a single layer: they need a pixel's neighbourhood, and that is only settled once the stack has been composed.</sys:String>
+    <sys:String x:Key="S_LocalOnFinal">These tools act on the finished picture, not on a single layer. The local ones need a pixel's neighbourhood, and that is only settled once the stack has been composed. Vignette and grain belong to the camera, not to a layer inside it.</sys:String>
     <sys:String x:Key="S_Noise">Noise reduction</sys:String>
     <sys:String x:Key="S_NoiseLuma">Luminance</sys:String>
     <sys:String x:Key="S_NoiseColour">Colour</sys:String>

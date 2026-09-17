@@ -41,6 +41,7 @@ static int RunAll()
     LayerPlacementInvariants.Run();
     PlacementDragInvariants.Run();
     LocalToolInvariants.Run();
+    OpticsInvariants.Run();
     LayerPanelInvariants.Run();
     PassRebuildInvariants.Run();
     CryptomatteInvariants.Run();

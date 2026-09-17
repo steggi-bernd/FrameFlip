@@ -64,6 +64,7 @@ public sealed partial class AtelierPage : UserControl
 
     private WriteableBitmap? _surface;
     private string? _path;
+    private int _number;
 
     /// <summary>
     /// Die Ebene, deren Werkzeuge der Streifen gerade zeigt. Null heisst: das
@@ -140,6 +141,12 @@ public sealed partial class AtelierPage : UserControl
     public void Open(string path)
     {
         _path = path;
+
+        // Die Bildnummer aus dem Dateinamen. Sie ist der Wurf fuer das Filmkorn,
+        // und sie kommt aus dem Namen und nicht aus der Stelle im Lauf: Bild 47 soll
+        // immer dasselbe Korn bekommen - in der Vorschau, im Export und auch dann,
+        // wenn jemand spaeter nur einen Ausschnitt nachexportiert.
+        _number = SequenceLink.NumberOf(path) ?? 0;
         FileText.Text = Path.GetFileName(path);
         BusyBadge.Visibility = Visibility.Visible;
         EmptyHint.Visibility = Visibility.Collapsed;
@@ -374,7 +381,7 @@ public sealed partial class AtelierPage : UserControl
             FloatFrameProcessor.Apply(frame, adjustments, ViewFor(frame), grading,
                                       _surface.BackBuffer, _surface.BackBufferStride,
                                       _coarse ? CoarseStep : 1,
-                                      _showingOriginal ? Overlays.None : _overlays);
+                                      _showingOriginal ? Overlays.None : _overlays, _number);
 
             _surface.AddDirtyRect(new Int32Rect(0, 0, frame.Width, frame.Height));
         }
@@ -397,7 +404,7 @@ public sealed partial class AtelierPage : UserControl
         // Ein Histogramm, das sich beim Anklicken einer Ebene aendert, beantwortet
         // eine Frage, die niemand gestellt hat.
         FloatFrameProcessor.Measure(frame, _finalAdjustments, ViewFor(frame), _finalGrading,
-                                    histogram, step: 4);
+                                    histogram, step: 4, _number);
 
         Tools.ShowHistogram(histogram);
     }

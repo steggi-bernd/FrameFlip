@@ -7,7 +7,7 @@ sequence and write it out. Layers, masks driven by render data, and a colour too
 aimed at Photoshop and Lightroom rather than at a node graph.
 
 **Status:** steps 1 to 7 are built and running; of step 8, section 7.3 is complete —
-seven tools on the local path. Step 5 is complete —
+seven tools on the local path — and 7.4 has vignette and film grain. Step 5 is complete —
 pass, adjustment, image and group layers, with order, duplication, opacity, colour,
 blend modes and clipping masks. Of step 6, masks are data-driven: cryptomatte, any
 pass, luminance and gradient; painted masks are not built. Where an earlier estimate or
@@ -802,10 +802,57 @@ than one that is visibly unavailable.
 
 | Tool | Parameters | Notes |
 |---|---|---|
-| **Vignette** | amount, midpoint, roundness, feather, highlight protection | |
+| ~~**Vignette**~~ **built** | amount, midpoint, roundness, feather | the highlight protection turned out to be unnecessary — see below |
 | **Chromatic aberration** | amount, direction | adding it is a look; removing it is a fix |
 | **Lens distortion** | barrel/pincushion, scale | |
-| **Film grain** | amount, size, roughness, colour | **must vary per frame** — see section 10 |
+| ~~**Film grain**~~ **built** | amount, size, roughness, colour | **varies per frame**, from the number in the file name — see section 10 |
+
+**A third kind of tool.** The point-wise tools get a pixel; the local ones get a pixel
+and its blurred surroundings. These two need neither — they need to know *where* they
+are. A vignette is the same arithmetic at every pixel with a different distance from the
+centre; grain is the same arithmetic at every pixel with a different throw. No buffer, no
+second pass, one question.
+
+They run **before the view transform**, and that is not a convenience. A vignette is a
+lens falling off towards the edges, which is a multiplication on light; grain is a
+fluctuation in density, which is also one.
+
+That placement pays for itself immediately: **the vignette needs no highlight
+protection.** Other programs have that control because darkening a finished picture turns
+white into grey and a lamp into a grey disc. Here a lamp at 8.0 is dimmed to 4.0, and
+4.0 is still white after the view transform. The control is not missing; the question
+does not arise. There is a test that draws exactly that pair — a lamp and a white
+surface, side by side, both dimmed by half: the lamp comes out at 255, the white surface
+does not.
+
+The roundness runs from diamond through circle to rectangle by mixing three cheap
+distances rather than raising a superellipse to a power. Three powers per pixel is 75
+million of them at 4K, for a difference nobody could name.
+
+**Grain is the one tool that has to change per frame**, and section 10 says why: a
+pattern that sits still is not grain, it is dirt on the lens. The throw comes from the
+**frame number in the file name**, read with the same expression the sequence scanner
+uses — not from the position in the run. So frame 47 gets the same grain in the preview,
+in the export, and again when somebody re-exports frames 30 to 60 a week later. A running
+counter would have been simpler and would have given a different picture the second time.
+
+It multiplies rather than adds, because grain is a fluctuation in what gets through: black
+stays black, and in the highlights the view transform compresses it — which is where film
+shows least grain too. Lens before film, so the grain sits on top of the vignette and is
+as strong in the corners, relatively, as in the middle; the other way round the corners
+would come out cleaner than the centre, which is backwards.
+
+| 1080p | |
+|---|---|
+| no optics | **33 ms** |
+| vignette | **46 ms** |
+| grain | **~75 ms** |
+
+Grain is four throws per pixel, eight with the second layer that roughness adds — which
+is why the second layer is only thrown when someone asks for it. And the same caveat as
+for sharpening applies: **grain finer than the preview grid cannot be previewed
+truthfully.** While a slider moves, the grain is sampled on the coarse grid and comes out
+coarser than it will be.
 
 ### 7.5 Render data — the tools no image editor has
 
@@ -881,12 +928,14 @@ enough once there is a stack.
 Scopes measure the graded image, as the histogram already does — the diagram should
 show what the eye is seeing.
 
-**One gap, stated rather than hidden:** the measurement runs the point-wise chain, not
-the local one. A histogram taken with glow or clarity switched on shows the picture
-*without* them. For clarity that is a rounding error; for glow it is not, because glow
-genuinely raises the highlights. Closing it means running the measurement through the
-buffer as well, which doubles what a measurement costs — worth doing, and worth doing
-deliberately rather than by accident.
+**One gap, stated rather than hidden:** the measurement runs the point-wise chain and the
+optics, but not the local path. A histogram taken with glow or clarity switched on shows
+the picture *without* them. For clarity that is a rounding error; for glow it is not,
+because glow genuinely raises the highlights. Closing it means running the measurement
+through the buffer as well, which doubles what a measurement costs — worth doing, and
+worth doing deliberately rather than by accident. The optics were cheap to include, since
+they need no buffer, and a vignette shifts half the distribution left: a histogram that
+did not know about it would report headroom that is no longer there.
 
 ---
 
@@ -958,10 +1007,13 @@ worse than no batch at all. Resuming from a partial run belongs here too.
 **Measuring per frame.** Section 2. The single most important constraint, and the one
 most easily lost when a tool gets added late.
 
-**Film grain that does not move.** A grain pattern generated identically for every
-frame is fixed-pattern noise — it reads as dirt on the lens, not as film. The seed has
-to advance with the frame number. The same applies to any noise-based tool, and it is
-the exact mirror of the previous rule: measurement must be frozen, noise must not be.
+**Film grain that does not move.** ~~A grain pattern generated identically for every
+frame is fixed-pattern noise — it reads as dirt on the lens, not as film.~~ **Handled.**
+The throw comes from the frame number in the file name, not from a counter, so it
+advances with the sequence and also reproduces: the same frame gets the same grain in the
+preview, in the export and in a later partial re-export. The same will apply to any
+noise-based tool, and it is the exact mirror of the previous rule: measurement must be
+frozen, noise must not be.
 
 **Trusting one reference frame.** The interface has to make checking easy, not merely
 possible — jump to the darkest and brightest frames of the sequence, scrub with the
@@ -1024,8 +1076,9 @@ next one landing.
    single stop — it has to run before the view transform, where the overbrights still
    exist — and dehaze generalised "the highlights above a threshold" into "whatever the
    tool says goes into the blur". Texture found a wrong sentence in this document. What
-   remains of section 7 is 7.4 optics and 7.5 render data, and those need no new
-   machinery.
+   remains of section 7 is the rest of 7.4 and 7.5 render data. 7.4 brought a third kind
+   of tool after all: one that needs the *place* of a pixel rather than its
+   neighbourhood — vignette and grain are built on it.
 
 Steps 1–4 are the product. 5–8 are what makes it uncontested.
 

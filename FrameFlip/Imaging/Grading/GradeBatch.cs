@@ -141,7 +141,12 @@ public static class GradeBatch
                     }
 
                     var view = frame.IsSceneReferred ? request.View : new StandardViewTransform();
-                    Write(frame, request, view, prepared, overlays, target);
+
+                    // Die Bildnummer aus dem Dateinamen, nicht die Stelle im Lauf:
+                    // Sonst bekaeme dasselbe Bild ein anderes Korn, sobald jemand
+                    // einen Ausschnitt nachexportiert.
+                    Write(frame, request, view, prepared, overlays, target,
+                          SequenceLink.NumberOf(path) ?? 0);
 
                     Interlocked.Increment(ref written);
                 }
@@ -184,11 +189,12 @@ public static class GradeBatch
     };
 
     private static void Write(FloatFrame frame, GradeBatchRequest request, IViewTransform view,
-                              PreparedGrading grading, OverlayPlan[] overlays, string target)
+                              PreparedGrading grading, OverlayPlan[] overlays, string target,
+                              int number)
     {
         BitmapSource image = request.Format == GradeOutputFormat.Png8 || request.Format == GradeOutputFormat.Jpeg
-            ? Render8(frame, request, view, grading, overlays)
-            : Render16(frame, request, view, grading, overlays);
+            ? Render8(frame, request, view, grading, overlays, number)
+            : Render16(frame, request, view, grading, overlays, number);
 
         BitmapEncoder encoder = request.Format switch
         {
@@ -212,14 +218,14 @@ public static class GradeBatch
 
     private static unsafe BitmapSource Render8(FloatFrame frame, GradeBatchRequest request,
                                                IViewTransform view, PreparedGrading grading,
-                                               OverlayPlan[] overlays)
+                                               OverlayPlan[] overlays, int number)
     {
         int stride = frame.Width * 4;
         var pixels = new byte[stride * frame.Height];
 
         fixed (byte* target = pixels)
             FloatFrameProcessor.Apply(frame, request.Adjustments, view, grading, (IntPtr)target, stride,
-                                      step: 1, overlays);
+                                      step: 1, overlays, number);
 
         // JPEG kennt kein Alpha; Bgr32 statt Bgra32 zu schreiben spart dem Encoder
         // das Verwerfen und dem Ergebnis eine Ueberraschung bei durchsichtigen Stellen.
@@ -232,14 +238,14 @@ public static class GradeBatch
 
     private static unsafe BitmapSource Render16(FloatFrame frame, GradeBatchRequest request,
                                                 IViewTransform view, PreparedGrading grading,
-                                                OverlayPlan[] overlays)
+                                                OverlayPlan[] overlays, int number)
     {
         int stride = frame.Width * 8;      // vier Kanaele zu je zwei Byte
         var pixels = new byte[stride * frame.Height];
 
         fixed (byte* target = pixels)
             FloatFrameProcessor.ApplyRgba64(frame, request.Adjustments, view, grading,
-                                            (IntPtr)target, stride, overlays);
+                                            (IntPtr)target, stride, overlays, number);
 
         var source = BitmapSource.Create(frame.Width, frame.Height, 96, 96,
                                          PixelFormats.Rgba64, null, pixels, stride);

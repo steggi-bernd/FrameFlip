@@ -43,6 +43,8 @@ public partial class GradingPanel : UserControl
     private HalationTool _halation = new();
     private DehazeTool _dehaze = new();
     private TextureTool _texture = new();
+    private VignetteTool _vignette = new();
+    private GrainTool _grain = new();
 
     private static readonly Color[] CurveColours =
     {
@@ -115,26 +117,29 @@ public partial class GradingPanel : UserControl
             TargetText.Foreground = (System.Windows.Media.Brush)FindResource(
                 value is null ? "MutedBrush" : "AccentBrush");
 
-            // Die oertlichen Werkzeuge gelten dem fertigen Bild. Eine Einstellungsebene
-            // sitzt mitten im Stapel und wird punktweise gerechnet; eine Nachbarschaft
-            // gibt es dort noch gar nicht. Sie an einer Ebene bedienbar zu lassen waere
-            // schlimmer als sie abzuschalten - der Regler bewegte sich, und das Bild
-            // nicht, und niemand faende heraus, warum.
+            // Zwei Gruppen gelten dem fertigen Bild. Die oertlichen Werkzeuge, weil
+            // eine Einstellungsebene mitten im Stapel punktweise gerechnet wird und es
+            // dort noch gar keine Nachbarschaft gibt. Vignette und Korn, weil sie zur
+            // Kamera gehoeren und nicht zu einer Ebene in ihr - Korn auf einer Ebene,
+            // ueber die dann noch etwas gelegt wird, waere kein Korn mehr.
+            //
+            // Sie an einer Ebene bedienbar zu lassen waere schlimmer als sie
+            // abzuschalten: Der Regler bewegte sich, und das Bild nicht.
             bool onImage = value is null;
 
             LocalOnFinalNote.Visibility = onImage ? Visibility.Collapsed : Visibility.Visible;
 
             _localOnImage = onImage;
-            ApplyLocalEnabled();
+            ApplyPictureToolsEnabled();
         }
     }
 
     /// <summary>
-    /// Ob die oertlichen Abschnitte bedienbar sind. Zwei Gruende koennen sie
-    /// abschalten - der Gesamtschalter und eine ausgewaehlte Ebene -, und beide
-    /// muessen gelten, nicht der zuletzt gesetzte.
+    /// Ob die Abschnitte bedienbar sind, die dem ganzen Bild gelten. Zwei Gruende
+    /// koennen sie abschalten - der Gesamtschalter und eine ausgewaehlte Ebene -, und
+    /// beide muessen gelten, nicht der zuletzt gesetzte.
     /// </summary>
-    private void ApplyLocalEnabled()
+    private void ApplyPictureToolsEnabled()
     {
         bool enabled = ToolsEnabled && _localOnImage;
 
@@ -145,6 +150,8 @@ public partial class GradingPanel : UserControl
         ClarityBody.IsEnabled = enabled;
         TextureBody.IsEnabled = enabled;
         SharpenBody.IsEnabled = enabled;
+        VignetteBody.IsEnabled = enabled;
+        GrainBody.IsEnabled = enabled;
     }
 
     /// <summary>
@@ -161,6 +168,7 @@ public partial class GradingPanel : UserControl
         // Werkzeugen da.
         var tools = stack?.Tools.ToList();
         var local = stack?.Local.ToList();
+        var optics = stack?.Optics.ToList();
 
         Stack.Tools.Clear();
         if (tools is not null) Stack.Tools.AddRange(tools);
@@ -170,6 +178,9 @@ public partial class GradingPanel : UserControl
         // Werkzeug behielte - eingestellt an der einen Ebene, wirksam an allen.
         Stack.Local.Clear();
         if (local is not null) Stack.Local.AddRange(local);
+
+        Stack.Optics.Clear();
+        if (optics is not null) Stack.Optics.AddRange(optics);
 
         _curves = Take<CurvesTool>();
         _whiteBalance = Take<WhiteBalanceTool>();
@@ -189,6 +200,11 @@ public partial class GradingPanel : UserControl
         _texture = TakeLocal<TextureTool>();
         _sharpen = TakeLocal<SharpenTool>();
 
+        // Die Ortswerkzeuge haben ihre eigene Liste - dieselbe Ueberlegung, ein
+        // anderer Weg durch den Bildprozessor.
+        _vignette = TakeOptics<VignetteTool>();
+        _grain = TakeOptics<GrainTool>();
+
         T TakeLocal<T>() where T : ILocalTool, new()
         {
             var found = Stack.Local.OfType<T>().FirstOrDefault();
@@ -196,6 +212,17 @@ public partial class GradingPanel : UserControl
 
             var created = new T();
             Stack.Local.Add(created);
+
+            return created;
+        }
+
+        T TakeOptics<T>() where T : IOpticsTool, new()
+        {
+            var found = Stack.Optics.OfType<T>().FirstOrDefault();
+            if (found is not null) return found;
+
+            var created = new T();
+            Stack.Optics.Add(created);
 
             return created;
         }
@@ -243,7 +270,7 @@ public partial class GradingPanel : UserControl
             ZonesBody.IsEnabled = value;
             BandsBody.IsEnabled = value;
             LutBody.IsEnabled = value;
-            ApplyLocalEnabled();
+            ApplyPictureToolsEnabled();
             VibranceSlider.IsEnabled = value;
         }
     }
@@ -435,6 +462,23 @@ public partial class GradingPanel : UserControl
             SharpenThresholdSlider.Value = Math.Clamp(_sharpen.Threshold,
                                                       SharpenThresholdSlider.Minimum, SharpenThresholdSlider.Maximum);
 
+            VignetteSlider.Value = Math.Clamp(_vignette.Amount,
+                                              VignetteSlider.Minimum, VignetteSlider.Maximum);
+            VignetteMidpointSlider.Value = Math.Clamp(_vignette.Midpoint,
+                                                      VignetteMidpointSlider.Minimum, VignetteMidpointSlider.Maximum);
+            VignetteRoundnessSlider.Value = Math.Clamp(_vignette.Roundness,
+                                                       VignetteRoundnessSlider.Minimum, VignetteRoundnessSlider.Maximum);
+            VignetteFeatherSlider.Value = Math.Clamp(_vignette.Feather,
+                                                     VignetteFeatherSlider.Minimum, VignetteFeatherSlider.Maximum);
+
+            GrainSlider.Value = Math.Clamp(_grain.Amount, GrainSlider.Minimum, GrainSlider.Maximum);
+            GrainSizeSlider.Value = Math.Clamp(_grain.Size,
+                                               GrainSizeSlider.Minimum, GrainSizeSlider.Maximum);
+            GrainRoughnessSlider.Value = Math.Clamp(_grain.Roughness,
+                                                    GrainRoughnessSlider.Minimum, GrainRoughnessSlider.Maximum);
+            GrainColourSlider.Value = Math.Clamp(_grain.Colour,
+                                                 GrainColourSlider.Minimum, GrainColourSlider.Maximum);
+
             DehazeSlider.Value = Math.Clamp(_dehaze.Amount, DehazeSlider.Minimum, DehazeSlider.Maximum);
             DehazeRadiusSlider.Value = Math.Clamp(_dehaze.Reach,
                                                   DehazeRadiusSlider.Minimum, DehazeRadiusSlider.Maximum);
@@ -526,6 +570,16 @@ public partial class GradingPanel : UserControl
         _sharpen.Reach = (int)Math.Round(SharpenRadiusSlider.Value);
         _sharpen.Threshold = (float)SharpenThresholdSlider.Value;
 
+        _vignette.Amount = (float)VignetteSlider.Value;
+        _vignette.Midpoint = (float)VignetteMidpointSlider.Value;
+        _vignette.Roundness = (float)VignetteRoundnessSlider.Value;
+        _vignette.Feather = (float)VignetteFeatherSlider.Value;
+
+        _grain.Amount = (float)GrainSlider.Value;
+        _grain.Size = (int)Math.Round(GrainSizeSlider.Value);
+        _grain.Roughness = (float)GrainRoughnessSlider.Value;
+        _grain.Colour = (float)GrainColourSlider.Value;
+
         _dehaze.Amount = (float)DehazeSlider.Value;
         _dehaze.Reach = (int)Math.Round(DehazeRadiusSlider.Value);
 
@@ -584,6 +638,14 @@ public partial class GradingPanel : UserControl
         SharpenValue.Text = $"{SharpenSlider.Value:0.00}";
         SharpenRadiusValue.Text = $"{SharpenRadiusSlider.Value:0}";
         SharpenThresholdValue.Text = $"{SharpenThresholdSlider.Value:0.000}";
+        VignetteValue.Text = $"{VignetteSlider.Value:+0.00;-0.00;0.00}";
+        VignetteMidpointValue.Text = $"{VignetteMidpointSlider.Value:0.00}";
+        VignetteRoundnessValue.Text = $"{VignetteRoundnessSlider.Value:+0.00;-0.00;0.00}";
+        VignetteFeatherValue.Text = $"{VignetteFeatherSlider.Value:0.00}";
+        GrainValue.Text = $"{GrainSlider.Value:0.00}";
+        GrainSizeValue.Text = $"{GrainSizeSlider.Value:0}";
+        GrainRoughnessValue.Text = $"{GrainRoughnessSlider.Value:0.00}";
+        GrainColourValue.Text = $"{GrainColourSlider.Value:0.00}";
         DehazeValue.Text = $"{DehazeSlider.Value:0.00}";
         DehazeRadiusValue.Text = $"{DehazeRadiusSlider.Value:0}";
         TextureValue.Text = $"{TextureSlider.Value:+0.00;-0.00;0.00}";

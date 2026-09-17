@@ -29,10 +29,20 @@ public sealed class GradingStack
     /// </summary>
     public List<ILocalTool> Local { get; set; } = new();
 
+    /// <summary>
+    /// Die Werkzeuge, die den Ort eines Bildpunktes brauchen - Vignette und Korn.
+    ///
+    /// Wieder eine eigene Liste, und wieder, weil sie einen anderen Weg nehmen: Sie
+    /// brauchen zwar keinen Zwischenpuffer, wohl aber die Frage "wo bin ich", und die
+    /// kann eine punktweise Kette nicht beantworten.
+    /// </summary>
+    public List<IOpticsTool> Optics { get; set; } = new();
+
     /// <summary>True, wenn kein Werkzeug etwas zu tun hat.</summary>
     public bool IsNeutral
         => (Tools.Count == 0 || Tools.All(t => t.IsNeutral)) &&
-           (Local.Count == 0 || Local.All(t => t.IsNeutral));
+           (Local.Count == 0 || Local.All(t => t.IsNeutral)) &&
+           (Optics.Count == 0 || Optics.All(t => t.IsNeutral));
 
     /// <summary>
     /// Bereitet alle Werkzeuge vor und sammelt die ein, die tatsaechlich etwas tun.
@@ -73,8 +83,18 @@ public sealed class GradingStack
             (tool.Stage <= LocalStage.Light ? light : local).Add(tool);
         }
 
+        var optics = new List<IOpticsTool>();
+
+        foreach (var tool in Optics.OrderBy(t => t.Stage))
+        {
+            if (tool.IsNeutral) continue;
+
+            tool.Prepare();
+            optics.Add(tool);
+        }
+
         return new PreparedGrading(linear.ToArray(), display.ToArray(),
-                                   local.ToArray(), light.ToArray());
+                                   local.ToArray(), light.ToArray(), optics.ToArray());
     }
 
     /// <summary>
@@ -88,6 +108,25 @@ public sealed class GradingStack
     {
         Tools = Tools.Select(Copy).ToList(),
         Local = Local.Select(CopyLocal).ToList(),
+        Optics = Optics.Select(CopyOptics).ToList(),
+    };
+
+    private static IOpticsTool CopyOptics(IOpticsTool tool) => tool switch
+    {
+        VignetteTool vignette => new VignetteTool
+        {
+            Amount = vignette.Amount, Midpoint = vignette.Midpoint,
+            Roundness = vignette.Roundness, Feather = vignette.Feather,
+        },
+
+        GrainTool grain => new GrainTool
+        {
+            Amount = grain.Amount, Size = grain.Size,
+            Roughness = grain.Roughness, Colour = grain.Colour,
+        },
+
+        // Wie oben: Ein Werkzeug, das hier fehlt, wuerde geteilt statt kopiert.
+        _ => throw new NotSupportedException($"Kein Kopierweg fuer {tool.GetType().Name}."),
     };
 
     private static ILocalTool CopyLocal(ILocalTool tool) => tool switch
@@ -149,12 +188,14 @@ public sealed class GradingStack
 public readonly struct PreparedGrading
 {
     public PreparedGrading(IGradingTool[] sceneLinear, IGradingTool[] display,
-                           ILocalTool[] local, ILocalTool[]? light = null)
+                           ILocalTool[] local, ILocalTool[]? light = null,
+                           IOpticsTool[]? optics = null)
     {
         SceneLinear = sceneLinear;
         Display = display;
         Local = local;
         LocalLight = light ?? Array.Empty<ILocalTool>();
+        Optics = optics ?? Array.Empty<IOpticsTool>();
     }
 
     public IGradingTool[] SceneLinear { get; }
@@ -182,10 +223,17 @@ public readonly struct PreparedGrading
     /// </summary>
     public ILocalTool[] LocalLight { get; } = Array.Empty<ILocalTool>();
 
+    /// <summary>
+    /// Die Ortswerkzeuge, in ihrer festen Reihenfolge. Sie rechnen auf der linearen
+    /// Seite mit, ohne Puffer - nur mit der Frage, wo der Bildpunkt liegt.
+    /// </summary>
+    public IOpticsTool[] Optics { get; } = Array.Empty<IOpticsTool>();
+
     /// <summary>True, wenn ueberhaupt ein oertliches Werkzeug dabei ist.</summary>
     public bool HasLocal => Local.Length > 0 || LocalLight.Length > 0;
 
-    public bool IsEmpty => SceneLinear.Length == 0 && Display.Length == 0 && !HasLocal;
+    public bool IsEmpty => SceneLinear.Length == 0 && Display.Length == 0 && !HasLocal &&
+                           Optics.Length == 0;
 
     public static readonly PreparedGrading None =
         new(Array.Empty<IGradingTool>(), Array.Empty<IGradingTool>(), Array.Empty<ILocalTool>());

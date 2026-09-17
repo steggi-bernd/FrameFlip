@@ -149,10 +149,20 @@ public static class AtelierPageInvariants
             Check.That(count == 1, $"{kind.Name} steht genau einmal in der oertlichen Liste", $"{count}");
         }
 
+        // Vignette und Korn stehen in ihrer eigenen Liste, aus demselben Grund und
+        // auf einem anderen Weg.
+        foreach (var kind in new[] { typeof(VignetteTool), typeof(GrainTool) })
+        {
+            int count = panel.Stack.Optics.Count(tool => tool.GetType() == kind);
+            Check.That(count == 1, $"{kind.Name} steht genau einmal in der Ortsliste", $"{count}");
+        }
+
         // An einer Ebene sind sie abgeschaltet. Sie wirken auf das fertige Bild; eine
         // Einstellungsebene wird punktweise gerechnet, und eine Nachbarschaft gibt es
         // dort nicht. Bedienbar zu bleiben waere schlimmer als abgeschaltet zu sein -
         // der Regler liefe, und das Bild bliebe stehen.
+        var vignetteBody = (System.Windows.FrameworkElement)panel.FindName("VignetteBody");
+        var grainBody = (System.Windows.FrameworkElement)panel.FindName("GrainBody");
         var dehazeBody = (System.Windows.FrameworkElement)panel.FindName("DehazeBody");
         var textureBody = (System.Windows.FrameworkElement)panel.FindName("TextureBody");
         var bloomBody = (System.Windows.FrameworkElement)panel.FindName("BloomBody");
@@ -164,7 +174,8 @@ public static class AtelierPageInvariants
         panel.Target = "eine Ebene";
 
         Check.That(!dehazeBody.IsEnabled && !bloomBody.IsEnabled && !noiseBody.IsEnabled &&
-                   !clarityBody.IsEnabled && !textureBody.IsEnabled && !sharpenBody.IsEnabled,
+                   !clarityBody.IsEnabled && !textureBody.IsEnabled && !sharpenBody.IsEnabled &&
+                   !vignetteBody.IsEnabled && !grainBody.IsEnabled,
                    "an einer Ebene sind die oertlichen Werkzeuge abgeschaltet");
         Check.That(note.Visibility == System.Windows.Visibility.Visible,
                    "und der Grund steht dabei");
@@ -172,7 +183,8 @@ public static class AtelierPageInvariants
         panel.Target = null;
 
         Check.That(dehazeBody.IsEnabled && bloomBody.IsEnabled && noiseBody.IsEnabled &&
-                   clarityBody.IsEnabled && textureBody.IsEnabled && sharpenBody.IsEnabled,
+                   clarityBody.IsEnabled && textureBody.IsEnabled && sharpenBody.IsEnabled &&
+                   vignetteBody.IsEnabled && grainBody.IsEnabled,
                    "am fertigen Bild wieder an");
         Check.That(note.Visibility != System.Windows.Visibility.Visible,
                    "und der Hinweis verschwindet");

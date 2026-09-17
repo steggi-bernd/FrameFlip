@@ -67,7 +67,7 @@ public static class FloatFrameProcessor
     public static unsafe void Apply(FloatFrame frame, ImageAdjustments adjustments,
                                     IViewTransform view, PreparedGrading grading,
                                     IntPtr destination, int destinationStride, int step = 1,
-                                    OverlayPlan[]? overlays = null)
+                                    OverlayPlan[]? overlays = null, int number = 0)
     {
         overlays ??= Overlays.None;
 
@@ -76,31 +76,13 @@ public static class FloatFrameProcessor
         if (grading.HasLocal)
         {
             ApplyLocal(frame, adjustments, view, grading, destination, destinationStride,
-                       step, overlays);
+                       step, overlays, number);
             return;
         }
-
-        var linearTools = grading.SceneLinear ?? Array.Empty<IGradingTool>();
-        var displayTools = grading.Display ?? Array.Empty<IGradingTool>();
 
         step = Math.Clamp(step, 1, 16);
 
         byte* target = (byte*)destination.ToPointer();
-
-        float gain = (float)Math.Pow(2.0, adjustments.Exposure);
-        float saturation = (float)adjustments.Saturation;
-        var channel = adjustments.Channel;
-
-        float black = (float)adjustments.BlackPoint;
-        float white = (float)adjustments.WhitePoint;
-        float span = white - black;
-        if (MathF.Abs(span) < 1e-6f) span = 1e-6f;
-
-        float inverseGamma = 1f / MathF.Max(0.0001f, (float)adjustments.Gamma);
-        float contrast = (float)adjustments.Contrast;
-
-        bool needsTone = !Same(black, 0f) || !Same(white, 1f) ||
-                         !Same(inverseGamma, 1f) || !Same(contrast, 1f);
 
         int width = frame.Width;
         var r = frame.R;
@@ -108,8 +90,7 @@ public static class FloatFrameProcessor
         var b = frame.B;
         var a = frame.A;
 
-        var plan = new ShadePlan(gain, saturation, channel, black, span, inverseGamma, contrast,
-                                 needsTone, view, linearTools, displayTools);
+        var plan = BuildPlan(adjustments, view, grading, frame, number);
 
         int height = frame.Height;
 
@@ -130,7 +111,7 @@ public static class FloatFrameProcessor
                     float vr = r[i], vg = g[i], vb = b[i];
                     float alpha = a is null ? 1f : a[i];
 
-                    Shade(in plan, ref vr, ref vg, ref vb, alpha);
+                    Shade(in plan, x, y, ref vr, ref vg, ref vb, alpha);
 
                     // Ganz zum Schluss, auf den fertigen Anzeigewerten: Ein
                     // Wasserzeichen soll in jedem Bild gleich aussehen.
@@ -185,7 +166,7 @@ public static class FloatFrameProcessor
                     float vr = r[i], vg = g[i], vb = b[i];
                     float alpha = a is null ? 1f : a[i];
 
-                    Shade(in plan, ref vr, ref vg, ref vb, alpha);
+                    Shade(in plan, x, y, ref vr, ref vg, ref vb, alpha);
 
                     if (overlays.Length > 0) Overlays.Apply(overlays, x, y, ref vr, ref vg, ref vb);
 
@@ -366,9 +347,9 @@ public static class FloatFrameProcessor
     private static unsafe void ApplyLocal(FloatFrame frame, ImageAdjustments adjustments,
                                           IViewTransform view, PreparedGrading grading,
                                           IntPtr destination, int destinationStride,
-                                          int step, OverlayPlan[] overlays)
+                                          int step, OverlayPlan[] overlays, int number)
     {
-        var plan = BuildPlan(adjustments, view, grading);
+        var plan = BuildPlan(adjustments, view, grading, frame, number);
 
         int width = frame.Width;
         int height = frame.Height;
@@ -413,8 +394,8 @@ public static class FloatFrameProcessor
                 float vr = r[i], vg = g[i], vb = b[i];
                 float va = a is null ? 1f : a[i];
 
-                if (split) ShadeLinear(in plan, ref vr, ref vg, ref vb);
-                else Shade(in plan, ref vr, ref vg, ref vb, va);
+                if (split) ShadeLinear(in plan, columns[gx], y, ref vr, ref vg, ref vb);
+                else Shade(in plan, columns[gx], y, ref vr, ref vg, ref vb, va);
 
                 int at = (row + gx) * 3;
                 values[at] = vr;
@@ -511,8 +492,11 @@ public static class FloatFrameProcessor
     {
         public ShadePlan(float gain, float saturation, ChannelView channel,
                          float black, float span, float inverseGamma, float contrast, bool needsTone,
-                         IViewTransform view, IGradingTool[] linear, IGradingTool[] display)
+                         IViewTransform view, IGradingTool[] linear, IGradingTool[] display,
+                         IOpticsTool[] optics, OpticsPlace place)
         {
+            Optics = optics;
+            Place = place;
             Gain = gain;
             Saturation = saturation;
             Channel = channel;
@@ -531,6 +515,8 @@ public static class FloatFrameProcessor
         public readonly ChannelView Channel;
         public readonly IViewTransform View;
         public readonly IGradingTool[] Linear, Display;
+        public readonly IOpticsTool[] Optics;
+        public readonly OpticsPlace Place;
     }
 
     /// <summary>
@@ -542,9 +528,10 @@ public static class FloatFrameProcessor
     /// beim naechsten Werkzeug auseinander, und dann saehe das Ergebnis anders aus
     /// als die Vorschau, auf die jemand sich verlassen hat.
     /// </summary>
-    private static void Shade(in ShadePlan plan, ref float vr, ref float vg, ref float vb, float alpha)
+    private static void Shade(in ShadePlan plan, int x, int y,
+                              ref float vr, ref float vg, ref float vb, float alpha)
     {
-        ShadeLinear(in plan, ref vr, ref vg, ref vb);
+        ShadeLinear(in plan, x, y, ref vr, ref vg, ref vb);
         ShadeDisplay(in plan, ref vr, ref vg, ref vb, alpha);
     }
 
@@ -555,7 +542,8 @@ public static class FloatFrameProcessor
     /// Glanz und Halation brauchen die Ueberhellen, und hinter der Umwandlung gibt es
     /// die nicht mehr. Wer beides in einem Zug rechnet, kann dort nichts einschieben.
     /// </summary>
-    private static void ShadeLinear(in ShadePlan plan, ref float vr, ref float vg, ref float vb)
+    private static void ShadeLinear(in ShadePlan plan, int x, int y,
+                                    ref float vr, ref float vg, ref float vb)
     {
         // --- lineare Seite ---
 
@@ -582,6 +570,11 @@ public static class FloatFrameProcessor
 
         var linear = plan.Linear;
         for (int t = 0; t < linear.Length; t++) linear[t].Apply(ref vr, ref vg, ref vb);
+
+        // Die Ortswerkzeuge zuletzt auf dieser Seite: Vignette und Korn sind das,
+        // was die Kamera dem Licht antut, nachdem die Szene fertig ist.
+        var optics = plan.Optics;
+        for (int t = 0; t < optics.Length; t++) optics[t].Apply(in plan.Place, x, y, ref vr, ref vg, ref vb);
     }
 
     /// <summary>Die Sichtumwandlung und alles dahinter.</summary>
@@ -630,10 +623,10 @@ public static class FloatFrameProcessor
     public static unsafe void ApplyRgba64(FloatFrame frame, ImageAdjustments adjustments,
                                           IViewTransform view, PreparedGrading grading,
                                           IntPtr destination, int destinationStride,
-                                          OverlayPlan[]? overlays = null)
+                                          OverlayPlan[]? overlays = null, int number = 0)
     {
         overlays ??= Overlays.None;
-        var plan = BuildPlan(adjustments, view, grading);
+        var plan = BuildPlan(adjustments, view, grading, frame, number);
         ushort* target = (ushort*)destination.ToPointer();
 
         int width = frame.Width;
@@ -671,8 +664,8 @@ public static class FloatFrameProcessor
                     float vr = r[i], vg = g[i], vb = b[i];
                     float va = a is null ? 1f : a[i];
 
-                    if (split) ShadeLinear(in plan, ref vr, ref vg, ref vb);
-                    else Shade(in plan, ref vr, ref vg, ref vb, va);
+                    if (split) ShadeLinear(in plan, x, y, ref vr, ref vg, ref vb);
+                    else Shade(in plan, x, y, ref vr, ref vg, ref vb, va);
 
                     int at = i * 3;
                     values[at] = vr;
@@ -716,7 +709,7 @@ public static class FloatFrameProcessor
                     vg = g[i];
                     vb = b[i];
 
-                    Shade(in plan, ref vr, ref vg, ref vb, alpha);
+                    Shade(in plan, x, y, ref vr, ref vg, ref vb, alpha);
                 }
 
                 if (overlays.Length > 0) Overlays.Apply(overlays, x, y, ref vr, ref vg, ref vb);
@@ -730,7 +723,8 @@ public static class FloatFrameProcessor
         });
     }
 
-    private static ShadePlan BuildPlan(ImageAdjustments adjustments, IViewTransform view, PreparedGrading grading)
+    private static ShadePlan BuildPlan(ImageAdjustments adjustments, IViewTransform view,
+                                       PreparedGrading grading, FloatFrame frame, int number)
     {
         float black = (float)adjustments.BlackPoint;
         float white = (float)adjustments.WhitePoint;
@@ -746,7 +740,9 @@ public static class FloatFrameProcessor
         return new ShadePlan((float)Math.Pow(2.0, adjustments.Exposure), (float)adjustments.Saturation,
                              adjustments.Channel, black, span, inverseGamma, contrast, needsTone, view,
                              grading.SceneLinear ?? Array.Empty<IGradingTool>(),
-                             grading.Display ?? Array.Empty<IGradingTool>());
+                             grading.Display ?? Array.Empty<IGradingTool>(),
+                             grading.Optics ?? Array.Empty<IOpticsTool>(),
+                             new OpticsPlace(frame.Width, frame.Height, number));
     }
 
     private static ushort ToUShort(float value)
@@ -781,10 +777,17 @@ public static class FloatFrameProcessor
 
     /// <inheritdoc cref="Measure(FloatFrame, ImageAdjustments, IViewTransform, Histogram, int)"/>
     public static void Measure(FloatFrame frame, ImageAdjustments adjustments, IViewTransform view,
-                               PreparedGrading grading, Histogram histogram, int step = 1)
+                               PreparedGrading grading, Histogram histogram, int step = 1,
+                               int number = 0)
     {
         var linearTools = grading.SceneLinear ?? Array.Empty<IGradingTool>();
         var displayTools = grading.Display ?? Array.Empty<IGradingTool>();
+
+        // Die Ortswerkzeuge zaehlen mit. Eine Vignette verschiebt die halbe
+        // Verteilung nach links, und ein Histogramm, das sie nicht kennt, zeigt eine
+        // Reserve an, die es nicht mehr gibt.
+        var optics = grading.Optics ?? Array.Empty<IOpticsTool>();
+        var place = new OpticsPlace(frame.Width, frame.Height, number);
 
         histogram.Clear();
         step = Math.Max(1, step);
@@ -827,6 +830,9 @@ public static class FloatFrameProcessor
 
                 for (int t = 0; t < linearTools.Length; t++)
                     linearTools[t].Apply(ref vr, ref vg, ref vb);
+
+                for (int t = 0; t < optics.Length; t++)
+                    optics[t].Apply(in place, x, y, ref vr, ref vg, ref vb);
 
                 view.Apply(ref vr, ref vg, ref vb);
 
