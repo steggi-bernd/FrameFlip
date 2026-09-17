@@ -114,7 +114,16 @@ public sealed class ImageLayer
     /// Renderpasse additiv zerlegt sind: Alle Passe auf Add ergeben wieder das
     /// Bild, das Blender gerendert hat.
     /// </summary>
-    public BlendMode Mode { get; set; } = BlendMode.Add;
+    /// <summary>
+    /// Die Mischung. Normal als Voreinstellung, und das ist eine Korrektur.
+    ///
+    /// Vorher stand hier Add, weil der Stapel fuer PASSE gebaut wurde und deren
+    /// Summe wieder das Bild ergibt. Nur legt sie jeder, der die Klasse benutzt,
+    /// ohnehin ausdruecklich fest - der Passaufbau ebenso wie der Menuepunkt fuer
+    /// eine Bildebene. Uebrig blieb eine Voreinstellung, die nur den erwischt, der
+    /// eine Ebene im Vorbeigehen anlegt, und die dann ein Logo zum Leuchten bringt.
+    /// </summary>
+    public BlendMode Mode { get; set; } = BlendMode.Normal;
 
     /// <summary>0 bis 1.</summary>
     public float Opacity { get; set; } = 1f;

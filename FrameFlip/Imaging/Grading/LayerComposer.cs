@@ -307,7 +307,12 @@ public static class LayerComposer
                     }
 
                     float lr, lg, lb;
-                    float placedAlpha = 1f;
+                    // Die Deckung, die die Ebene SELBST mitbringt - aus ihrem
+                    // Alphakanal, aus der weichen Kante ihrer Flaeche oder aus
+                    // beidem. Sie wirkt wie eine Maske und wird weiter unten zur
+                    // oertlichen Deckkraft verrechnet.
+                    float ownAlpha = 1f;
+                    bool hasOwnAlpha = false;
                     bool hasPlacedAlpha = false;
 
                     if (plan.Content == LayerContent.Adjustment)
@@ -335,7 +340,7 @@ public static class LayerComposer
                         float covered = plan.Placement.Coverage(x, y, out float u, out float v);
                         if (covered <= 0f) continue;
 
-                        plan.Placement.Sample(frame!, u, v, out lr, out lg, out lb, out placedAlpha);
+                        plan.Placement.Sample(frame!, u, v, out lr, out lg, out lb, out ownAlpha);
 
                         lr *= plan.ScaleR;
                         lg *= plan.ScaleG;
@@ -344,14 +349,31 @@ public static class LayerComposer
                         // Die eigene Deckung der Ebene zaehlt mit, und die weiche
                         // Kante der Flaeche ebenso: Ein Logo mit durchsichtigem Rand
                         // bleibt durchsichtig, und eine gedrehte Kante bleibt glatt.
-                        placedAlpha *= covered;
-                        hasPlacedAlpha = true;
+                        ownAlpha *= covered;
+                        hasOwnAlpha = true;
                     }
                     else
                     {
                         lr = frame!.R[i] * plan.ScaleR;
                         lg = frame.G[i] * plan.ScaleG;
                         lb = frame.B[i] * plan.ScaleB;
+
+                        // Eine Bildebene in Bildgroesse bringt ihre Deckung genauso
+                        // mit wie eine platzierte - nur dass sie nicht abgetastet
+                        // werden muss. Sie hier zu uebergehen war der Fehler, der
+                        // freigestellte PNGs mit pixeligem Nebel fuellte: Unter der
+                        // Deckung steht in den meisten Dateien, was zufaellig im
+                        // Puffer stand, und ohne Deckung wird genau das gezeigt.
+                        //
+                        // Nur bei BILDebenen. Bei einem Pass heisst Deckung null
+                        // "hier wurde nichts getroffen", und die Farbe daneben ist
+                        // trotzdem echt - das Umgebungslicht steht dort. Einen Pass
+                        // mit seinem Alpha zu multiplizieren loeschte den Himmel.
+                        if (plan.Content == LayerContent.Image && frame.A is not null)
+                        {
+                            ownAlpha = frame.A[i];
+                            hasOwnAlpha = true;
+                        }
                     }
 
                     // Die Maske greift an genau einer Stelle an: Sie macht die
@@ -366,9 +388,9 @@ public static class LayerComposer
                                                 inGroup ? gg : vg,
                                                 inGroup ? gb : vb);
 
-                    // Die Deckung einer platzierten Ebene wirkt wie eine Maske: Sie
-                    // macht die Deckkraft oertlich. Dieselbe Stelle, dieselbe Regel.
-                    if (hasPlacedAlpha) opacity *= Math.Clamp(placedAlpha, 0f, 1f);
+                    // Die eigene Deckung wirkt wie eine Maske: Sie macht die
+                    // Deckkraft oertlich. Dieselbe Stelle, dieselbe Regel.
+                    if (hasOwnAlpha) opacity *= Math.Clamp(ownAlpha, 0f, 1f);
 
                     if (inGroup)
                     {
@@ -399,7 +421,7 @@ public static class LayerComposer
                     // undurchsichtig zu machen, das es nicht war.
                     if (frame is null) continue;
 
-                    float la = (hasPlacedAlpha ? 1f : frame.A is null ? 1f : frame.A[i]) * opacity;
+                    float la = (hasOwnAlpha ? 1f : frame.A is null ? 1f : frame.A[i]) * opacity;
                     if (la > va) va = la;
                 }
 

@@ -43,6 +43,7 @@ static int RunAll()
     LocalToolInvariants.Run();
     OpticsInvariants.Run();
     RenderDataInvariants.Run();
+    PngLayerInvariants.Run();
     LayerPanelInvariants.Run();
     PassRebuildInvariants.Run();
     CryptomatteInvariants.Run();
