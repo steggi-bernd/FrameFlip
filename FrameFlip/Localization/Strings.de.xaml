@@ -844,4 +844,9 @@
     <sys:String x:Key="S_DitherDuotoneHint">Rastert die HELLIGKEIT statt jeden Kanal für sich und bildet das Ergebnis auf zwei Farben ab - Schwarz und die gewählte. Ohne diesen Schalter entscheiden Rot, Grün und Blau jeder für sich; auf einem farbigen Bild laufen sie auseinander, und was als Silhouette erkennbar war, zerfällt in drei unabhängige Punktwolken. Es ist außerdem die einzige Art, hier überhaupt Farbe zu bekommen: Der Rasterdurchgang läuft ganz am Ende, nach allen Farbwerkzeugen.</sys:String>
     <sys:String x:Key="S_DitherHue">Farbton</sys:String>
     <sys:String x:Key="S_DitherSaturation">Sättigung</sys:String>
+    <sys:String x:Key="S_GroupBasics">Grundkorrektur</sys:String>
+    <sys:String x:Key="S_GroupLight">Licht und Zeichnung</sys:String>
+    <sys:String x:Key="S_GroupOptics">Optik</sys:String>
+    <sys:String x:Key="S_GroupFilm">Film</sys:String>
+    <sys:String x:Key="S_GroupTable">Tabelle</sys:String>
 </ResourceDictionary>

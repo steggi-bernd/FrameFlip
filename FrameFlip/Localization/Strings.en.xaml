@@ -844,4 +844,9 @@
     <sys:String x:Key="S_DitherDuotoneHint">Rasters the BRIGHTNESS instead of each channel on its own and maps the result onto two colours - black and the chosen one. Without this, red, green and blue each decide for themselves; on a colour picture they drift apart, and what was a readable silhouette falls into three independent clouds of dots. It is also the only way to get colour here at all: the raster pass runs right at the end, after every colour tool.</sys:String>
     <sys:String x:Key="S_DitherHue">Hue</sys:String>
     <sys:String x:Key="S_DitherSaturation">Saturation</sys:String>
+    <sys:String x:Key="S_GroupBasics">Basics</sys:String>
+    <sys:String x:Key="S_GroupLight">Light and detail</sys:String>
+    <sys:String x:Key="S_GroupOptics">Optics</sys:String>
+    <sys:String x:Key="S_GroupFilm">Film</sys:String>
+    <sys:String x:Key="S_GroupTable">Table</sys:String>
 </ResourceDictionary>

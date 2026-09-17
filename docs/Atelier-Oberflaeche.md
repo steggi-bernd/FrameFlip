@@ -270,18 +270,24 @@ the tool list*, not a place you go.
    tool's frame, which fixes bugs 3 and 4 by construction rather than by patching.
 4. **The right column** (section 5), stage 1: splitters, tabs, memory, layers moved to
    the bottom.
-5. **The filter gallery** (section 8), and in this order: the matte switch first,
+5. **Masks that can be drawn.** There are six kinds today - none, luminance,
+   underlying, pass, gradient, cryptomatte - and cryptomatte works end to end, picked by
+   clicking an object with the Select tool. What is missing is a **painted** mask: a
+   brush, and a way to see what it covers. Everything else in this program can already
+   say *where* it applies except the one way people reach for first.
+6. **The filter gallery** (section 8), and in this order: the matte switch first,
    because it is three lines and it is the effect that started this; then dither and
    displacement, which need nothing new; then pixel sorting, which needs a sixth pass
    kind and deserves to be decided on its own merits rather than carried in by the
    other three.
-6. **Tear-off windows**, stage 3, if the second monitor turns out to matter.
+7. **Tear-off windows**, stage 4, if the second monitor turns out to matter.
 
 Steps 1 and 2 are worth doing whatever happens to the rest. Step 3 is the one that
 changes how the program feels. Step 4 is comfort, and comfort is worth less than a
 mouse that does what it looks like it does.
 
-Step 5 is the only one that adds something the program cannot do at all today, and it
+Steps 5 and 6 are the only ones that add something the program cannot do at all today, and
+the gallery
 is deliberately last — not because it matters least, but because a gallery of
 procedural effects without a tool column is a list of sliders, and a mask that cannot
 be drawn with the mouse is a mask nobody will use.

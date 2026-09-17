@@ -94,6 +94,7 @@ static int RunAll()
     DitherInvariants.Run();
     DitherPipelineInvariants.Run();
     DitherPanelInvariants.Run();
+    GradingGroupInvariants.Run();
     RenderInvariants.Run();
     RenderServiceInvariants.Run();
     UploadInvariants.Run();

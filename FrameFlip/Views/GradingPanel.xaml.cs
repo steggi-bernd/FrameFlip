@@ -700,6 +700,56 @@ public partial class GradingPanel : UserControl
     /// Ein eigener Weg, weil ein Schalter keinen Zahlenwert meldet - sonst waere es
     /// derselbe: einsammeln, was in den Bedienelementen steht, und weitergeben.
     /// </summary>
+    /// <summary>
+    /// Was ein zugeklappter Abschnitt vorher war.
+    ///
+    /// Eine Gruppe zuzuklappen versteckt ihre Abschnitte; sie wieder aufzuklappen
+    /// darf sie nicht alle OEFFNEN. Wer eine Gruppe zumacht und wieder auf, will den
+    /// Stand von vorher und nicht einen Streifen aus zwanzig offenen Abschnitten.
+    /// </summary>
+    private readonly Dictionary<string, bool> _wasOpen = new(StringComparer.Ordinal);
+
+    /// <summary>
+    /// Eine Gruppe auf- oder zuklappen.
+    ///
+    /// Einundzwanzig Abschnitte in einer Liste sind keine Liste mehr, sondern ein
+    /// Schacht: Wer die Vignette sucht, rollt an siebzehn Dingen vorbei, die er nicht
+    /// gesucht hat. Fuenf Gruppen bilden den Rechenweg ab - Grundkorrektur, Licht und
+    /// Zeichnung, Optik, Film, Tabelle -, und das ist dieselbe Reihenfolge, in der
+    /// auch gerechnet wird.
+    ///
+    /// Die Gruppe kennt ihre Abschnitte ueber eine Namensliste und nicht ueber die
+    /// Schachtelung. Das haelt die XAML flach: Ein Abschnitt, der in eine Gruppe
+    /// hineinwandert, aendert nur einen Namen in einer Zeile, statt drei Ebenen
+    /// Klammern zu verschieben.
+    /// </summary>
+    private void OnGroupToggled(object sender, RoutedEventArgs e)
+    {
+        if (sender is not ToggleButton button || button.Tag is not string members) return;
+
+        bool open = button.IsChecked == true;
+
+        foreach (string name in members.Split(','))
+        {
+            if (FindName(name + "Head") is FrameworkElement head)
+                head.Visibility = open ? Visibility.Visible : Visibility.Collapsed;
+
+            if (FindName(name + "Body") is not FrameworkElement body) continue;
+
+            if (open)
+            {
+                body.Visibility = _wasOpen.TryGetValue(name, out bool was) && was
+                    ? Visibility.Visible
+                    : Visibility.Collapsed;
+            }
+            else
+            {
+                _wasOpen[name] = body.Visibility == Visibility.Visible;
+                body.Visibility = Visibility.Collapsed;
+            }
+        }
+    }
+
     private void OnDitherPattern(object sender, RoutedEventArgs e)
     {
         if (_filling || !IsLoaded) return;

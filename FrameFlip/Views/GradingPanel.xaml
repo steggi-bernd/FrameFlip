@@ -41,8 +41,12 @@
             <TextBlock x:Name="ClipText" Margin="0,0,0,4" FontSize="10"
                        Foreground="{StaticResource MutedBrush}" TextWrapping="Wrap" />
 
+            <ToggleButton x:Name="GroupBasic" Style="{StaticResource SectionHeader}"
+                          Margin="0,18,0,2" IsChecked="True" Tag="Basic,Curve,WhiteBalance,Zones,Bands"
+                          Content="{DynamicResource S_GroupBasics}"
+                          Checked="OnGroupToggled" Unchecked="OnGroupToggled" />
             <!-- Grundkorrektur -->
-            <Grid Margin="0,10,0,6">
+            <Grid x:Name="BasicHead" Margin="0,10,0,6">
                 <TextBlock Text="{DynamicResource S_Correction}" Style="{StaticResource PanelHeading}" />
                 <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
                     <Button Style="{StaticResource LinkButton}" Margin="0,0,10,0"
@@ -104,7 +108,7 @@
             </StackPanel>
 
             <!-- Kurven -->
-            <Grid Margin="0,16,0,6">
+            <Grid x:Name="CurveHead" Margin="0,16,0,6">
                 <TextBlock Text="{DynamicResource S_Curves}" Style="{StaticResource PanelHeading}" />
                 <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
                     <Button Style="{StaticResource LinkButton}" Margin="0,0,10,0"
@@ -140,7 +144,7 @@
             </StackPanel>
 
             <!-- Weissabgleich -->
-            <Grid Margin="0,16,0,0">
+            <Grid x:Name="WhiteBalanceHead" Margin="0,16,0,0">
                 <TextBlock Text="{DynamicResource S_WhiteBalance}" Style="{StaticResource PanelHeading}" />
                 <Button Style="{StaticResource LinkButton}" HorizontalAlignment="Right"
                         Content="+" Tag="WhiteBalanceBody" Click="OnSectionToggled" />
@@ -187,7 +191,7 @@
                     ValueChanged="OnChanged" MouseDoubleClick="OnSliderReset" Tag="0" />
 
             <!-- Zonen -->
-            <Grid Margin="0,16,0,0">
+            <Grid x:Name="ZonesHead" Margin="0,16,0,0">
                 <TextBlock Text="{DynamicResource S_Zones}" Style="{StaticResource PanelHeading}" />
                 <Button Style="{StaticResource LinkButton}" HorizontalAlignment="Right"
                         Content="+" Tag="ZonesBody" Click="OnSectionToggled" />
@@ -256,7 +260,7 @@
             </StackPanel>
 
             <!-- Farbbereiche -->
-            <Grid Margin="0,16,0,0">
+            <Grid x:Name="BandsHead" Margin="0,16,0,0">
                 <TextBlock Text="{DynamicResource S_ColourBands}" Style="{StaticResource PanelHeading}" />
                 <Button Style="{StaticResource LinkButton}" HorizontalAlignment="Right"
                         Content="+" Tag="BandsBody" Click="OnSectionToggled" />
@@ -304,11 +308,15 @@
                        Foreground="{StaticResource MutedBrush}"
                        Text="{DynamicResource S_LocalOnFinal}" />
 
+            <ToggleButton x:Name="GroupDehaze" Style="{StaticResource SectionHeader}"
+                          Margin="0,18,0,2" IsChecked="True" Tag="Dehaze,Bloom,Halation,Noise,Clarity,Texture,Sharpen"
+                          Content="{DynamicResource S_GroupLight}"
+                          Checked="OnGroupToggled" Unchecked="OnGroupToggled" />
             <!--
                 Dunst, Glanz und Halation stehen vorn, weil sie zuerst rechnen - und
                 zwar vor der Sichtumwandlung, wo die Werte noch Lichtmengen sind.
             -->
-            <Grid Margin="0,16,0,0">
+            <Grid x:Name="DehazeHead" Margin="0,16,0,0">
                 <TextBlock Text="{DynamicResource S_Dehaze}" Style="{StaticResource PanelHeading}" />
                 <Button Style="{StaticResource LinkButton}" HorizontalAlignment="Right"
                         Content="+" Tag="DehazeBody" Click="OnSectionToggled" />
@@ -335,7 +343,7 @@
                            Text="{DynamicResource S_DehazeHint}" />
             </StackPanel>
 
-            <Grid Margin="0,16,0,0">
+            <Grid x:Name="BloomHead" Margin="0,16,0,0">
                 <TextBlock Text="{DynamicResource S_Bloom}" Style="{StaticResource PanelHeading}" />
                 <Button Style="{StaticResource LinkButton}" HorizontalAlignment="Right"
                         Content="+" Tag="BloomBody" Click="OnSectionToggled" />
@@ -370,7 +378,7 @@
                            Text="{DynamicResource S_BloomHint}" />
             </StackPanel>
 
-            <Grid Margin="0,16,0,0">
+            <Grid x:Name="HalationHead" Margin="0,16,0,0">
                 <TextBlock Text="{DynamicResource S_Halation}" Style="{StaticResource PanelHeading}" />
                 <Button Style="{StaticResource LinkButton}" HorizontalAlignment="Right"
                         Content="+" Tag="HalationBody" Click="OnSectionToggled" />
@@ -413,7 +421,7 @@
                            Text="{DynamicResource S_HalationHint}" />
             </StackPanel>
 
-            <Grid Margin="0,16,0,0">
+            <Grid x:Name="NoiseHead" Margin="0,16,0,0">
                 <TextBlock Text="{DynamicResource S_Noise}" Style="{StaticResource PanelHeading}" />
                 <Button Style="{StaticResource LinkButton}" HorizontalAlignment="Right"
                         Content="+" Tag="NoiseBody" Click="OnSectionToggled" />
@@ -451,7 +459,7 @@
             <!--
                 Klarheit: oertlicher Kontrast mit grossem Radius.
             -->
-            <Grid Margin="0,16,0,0">
+            <Grid x:Name="ClarityHead" Margin="0,16,0,0">
                 <TextBlock Text="{DynamicResource S_Clarity}" Style="{StaticResource PanelHeading}" />
                 <Button Style="{StaticResource LinkButton}" HorizontalAlignment="Right"
                         Content="+" Tag="ClarityBody" Click="OnSectionToggled" />
@@ -478,7 +486,7 @@
                            Text="{DynamicResource S_ClarityHint}" />
             </StackPanel>
 
-            <Grid Margin="0,16,0,0">
+            <Grid x:Name="TextureHead" Margin="0,16,0,0">
                 <TextBlock Text="{DynamicResource S_Texture}" Style="{StaticResource PanelHeading}" />
                 <Button Style="{StaticResource LinkButton}" HorizontalAlignment="Right"
                         Content="+" Tag="TextureBody" Click="OnSectionToggled" />
@@ -505,7 +513,7 @@
                            Text="{DynamicResource S_TextureHint}" />
             </StackPanel>
 
-            <Grid Margin="0,16,0,0">
+            <Grid x:Name="SharpenHead" Margin="0,16,0,0">
                 <TextBlock Text="{DynamicResource S_Sharpen}" Style="{StaticResource PanelHeading}" />
                 <Button Style="{StaticResource LinkButton}" HorizontalAlignment="Right"
                         Content="+" Tag="SharpenBody" Click="OnSectionToggled" />
@@ -540,6 +548,10 @@
                            Text="{DynamicResource S_SharpenHint}" />
             </StackPanel>
 
+            <ToggleButton x:Name="GroupMotion" Style="{StaticResource SectionHeader}"
+                          Margin="0,18,0,2" IsChecked="True" Tag="Motion,Depth,Distortion,Chromatic,Vignette"
+                          Content="{DynamicResource S_GroupOptics}"
+                          Checked="OnGroupToggled" Unchecked="OnGroupToggled" />
             <!--
                 Vignette und Korn: die dritte Art Werkzeug. Sie brauchen keinen
                 Zwischenpuffer, wohl aber den ORT eines Bildpunktes - und stehen
@@ -550,7 +562,7 @@
                 und weil sie die einzigen Werkzeuge sind, die ohne die Renderdaten
                 der EXR gar nichts tun koennen.
             -->
-            <Grid Margin="0,16,0,0">
+            <Grid x:Name="MotionHead" Margin="0,16,0,0">
                 <TextBlock Text="{DynamicResource S_Motion}" Style="{StaticResource PanelHeading}" />
                 <Button Style="{StaticResource LinkButton}" HorizontalAlignment="Right"
                         Content="+" Tag="MotionBody" Click="OnSectionToggled" />
@@ -577,7 +589,7 @@
                            Text="{DynamicResource S_MotionHint}" />
             </StackPanel>
 
-            <Grid Margin="0,16,0,0">
+            <Grid x:Name="DepthHead" Margin="0,16,0,0">
                 <TextBlock Text="{DynamicResource S_DepthField}" Style="{StaticResource PanelHeading}" />
                 <Button Style="{StaticResource LinkButton}" HorizontalAlignment="Right"
                         Content="+" Tag="DepthBody" Click="OnSectionToggled" />
@@ -604,7 +616,7 @@
                            Text="{DynamicResource S_DepthHint}" />
             </StackPanel>
 
-            <Grid Margin="0,16,0,0">
+            <Grid x:Name="DistortionHead" Margin="0,16,0,0">
                 <TextBlock Text="{DynamicResource S_Distortion}" Style="{StaticResource PanelHeading}" />
                 <Button Style="{StaticResource LinkButton}" HorizontalAlignment="Right"
                         Content="+" Tag="DistortionBody" Click="OnSectionToggled" />
@@ -631,7 +643,7 @@
                            Text="{DynamicResource S_DistortionHint}" />
             </StackPanel>
 
-            <Grid Margin="0,16,0,0">
+            <Grid x:Name="ChromaticHead" Margin="0,16,0,0">
                 <TextBlock Text="{DynamicResource S_Chromatic}" Style="{StaticResource PanelHeading}" />
                 <Button Style="{StaticResource LinkButton}" HorizontalAlignment="Right"
                         Content="+" Tag="ChromaticBody" Click="OnSectionToggled" />
@@ -650,7 +662,7 @@
                            Text="{DynamicResource S_ChromaticHint}" />
             </StackPanel>
 
-            <Grid Margin="0,16,0,0">
+            <Grid x:Name="VignetteHead" Margin="0,16,0,0">
                 <TextBlock Text="{DynamicResource S_Vignette}" Style="{StaticResource PanelHeading}" />
                 <Button Style="{StaticResource LinkButton}" HorizontalAlignment="Right"
                         Content="+" Tag="VignetteBody" Click="OnSectionToggled" />
@@ -693,13 +705,17 @@
                            Text="{DynamicResource S_VignetteHint}" />
             </StackPanel>
 
+            <ToggleButton x:Name="GroupDither" Style="{StaticResource SectionHeader}"
+                          Margin="0,18,0,2" IsChecked="True" Tag="Dither,Grain"
+                          Content="{DynamicResource S_GroupFilm}"
+                          Checked="OnGroupToggled" Unchecked="OnGroupToggled" />
             <!--
                 Rastern. Steht NACH dem Korn, weil es dort auch gerechnet wird: Ein
                 Korn hinterher braeuchte Zwischenwerte, die es nach dem Rastern nicht
                 mehr gibt - es wuerde die Stufen wieder verwischen und damit genau das
                 aufheben, wofuer jemand gerastert hat.
             -->
-            <Grid Margin="0,16,0,0">
+            <Grid x:Name="DitherHead" Margin="0,16,0,0">
                 <TextBlock Text="{DynamicResource S_Dither}" Style="{StaticResource PanelHeading}" />
                 <Button Style="{StaticResource LinkButton}" HorizontalAlignment="Right"
                         Content="+" Tag="DitherBody" Click="OnSectionToggled" />
@@ -843,7 +859,7 @@
                            Text="{DynamicResource S_DitherHint}" />
             </StackPanel>
 
-            <Grid Margin="0,16,0,0">
+            <Grid x:Name="GrainHead" Margin="0,16,0,0">
                 <TextBlock Text="{DynamicResource S_Grain}" Style="{StaticResource PanelHeading}" />
                 <Button Style="{StaticResource LinkButton}" HorizontalAlignment="Right"
                         Content="+" Tag="GrainBody" Click="OnSectionToggled" />
@@ -886,8 +902,12 @@
                            Text="{DynamicResource S_GrainHint}" />
             </StackPanel>
 
+            <ToggleButton x:Name="GroupLut" Style="{StaticResource SectionHeader}"
+                          Margin="0,18,0,2" IsChecked="True" Tag="Lut"
+                          Content="{DynamicResource S_GroupTable}"
+                          Checked="OnGroupToggled" Unchecked="OnGroupToggled" />
             <!-- Tabelle -->
-            <Grid Margin="0,16,0,0">
+            <Grid x:Name="LutHead" Margin="0,16,0,0">
                 <TextBlock Text="{DynamicResource S_Lut}" Style="{StaticResource PanelHeading}" />
                 <Button Style="{StaticResource LinkButton}" HorizontalAlignment="Right"
                         Content="+" Tag="LutBody" Click="OnSectionToggled" />
