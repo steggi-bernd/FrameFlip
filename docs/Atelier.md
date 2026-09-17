@@ -6,8 +6,8 @@ A second mode inside FrameFlip: grade one frame, then apply that grade to the wh
 sequence and write it out. Layers, masks driven by render data, and a colour toolset
 aimed at Photoshop and Lightroom rather than at a node graph.
 
-**Status:** steps 1 to 7 are built and running; of step 8, section 7.3 is complete —
-seven tools on the local path — and 7.4 has vignette and film grain. Step 5 is complete —
+**Status:** steps 1 to 7 are built and running; of step 8, sections 7.3 and 7.4 are
+complete — eleven tools across four kinds of pass. Step 5 is complete —
 pass, adjustment, image and group layers, with order, duplication, opacity, colour,
 blend modes and clipping masks. Of step 6, masks are data-driven: cryptomatte, any
 pass, luminance and gradient; painted masks are not built. Where an earlier estimate or
@@ -803,8 +803,8 @@ than one that is visibly unavailable.
 | Tool | Parameters | Notes |
 |---|---|---|
 | ~~**Vignette**~~ **built** | amount, midpoint, roundness, feather | the highlight protection turned out to be unnecessary — see below |
-| **Chromatic aberration** | amount, direction | adding it is a look; removing it is a fix |
-| **Lens distortion** | barrel/pincushion, scale | |
+| ~~**Chromatic aberration**~~ **built** | amount | adding it is a look; removing it is a fix — and the sign is the direction, so that is one control, not two |
+| ~~**Lens distortion**~~ **built** | barrel/pincushion, scale | the scale is the second half of the same correction, not an extra |
 | ~~**Film grain**~~ **built** | amount, size, roughness, colour | **varies per frame**, from the number in the file name — see section 10 |
 
 **A third kind of tool.** The point-wise tools get a pixel; the local ones get a pixel
@@ -853,6 +853,47 @@ is why the second layer is only thrown when someone asks for it. And the same ca
 for sharpening applies: **grain finer than the preview grid cannot be previewed
 truthfully.** While a slider moves, the grain is sampled on the coarse grid and comes out
 coarser than it will be.
+
+**A fourth kind, and the last one.** Everything so far asks *what colour is this pixel*.
+These two ask *which pixel belongs here* — they move things. That needs the whole picture
+as a source, so it cannot be computed in place: overwrite a pixel that another one is
+about to read and it is gone.
+
+The pass runs **backwards**: not "where does this pixel go" but, for every destination,
+"where does it come from". Forwards, not every destination would be hit and the result
+would be a sieve. It samples bilinearly — nearest-neighbour would put a staircase along
+every slanted edge that people would read as a fault in the file — and it clamps at the
+border rather than filling black, because a stretched edge reads as an edge and a black
+seam reads as a bug.
+
+**Both tools share one pass.** They are both radial: same angle, different distance. So a
+tool's whole contribution is *one factor per channel* at a given radius, the factors
+multiply, and the sampling happens once. Distortion moves all three channels together
+because it is geometry; chromatic aberration moves red out and blue in and leaves green
+where it is, because green carries almost all of the luminance — a picture whose
+luminance moves is displaced, not fringed. Sampling twice would blur twice, and the
+second blur would buy nothing.
+
+That is also why a lateral fringe needs no radius control of its own: the displacement is
+distance times (factor minus one), so it grows towards the edges by itself, which is what
+a lens does.
+
+**It put the grain in the right place.** Grain sits in the film and the film sits behind
+the lens; a grain that gets resampled by the geometry is not grain any more but a
+fringed impression of one. So the optics split into two stops: the lens (vignette) at the
+end of the linear chain, and the film (grain) after the geometry and the light tools, just
+before the view transform. On the straight path the two are adjacent and nothing lies
+between them. There is a test for exactly that — with chromatic aberration switched on,
+grain on a flat field must come out byte-for-byte as it does without.
+
+The buffer path therefore now reads, in the order light actually takes:
+
+```
+  exposure → linear tools → vignette
+  → [distortion, fringing] → dehaze → glow → halation
+  → grain → view transform → display tools
+  → noise reduction → clarity → texture → sharpening
+```
 
 ### 7.5 Render data — the tools no image editor has
 
@@ -1076,9 +1117,11 @@ next one landing.
    single stop — it has to run before the view transform, where the overbrights still
    exist — and dehaze generalised "the highlights above a threshold" into "whatever the
    tool says goes into the blur". Texture found a wrong sentence in this document. What
-   remains of section 7 is the rest of 7.4 and 7.5 render data. 7.4 brought a third kind
-   of tool after all: one that needs the *place* of a pixel rather than its
-   neighbourhood — vignette and grain are built on it.
+   remains of section 7 is 7.5, the render data. 7.4 brought two more kinds of tool: one
+   that needs the *place* of a pixel rather than its neighbourhood (vignette, grain), and
+   one that *moves* pixels and therefore needs the whole picture as a source (distortion,
+   fringing). Four kinds of pass in total, and 7.5 needs none of them — it needs the
+   other channels of the file, which the pass stack already reads.
 
 Steps 1–4 are the product. 5–8 are what makes it uncontested.
 

@@ -38,11 +38,21 @@ public sealed class GradingStack
     /// </summary>
     public List<IOpticsTool> Optics { get; set; } = new();
 
+    /// <summary>
+    /// Die Werkzeuge, die Bildpunkte verschieben - Verzeichnung und chromatische
+    /// Aberration.
+    ///
+    /// Die vierte Liste, und die letzte: Sie brauchen das ganze Bild als Quelle und
+    /// koennen deshalb nicht an Ort und Stelle rechnen.
+    /// </summary>
+    public List<IGeometryTool> Geometry { get; set; } = new();
+
     /// <summary>True, wenn kein Werkzeug etwas zu tun hat.</summary>
     public bool IsNeutral
         => (Tools.Count == 0 || Tools.All(t => t.IsNeutral)) &&
            (Local.Count == 0 || Local.All(t => t.IsNeutral)) &&
-           (Optics.Count == 0 || Optics.All(t => t.IsNeutral));
+           (Optics.Count == 0 || Optics.All(t => t.IsNeutral)) &&
+           (Geometry.Count == 0 || Geometry.All(t => t.IsNeutral));
 
     /// <summary>
     /// Bereitet alle Werkzeuge vor und sammelt die ein, die tatsaechlich etwas tun.
@@ -93,8 +103,18 @@ public sealed class GradingStack
             optics.Add(tool);
         }
 
-        return new PreparedGrading(linear.ToArray(), display.ToArray(),
-                                   local.ToArray(), light.ToArray(), optics.ToArray());
+        var geometry = new List<IGeometryTool>();
+
+        foreach (var tool in Geometry)
+        {
+            if (tool.IsNeutral) continue;
+
+            tool.Prepare();
+            geometry.Add(tool);
+        }
+
+        return new PreparedGrading(linear.ToArray(), display.ToArray(), local.ToArray(),
+                                   light.ToArray(), optics.ToArray(), geometry.ToArray());
     }
 
     /// <summary>
@@ -109,6 +129,17 @@ public sealed class GradingStack
         Tools = Tools.Select(Copy).ToList(),
         Local = Local.Select(CopyLocal).ToList(),
         Optics = Optics.Select(CopyOptics).ToList(),
+        Geometry = Geometry.Select(CopyGeometry).ToList(),
+    };
+
+    private static IGeometryTool CopyGeometry(IGeometryTool tool) => tool switch
+    {
+        DistortionTool lens => new DistortionTool { Amount = lens.Amount, Scale = lens.Scale },
+
+        ChromaticTool colour => new ChromaticTool { Amount = colour.Amount },
+
+        // Wie oben: Ein Werkzeug, das hier fehlt, wuerde geteilt statt kopiert.
+        _ => throw new NotSupportedException($"Kein Kopierweg fuer {tool.GetType().Name}."),
     };
 
     private static IOpticsTool CopyOptics(IOpticsTool tool) => tool switch
@@ -189,13 +220,14 @@ public readonly struct PreparedGrading
 {
     public PreparedGrading(IGradingTool[] sceneLinear, IGradingTool[] display,
                            ILocalTool[] local, ILocalTool[]? light = null,
-                           IOpticsTool[]? optics = null)
+                           IOpticsTool[]? optics = null, IGeometryTool[]? geometry = null)
     {
         SceneLinear = sceneLinear;
         Display = display;
         Local = local;
         LocalLight = light ?? Array.Empty<ILocalTool>();
         Optics = optics ?? Array.Empty<IOpticsTool>();
+        Geometry = geometry ?? Array.Empty<IGeometryTool>();
     }
 
     public IGradingTool[] SceneLinear { get; }
@@ -229,11 +261,43 @@ public readonly struct PreparedGrading
     /// </summary>
     public IOpticsTool[] Optics { get; } = Array.Empty<IOpticsTool>();
 
-    /// <summary>True, wenn ueberhaupt ein oertliches Werkzeug dabei ist.</summary>
-    public bool HasLocal => Local.Length > 0 || LocalLight.Length > 0;
+    /// <summary>
+    /// Die Werkzeuge, die Bildpunkte verschieben. Sie brauchen denselben Puffer wie
+    /// die oertlichen, aus einem anderen Grund: Sie lesen anderswo, statt woanders
+    /// hinzusehen.
+    /// </summary>
+    public IGeometryTool[] Geometry { get; } = Array.Empty<IGeometryTool>();
+
+    /// <summary>True, wenn der Bildweg den Puffer und den zweiten Durchgang braucht.</summary>
+    public bool HasLocal => Local.Length > 0 || LocalLight.Length > 0 || Geometry.Length > 0;
 
     public bool IsEmpty => SceneLinear.Length == 0 && Display.Length == 0 && !HasLocal &&
                            Optics.Length == 0;
+
+    /// <summary>
+    /// Die Ortswerkzeuge der Linse - alles, was vor dem Film geschieht.
+    /// </summary>
+    public IOpticsTool[] Lens => Split(OpticsStage.Lens);
+
+    /// <summary>Die des Films. Sie rechnen NACH der Geometrie, weil Korn im Film sitzt.</summary>
+    public IOpticsTool[] Film => Split(OpticsStage.Film);
+
+    private IOpticsTool[] Split(OpticsStage stage)
+    {
+        int count = 0;
+        foreach (var tool in Optics)
+            if (tool.Stage == stage) count++;
+
+        if (count == 0) return Array.Empty<IOpticsTool>();
+
+        var picked = new IOpticsTool[count];
+        int at = 0;
+
+        foreach (var tool in Optics)
+            if (tool.Stage == stage) picked[at++] = tool;
+
+        return picked;
+    }
 
     public static readonly PreparedGrading None =
         new(Array.Empty<IGradingTool>(), Array.Empty<IGradingTool>(), Array.Empty<ILocalTool>());

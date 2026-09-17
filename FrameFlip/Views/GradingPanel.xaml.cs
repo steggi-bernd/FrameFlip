@@ -45,6 +45,8 @@ public partial class GradingPanel : UserControl
     private TextureTool _texture = new();
     private VignetteTool _vignette = new();
     private GrainTool _grain = new();
+    private DistortionTool _distortion = new();
+    private ChromaticTool _chromatic = new();
 
     private static readonly Color[] CurveColours =
     {
@@ -150,6 +152,8 @@ public partial class GradingPanel : UserControl
         ClarityBody.IsEnabled = enabled;
         TextureBody.IsEnabled = enabled;
         SharpenBody.IsEnabled = enabled;
+        DistortionBody.IsEnabled = enabled;
+        ChromaticBody.IsEnabled = enabled;
         VignetteBody.IsEnabled = enabled;
         GrainBody.IsEnabled = enabled;
     }
@@ -169,6 +173,7 @@ public partial class GradingPanel : UserControl
         var tools = stack?.Tools.ToList();
         var local = stack?.Local.ToList();
         var optics = stack?.Optics.ToList();
+        var geometry = stack?.Geometry.ToList();
 
         Stack.Tools.Clear();
         if (tools is not null) Stack.Tools.AddRange(tools);
@@ -181,6 +186,9 @@ public partial class GradingPanel : UserControl
 
         Stack.Optics.Clear();
         if (optics is not null) Stack.Optics.AddRange(optics);
+
+        Stack.Geometry.Clear();
+        if (geometry is not null) Stack.Geometry.AddRange(geometry);
 
         _curves = Take<CurvesTool>();
         _whiteBalance = Take<WhiteBalanceTool>();
@@ -205,6 +213,10 @@ public partial class GradingPanel : UserControl
         _vignette = TakeOptics<VignetteTool>();
         _grain = TakeOptics<GrainTool>();
 
+        // Und die vierte Liste: die Werkzeuge, die Bildpunkte verschieben.
+        _distortion = TakeGeometry<DistortionTool>();
+        _chromatic = TakeGeometry<ChromaticTool>();
+
         T TakeLocal<T>() where T : ILocalTool, new()
         {
             var found = Stack.Local.OfType<T>().FirstOrDefault();
@@ -223,6 +235,17 @@ public partial class GradingPanel : UserControl
 
             var created = new T();
             Stack.Optics.Add(created);
+
+            return created;
+        }
+
+        T TakeGeometry<T>() where T : IGeometryTool, new()
+        {
+            var found = Stack.Geometry.OfType<T>().FirstOrDefault();
+            if (found is not null) return found;
+
+            var created = new T();
+            Stack.Geometry.Add(created);
 
             return created;
         }
@@ -462,6 +485,14 @@ public partial class GradingPanel : UserControl
             SharpenThresholdSlider.Value = Math.Clamp(_sharpen.Threshold,
                                                       SharpenThresholdSlider.Minimum, SharpenThresholdSlider.Maximum);
 
+            DistortionSlider.Value = Math.Clamp(_distortion.Amount,
+                                                DistortionSlider.Minimum, DistortionSlider.Maximum);
+            DistortionScaleSlider.Value = Math.Clamp(_distortion.Scale,
+                                                     DistortionScaleSlider.Minimum, DistortionScaleSlider.Maximum);
+
+            ChromaticSlider.Value = Math.Clamp(_chromatic.Amount,
+                                               ChromaticSlider.Minimum, ChromaticSlider.Maximum);
+
             VignetteSlider.Value = Math.Clamp(_vignette.Amount,
                                               VignetteSlider.Minimum, VignetteSlider.Maximum);
             VignetteMidpointSlider.Value = Math.Clamp(_vignette.Midpoint,
@@ -570,6 +601,11 @@ public partial class GradingPanel : UserControl
         _sharpen.Reach = (int)Math.Round(SharpenRadiusSlider.Value);
         _sharpen.Threshold = (float)SharpenThresholdSlider.Value;
 
+        _distortion.Amount = (float)DistortionSlider.Value;
+        _distortion.Scale = (float)DistortionScaleSlider.Value;
+
+        _chromatic.Amount = (float)ChromaticSlider.Value;
+
         _vignette.Amount = (float)VignetteSlider.Value;
         _vignette.Midpoint = (float)VignetteMidpointSlider.Value;
         _vignette.Roundness = (float)VignetteRoundnessSlider.Value;
@@ -638,6 +674,9 @@ public partial class GradingPanel : UserControl
         SharpenValue.Text = $"{SharpenSlider.Value:0.00}";
         SharpenRadiusValue.Text = $"{SharpenRadiusSlider.Value:0}";
         SharpenThresholdValue.Text = $"{SharpenThresholdSlider.Value:0.000}";
+        DistortionValue.Text = $"{DistortionSlider.Value:+0.00;-0.00;0.00}";
+        DistortionScaleValue.Text = $"{DistortionScaleSlider.Value:0.00}";
+        ChromaticValue.Text = $"{ChromaticSlider.Value:+0.00;-0.00;0.00}";
         VignetteValue.Text = $"{VignetteSlider.Value:+0.00;-0.00;0.00}";
         VignetteMidpointValue.Text = $"{VignetteMidpointSlider.Value:0.00}";
         VignetteRoundnessValue.Text = $"{VignetteRoundnessSlider.Value:+0.00;-0.00;0.00}";

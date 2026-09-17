@@ -546,6 +546,52 @@
                 deshalb weder bei den punktweisen noch bei den oertlichen.
             -->
             <Grid Margin="0,16,0,0">
+                <TextBlock Text="{DynamicResource S_Distortion}" Style="{StaticResource PanelHeading}" />
+                <Button Style="{StaticResource LinkButton}" HorizontalAlignment="Right"
+                        Content="+" Tag="DistortionBody" Click="OnSectionToggled" />
+            </Grid>
+            <StackPanel x:Name="DistortionBody" Visibility="Collapsed" Margin="0,6,0,0">
+                <Grid Margin="0,0,0,2">
+                    <TextBlock Text="{DynamicResource S_DistortionAmount}" Style="{StaticResource PanelLabel}" />
+                    <TextBlock x:Name="DistortionValue" Style="{StaticResource PanelValue}" />
+                </Grid>
+                <Slider x:Name="DistortionSlider" Style="{StaticResource PanelSlider}"
+                        Minimum="-1" Maximum="1" Value="0" SmallChange="0.02" LargeChange="0.1"
+                        ValueChanged="OnChanged" MouseDoubleClick="OnSliderReset" Tag="0" />
+
+                <Grid Margin="0,10,0,2">
+                    <TextBlock Text="{DynamicResource S_DistortionScale}" Style="{StaticResource PanelLabel}" />
+                    <TextBlock x:Name="DistortionScaleValue" Style="{StaticResource PanelValue}" />
+                </Grid>
+                <Slider x:Name="DistortionScaleSlider" Style="{StaticResource PanelSlider}"
+                        Minimum="0.5" Maximum="1.5" Value="1" SmallChange="0.01" LargeChange="0.05"
+                        ValueChanged="OnChanged" MouseDoubleClick="OnSliderReset" Tag="1" />
+
+                <TextBlock Margin="0,8,0,0" FontSize="10" TextWrapping="Wrap"
+                           Foreground="{StaticResource MutedBrush}"
+                           Text="{DynamicResource S_DistortionHint}" />
+            </StackPanel>
+
+            <Grid Margin="0,16,0,0">
+                <TextBlock Text="{DynamicResource S_Chromatic}" Style="{StaticResource PanelHeading}" />
+                <Button Style="{StaticResource LinkButton}" HorizontalAlignment="Right"
+                        Content="+" Tag="ChromaticBody" Click="OnSectionToggled" />
+            </Grid>
+            <StackPanel x:Name="ChromaticBody" Visibility="Collapsed" Margin="0,6,0,0">
+                <Grid Margin="0,0,0,2">
+                    <TextBlock Text="{DynamicResource S_ChromaticAmount}" Style="{StaticResource PanelLabel}" />
+                    <TextBlock x:Name="ChromaticValue" Style="{StaticResource PanelValue}" />
+                </Grid>
+                <Slider x:Name="ChromaticSlider" Style="{StaticResource PanelSlider}"
+                        Minimum="-1" Maximum="1" Value="0" SmallChange="0.02" LargeChange="0.1"
+                        ValueChanged="OnChanged" MouseDoubleClick="OnSliderReset" Tag="0" />
+
+                <TextBlock Margin="0,8,0,0" FontSize="10" TextWrapping="Wrap"
+                           Foreground="{StaticResource MutedBrush}"
+                           Text="{DynamicResource S_ChromaticHint}" />
+            </StackPanel>
+
+            <Grid Margin="0,16,0,0">
                 <TextBlock Text="{DynamicResource S_Vignette}" Style="{StaticResource PanelHeading}" />
                 <Button Style="{StaticResource LinkButton}" HorizontalAlignment="Right"
                         Content="+" Tag="VignetteBody" Click="OnSectionToggled" />

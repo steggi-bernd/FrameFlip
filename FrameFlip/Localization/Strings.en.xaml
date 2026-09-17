@@ -61,6 +61,13 @@
     <sys:String x:Key="S_ClarityAmount">Amount</sys:String>
     <sys:String x:Key="S_ClarityReach">Radius</sys:String>
     <sys:String x:Key="S_ClarityHint">Local contrast: it boosts what a pixel is against its surroundings and leaves flat areas alone. A large radius gives modelling, a small one gives sharpness. Negative takes contrast away.</sys:String>
+    <sys:String x:Key="S_Distortion">Distortion</sys:String>
+    <sys:String x:Key="S_DistortionAmount">Amount</sys:String>
+    <sys:String x:Key="S_DistortionScale">Scale</sys:String>
+    <sys:String x:Key="S_DistortionHint">Barrel and pincushion: a wide angle bows straight lines outwards, a long lens pulls them in. Straightening a barrel brings the edge into frame — a scale below one enlarges far enough for the empty corners to fall outside.</sys:String>
+    <sys:String x:Key="S_Chromatic">Colour fringing</sys:String>
+    <sys:String x:Key="S_ChromaticAmount">Amount</sys:String>
+    <sys:String x:Key="S_ChromaticHint">Chromatic aberration: a lens bends blue more than red, so towards the edges the channels no longer meet. Adding it is a look, removing it is a fix — the sign is the direction. Green stays put.</sys:String>
     <sys:String x:Key="S_Vignette">Vignette</sys:String>
     <sys:String x:Key="S_VignetteAmount">Amount</sys:String>
     <sys:String x:Key="S_VignetteMidpoint">Midpoint</sys:String>

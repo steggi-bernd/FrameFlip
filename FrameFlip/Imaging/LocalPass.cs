@@ -29,13 +29,21 @@ namespace FrameFlip.Imaging;
 /// </summary>
 public static class LocalPass
 {
-    /// <summary>Der Zwischenpuffer eines Durchgangs. Wird wiederverwendet.</summary>
+    /// <summary>
+    /// Der Zwischenpuffer eines Durchgangs. Wird wiederverwendet.
+    ///
+    /// Felder und keine Eigenschaften, weil zwei von ihnen die Rolle tauschen: Der
+    /// Geometriedurchgang liest aus dem einen und schreibt in das andere, und danach
+    /// ist das Arbeitsfeld das Bild. Wer nach einem solchen Durchgang noch den alten
+    /// Verweis in der Hand haelt, liest den Stand von vorher.
+    /// </summary>
     public sealed class Scratch
     {
         public float[] Values = Array.Empty<float>();
         public float[] Blurred = Array.Empty<float>();
         public float[] Work = Array.Empty<float>();
         public byte[] Alpha = Array.Empty<byte>();
+        public byte[] AlphaWork = Array.Empty<byte>();
 
         /// <summary>Sorgt dafuer, dass Platz fuer so viele Punkte da ist.</summary>
         public void Hold(int count)
@@ -46,6 +54,7 @@ public static class LocalPass
             Blurred = new float[count * 3];
             Work = new float[count * 3];
             Alpha = new byte[count];
+            AlphaWork = new byte[count];
         }
     }
 

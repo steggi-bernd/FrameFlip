@@ -61,6 +61,13 @@
     <sys:String x:Key="S_ClarityAmount">Stärke</sys:String>
     <sys:String x:Key="S_ClarityReach">Radius</sys:String>
     <sys:String x:Key="S_ClarityHint">Örtlicher Kontrast: Er verstärkt, was ein Punkt gegenüber seiner Umgebung ist, und lässt gleichmäßige Flächen in Ruhe. Großer Radius gibt Plastizität, kleiner gibt Schärfe. Negativ nimmt Kontrast weg.</sys:String>
+    <sys:String x:Key="S_Distortion">Verzeichnung</sys:String>
+    <sys:String x:Key="S_DistortionAmount">Stärke</sys:String>
+    <sys:String x:Key="S_DistortionScale">Maßstab</sys:String>
+    <sys:String x:Key="S_DistortionHint">Tonne und Kissen: Ein Weitwinkel wölbt gerade Linien nach außen, ein Tele zieht sie nach innen. Wer eine Tonne geradezieht, holt den Rand ins Bild — ein Maßstab unter eins vergrößert so weit, dass die leeren Ecken herausfallen.</sys:String>
+    <sys:String x:Key="S_Chromatic">Farbsäume</sys:String>
+    <sys:String x:Key="S_ChromaticAmount">Stärke</sys:String>
+    <sys:String x:Key="S_ChromaticHint">Chromatische Aberration: Eine Linse bricht Blau stärker als Rot, also treffen die Kanäle nach außen hin nicht mehr aufeinander. Hinzufügen ist ein Blick, wegnehmen eine Reparatur — das Vorzeichen ist die Richtung. Grün bleibt stehen.</sys:String>
     <sys:String x:Key="S_Vignette">Vignette</sys:String>
     <sys:String x:Key="S_VignetteAmount">Stärke</sys:String>
     <sys:String x:Key="S_VignetteMidpoint">Ansatz</sys:String>

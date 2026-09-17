@@ -200,6 +200,11 @@ public static class FloatFrameProcessor
     {
         if (split)
         {
+            // Zuerst die Geometrie: Alles Weitere soll das Bild dort sehen, wo es
+            // am Ende steht. Glanz um eine Kante, die danach noch wandert, saesse
+            // nicht mehr an ihr.
+            GeometryPass.Run(scratch, grading.Geometry, plan.Place, gridWidth, gridHeight, step);
+
             LocalPass.Run(scratch, grading.LocalLight, gridWidth, gridHeight, imageWidth, step);
 
             var values = scratch.Values;
@@ -218,6 +223,10 @@ public static class FloatFrameProcessor
                     int at = (row + gx) * 3;
 
                     float vr = values[at], vg = values[at + 1], vb = values[at + 2];
+
+                    // Der Film kommt hier und nicht im ersten Durchgang: Er sitzt
+                    // hinter der Linse, und dazwischen lag die Geometrie.
+                    ShadeFilm(in plan, gx * step, gy * step, ref vr, ref vg, ref vb);
 
                     // Die Deckung liegt als Byte daneben. Fuer die Kanalansicht ist
                     // das genau genug - sie zeigt ohnehin Bytes.
@@ -370,11 +379,12 @@ public static class FloatFrameProcessor
 
         int gridWidth = columns.Length;
 
-        // Mit Lichtwerkzeugen endet der erste Durchgang VOR der Sichtumwandlung; sie
-        // kommt dann im zweiten, nachdem Glanz und Halation ihr Licht verteilt haben.
-        // Ohne sie bleibt alles in einem Zug - ein zusaetzlicher Lauf ueber den
-        // Puffer kostet bei 4K rund dreihundert Megabyte hin und zurueck.
-        bool split = grading.LocalLight.Length > 0;
+        // Mit Lichtwerkzeugen oder Geometrie endet der erste Durchgang VOR der
+        // Sichtumwandlung; sie kommt dann im zweiten, nachdem das Licht verteilt und
+        // die Punkte verschoben sind. Ohne beides bleibt alles in einem Zug - ein
+        // zusaetzlicher Lauf ueber den Puffer kostet bei 4K rund dreihundert
+        // Megabyte hin und zurueck.
+        bool split = grading.LocalLight.Length > 0 || grading.Geometry.Length > 0;
 
         // --- erster Durchgang: die Kette bis hinter die Anzeigewerkzeuge ---
         Parallel.For(0, rows.Length, new ParallelOptions
@@ -406,8 +416,13 @@ public static class FloatFrameProcessor
             }
         });
 
-        // --- weichzeichnen und durch die Werkzeuge ---
+        // --- verschieben, weichzeichnen und durch die Werkzeuge ---
         RunLocal(plan, scratch, grading, gridWidth, rows.Length, width, step, split);
+
+        // Nach dem Geometriedurchgang ist das Bild im anderen Feld - wer den alten
+        // Verweis weiterbenutzt, schreibt den Stand von vor der Verschiebung hinaus.
+        values = scratch.Values;
+        alpha = scratch.Alpha;
 
         // --- zweiter Durchgang: hinausschreiben ---
         byte* target = (byte*)destination.ToPointer();
@@ -493,9 +508,10 @@ public static class FloatFrameProcessor
         public ShadePlan(float gain, float saturation, ChannelView channel,
                          float black, float span, float inverseGamma, float contrast, bool needsTone,
                          IViewTransform view, IGradingTool[] linear, IGradingTool[] display,
-                         IOpticsTool[] optics, OpticsPlace place)
+                         IOpticsTool[] lens, IOpticsTool[] film, OpticsPlace place)
         {
-            Optics = optics;
+            Lens = lens;
+            Film = film;
             Place = place;
             Gain = gain;
             Saturation = saturation;
@@ -515,7 +531,7 @@ public static class FloatFrameProcessor
         public readonly ChannelView Channel;
         public readonly IViewTransform View;
         public readonly IGradingTool[] Linear, Display;
-        public readonly IOpticsTool[] Optics;
+        public readonly IOpticsTool[] Lens, Film;
         public readonly OpticsPlace Place;
     }
 
@@ -532,6 +548,7 @@ public static class FloatFrameProcessor
                               ref float vr, ref float vg, ref float vb, float alpha)
     {
         ShadeLinear(in plan, x, y, ref vr, ref vg, ref vb);
+        ShadeFilm(in plan, x, y, ref vr, ref vg, ref vb);
         ShadeDisplay(in plan, ref vr, ref vg, ref vb, alpha);
     }
 
@@ -571,10 +588,26 @@ public static class FloatFrameProcessor
         var linear = plan.Linear;
         for (int t = 0; t < linear.Length; t++) linear[t].Apply(ref vr, ref vg, ref vb);
 
-        // Die Ortswerkzeuge zuletzt auf dieser Seite: Vignette und Korn sind das,
-        // was die Kamera dem Licht antut, nachdem die Szene fertig ist.
-        var optics = plan.Optics;
-        for (int t = 0; t < optics.Length; t++) optics[t].Apply(in plan.Place, x, y, ref vr, ref vg, ref vb);
+        // Die Linse zuletzt auf dieser Seite: Der Randabfall ist das, was die Kamera
+        // dem Licht antut, nachdem die Szene fertig ist. Was im FILM geschieht, kommt
+        // erst danach - dazwischen liegt alles, was die Linse sonst noch tut.
+        var lens = plan.Lens;
+        for (int t = 0; t < lens.Length; t++) lens[t].Apply(in plan.Place, x, y, ref vr, ref vg, ref vb);
+    }
+
+    /// <summary>
+    /// Was im Film geschieht: das Korn.
+    ///
+    /// Eine eigene Stufe, weil zwischen Linse und Film etwas liegen kann - die
+    /// Geometrie verschiebt Bildpunkte, und Korn, das mitverschoben wird, ist kein
+    /// Korn mehr, sondern ein farbig gesaeumter Abdruck davon. Auf dem geraden Weg
+    /// folgt sie unmittelbar auf die Linse; mit Puffer kommt sie danach.
+    /// </summary>
+    private static void ShadeFilm(in ShadePlan plan, int x, int y,
+                                  ref float vr, ref float vg, ref float vb)
+    {
+        var film = plan.Film;
+        for (int t = 0; t < film.Length; t++) film[t].Apply(in plan.Place, x, y, ref vr, ref vg, ref vb);
     }
 
     /// <summary>Die Sichtumwandlung und alles dahinter.</summary>
@@ -681,6 +714,11 @@ public static class FloatFrameProcessor
 
         var shaded = scratch?.Values;
 
+        // Hat die Geometrie Punkte verschoben, ist die Deckung mitgewandert und liegt
+        // im Puffer - die der Datei zeigte dann auf die Stelle von vorher. Ohne
+        // Geometrie bleibt es bei der Datei, die sie mit voller Genauigkeit fuehrt.
+        var moved = grading.Geometry.Length > 0 ? scratch?.Alpha : null;
+
         Parallel.For(0, height, new ParallelOptions
         {
             MaxDegreeOfParallelism = Math.Clamp(Environment.ProcessorCount, 1, 8),
@@ -692,7 +730,7 @@ public static class FloatFrameProcessor
             for (int x = 0; x < width; x++)
             {
                 int i = y * width + x;
-                float alpha = a is null ? 1f : a[i];
+                float alpha = moved is not null ? moved[i] / 255f : a is null ? 1f : a[i];
 
                 float vr, vg, vb;
 
@@ -741,7 +779,7 @@ public static class FloatFrameProcessor
                              adjustments.Channel, black, span, inverseGamma, contrast, needsTone, view,
                              grading.SceneLinear ?? Array.Empty<IGradingTool>(),
                              grading.Display ?? Array.Empty<IGradingTool>(),
-                             grading.Optics ?? Array.Empty<IOpticsTool>(),
+                             grading.Lens, grading.Film,
                              new OpticsPlace(frame.Width, frame.Height, number));
     }
 
