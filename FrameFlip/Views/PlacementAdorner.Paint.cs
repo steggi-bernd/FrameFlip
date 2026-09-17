@@ -36,6 +36,16 @@ public sealed partial class PlacementAdorner
     private WriteableBitmap? _wash;
     private bool _washStale = true;
 
+    /// <summary>
+    /// Welcher Bereich der Maske seit der letzten Darstellung beruehrt wurde.
+    ///
+    /// Ein Pinselstrich aendert ein paar hundert Maskenpunkte; den Schleier
+    /// vollstaendig neu zu bauen hiesse, fuer jeden Strich eine halbe Million zu
+    /// schreiben. Bei dreissig Strichen je Sekunde ist das der Unterschied zwischen
+    /// einem Pinsel, der an der Maus klebt, und einem, der hinterherzieht.
+    /// </summary>
+    private int _dirtyX0, _dirtyY0, _dirtyX1 = -1, _dirtyY1 = -1;
+
     /// <summary>Der Pinselradius in Bildpunkten der Leinwand.</summary>
     public float BrushRadius { get; set; } = 40f;
 
@@ -87,6 +97,38 @@ public sealed partial class PlacementAdorner
     public void MaskChanged()
     {
         _washStale = true;
+        _dirtyX1 = -1;
+
+        InvalidateVisual();
+    }
+
+    /// <summary>Merkt sich, welcher Bereich der Maske einen Strich abbekommen hat.</summary>
+    private void Touched(float imageX, float imageY, float radius)
+    {
+        if (_mask is null) return;
+
+        int r = (int)MathF.Ceiling(radius / PaintedMask.Coarse) + 1;
+
+        int cx = (int)(imageX / PaintedMask.Coarse);
+        int cy = (int)(imageY / PaintedMask.Coarse);
+
+        if (_dirtyX1 < 0)
+        {
+            _dirtyX0 = cx - r;
+            _dirtyY0 = cy - r;
+            _dirtyX1 = cx + r;
+            _dirtyY1 = cy + r;
+        }
+        else
+        {
+            _dirtyX0 = Math.Min(_dirtyX0, cx - r);
+            _dirtyY0 = Math.Min(_dirtyY0, cy - r);
+            _dirtyX1 = Math.Max(_dirtyX1, cx + r);
+            _dirtyY1 = Math.Max(_dirtyY1, cy + r);
+        }
+
+        _washStale = true;
+
         InvalidateVisual();
     }
 
@@ -133,31 +175,50 @@ public sealed partial class PlacementAdorner
     {
         if (!_washStale || _mask is null) return;
 
-
         _washStale = false;
 
         int w = Math.Max(1, _mask.Width);
         int h = Math.Max(1, _mask.Height);
 
-        if (_wash is null || _wash.PixelWidth != w || _wash.PixelHeight != h)
-            _wash = new WriteableBitmap(w, h, 96, 96, PixelFormats.Bgra32, null);
+        bool fresh = _wash is null || _wash.PixelWidth != w || _wash.PixelHeight != h;
+
+        if (fresh) _wash = new WriteableBitmap(w, h, 96, 96, PixelFormats.Bgra32, null);
+
+        // Nach einem Strich reicht der beruehrte Ausschnitt. Nur wenn die Maske ganz
+        // neu ist - oder von aussen gewechselt hat - muss alles geschrieben werden.
+        int x0 = fresh || _dirtyX1 < 0 ? 0 : Math.Max(0, _dirtyX0);
+        int y0 = fresh || _dirtyX1 < 0 ? 0 : Math.Max(0, _dirtyY0);
+        int x1 = fresh || _dirtyX1 < 0 ? w - 1 : Math.Min(w - 1, _dirtyX1);
+        int y1 = fresh || _dirtyX1 < 0 ? h - 1 : Math.Min(h - 1, _dirtyY1);
+
+        _dirtyX1 = -1;
+
+        if (x1 < x0 || y1 < y0) return;
+
+        int across = x1 - x0 + 1;
+        int down = y1 - y0 + 1;
 
         var cover = _mask.Cover();
-        var pixels = new byte[w * h * 4];
+        var pixels = new byte[across * down * 4];
 
-        for (int i = 0; i < cover.Length && i < w * h; i++)
+        for (int y = 0; y < down; y++)
         {
-            // Ein warmer Ton, halb durchsichtig: Er muss auf hellem wie auf dunklem
-            // Bild zu sehen sein und darf nicht fuer Bildinhalt gehalten werden.
-            byte strength = (byte)(cover[i] * 0.55f);
+            int from = (y0 + y) * w + x0;
+            int to = y * across * 4;
 
-            pixels[i * 4] = 0x40;
-            pixels[i * 4 + 1] = 0x30;
-            pixels[i * 4 + 2] = 0xFF;
-            pixels[i * 4 + 3] = strength;
+            for (int x = 0; x < across; x++)
+            {
+                // Ein warmer Ton, halb durchsichtig: Er muss auf hellem wie auf
+                // dunklem Bild zu sehen sein und darf nicht fuer Bildinhalt gehalten
+                // werden.
+                pixels[to + x * 4] = 0x40;
+                pixels[to + x * 4 + 1] = 0x30;
+                pixels[to + x * 4 + 2] = 0xFF;
+                pixels[to + x * 4 + 3] = (byte)(cover[from + x] * 0.55f);
+            }
         }
 
-        _wash.WritePixels(new Int32Rect(0, 0, w, h), pixels, w * 4, 0);
+        _wash!.WritePixels(new Int32Rect(x0, y0, across, down), pixels, across * 4, 0);
     }
 
     // ---------------------------------------------------------------- Bedienung
@@ -182,7 +243,7 @@ public sealed partial class PlacementAdorner
         _mask.Stroke(x, y, BrushRadius, _erasing ? 0f : 1f, BrushFlow,
                      BrushHardness, BrushOpacity);
 
-        MaskChanged();
+        Touched(x, y, BrushRadius);
         Painted?.Invoke(true);
 
         e.Handled = true;
@@ -230,9 +291,10 @@ public sealed partial class PlacementAdorner
                          BrushHardness, BrushOpacity);
         }
 
+        Touched((float)_lastStroke.X, (float)_lastStroke.Y, BrushRadius + (float)away);
+
         _lastStroke = new Point(x, y);
 
-        MaskChanged();
         Painted?.Invoke(true);
     }
 

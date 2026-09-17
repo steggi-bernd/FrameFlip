@@ -12,8 +12,8 @@ namespace FrameFlip.Imaging.Grading;
 /// aber MITTEN im Stapel - was sie ausgibt, wird darueber weiterverrechnet, und es
 /// muss deshalb wieder lineares Licht sein. Sie benutzt darum dieselbe Abbildung wie
 /// die Kontrastmischungen und die Helligkeitsmasken: x/(x+0,18) hinein, das
-/// Ergebnis zurueck. Mittleres Grau liegt darin genau auf 0,5, nichts wird
-/// beschnitten, und der Rueckweg ist exakt.
+/// Ergebnis zurueck. Mittleres Grau liegt darin genau auf 0,5, und der Rueckweg ist
+/// exakt - bis auf einen Deckel ganz oben, siehe <see cref="Cap"/>.
 ///
 /// Folge, die man wissen muss: Eine Kurve auf einer Einstellungsebene greift auf
 /// einer anderen Skala als dieselbe Kurve im Streifen darunter. Beide sind Kurven auf
@@ -107,6 +107,9 @@ public readonly struct LayerGrade
 
         // --- geliehene Anzeigeseite ---
 
+        // Was der Punkt vorher an Licht hatte - gebraucht fuer den Deckel am Ende.
+        float wasR = r, wasG = g, wasB = b;
+
         r = Blending.ToDisplay(r);
         g = Blending.ToDisplay(g);
         b = Blending.ToDisplay(b);
@@ -120,10 +123,34 @@ public readonly struct LayerGrade
 
         for (int t = 0; t < display.Length; t++) display[t].Apply(ref r, ref g, ref b);
 
-        r = Blending.ToLight(r);
-        g = Blending.ToLight(g);
-        b = Blending.ToLight(b);
+        r = Cap(Blending.ToLight(r), wasR);
+        g = Cap(Blending.ToLight(g), wasG);
+        b = Cap(Blending.ToLight(b), wasB);
     }
+
+    /// <summary>
+    /// Der Deckel auf dem Rueckweg - und der Grund, warum es ihn geben muss.
+    ///
+    /// Ein Anzeigewerkzeug klemmt bei 1, und das ist sein gutes Recht: Dort ist
+    /// Weiss. Die geliehene Abbildung kennt aber kein Weiss - sie bildet Unendlich
+    /// auf 1 ab, und der Rueckweg 0,18*d/(1-d) laeuft entsprechend davon. Wer die
+    /// Lichter einer Einstellungsebene verdoppelt, bekommt aus mittlerem Grau nicht
+    /// das Doppelte, sondern das Hunderttausendfache.
+    ///
+    /// Sichtbar wird das nicht sofort - Weiss bleibt Weiss -, sondern ueberall dort,
+    /// wo spaeter gemittelt wird: Ein einziger solcher Punkt zieht einen Glanzschein
+    /// ueber das halbe Bild, faerbt jede Unschaerfe und verschiebt die
+    /// Tonwertabbildung. Die Ebene sieht dann kaputt aus statt heller.
+    ///
+    /// Sechs Blenden ueber dem, was der Punkt vorher hatte - mindestens ueber
+    /// mittlerem Grau, sonst koennte eine dunkle Stelle nie hell werden. Was ein
+    /// Werkzeug NICHT anfasst, geht unveraendert durch: Eine Sonne bleibt eine Sonne.
+    /// </summary>
+    private static float Cap(float light, float before)
+        => MathF.Min(light, MathF.Max(before, Blending.MiddleGrey) * Headroom);
+
+    /// <summary>Sechs Blenden. Genug fuer jede Aufhellung, endlich genug zum Rechnen.</summary>
+    private const float Headroom = 64f;
 
     private float Tone(float v)
     {

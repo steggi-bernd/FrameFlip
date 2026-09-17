@@ -183,10 +183,37 @@ public partial class AtelierPage
         var layer = Layers.Selection;
         if (layer is null) return;
 
-        if (!interim) _settings.Layers = Layers.Stack;
+        if (!interim)
+        {
+            StopDragFrames();
 
-        Layers.PlaceMovedOutside(interim);
+            _settings.Layers = Layers.Stack;
+            Layers.PlaceMovedOutside(false);
+
+            return;
+        }
+
+        // NICHT je Mausmeldung rechnen - das ist der Unterschied zwischen einem
+        // Pinsel, der an der Maus klebt, und einem, der hinterherzieht.
+        //
+        // Windows liefert Mausbewegungen so schnell, wie das Programm sie abholt.
+        // Wer in jeder davon ein 4K-Bild zusammensetzt, staut die Warteschlange,
+        // sobald ein Durchgang laenger dauert als der Abstand zweier Bewegungen; der
+        // Strich laeuft dann sichtbar davon. Der Schleier ueber dem Bild zeichnet
+        // sich sofort - er klebt an der Maus -, und das Bild darunter zieht mit einem
+        // Bild Verzoegerung nach.
+        //
+        // Derselbe Griff wie beim Verschieben, und derselbe Zeittakt.
+        _pendingPaint = true;
+
+        if (_dragHooked) return;
+
+        _dragHooked = true;
+        CompositionTarget.Rendering += OnDragFrame;
     }
+
+    /// <summary>Ein Strich, der noch nicht gerechnet ist.</summary>
+    private bool _pendingPaint;
 
     /// <summary>Die zuletzt gezogene Lage, die noch nicht gerechnet ist.</summary>
     private LayerTransform? _pendingPlace;
@@ -239,9 +266,11 @@ public partial class AtelierPage
     /// <summary>Eine Bildwiederholung: Was seither gezogen wurde, wird jetzt gerechnet.</summary>
     private void OnDragFrame(object? sender, EventArgs e)
     {
-        if (_pendingPlace is null) return;
+        if (_pendingPlace is null && !_pendingPaint) return;
 
         _pendingPlace = null;
+        _pendingPaint = false;
+
         Layers.PlaceMovedOutside(true);
     }
 
@@ -255,6 +284,7 @@ public partial class AtelierPage
     private void StopDragFrames()
     {
         _pendingPlace = null;
+        _pendingPaint = false;
 
         if (!_dragHooked) return;
 

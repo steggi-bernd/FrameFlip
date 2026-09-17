@@ -23,6 +23,7 @@ public static class PaintedMaskInvariants
         PackingLosesNothing();
         TheLockDecidesHowManyFrames();
         TheComposerSeesIt();
+        ToolsWorkOnAMaskLayer();
     }
 
     private static void AStrokeLandsWhereItWasPut()
@@ -133,6 +134,113 @@ public static class PaintedMaskInvariants
 
         Check.Near(own.PaintFor(1)!.At(50, 50), 0, 0.02,
                    "eine Kopie malt nicht ins Original");
+    }
+
+    /// <summary>
+    /// Eine Einstellungsebene mit Maske muss auch WIRKEN - mit allen Werkzeugen.
+    ///
+    /// Der Pinsel legt eine Einstellungsebene an; sie bringt nichts mit und wartet
+    /// darauf, dass jemand sagt, was dort geschehen soll. Wenn die Werkzeuge auf ihr
+    /// nichts tun, ist die ganze Maskenebene nutzlos - man haette einen Ort markiert,
+    /// an dem nichts passieren kann.
+    ///
+    /// Geprueft werden die, nach denen gefragt wurde: Zonen - Tiefen, Mitten, Lichter
+    /// - und Farbbereiche.
+    /// </summary>
+    private static void ToolsWorkOnAMaskLayer()
+    {
+        Check.Group("Werkzeuge wirken auf einer Maskenebene");
+
+        const int w = 120, h = 100;
+
+        static FloatFrame Colour(int w, int h, float r, float g, float b)
+        {
+            int count = w * h;
+            var rr = new float[count];
+            var gg = new float[count];
+            var bb = new float[count];
+
+            Array.Fill(rr, r);
+            Array.Fill(gg, g);
+            Array.Fill(bb, b);
+
+            return new FloatFrame
+            {
+                Width = w, Height = h, R = rr, G = gg, B = bb,
+                A = null, IsSceneReferred = false,
+            };
+        }
+
+        var ground = Colour(w, h, 0.35f, 0.22f, 0.12f);
+
+        var mask = new ImageLayer
+        {
+            Content = LayerContent.Adjustment, Name = "Maske",
+            Mode = BlendMode.Normal,
+            Mask = new LayerMask { Kind = MaskKind.Painted, PaintLocked = true },
+            Tools = new GradingStack(),
+        };
+
+        mask.Mask.PaintOn(0, w, h).Stroke(w / 2f, h / 2f, 25f, 1f, 1f);
+
+        var stack = new LayerStack
+        {
+            Layers =
+            {
+                new ImageLayer { Content = LayerContent.Pass, Source = "", Name = "Bild" },
+                mask,
+            },
+        };
+
+        var sources = new Dictionary<string, FloatFrame>(StringComparer.Ordinal) { [""] = ground };
+
+        int middle = h / 2 * w + w / 2;
+        int corner = 5 * w + 5;
+
+        float plainMiddle = LayerComposer.Compose(stack, sources)!.R[middle];
+
+        // --- Zonen: Tiefen, Mitten, Lichter ---
+        mask.Tools!.Tools.Add(new LiftGammaGainTool { Gain = new ColourTriplet(2.0f, 1.0f, 1.0f) });
+
+        var lifted = LayerComposer.Compose(stack, sources);
+
+        Console.WriteLine($"         Zonen: Mitte {plainMiddle:0.000} -> {lifted!.R[middle]:0.000}, " +
+                          $"Ecke {lifted.R[corner]:0.000}");
+
+        Check.That(MathF.Abs(lifted.R[middle] - plainMiddle) > 0.02f,
+                   "Zonen wirken dort, wo gemalt wurde",
+                   $"{lifted.R[middle]:0.000} gegen {plainMiddle:0.000}");
+
+        Check.Near(lifted.R[corner], ground.R[corner], 0.01,
+                   "und daneben nicht - die Maske haelt");
+
+        // Und zwar in einer Groessenordnung, mit der sich weiterrechnen laesst.
+        //
+        // Die Anzeigewerkzeuge klemmen bei Weiss, die geliehene Abbildung bildet
+        // Weiss aber auf UNENDLICH Licht ab: Vor dem Deckel kam hier 177640 heraus -
+        // sichtbar nicht als Fehler, sondern als Glanzschein ueber dem halben Bild
+        // und als Unschaerfe, die eine Farbe bekommt.
+        Check.That(lifted.R[middle] < 32f,
+                   "und in einer Groesse, die spaeter niemanden vergiftet",
+                   $"{lifted.R[middle]:0.0}");
+
+        mask.Tools.Tools.Clear();
+
+        // --- Farbbereiche ---
+        // Der Grund ist orange - also traegt das Orangeband die Aenderung.
+        var bands = new HslTool();
+
+        bands.Bands[1].Luminance = 60f;
+
+        mask.Tools.Tools.Add(bands);
+
+        var banded = LayerComposer.Compose(stack, sources);
+
+        Console.WriteLine($"         Farbbereiche: Mitte {plainMiddle:0.000} -> {banded!.R[middle]:0.000}");
+
+        Check.That(MathF.Abs(banded.R[middle] - plainMiddle) > 0.02f,
+                   "Farbbereiche wirken ebenso",
+                   $"{banded.R[middle]:0.000} gegen {plainMiddle:0.000}");
     }
 
     /// <summary>Und der Composer muss sie auch benutzen.</summary>

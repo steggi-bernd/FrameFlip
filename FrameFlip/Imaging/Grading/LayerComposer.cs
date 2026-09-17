@@ -367,7 +367,6 @@ public static class LayerComposer
                     // oertlichen Deckkraft verrechnet.
                     float ownAlpha = 1f;
                     bool hasOwnAlpha = false;
-                    bool hasPlacedAlpha = false;
 
                     if (plan.Content == LayerContent.Adjustment)
                     {
