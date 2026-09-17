@@ -105,21 +105,55 @@ public partial class AtelierPage
     /// Dieselbe Geste wie auf der Ebenenliste, nur auf der groesseren Flaeche - und
     /// das ist die, auf die man zielt, wenn man etwas "ins Bild" legen will.
     /// </summary>
+    /// <summary>
+    /// Eine Datei wurde ins Bild fallen gelassen.
+    ///
+    /// Ist noch nichts offen, wird die erste Datei das BILD und nicht eine Ebene
+    /// darauf. Vorher tat ein Zug auf die leere Flaeche gar nichts: Die Bedingung
+    /// verlangte ein offenes Bild, und genau das wollte ja gerade jemand oeffnen.
+    /// Eine Ebene ohne Bild darunter gibt es ohnehin nicht - die unterste Ebene IST
+    /// das Bild.
+    /// </summary>
     private void OnImageFilesDropped(object sender, DragEventArgs e)
     {
-        if (_frame is null) return;
         if (e.Data.GetData(DataFormats.FileDrop) is not string[] files) return;
 
         e.Handled = true;
 
-        foreach (string file in files) Layers.AddImage(file);
+        var usable = files.Where(Readable).ToList();
+        if (usable.Count == 0) return;
+
+        int first = 0;
+
+        if (_frame is null)
+        {
+            Open(usable[0]);
+            first = 1;
+        }
+
+        for (int i = first; i < usable.Count; i++) Layers.AddImage(usable[i]);
+    }
+
+    /// <summary>
+    /// Was sich oeffnen laesst. Dieselbe Liste wie im Ebenenstreifen.
+    ///
+    /// Geprueft wird die Endung und nicht der Inhalt: Die Antwort muss da sein,
+    /// waehrend die Maus ueber der Flaeche schwebt, und eine Datei dafuer zu oeffnen
+    /// waere ein Lesezugriff je Mausbewegung.
+    /// </summary>
+    private static bool Readable(string path)
+    {
+        string extension = System.IO.Path.GetExtension(path);
+
+        return extension.ToLowerInvariant() is ".exr" or ".png" or ".jpg" or ".jpeg"
+                                            or ".tif" or ".tiff" or ".bmp" or ".webp";
     }
 
     private void OnImageFilesDragOver(object sender, DragEventArgs e)
     {
-        // Ohne offenes Bild gibt es keinen Stapel, in den etwas gelegt werden
-        // koennte - der Zeiger soll das sagen, statt es klaglos zu schlucken.
-        e.Effects = _frame is not null && e.Data.GetDataPresent(DataFormats.FileDrop)
+        // Auch ohne offenes Bild: Dann wird die Datei das Bild. Vorher sagte der
+        // Zeiger hier nein, und zwar in genau der Lage, in der jemand anfangen will.
+        e.Effects = e.Data.GetData(DataFormats.FileDrop) is string[] files && files.Any(Readable)
             ? DragDropEffects.Copy
             : DragDropEffects.None;
 

@@ -102,13 +102,31 @@
             <Border Background="{StaticResource OverlayBackground}"
                     BorderBrush="{StaticResource PanelBorder}" BorderThickness="1"
                     CornerRadius="4" Padding="0,3">
-                <ListBox x:Name="LayerList" MaxHeight="150" Background="Transparent"
-                         BorderThickness="0" Focusable="False"
-                         ItemContainerStyle="{StaticResource LayerRow}"
-                         ScrollViewer.HorizontalScrollBarVisibility="Disabled"
-                         SelectionChanged="OnSelectionChanged"
-                         AllowDrop="True" Drop="OnFilesDropped" DragOver="OnFilesDragOver"
-                         ToolTip="{DynamicResource S_DropHere}" />
+                <!--
+                    Der Strich liegt UEBER der Liste und faengt keine Maus: Er zeigt
+                    beim Ziehen, wo die Zeile landen wuerde, und darf dabei nicht
+                    selbst im Weg sein.
+
+                    Die Liste ist ansprechbar - ohne Fokus gibt es keine Tasten, und
+                    eine Ebenenliste ohne Entfernen-Taste fuehlt sich kaputt an.
+                -->
+                <Grid>
+                    <ListBox x:Name="LayerList" MaxHeight="150" Background="Transparent"
+                             BorderThickness="0"
+                             ItemContainerStyle="{StaticResource LayerRow}"
+                             ScrollViewer.HorizontalScrollBarVisibility="Disabled"
+                             SelectionChanged="OnSelectionChanged"
+                             PreviewKeyDown="OnListKeyDown"
+                             PreviewMouseLeftButtonDown="OnRowPressed"
+                             PreviewMouseMove="OnRowDragging"
+                             AllowDrop="True" Drop="OnFilesDropped" DragOver="OnFilesDragOver"
+                             ToolTip="{DynamicResource S_DropHere}" />
+
+                    <Canvas IsHitTestVisible="False">
+                        <Rectangle x:Name="DropLine" Height="2" Visibility="Collapsed"
+                                   Fill="{StaticResource AccentBrush}" />
+                    </Canvas>
+                </Grid>
             </Border>
 
             <Grid Margin="0,6,0,0">

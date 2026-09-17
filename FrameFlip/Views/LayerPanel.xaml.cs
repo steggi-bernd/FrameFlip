@@ -427,6 +427,16 @@ public partial class LayerPanel : UserControl
     /// </summary>
     private void OnFilesDropped(object sender, DragEventArgs e)
     {
+        // Der eigene Zug zuerst: Eine Zeile, die auf die Liste faellt, ist ein
+        // Umsortieren und keine Datei.
+        if (e.Data.GetDataPresent(RowFormat))
+        {
+            DropRow(e);
+            e.Handled = true;
+
+            return;
+        }
+
         if (e.Data.GetData(DataFormats.FileDrop) is not string[] files) return;
 
         e.Handled = true;
@@ -436,6 +446,14 @@ public partial class LayerPanel : UserControl
 
     private void OnFilesDragOver(object sender, DragEventArgs e)
     {
+        if (e.Data.GetDataPresent(RowFormat))
+        {
+            e.Effects = ShowDropLine(e) ? DragDropEffects.Move : DragDropEffects.None;
+            e.Handled = true;
+
+            return;
+        }
+
         bool welcome = e.Data.GetData(DataFormats.FileDrop) is string[] files && files.Any(Readable);
 
         e.Effects = welcome ? DragDropEffects.Copy : DragDropEffects.None;

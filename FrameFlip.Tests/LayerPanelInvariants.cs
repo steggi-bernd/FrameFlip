@@ -28,6 +28,7 @@ public static class LayerPanelInvariants
             MaskControlsReachTheLayer(panel);
             GroupsNestInTheList(panel);
             ListReadsTopDown(panel);
+            DraggingReordersTheStack(panel);
         });
     }
 
@@ -42,6 +43,58 @@ public static class LayerPanelInvariants
         "ViewLayer.GlossDir.R", "ViewLayer.GlossDir.G", "ViewLayer.GlossDir.B",
         "ViewLayer.Depth.Z",
     });
+
+    /// <summary>
+    /// Ziehen in der Liste - die Rechnung dahinter, nicht das Zugereignis.
+    ///
+    /// Hier steht die Umkehrung, an der schon einmal etwas falsch herum gebaut
+    /// wurde: Die Liste laeuft rueckwaerts zum Stapel. Wer eine Zeile UEBER eine
+    /// andere zieht, meint im Stapel den HOEHEREN Platz. Ein Test, der nur prueft,
+    /// dass sich ueberhaupt etwas bewegt, faende genau diesen Fehler nicht.
+    /// </summary>
+    private static void DraggingReordersTheStack(LayerPanel panel)
+    {
+        Check.Group("Ziehen sortiert um - in der Richtung der Liste");
+
+        var stack = panel.Stack;
+
+        stack.Layers.Clear();
+
+        var unten = new ImageLayer { Name = "unten" };
+        var mitte = new ImageLayer { Name = "mitte" };
+        var oben = new ImageLayer { Name = "oben" };
+
+        stack.Layers.Add(unten);
+        stack.Layers.Add(mitte);
+        stack.Layers.Add(oben);
+
+        // In der Liste steht "oben" zuoberst. Die unterste Zeile darueber zu ziehen
+        // heisst: ganz nach oben, also an das Ende des Stapels.
+        Check.That(panel.Reorder(unten, oben, above: true), "der Zug bewirkt etwas");
+
+        Check.That(ReferenceEquals(stack.Layers[^1], unten),
+                   "ueber die oberste Zeile gezogen landet sie auf dem hoechsten Platz",
+                   string.Join(", ", stack.Layers.Select(l => l.Name)));
+
+        // Und darunter gezogen landet sie eine Stelle tiefer.
+        Check.That(panel.Reorder(unten, mitte, above: false), "und andersherum auch");
+        Check.That(ReferenceEquals(stack.Layers[0], unten),
+                   "unter die unterste Zeile gezogen landet sie zuunterst",
+                   string.Join(", ", stack.Layers.Select(l => l.Name)));
+
+        // Eine Gruppe darf nicht in sich selbst - der Stapel waere danach ein Ring.
+        var gruppe = new ImageLayer { Name = "Gruppe", Content = LayerContent.Group };
+        var kind = new ImageLayer { Name = "Kind" };
+
+        gruppe.Children.Add(kind);
+        stack.Layers.Add(gruppe);
+
+        Check.That(!panel.Reorder(gruppe, kind, above: true),
+                   "eine Gruppe wandert nicht in sich selbst");
+        Check.That(ReferenceEquals(gruppe.Children[0], kind), "und ihr Kind bleibt, wo es war");
+
+        Check.That(!panel.Reorder(kind, kind, above: true), "und nichts landet auf sich selbst");
+    }
 
     private static void InAWindow(Action<LayerPanel> body)
     {

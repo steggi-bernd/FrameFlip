@@ -1,3 +1,4 @@
+using System.Windows.Media;
 using FrameFlip.Imaging;
 using FrameFlip.Imaging.Grading;
 
@@ -43,12 +44,29 @@ public partial class AtelierPage
                         Display.Stretch == System.Windows.Media.Stretch.Uniform);
     }
 
+    /// <summary>Die zuletzt gezogene Lage, die noch nicht gerechnet ist.</summary>
+    private LayerTransform? _pendingPlace;
+
+    private bool _dragHooked;
+
     /// <summary>
     /// Am Rahmen wurde gezogen.
     ///
     /// Die Ebene bekommt die neuen Werte, und der Streifen zieht seine Regler nach.
     /// Erst dann wird gerechnet - beim Ziehen grob, beim Loslassen voll, genau wie
     /// bei jedem Regler auch.
+    ///
+    /// Gerechnet wird aber NICHT je Mausbewegung, und das ist der Unterschied
+    /// zwischen "es zieht" und "es haengt hinterher". Windows liefert Mausbewegungen
+    /// so schnell, wie das Programm sie abholt; wer in jeder davon ein Bild
+    /// zusammensetzt, staut die Warteschlange, sobald ein Bild laenger dauert als
+    /// der Abstand zweier Bewegungen. Der Zeiger laeuft dann sichtbar davon, und was
+    /// man sieht, ist nicht der Ort von jetzt, sondern der von vor zehn Meldungen.
+    ///
+    /// Deshalb wird nur GEMERKT, was zuletzt gezogen wurde, und einmal je
+    /// Bildwiederholung gerechnet. Der Rahmen selbst zeichnet sich sofort - er
+    /// klebt an der Maus -, und das Bild darunter zieht mit einem Bild Verzoegerung
+    /// nach. Das ist so schnell, wie es ueberhaupt sein kann.
     /// </summary>
     private void OnPlacementDragged(LayerTransform place, bool interim)
     {
@@ -56,8 +74,47 @@ public partial class AtelierPage
         if (layer is null) return;
 
         layer.Place = place;
-
         _settings.Layers = Layers.Stack;
-        Layers.PlaceMovedOutside(interim);
+
+        if (!interim)
+        {
+            StopDragFrames();
+            Layers.PlaceMovedOutside(false);
+
+            return;
+        }
+
+        _pendingPlace = place;
+
+        if (_dragHooked) return;
+
+        _dragHooked = true;
+        CompositionTarget.Rendering += OnDragFrame;
+    }
+
+    /// <summary>Eine Bildwiederholung: Was seither gezogen wurde, wird jetzt gerechnet.</summary>
+    private void OnDragFrame(object? sender, EventArgs e)
+    {
+        if (_pendingPlace is null) return;
+
+        _pendingPlace = null;
+        Layers.PlaceMovedOutside(true);
+    }
+
+    /// <summary>
+    /// Haengt den Zeittakt wieder aus.
+    ///
+    /// Eingehaengt laeuft er bei JEDER Bildwiederholung, auch wenn niemand zieht -
+    /// sechzig Aufrufe je Sekunde fuer nichts, und ein Programm, das im Leerlauf
+    /// Strom zieht.
+    /// </summary>
+    private void StopDragFrames()
+    {
+        _pendingPlace = null;
+
+        if (!_dragHooked) return;
+
+        _dragHooked = false;
+        CompositionTarget.Rendering -= OnDragFrame;
     }
 }
