@@ -61,6 +61,10 @@
     <sys:String x:Key="S_ClarityAmount">Stärke</sys:String>
     <sys:String x:Key="S_ClarityReach">Radius</sys:String>
     <sys:String x:Key="S_ClarityHint">Örtlicher Kontrast: Er verstärkt, was ein Punkt gegenüber seiner Umgebung ist, und lässt gleichmäßige Flächen in Ruhe. Großer Radius gibt Plastizität, kleiner gibt Schärfe. Negativ nimmt Kontrast weg.</sys:String>
+    <sys:String x:Key="S_DepthField">Tiefenschärfe</sys:String>
+    <sys:String x:Key="S_DepthAperture">Blende</sys:String>
+    <sys:String x:Key="S_DepthFocus">Fokus</sys:String>
+    <sys:String x:Key="S_DepthHint">Braucht einen Tiefenpass in der Datei — Depth, Z oder ersatzweise Mist. Der Fokus steht in den Einheiten der Szene. Es ist eine Näherung: Was hinter einer scharfen Kante liegt, steht nicht in der Datei, also kann unscharfer Hintergrund nicht über einen scharfen Vordergrund kriechen.</sys:String>
     <sys:String x:Key="S_Distortion">Verzeichnung</sys:String>
     <sys:String x:Key="S_DistortionAmount">Stärke</sys:String>
     <sys:String x:Key="S_DistortionScale">Maßstab</sys:String>

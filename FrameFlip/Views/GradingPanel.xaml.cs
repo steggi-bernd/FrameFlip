@@ -47,6 +47,7 @@ public partial class GradingPanel : UserControl
     private GrainTool _grain = new();
     private DistortionTool _distortion = new();
     private ChromaticTool _chromatic = new();
+    private DepthFieldTool _depth = new();
 
     private static readonly Color[] CurveColours =
     {
@@ -152,6 +153,7 @@ public partial class GradingPanel : UserControl
         ClarityBody.IsEnabled = enabled;
         TextureBody.IsEnabled = enabled;
         SharpenBody.IsEnabled = enabled;
+        DepthBody.IsEnabled = enabled;
         DistortionBody.IsEnabled = enabled;
         ChromaticBody.IsEnabled = enabled;
         VignetteBody.IsEnabled = enabled;
@@ -174,6 +176,7 @@ public partial class GradingPanel : UserControl
         var local = stack?.Local.ToList();
         var optics = stack?.Optics.ToList();
         var geometry = stack?.Geometry.ToList();
+        var data = stack?.Data.ToList();
 
         Stack.Tools.Clear();
         if (tools is not null) Stack.Tools.AddRange(tools);
@@ -189,6 +192,9 @@ public partial class GradingPanel : UserControl
 
         Stack.Geometry.Clear();
         if (geometry is not null) Stack.Geometry.AddRange(geometry);
+
+        Stack.Data.Clear();
+        if (data is not null) Stack.Data.AddRange(data);
 
         _curves = Take<CurvesTool>();
         _whiteBalance = Take<WhiteBalanceTool>();
@@ -216,6 +222,9 @@ public partial class GradingPanel : UserControl
         // Und die vierte Liste: die Werkzeuge, die Bildpunkte verschieben.
         _distortion = TakeGeometry<DistortionTool>();
         _chromatic = TakeGeometry<ChromaticTool>();
+
+        // Und die fuenfte: die Werkzeuge, die Renderdaten brauchen.
+        _depth = TakeData<DepthFieldTool>();
 
         T TakeLocal<T>() where T : ILocalTool, new()
         {
@@ -246,6 +255,17 @@ public partial class GradingPanel : UserControl
 
             var created = new T();
             Stack.Geometry.Add(created);
+
+            return created;
+        }
+
+        T TakeData<T>() where T : IDataTool, new()
+        {
+            var found = Stack.Data.OfType<T>().FirstOrDefault();
+            if (found is not null) return found;
+
+            var created = new T();
+            Stack.Data.Add(created);
 
             return created;
         }
@@ -485,6 +505,11 @@ public partial class GradingPanel : UserControl
             SharpenThresholdSlider.Value = Math.Clamp(_sharpen.Threshold,
                                                       SharpenThresholdSlider.Minimum, SharpenThresholdSlider.Maximum);
 
+            DepthApertureSlider.Value = Math.Clamp(_depth.Aperture,
+                                                   DepthApertureSlider.Minimum, DepthApertureSlider.Maximum);
+            DepthFocusSlider.Value = Math.Clamp(FocusAt(_depth.Focus),
+                                                DepthFocusSlider.Minimum, DepthFocusSlider.Maximum);
+
             DistortionSlider.Value = Math.Clamp(_distortion.Amount,
                                                 DistortionSlider.Minimum, DistortionSlider.Maximum);
             DistortionScaleSlider.Value = Math.Clamp(_distortion.Scale,
@@ -601,6 +626,9 @@ public partial class GradingPanel : UserControl
         _sharpen.Reach = (int)Math.Round(SharpenRadiusSlider.Value);
         _sharpen.Threshold = (float)SharpenThresholdSlider.Value;
 
+        _depth.Aperture = (float)DepthApertureSlider.Value;
+        _depth.Focus = FocusFrom(DepthFocusSlider.Value);
+
         _distortion.Amount = (float)DistortionSlider.Value;
         _distortion.Scale = (float)DistortionScaleSlider.Value;
 
@@ -674,6 +702,10 @@ public partial class GradingPanel : UserControl
         SharpenValue.Text = $"{SharpenSlider.Value:0.00}";
         SharpenRadiusValue.Text = $"{SharpenRadiusSlider.Value:0}";
         SharpenThresholdValue.Text = $"{SharpenThresholdSlider.Value:0.000}";
+        DepthApertureValue.Text = $"{DepthApertureSlider.Value:0.00}";
+        DepthFocusValue.Text = FocusFrom(DepthFocusSlider.Value) is var metres && metres < 10
+            ? $"{metres:0.00}"
+            : $"{metres:0.0}";
         DistortionValue.Text = $"{DistortionSlider.Value:+0.00;-0.00;0.00}";
         DistortionScaleValue.Text = $"{DistortionScaleSlider.Value:0.00}";
         ChromaticValue.Text = $"{ChromaticSlider.Value:+0.00;-0.00;0.00}";
@@ -701,6 +733,24 @@ public partial class GradingPanel : UserControl
         NoiseThresholdValue.Text = $"{NoiseThresholdSlider.Value:0.000}";
         UpdateZoneValues();
     }
+
+    /// <summary>
+    /// Der Fokusregler laeuft nicht gleichmaessig, sondern verdoppelnd.
+    ///
+    /// Eine gerade Skala von null bis zweihundert Metern draengte alles Brauchbare in
+    /// das erste Zwanzigstel: Zwischen zwei und drei Metern entscheidet sich, ob ein
+    /// Gesicht scharf ist, und zwischen hundert und hundertzehn nichts mehr. Der
+    /// Weg des Reglers ist deshalb der Logarithmus der Entfernung - gleiche
+    /// Reglerwege sind gleiche Faktoren.
+    /// </summary>
+    private const double NearestFocus = 0.1;
+    private const double FocusRange = 2000.0;
+
+    private static float FocusFrom(double at)
+        => (float)(NearestFocus * Math.Pow(FocusRange, Math.Clamp(at, 0.0, 1.0)));
+
+    private static double FocusAt(float metres)
+        => Math.Clamp(Math.Log(Math.Max(NearestFocus, metres) / NearestFocus) / Math.Log(FocusRange), 0.0, 1.0);
 
     /// <summary>
     /// Mired nach Kelvin und zurueck.

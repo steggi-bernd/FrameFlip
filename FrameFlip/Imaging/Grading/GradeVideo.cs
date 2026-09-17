@@ -232,6 +232,13 @@ public static class GradeVideo
         public byte[]? Pixels;
     }
 
+    /// <summary>Die Passe, die die Werkzeuge dieses Bildes brauchen - wie im Stapellauf.</summary>
+    private static FloatFrame?[] Renderdata(PreparedGrading grading, string path)
+        => grading.Data.Length == 0
+            ? Array.Empty<FloatFrame?>()
+            : FramePasses.Resolve(grading.Data, Decoding.Exr.ExrPasses.Of(path),
+                                  name => FloatFrame.FromExrPass(path, name));
+
     private static byte[]? Render(string path, GradeVideoRequest request, PreparedGrading grading,
                                   int width, int height)
     {
@@ -252,7 +259,7 @@ public static class GradeVideo
             fixed (byte* target = pixels)
                 FloatFrameProcessor.Apply(frame, request.Adjustments, view, grading,
                                           (IntPtr)target, stride, step: 1, overlays,
-                                          SequenceLink.NumberOf(path) ?? 0);
+                                          SequenceLink.NumberOf(path) ?? 0, Renderdata(grading, path));
         }
 
         return pixels;

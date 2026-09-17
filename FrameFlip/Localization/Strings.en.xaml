@@ -61,6 +61,10 @@
     <sys:String x:Key="S_ClarityAmount">Amount</sys:String>
     <sys:String x:Key="S_ClarityReach">Radius</sys:String>
     <sys:String x:Key="S_ClarityHint">Local contrast: it boosts what a pixel is against its surroundings and leaves flat areas alone. A large radius gives modelling, a small one gives sharpness. Negative takes contrast away.</sys:String>
+    <sys:String x:Key="S_DepthField">Depth of field</sys:String>
+    <sys:String x:Key="S_DepthAperture">Aperture</sys:String>
+    <sys:String x:Key="S_DepthFocus">Focus</sys:String>
+    <sys:String x:Key="S_DepthHint">Needs a depth pass in the file — Depth, Z, or Mist as a stand-in. Focus is in the scene's own units. It is an approximation: what lies behind a sharp edge is not in the file, so a blurred background cannot creep over a sharp foreground.</sys:String>
     <sys:String x:Key="S_Distortion">Distortion</sys:String>
     <sys:String x:Key="S_DistortionAmount">Amount</sys:String>
     <sys:String x:Key="S_DistortionScale">Scale</sys:String>

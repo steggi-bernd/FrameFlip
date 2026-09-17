@@ -45,6 +45,15 @@ public static class LocalPass
         public byte[] Alpha = Array.Empty<byte>();
         public byte[] AlphaWork = Array.Empty<byte>();
 
+        /// <summary>
+        /// Eine dritte Stufe fuer die Tiefenschaerfe - und nur fuer sie.
+        ///
+        /// Getrennt angelegt und nicht in Hold, weil sie fast nie gebraucht wird: Ein
+        /// vierter Puffer waere bei 4K hundert Megabyte je Faden, die neunundneunzig
+        /// von hundert Bildern nur herumliegen.
+        /// </summary>
+        public float[] Levels = Array.Empty<float>();
+
         /// <summary>Sorgt dafuer, dass Platz fuer so viele Punkte da ist.</summary>
         public void Hold(int count)
         {
@@ -55,6 +64,12 @@ public static class LocalPass
             Work = new float[count * 3];
             Alpha = new byte[count];
             AlphaWork = new byte[count];
+        }
+
+        /// <summary>Legt die dritte Stufe an, falls sie noch fehlt.</summary>
+        public void HoldLevels(int count)
+        {
+            if (Levels.Length < count * 3) Levels = new float[count * 3];
         }
     }
 

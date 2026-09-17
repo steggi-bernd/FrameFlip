@@ -47,12 +47,21 @@ public sealed class GradingStack
     /// </summary>
     public List<IGeometryTool> Geometry { get; set; } = new();
 
+    /// <summary>
+    /// Die Werkzeuge, die Renderdaten brauchen - Tiefenschaerfe und was noch kommt.
+    ///
+    /// Die fuenfte Liste. Sie sind die einzigen, die ohne EXR gar nichts tun koennen:
+    /// Alles andere liefe auf einem JPEG auch, schlechter zwar, aber es liefe.
+    /// </summary>
+    public List<IDataTool> Data { get; set; } = new();
+
     /// <summary>True, wenn kein Werkzeug etwas zu tun hat.</summary>
     public bool IsNeutral
         => (Tools.Count == 0 || Tools.All(t => t.IsNeutral)) &&
            (Local.Count == 0 || Local.All(t => t.IsNeutral)) &&
            (Optics.Count == 0 || Optics.All(t => t.IsNeutral)) &&
-           (Geometry.Count == 0 || Geometry.All(t => t.IsNeutral));
+           (Geometry.Count == 0 || Geometry.All(t => t.IsNeutral)) &&
+           (Data.Count == 0 || Data.All(t => t.IsNeutral));
 
     /// <summary>
     /// Bereitet alle Werkzeuge vor und sammelt die ein, die tatsaechlich etwas tun.
@@ -113,8 +122,19 @@ public sealed class GradingStack
             geometry.Add(tool);
         }
 
+        var data = new List<IDataTool>();
+
+        foreach (var tool in Data)
+        {
+            if (tool.IsNeutral) continue;
+
+            tool.Prepare();
+            data.Add(tool);
+        }
+
         return new PreparedGrading(linear.ToArray(), display.ToArray(), local.ToArray(),
-                                   light.ToArray(), optics.ToArray(), geometry.ToArray());
+                                   light.ToArray(), optics.ToArray(), geometry.ToArray(),
+                                   data.ToArray());
     }
 
     /// <summary>
@@ -130,6 +150,15 @@ public sealed class GradingStack
         Local = Local.Select(CopyLocal).ToList(),
         Optics = Optics.Select(CopyOptics).ToList(),
         Geometry = Geometry.Select(CopyGeometry).ToList(),
+        Data = Data.Select(CopyData).ToList(),
+    };
+
+    private static IDataTool CopyData(IDataTool tool) => tool switch
+    {
+        DepthFieldTool depth => new DepthFieldTool { Aperture = depth.Aperture, Focus = depth.Focus },
+
+        // Wie oben: Ein Werkzeug, das hier fehlt, wuerde geteilt statt kopiert.
+        _ => throw new NotSupportedException($"Kein Kopierweg fuer {tool.GetType().Name}."),
     };
 
     private static IGeometryTool CopyGeometry(IGeometryTool tool) => tool switch
@@ -220,8 +249,10 @@ public readonly struct PreparedGrading
 {
     public PreparedGrading(IGradingTool[] sceneLinear, IGradingTool[] display,
                            ILocalTool[] local, ILocalTool[]? light = null,
-                           IOpticsTool[]? optics = null, IGeometryTool[]? geometry = null)
+                           IOpticsTool[]? optics = null, IGeometryTool[]? geometry = null,
+                           IDataTool[]? data = null)
     {
+        Data = data ?? Array.Empty<IDataTool>();
         SceneLinear = sceneLinear;
         Display = display;
         Local = local;
@@ -268,8 +299,15 @@ public readonly struct PreparedGrading
     /// </summary>
     public IGeometryTool[] Geometry { get; } = Array.Empty<IGeometryTool>();
 
+    /// <summary>
+    /// Die Werkzeuge, die Renderdaten brauchen. Sie rechnen im selben Puffer wie die
+    /// oertlichen, mit einem Pass der Datei als zweiter Quelle.
+    /// </summary>
+    public IDataTool[] Data { get; } = Array.Empty<IDataTool>();
+
     /// <summary>True, wenn der Bildweg den Puffer und den zweiten Durchgang braucht.</summary>
-    public bool HasLocal => Local.Length > 0 || LocalLight.Length > 0 || Geometry.Length > 0;
+    public bool HasLocal => Local.Length > 0 || LocalLight.Length > 0 ||
+                            Geometry.Length > 0 || Data.Length > 0;
 
     public bool IsEmpty => SceneLinear.Length == 0 && Display.Length == 0 && !HasLocal &&
                            Optics.Length == 0;

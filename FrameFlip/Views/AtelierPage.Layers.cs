@@ -97,7 +97,15 @@ public partial class AtelierPage
         var needed = reads.Select(r => r.Key).ToList();
         var missing = reads.Where(r => r.Key.Length > 0 && !_sources.ContainsKey(r.Key)).ToList();
 
-        if (missing.Count == 0)
+        // Die Werkzeuge koennen einen Pass verlangen, den keine Ebene liest - die
+        // Tiefenschaerfe braucht die Entfernung. Er wird auf demselben Weg geholt und
+        // in demselben Vorrat gehalten; sonst gaebe es zwei Wege zu derselben Datei.
+        string? datum = DataPass();
+        if (datum is not null) needed.Add(datum);
+
+        bool datumMissing = datum is not null && !_sources.ContainsKey(datum);
+
+        if (missing.Count == 0 && !datumMissing)
         {
             DropStale(needed);
             Refresh(interim: false, recompose: true);
@@ -114,6 +122,12 @@ public partial class AtelierPage
             {
                 var frame = LayeredFrameLoader.Read(read, path);
                 if (frame is not null) found[read.Key] = frame;
+            }
+
+            if (datumMissing && datum is not null)
+            {
+                var frame = FloatFrame.FromExrPass(path, datum);
+                if (frame is not null) found[datum] = frame;
             }
 
             return found;
@@ -135,7 +149,7 @@ public partial class AtelierPage
 
                 foreach (var (name, frame) in read) _sources[name] = frame;
 
-                DropStale(Layers.Stack.NeededSources());
+                DropStale(NeededPasses());
                 Refresh(interim: false, recompose: true);
             });
         });
@@ -148,6 +162,28 @@ public partial class AtelierPage
     /// aus Blender fuehrt zwanzig davon. Wer sie alle liegenliesse, haette nach ein
     /// paar Versuchen zwei Gigabyte im Speicher.
     /// </summary>
+    /// <summary>
+    /// Welcher Pass die Renderdaten liefert, oder null.
+    ///
+    /// Gefragt wird der FERTIGE Stapel und nicht der, den der Streifen gerade zeigt:
+    /// Die Werkzeuge mit Renderdaten gelten dem ganzen Bild, wie die oertlichen auch.
+    /// </summary>
+    private string? DataPass()
+        => _finalGrading.Data.Length > 0
+            ? FramePasses.NameFor(PassNeed.Depth, _passes)
+            : null;
+
+    /// <summary>Die Passe der Ebenen und die der Werkzeuge zusammen.</summary>
+    private List<string> NeededPasses()
+    {
+        var needed = Layers.Stack.NeededSources().ToList();
+
+        string? datum = DataPass();
+        if (datum is not null) needed.Add(datum);
+
+        return needed;
+    }
+
     private void DropStale(IReadOnlyList<string> needed)
     {
         foreach (string stale in _sources.Keys.Where(k => k.Length > 0 && !needed.Contains(k)).ToList())

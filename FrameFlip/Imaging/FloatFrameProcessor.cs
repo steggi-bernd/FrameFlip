@@ -67,7 +67,8 @@ public static class FloatFrameProcessor
     public static unsafe void Apply(FloatFrame frame, ImageAdjustments adjustments,
                                     IViewTransform view, PreparedGrading grading,
                                     IntPtr destination, int destinationStride, int step = 1,
-                                    OverlayPlan[]? overlays = null, int number = 0)
+                                    OverlayPlan[]? overlays = null, int number = 0,
+                                    FloatFrame?[]? data = null)
     {
         overlays ??= Overlays.None;
 
@@ -76,7 +77,7 @@ public static class FloatFrameProcessor
         if (grading.HasLocal)
         {
             ApplyLocal(frame, adjustments, view, grading, destination, destinationStride,
-                       step, overlays, number);
+                       step, overlays, number, data);
             return;
         }
 
@@ -196,7 +197,8 @@ public static class FloatFrameProcessor
     /// nachgeholt werden muss.
     /// </param>
     private static void RunLocal(ShadePlan plan, LocalPass.Scratch scratch, PreparedGrading grading,
-                                 int gridWidth, int gridHeight, int imageWidth, int step, bool split)
+                                 int gridWidth, int gridHeight, int imageWidth, int step, bool split,
+                                 FloatFrame?[]? data, int[] columns, int[] rows)
     {
         if (split)
         {
@@ -204,6 +206,21 @@ public static class FloatFrameProcessor
             // am Ende steht. Glanz um eine Kante, die danach noch wandert, saesse
             // nicht mehr an ihr.
             GeometryPass.Run(scratch, grading.Geometry, plan.Place, gridWidth, gridHeight, step);
+
+            // Dann die Werkzeuge mit Renderdaten. Die Tiefenschaerfe entsteht im
+            // Objektiv, also vor allem, was danach kommt: Ein unscharfer Punkt, der
+            // hell genug ist, soll auch unscharf leuchten.
+            //
+            // Fehlt der Pass, ruht das Werkzeug. Eine Datei ohne Tiefe ist kein
+            // Fehler, sondern eine Datei ohne Tiefe - und ein Regler, der dann etwas
+            // erfindet, waere schlimmer als einer, der nichts tut.
+            for (int i = 0; i < grading.Data.Length; i++)
+            {
+                var pass = data is not null && i < data.Length ? data[i] : null;
+                if (pass is null) continue;
+
+                grading.Data[i].Run(scratch, pass, columns, rows, imageWidth, step);
+            }
 
             LocalPass.Run(scratch, grading.LocalLight, gridWidth, gridHeight, imageWidth, step);
 
@@ -356,7 +373,8 @@ public static class FloatFrameProcessor
     private static unsafe void ApplyLocal(FloatFrame frame, ImageAdjustments adjustments,
                                           IViewTransform view, PreparedGrading grading,
                                           IntPtr destination, int destinationStride,
-                                          int step, OverlayPlan[] overlays, int number)
+                                          int step, OverlayPlan[] overlays, int number,
+                                          FloatFrame?[]? data)
     {
         var plan = BuildPlan(adjustments, view, grading, frame, number);
 
@@ -384,7 +402,8 @@ public static class FloatFrameProcessor
         // die Punkte verschoben sind. Ohne beides bleibt alles in einem Zug - ein
         // zusaetzlicher Lauf ueber den Puffer kostet bei 4K rund dreihundert
         // Megabyte hin und zurueck.
-        bool split = grading.LocalLight.Length > 0 || grading.Geometry.Length > 0;
+        bool split = grading.LocalLight.Length > 0 || grading.Geometry.Length > 0 ||
+                     grading.Data.Length > 0;
 
         // --- erster Durchgang: die Kette bis hinter die Anzeigewerkzeuge ---
         Parallel.For(0, rows.Length, new ParallelOptions
@@ -417,7 +436,8 @@ public static class FloatFrameProcessor
         });
 
         // --- verschieben, weichzeichnen und durch die Werkzeuge ---
-        RunLocal(plan, scratch, grading, gridWidth, rows.Length, width, step, split);
+        RunLocal(plan, scratch, grading, gridWidth, rows.Length, width, step, split,
+                 data, columns, rows);
 
         // Nach dem Geometriedurchgang ist das Bild im anderen Feld - wer den alten
         // Verweis weiterbenutzt, schreibt den Stand von vor der Verschiebung hinaus.
@@ -656,7 +676,8 @@ public static class FloatFrameProcessor
     public static unsafe void ApplyRgba64(FloatFrame frame, ImageAdjustments adjustments,
                                           IViewTransform view, PreparedGrading grading,
                                           IntPtr destination, int destinationStride,
-                                          OverlayPlan[]? overlays = null, int number = 0)
+                                          OverlayPlan[]? overlays = null, int number = 0,
+                                          FloatFrame?[]? data = null)
     {
         overlays ??= Overlays.None;
         var plan = BuildPlan(adjustments, view, grading, frame, number);
@@ -709,7 +730,8 @@ public static class FloatFrameProcessor
                 }
             });
 
-            RunLocal(plan, scratch, grading, width, height, width, step: 1, split);
+            RunLocal(plan, scratch, grading, width, height, width, step: 1, split,
+                     data, LocalPass.Grid(width, 1), LocalPass.Grid(height, 1));
         }
 
         var shaded = scratch?.Values;

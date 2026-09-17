@@ -62,6 +62,17 @@ public sealed partial class AtelierPage : UserControl
     /// <summary>Was die Datei anbietet - die Auswahl im Plusknopf.</summary>
     private IReadOnlyList<ExrPass> _passes = Array.Empty<ExrPass>();
 
+    /// <summary>
+    /// Die Passe, die die Werkzeuge brauchen - aus dem, was schon gelesen ist.
+    ///
+    /// Hier wird nichts von der Platte geholt: Das laeuft ueber denselben Weg wie die
+    /// Passe der Ebenen, und zwar vorher. Ein Lesezugriff im Zeichnen waere bei jedem
+    /// Reglerzug eine Datei im Weg.
+    /// </summary>
+    private FloatFrame?[] Renderdata(PreparedGrading grading)
+        => FramePasses.Resolve(grading.Data, _passes,
+                               name => _sources.TryGetValue(name, out var found) ? found : null);
+
     private WriteableBitmap? _surface;
     private string? _path;
     private int _number;
@@ -381,7 +392,8 @@ public sealed partial class AtelierPage : UserControl
             FloatFrameProcessor.Apply(frame, adjustments, ViewFor(frame), grading,
                                       _surface.BackBuffer, _surface.BackBufferStride,
                                       _coarse ? CoarseStep : 1,
-                                      _showingOriginal ? Overlays.None : _overlays, _number);
+                                      _showingOriginal ? Overlays.None : _overlays, _number,
+                                      Renderdata(grading));
 
             _surface.AddDirtyRect(new Int32Rect(0, 0, frame.Width, frame.Height));
         }

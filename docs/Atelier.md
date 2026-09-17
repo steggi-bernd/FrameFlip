@@ -7,7 +7,8 @@ sequence and write it out. Layers, masks driven by render data, and a colour too
 aimed at Photoshop and Lightroom rather than at a node graph.
 
 **Status:** steps 1 to 7 are built and running; of step 8, sections 7.3 and 7.4 are
-complete — eleven tools across four kinds of pass. Step 5 is complete —
+complete and 7.5 is all but one row — twelve tools across five kinds of pass. Step 5 is
+complete —
 pass, adjustment, image and group layers, with order, duplication, opacity, colour,
 blend modes and clipping masks. Of step 6, masks are data-driven: cryptomatte, any
 pass, luminance and gradient; painted masks are not built. Where an earlier estimate or
@@ -890,7 +891,7 @@ The buffer path therefore now reads, in the order light actually takes:
 
 ```
   exposure → linear tools → vignette
-  → [distortion, fringing] → dehaze → glow → halation
+  → [distortion, fringing] → depth of field → dehaze → glow → halation
   → grain → view transform → display tools
   → noise reduction → clarity → texture → sharpening
 ```
@@ -899,12 +900,63 @@ The buffer path therefore now reads, in the order light actually takes:
 
 | Tool | Parameters | Notes |
 |---|---|---|
-| **Light mixing** ★ | per pass: gain, tint | diffuse, glossy, transmission, emission, volume, each direct/indirect. Relight without rerendering — the reason to open the EXR at all |
-| **AO multiply** | amount | contact shadows dialled after the fact |
-| **Depth haze** | near, far, colour, density | from Z or Mist |
-| **Post depth of field** | focus distance, aperture, bokeh shape | from Z. Approximate at edges, and honest about it |
-| **Post motion blur** | shutter, samples | from the Vector pass |
+| ~~**Light mixing**~~ ★ **built** | per pass: gain, tint | as layers, with step 5 — relight without rerendering, the reason to open the EXR at all |
+| ~~**AO multiply**~~ **reachable** | amount | the AO pass as a layer in Multiply, at the opacity you want. That is exactly `lerp(1, ao, amount)` — see below |
+| ~~**Depth haze**~~ **reachable** | near, far, colour, density | an adjustment layer with a depth mask: near and far are the mask's black and white point, colour and density are the layer's tint and exposure — see below |
+| ~~**Post depth of field**~~ **built** | focus distance, aperture | from Depth, Z or Mist. Approximate at edges, and honest about it — see below. No bokeh shape: that needs a real gather |
+| **Post motion blur** | shutter, samples | from the Vector pass. The one row left in section 7 |
 | **Cryptomatte picker** ★ | click to add/remove | not a correction — the mask source of section 6, listed here because it is what people will come for |
+
+**Three of these were already there, and saying so is the point.** Light mixing arrived
+with step 5 because a pass *is* a layer; AO multiply is the AO pass as a layer in Multiply
+at the opacity you want, which is the same arithmetic a dedicated slider would do; depth
+haze is an adjustment layer with a depth mask, which has been possible since depth became
+a mask source. Building three more sliders that do what the stack already does would add
+surface without adding reach — the same conclusion the Texture row reached, only this time
+it held up.
+
+#### Post depth of field — the fifth kind of tool
+
+This one could not be reached that way, and it is the clearest case for the whole
+program: it needs the **distance of every pixel**, and no finished picture has that.
+With it, the depth of field can be changed after the render — in seconds instead of
+another night.
+
+That makes it a fifth kind of tool: one that needs a *pass of the file* besides the
+picture. Which pass is not fixed, because the name is not: Blender writes `Depth` today,
+older versions wrote `Z`, and someone rendering fog but no depth has only `Mist`. The
+tool says **what** it needs; which pass covers it in this file is decided at read time,
+in one place, in that order. A three-channel pass with a matching name does not count —
+distance is a quantity per pixel, not a picture.
+
+**Without the pass, the tool rests.** Not "assumes a distance": a file without depth is
+not an error, it is a file without depth, and a control that invents something would turn
+a missing pass into a soft picture with no findable cause.
+
+**The blur follows the reciprocal of the distance, not the distance.** Optically, between
+two and four metres lies the same as between four metres and infinity. Computed linearly,
+the foreground never goes soft and the background turns uniformly to mush past some line.
+There is a test for it: with the focus at ten metres, five metres must come out markedly
+softer than fifteen, although both are the same number of metres off.
+
+**And it is an approximation, with a nameable failure.** Real depth of field happens while
+the light is gathered, and there sharp and unsharp partly hide each other. Afterwards that
+cannot be restored: what lies behind a sharp edge is not in the file. It shows in exactly
+one place — a sharp subject against a blurred background keeps too clean an edge, because
+the blurred background cannot creep over it. Whoever needs that renders the depth of
+field. For everything else — trying, adjusting, a second look — this is the faster way.
+
+Three levels are mixed: sharp, half, full. A gather over a disc of varying radius would be
+the right thing and would cost twelve hundred samples per pixel at radius twenty; three
+levels cost two blurs for the whole picture. The third level is the only place in the
+program with a fourth float buffer, and it is allocated only when someone opens the
+aperture.
+
+| 1080p | |
+|---|---|
+| no depth of field | **14 ms** |
+| aperture open, every pixel | **58 ms** |
+| while a slider moves | **7 ms** |
 
 ### 7.6 The order they run in
 
@@ -1117,11 +1169,11 @@ next one landing.
    single stop — it has to run before the view transform, where the overbrights still
    exist — and dehaze generalised "the highlights above a threshold" into "whatever the
    tool says goes into the blur". Texture found a wrong sentence in this document. What
-   remains of section 7 is 7.5, the render data. 7.4 brought two more kinds of tool: one
-   that needs the *place* of a pixel rather than its neighbourhood (vignette, grain), and
-   one that *moves* pixels and therefore needs the whole picture as a source (distortion,
-   fringing). Four kinds of pass in total, and 7.5 needs none of them — it needs the
-   other channels of the file, which the pass stack already reads.
+   remains of section 7 is one row: post motion blur. 7.4 brought two more kinds of tool —
+   one that needs the *place* of a pixel (vignette, grain) and one that *moves* pixels
+   (distortion, fringing) — and 7.5 brought the fifth: one that needs a *pass of the file*
+   beside the picture. Three of 7.5's rows turned out to be reachable through the layer
+   stack already, which is what a stack is for.
 
 Steps 1–4 are the product. 5–8 are what makes it uncontested.
 

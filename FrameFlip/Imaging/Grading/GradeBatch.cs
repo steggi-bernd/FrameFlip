@@ -146,7 +146,7 @@ public static class GradeBatch
                     // Sonst bekaeme dasselbe Bild ein anderes Korn, sobald jemand
                     // einen Ausschnitt nachexportiert.
                     Write(frame, request, view, prepared, overlays, target,
-                          SequenceLink.NumberOf(path) ?? 0);
+                          SequenceLink.NumberOf(path) ?? 0, Renderdata(prepared, path));
 
                     Interlocked.Increment(ref written);
                 }
@@ -188,13 +188,25 @@ public static class GradeBatch
         _ => ".png",
     };
 
+    /// <summary>
+    /// Die Passe, die die Werkzeuge dieses Bildes brauchen.
+    ///
+    /// Je Bild gelesen, weil die Entfernung sich je Bild aendert - anders als das
+    /// Rezept, das fuer den ganzen Lauf gilt. Fehlt der Pass, ruht das Werkzeug.
+    /// </summary>
+    private static FloatFrame?[] Renderdata(PreparedGrading grading, string path)
+        => grading.Data.Length == 0
+            ? Array.Empty<FloatFrame?>()
+            : FramePasses.Resolve(grading.Data, Decoding.Exr.ExrPasses.Of(path),
+                                  name => FloatFrame.FromExrPass(path, name));
+
     private static void Write(FloatFrame frame, GradeBatchRequest request, IViewTransform view,
                               PreparedGrading grading, OverlayPlan[] overlays, string target,
-                              int number)
+                              int number, FloatFrame?[] data)
     {
         BitmapSource image = request.Format == GradeOutputFormat.Png8 || request.Format == GradeOutputFormat.Jpeg
-            ? Render8(frame, request, view, grading, overlays, number)
-            : Render16(frame, request, view, grading, overlays, number);
+            ? Render8(frame, request, view, grading, overlays, number, data)
+            : Render16(frame, request, view, grading, overlays, number, data);
 
         BitmapEncoder encoder = request.Format switch
         {
@@ -218,14 +230,15 @@ public static class GradeBatch
 
     private static unsafe BitmapSource Render8(FloatFrame frame, GradeBatchRequest request,
                                                IViewTransform view, PreparedGrading grading,
-                                               OverlayPlan[] overlays, int number)
+                                               OverlayPlan[] overlays, int number,
+                                               FloatFrame?[] data)
     {
         int stride = frame.Width * 4;
         var pixels = new byte[stride * frame.Height];
 
         fixed (byte* target = pixels)
             FloatFrameProcessor.Apply(frame, request.Adjustments, view, grading, (IntPtr)target, stride,
-                                      step: 1, overlays, number);
+                                      step: 1, overlays, number, data);
 
         // JPEG kennt kein Alpha; Bgr32 statt Bgra32 zu schreiben spart dem Encoder
         // das Verwerfen und dem Ergebnis eine Ueberraschung bei durchsichtigen Stellen.
@@ -238,14 +251,15 @@ public static class GradeBatch
 
     private static unsafe BitmapSource Render16(FloatFrame frame, GradeBatchRequest request,
                                                 IViewTransform view, PreparedGrading grading,
-                                                OverlayPlan[] overlays, int number)
+                                                OverlayPlan[] overlays, int number,
+                                                FloatFrame?[] data)
     {
         int stride = frame.Width * 8;      // vier Kanaele zu je zwei Byte
         var pixels = new byte[stride * frame.Height];
 
         fixed (byte* target = pixels)
             FloatFrameProcessor.ApplyRgba64(frame, request.Adjustments, view, grading,
-                                            (IntPtr)target, stride, overlays, number);
+                                            (IntPtr)target, stride, overlays, number, data);
 
         var source = BitmapSource.Create(frame.Width, frame.Height, 96, 96,
                                          PixelFormats.Rgba64, null, pixels, stride);
