@@ -29,6 +29,7 @@ public static class StackReproInvariants
         ScreenOnTopStaysClean(folder);
         TheWholeReportedStack(folder);
         ScreenOverBlack(folder);
+        ByTheNumbersOfTheRealFiles();
     }
 
     /// <summary>
@@ -229,6 +230,169 @@ public static class StackReproInvariants
                        $"{noise:0.00}");
         }
     }
+
+    /// <summary>
+    /// Der gemeldete Aufbau, gebaut nach den ZAHLEN der echten Dateien.
+    ///
+    /// Die Dateien selbst bekomme ich nicht zu sehen, ihre Statistik schon - und die
+    /// enthaelt drei Befunde, die zusammen alles erklaeren, was gemeldet wurde:
+    ///
+    ///   Die Figurenebene hat KEINEN EINZIGEN ganz durchsichtigen Punkt. 59 Prozent
+    ///   liegen dazwischen. Wo sie frei aussieht, ist sie es nicht.
+    ///
+    ///   Unter der Freistellung des Renders steht Muell mit Mittel 19/30/34 und
+    ///   Nachbarabstand 32 - das ist kein Schleier, das ist ein Bild.
+    ///
+    ///   Und die beiden Glanzebenen sind gar nicht freigestellt: hundert Prozent
+    ///   Deckung. Damit steht in den freien Stellen nicht mehr "nichts", sondern
+    ///   "Glanz ueber dem, was dort steht" - und was dort steht, ist der Muell.
+    ///
+    /// Gerechnet wird kleiner als 3840x2160; nur die Verhaeltnisse zaehlen.
+    /// </summary>
+    private static void ByTheNumbersOfTheRealFiles()
+    {
+        Check.Group("Der gemeldete Aufbau nach den Zahlen der echten Dateien");
+
+        const int w = 640, h = 360;
+
+        var random = new Random(7);
+
+        static float L(double b) => Srgb.Decode((float)Math.Clamp(b / 255.0, 0.0, 1.0));
+
+        var render = Blank(w, h);
+        var figure = Blank(w, h);
+        var glare = Blank(w, h);
+
+        for (int y = 0; y < h; y++)
+        {
+            for (int x = 0; x < w; x++)
+            {
+                int i = y * w + x;
+
+                // Der obere Viertelstreifen ist die freigestellte Stelle.
+                bool free = y < h / 4;
+
+                // Render: dort Deckung genau null, darunter Muell 19/30/34 mit
+                // Nachbarabstand 32.
+                render.R[i] = L(19 + random.NextDouble() * 32 - 16);
+                render.G[i] = L(30 + random.NextDouble() * 32 - 16);
+                render.B[i] = L(34 + random.NextDouble() * 32 - 16);
+                render.A[i] = free ? 0f : 1f;
+
+                if (!free)
+                {
+                    render.R[i] = L(90);
+                    render.G[i] = L(95);
+                    render.B[i] = L(100);
+                }
+
+                // Figur: NIE ganz durchsichtig - das ist der Befund, um den es geht.
+                figure.R[i] = L(12 + random.NextDouble() * 32 - 16);
+                figure.G[i] = L(13 + random.NextDouble() * 32 - 16);
+                figure.B[i] = L(14 + random.NextDouble() * 32 - 16);
+                figure.A[i] = free ? (float)(1 + random.NextDouble() * 5) / 255f : 1f;
+
+                // Glanz: deckt ueberall, ist fast ueberall schwarz.
+                glare.R[i] = glare.G[i] = glare.B[i] = 0f;
+                glare.A[i] = 1f;
+            }
+        }
+
+        double Run(bool withGlare, bool display = false, float matte = 0f,
+                   LayerTransform? place = null)
+        {
+            var stack = new LayerStack
+            {
+                Layers = { new ImageLayer { Content = LayerContent.Pass, Source = "", Name = "Bild" } },
+            };
+
+            foreach (string name in new[] { "render", "figur" })
+            {
+                stack.Layers.Add(new ImageLayer
+                {
+                    Content = LayerContent.Image, Source = name, Name = name,
+                    Mode = BlendMode.Normal, BlendInDisplay = display, MatteFloor = matte,
+                    Place = name == "figur" && place is not null ? place : new LayerTransform(),
+                });
+            }
+
+            if (withGlare)
+            {
+                stack.Layers.Add(new ImageLayer
+                {
+                    Content = LayerContent.Image, Source = "glanz", Name = "Glanz",
+                    Mode = BlendMode.Screen, OnTop = true,
+                    BlendInDisplay = display, MatteFloor = matte,
+                });
+            }
+
+            var sources = new Dictionary<string, FloatFrame>(StringComparer.Ordinal)
+            {
+                [""] = Blank(w, h),
+                ["render"] = render,
+                ["figur"] = figure,
+                ["glanz"] = glare,
+            };
+
+            var drawn = Draw(stack, sources);
+
+            return drawn is null ? -1 : Noise(drawn, w, 2, 2, 40);
+        }
+
+        double ohne = Run(withGlare: false);
+        double mit = Run(withGlare: true);
+        double alsPs = Run(withGlare: true, display: true);
+        double gesaeubert = Run(withGlare: true, matte: 0.04f);
+
+        Console.WriteLine($"         ohne Glanzebene:        {ohne:0.00}");
+        Console.WriteLine($"         mit Glanzebene:         {mit:0.00}");
+        Console.WriteLine($"         mit Glanz, Modus wie PS:{alsPs:0.00}");
+        Console.WriteLine($"         mit Glanz, Matte 10/255:{gesaeubert:0.00}");
+
+        // Und jetzt dasselbe, aber die Figur VERSCHOBEN - so, wie es gemeldet wurde.
+        //
+        // Ganze Bildpunkte kosten nichts: Der Abtaster landet genau auf der Punktreihe
+        // und interpoliert nicht. Bruchteile dagegen mischen vier Nachbarn - und er
+        // mischt Farbe und Deckung GETRENNT. Wo unter einer unsauberen Deckung Muell
+        // steht, ist das nicht dasselbe wie richtig gemischt, und die Differenz ist
+        // von Punkt zu Punkt zufaellig. Das ist Rauschen.
+        double ganz = Run(withGlare: true, place: new LayerTransform { OffsetY = 10f / h });
+        double halb = Run(withGlare: true, place: new LayerTransform { OffsetY = 10.5f / h });
+        double klein = Run(withGlare: true, place: new LayerTransform { OffsetY = 10.5f / h, Scale = 0.97f });
+
+        Console.WriteLine($"         verschoben um ganze Punkte:  {ganz:0.00}");
+        Console.WriteLine($"         verschoben um halbe Punkte:  {halb:0.00}");
+        Console.WriteLine($"         verschoben und kleingezogen: {klein:0.00}");
+
+        // WAS DIESER TEST SAGT - und was nicht.
+        //
+        // Er reproduziert das gemeldete Rauschen NICHT. Schwache Deckung ueber Muell,
+        // eine deckende Glanzebene auf Screen darueber, verschoben um ganze und um
+        // halbe Punkte: alles bleibt unter einer halben Stufe. Das ist ein Ergebnis
+        // und kein Fehlschlag - es schliesst diese Erklaerung aus, und ich hatte sie
+        // zweimal fuer die richtige gehalten.
+        //
+        // Was fehlt, ist die wirkliche Verteilung der Deckung in den gemeldeten
+        // Dateien. "59 Prozent dazwischen" kann ein sauberer weicher Rand sein oder
+        // eine Ebene, die ueberall halb da ist; das eine ist harmlos, das andere legt
+        // einen Schleier ueber alles. Solange das nicht gemessen ist, raet dieser Test.
+        //
+        // Er bleibt trotzdem stehen: Er haelt fest, dass FrameFlip diesen Fall
+        // beherrscht, und faellt um, wenn jemand ihn spaeter kaputt macht.
+        Check.That(mit < 1.0,
+                   "schwache Deckung unter deckendem Glanz bleibt ruhig",
+                   $"{mit:0.00}");
+
+        Check.That(halb < 1.0, "auch um halbe Bildpunkte verschoben", $"{halb:0.00}");
+    }
+
+    /// <summary>Ein leeres Feld in Bildgroesse - Schwarz, ganz durchsichtig.</summary>
+    private static FloatFrame Blank(int w, int h) => new()
+    {
+        Width = w, Height = h,
+        R = new float[w * h], G = new float[w * h], B = new float[w * h], A = new float[w * h],
+        IsSceneReferred = false,
+    };
 
     // ------------------------------------------------------------------- Handwerk
 

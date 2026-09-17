@@ -171,6 +171,91 @@ def befragen(path):
     print("  Gesamtrauschen im Rotkanal: {:.2f} Stufen zwischen Nachbarn".format(
         rauschen(rgb[:, :, 0])))
 
+    verteilung(a, punkte)
+    vormultipliziert(rgb, a)
+    beitrag(rgb, a)
+
+
+def verteilung(a, punkte):
+    """Wie die Deckung sich verteilt.
+
+    "59 Prozent dazwischen" kann zweierlei heissen: ein sauberer weicher Rand, oder
+    eine Ebene, die ueberall halb da ist. Das eine ist gewollt, das andere legt einen
+    Schleier ueber das ganze Bild. Man sieht es erst, wenn man die Stufen aufteilt.
+    """
+    grenzen = [(0, 0), (1, 3), (4, 10), (11, 32), (33, 96), (97, 200), (201, 254), (255, 255)]
+
+    print("  Deckung im Einzelnen:")
+
+    for tief, hoch in grenzen:
+        anteil = np.count_nonzero((a >= tief) & (a <= hoch)) / punkte
+
+        if anteil < 0.0005:
+            continue
+
+        name = "{:3d}".format(tief) if tief == hoch else "{:3d}-{:3d}".format(tief, hoch)
+
+        print("    {:>7} von 255: {:5.1f} %  {}".format(
+            name, 100 * anteil, "#" * int(round(40 * anteil))))
+
+
+def vormultipliziert(rgb, a):
+    """Ob die Datei vormultipliziert ist.
+
+    Bei vormultiplizierten Daten kann kein Kanal heller sein als die Deckung - die
+    Farbe ist ja schon mit ihr verrechnet. PNG ist als GERADE definiert, aber
+    geschrieben wird beides. Wer das verwechselt, rechnet die Deckung zweimal oder
+    gar nicht hinein, und "gar nicht" heisst: der Muell steht in voller Staerke da.
+    """
+    hell = rgb.max(axis=2).astype(np.int32)
+    ueber = np.count_nonzero(hell > a.astype(np.int32) + 2)
+
+    anteil = ueber / hell.size
+
+    if anteil < 0.001:
+        print("  -> Diese Datei sieht VORMULTIPLIZIERT aus: kein Kanal ist heller")
+        print("     als seine Deckung. FrameFlip liest PNG als gerade und")
+        print("     multipliziert die Deckung ein zweites Mal hinein.")
+    else:
+        print("  -> gerade (nicht vormultipliziert): {:.1f} % der Punkte sind "
+              "heller als ihre Deckung.".format(100 * anteil))
+
+
+def beitrag(rgb, a):
+    """Was diese Ebene dort beitraegt, wo sie nicht ganz deckt - und wie unruhig.
+
+    Das ist die Zahl, auf die es ankommt. Alles andere beschreibt die Datei; diese
+    hier sagt, was davon IM BILD landet. Zweimal gerechnet, weil es zwei Wege gibt:
+    im Anzeigeraum, so wie Photoshop es tut, und in linearem Licht, wie FrameFlip es
+    voreingestellt tut. Stehen dort zwei sehr verschiedene Zahlen, ist der Mischraum
+    die Ursache; stehen dort zwei grosse, ist es die Datei.
+    """
+    teil = (a > 0) & (a < 255)
+
+    if np.count_nonzero(teil) < 100:
+        return
+
+    deckung = (a / 255.0)[:, :, None]
+    farbe = rgb / 255.0
+
+    # Im Anzeigeraum: einfach mal der Deckung.
+    ps = deckung * farbe
+
+    # In linearem Licht: dekodieren, mischen, wieder kodieren.
+    licht = np.where(farbe <= 0.04045, farbe / 12.92, ((farbe + 0.055) / 1.055) ** 2.4)
+    gemischt = deckung * licht
+    ff = np.where(gemischt <= 0.0031308, 12.92 * gemischt,
+                  1.055 * np.maximum(gemischt, 0) ** (1 / 2.4) - 0.055)
+
+    zeilen = np.where(teil.any(axis=1))[0]
+    schnitt = slice(zeilen[0], zeilen[-1] + 1)
+
+    print("  Beitrag dort, wo die Ebene nicht ganz deckt:")
+    print("    wie Photoshop rechnet: Mittel {:5.1f} von 255, Nachbarabstand {:.2f}".format(
+        255 * ps[schnitt].mean(), rauschen(255 * ps[schnitt, :, 0])))
+    print("    wie FrameFlip rechnet: Mittel {:5.1f} von 255, Nachbarabstand {:.2f}".format(
+        255 * ff[schnitt].mean(), rauschen(255 * ff[schnitt, :, 0])))
+
 
 # --------------------------------------------------------------------- Zwilling
 
