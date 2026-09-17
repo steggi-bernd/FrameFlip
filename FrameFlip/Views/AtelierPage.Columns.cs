@@ -51,7 +51,19 @@ public partial class AtelierPage
         // nicht. Ein Wert, der beim Aufbau gesetzt wird, loest eben auch beim Aufbau
         // aus, und das ist die haeufigste Art, eine Oberflaeche zum Absturz zu
         // bringen, die im Uebersetzer einwandfrei aussieht.
-        if (Layers is null || Tools is null || LayerSplitter is null || LayersRow is null) return;
+        if (Layers is null || Tools is null || LayerSplitter is null || LayersRow is null ||
+            Properties is null || PropertiesHeader is null)
+        {
+            return;
+        }
+
+        // Die Zeile der Eigenschaften ist auf "so hoch wie noetig" gestellt - sie
+        // schrumpft von selbst auf null, sobald der Abschnitt zugeklappt ist. Eine
+        // Hoehe von Hand zu rechnen waere eine Zahl, die bei jedem neuen Werkzeug
+        // wieder falsch waere.
+        Properties.Visibility = PropertiesHeader.IsChecked == true
+            ? Visibility.Visible
+            : Visibility.Collapsed;
 
         bool colour = ColourHeader.IsChecked == true;
         bool layers = Layers.Visibility == Visibility.Visible;

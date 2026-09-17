@@ -166,6 +166,27 @@ public partial class GradingPanel : UserControl
     /// Uebernimmt gespeicherte Einstellungen. Die Werkzeuge werden dabei aus dem
     /// Stapel geholt oder angelegt, damit jedes genau einmal vorkommt.
     /// </summary>
+    /// <summary>
+    /// Setzt die Scharfstellung der Tiefenschaerfe - der Weg der Pipette.
+    ///
+    /// False heisst: Es gibt keine Tiefenschaerfe im Stapel. Das ist keine Stoerung,
+    /// sondern eine Auskunft, und der Aufrufer sagt sie weiter, statt still nichts zu
+    /// tun.
+    /// </summary>
+    public bool SetFocus(float distance)
+    {
+        var tool = Stack.Data.OfType<DepthFieldTool>().FirstOrDefault();
+
+        if (tool is null) return false;
+
+        tool.Focus = distance;
+
+        PushToControls();
+        Changed?.Invoke(false);
+
+        return true;
+    }
+
     public void Load(ImageAdjustments? adjustments, GradingStack? stack)
     {
         Adjustments = adjustments?.Clamped() ?? ImageAdjustments.Neutral;

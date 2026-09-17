@@ -800,4 +800,23 @@
     <sys:String x:Key="S_ToolPickHint">Pipette (I) - liest den Wert unter dem Zeiger ab.</sys:String>
     <sys:String x:Key="S_PickReadout">abgelesen</sys:String>
     <sys:String x:Key="S_SectionColour">Farbe</sys:String>
+    <sys:String x:Key="S_SectionProperties">Eigenschaften</sys:String>
+    <sys:String x:Key="S_ToolMove">Verschieben</sys:String>
+    <sys:String x:Key="S_ToolSelect">Auswählen</sys:String>
+    <sys:String x:Key="S_ToolCrop">Zuschneiden</sys:String>
+    <sys:String x:Key="S_ToolHand">Hand</sys:String>
+    <sys:String x:Key="S_ToolPick">Pipette</sys:String>
+    <sys:String x:Key="S_ToolMoveShort">Zieht die gewählte Ebene im Bild. An den Ecken größer und kleiner, am Griff darüber gedreht. Doppelklick stellt sie wieder mittig.</sys:String>
+    <sys:String x:Key="S_ToolSelectShort">Ein Klick auf ein Objekt legt eine Kryptomatte an. Die Einstellungen dazu stehen beim Maskenbereich der Ebene.</sys:String>
+    <sys:String x:Key="S_ToolCropShort">Zieht die Schnittkanten der gewählten Ebene. Der gedämpfte Rahmen zeigt, wovon abgeschnitten wird. Doppelklick nimmt den Schnitt zurück.</sys:String>
+    <sys:String x:Key="S_ToolHandShort">Schiebt den Ausschnitt. Die mittlere Maustaste tut überall dasselbe, ohne das Werkzeug zu wechseln.</sys:String>
+    <sys:String x:Key="S_ToolPickShort">Liest den Wert unter dem Zeiger ab — und die Entfernung, wenn die Datei einen Tiefenpass führt.</sys:String>
+    <sys:String x:Key="S_PickAt">Stelle</sys:String>
+    <sys:String x:Key="S_PickByte">Anzeigewert</sys:String>
+    <sys:String x:Key="S_PickLight">Licht</sys:String>
+    <sys:String x:Key="S_PickDepth">Entfernung</sys:String>
+    <sys:String x:Key="S_UseAsFocus">Hierauf scharfstellen</sys:String>
+    <sys:String x:Key="S_UseAsFocusHint">Setzt die Scharfstellung der Tiefenschärfe auf die abgelesene Entfernung. Ohne Pipette bleibt nur ein Regler in Metern und Probieren — und probiert wird an einer Zahl, die man nirgends ablesen kann.</sys:String>
+    <sys:String x:Key="S_FocusSet">Scharfgestellt auf</sys:String>
+    <sys:String x:Key="S_NoDepthTool">Dafür muss die Tiefenschärfe eingeschaltet sein — sie steht unter Optik.</sys:String>
 </ResourceDictionary>

@@ -1,6 +1,8 @@
 using System.Windows;
 using System.Windows.Input;
 using FrameFlip.Imaging;
+using FrameFlip.Imaging.Grading;
+using FrameFlip.Localization;
 
 using Point = System.Windows.Point;
 
@@ -55,6 +57,8 @@ public partial class AtelierPage
             };
 
             if (tool != AtelierTool.Pick) PickText.Visibility = Visibility.Collapsed;
+
+            Properties.Show(tool);
         }
         finally
         {
@@ -181,5 +185,41 @@ public partial class AtelierPage
 
         PickText.Text = $"{label}  {x},{y}   {br}/{bg}/{bb}   {r:0.###} {g:0.###} {b:0.###}";
         PickText.Visibility = Visibility.Visible;
+
+        Properties.Read(x, y, br, bg, bb, r, g, b, DepthAt(i));
+    }
+
+    /// <summary>
+    /// Die Entfernung an einer Stelle - null, wenn die Datei keine fuehrt.
+    ///
+    /// Null und nicht 0: "keine Entfernung bekannt" ist etwas anderes als "null
+    /// Meter", und der Unterschied entscheidet darueber, ob der Knopf zum
+    /// Scharfstellen ueberhaupt etwas anzubieten hat.
+    ///
+    /// Werte ab <see cref="FloatFrame.NotHit"/> zaehlen nicht mit: Blender schreibt
+    /// in den Hintergrund des Tiefenpasses eine sehr grosse Zahl, und die ist keine
+    /// Entfernung, sondern "hier steht nichts".
+    /// </summary>
+    private float? DepthAt(int i)
+    {
+        if (FramePasses.NameFor(PassNeed.Depth, _passes) is not { } name) return null;
+        if (!_sources.TryGetValue(name, out var depth)) return null;
+        if (i < 0 || i >= depth.R.Length) return null;
+
+        float value = depth.R[i];
+
+        return float.IsFinite(value) && value > 0f && value < FloatFrame.NotHit ? value : null;
+    }
+
+    /// <summary>Die abgelesene Entfernung soll die Scharfstellung werden.</summary>
+    private void OnFocusWanted(float distance)
+    {
+        if (!Tools.SetFocus(distance))
+        {
+            Properties.Told(Strings.T("S_NoDepthTool"));
+            return;
+        }
+
+        Properties.Told($"{Strings.T("S_FocusSet")} {distance:0.###}");
     }
 }

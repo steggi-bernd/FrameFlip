@@ -800,4 +800,23 @@
     <sys:String x:Key="S_ToolPickHint">Pick (I) - reads the value under the pointer.</sys:String>
     <sys:String x:Key="S_PickReadout">read</sys:String>
     <sys:String x:Key="S_SectionColour">Colour</sys:String>
+    <sys:String x:Key="S_SectionProperties">Properties</sys:String>
+    <sys:String x:Key="S_ToolMove">Move</sys:String>
+    <sys:String x:Key="S_ToolSelect">Select</sys:String>
+    <sys:String x:Key="S_ToolCrop">Crop</sys:String>
+    <sys:String x:Key="S_ToolHand">Hand</sys:String>
+    <sys:String x:Key="S_ToolPick">Pick</sys:String>
+    <sys:String x:Key="S_ToolMoveShort">Drags the selected layer in the picture. Corners resize, the grip above rotates. Double-click centres it again.</sys:String>
+    <sys:String x:Key="S_ToolSelectShort">Clicking an object creates a cryptomatte. Its settings live with the layer's mask section.</sys:String>
+    <sys:String x:Key="S_ToolCropShort">Drags the crop edges of the selected layer. The faint frame shows what is being cut away. Double-click undoes the crop.</sys:String>
+    <sys:String x:Key="S_ToolHandShort">Pans the view. The middle mouse button does the same anywhere, without switching tools.</sys:String>
+    <sys:String x:Key="S_ToolPickShort">Reads the value under the pointer - and the distance, if the file carries a depth pass.</sys:String>
+    <sys:String x:Key="S_PickAt">At</sys:String>
+    <sys:String x:Key="S_PickByte">Display</sys:String>
+    <sys:String x:Key="S_PickLight">Light</sys:String>
+    <sys:String x:Key="S_PickDepth">Distance</sys:String>
+    <sys:String x:Key="S_UseAsFocus">Focus on this</sys:String>
+    <sys:String x:Key="S_UseAsFocusHint">Sets the depth of field's focus to the distance just read. Without a picker all you have is a slider in metres and guesswork - and you are guessing at a number you cannot read anywhere.</sys:String>
+    <sys:String x:Key="S_FocusSet">Focused at</sys:String>
+    <sys:String x:Key="S_NoDepthTool">Depth of field has to be switched on for this - it lives under Optics.</sys:String>
 </ResourceDictionary>

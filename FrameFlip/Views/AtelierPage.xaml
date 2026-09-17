@@ -147,10 +147,28 @@
             <Grid>
                 <Grid.RowDefinitions>
                     <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
                     <RowDefinition x:Name="ColourRow" Height="*" />
                     <RowDefinition Height="Auto" />
                     <RowDefinition x:Name="LayersRow" Height="0" />
                 </Grid.RowDefinitions>
+
+                <!--
+                    Ganz oben, weil es dem Werkzeug gehoert und das Werkzeug links
+                    steht: Wer eines waehlt, sieht die Antwort auf derselben Hoehe.
+
+                    Was hier NICHT steht, ist ebenso eine Entscheidung: Mischung,
+                    Deckkraft, Maske und Platzierung gehoeren der EBENE. Sie gelten
+                    weiter, wenn man das Werkzeug wechselt, und waeren hier Zahlen,
+                    die verschwinden, sobald man etwas anderes anfasst.
+                -->
+                <ToggleButton x:Name="PropertiesHeader" Grid.Row="0"
+                              Style="{StaticResource SectionHeader}" IsChecked="True"
+                              Content="{DynamicResource S_SectionProperties}"
+                              Checked="OnSectionToggled" Unchecked="OnSectionToggled" />
+
+                <local:PropertiesPanel x:Name="Properties" Grid.Row="1" />
 
                 <!--
                     Jeder Abschnitt hat einen Kopf, und jeder Kopf klappt ihn zu.
@@ -162,12 +180,12 @@
                     innerhalb der Farbkorrektur stehen die Abschnitte weiter in der
                     Reihenfolge, in der gerechnet wird.
                 -->
-                <ToggleButton x:Name="ColourHeader" Grid.Row="0"
+                <ToggleButton x:Name="ColourHeader" Grid.Row="2"
                               Style="{StaticResource SectionHeader}" IsChecked="True"
                               Content="{DynamicResource S_SectionColour}"
                               Checked="OnSectionToggled" Unchecked="OnSectionToggled" />
 
-                <local:GradingPanel x:Name="Tools" Grid.Row="1" />
+                <local:GradingPanel x:Name="Tools" Grid.Row="3" />
 
                 <!--
                     Derselbe Griff wie auf der Uebersichtsseite: ein sichtbarer
@@ -175,14 +193,14 @@
                     unsichtbare Zone, die man erst findet, wenn der Zeiger sich
                     aendert, ist kein Griff, sondern ein Versteck.
                 -->
-                <GridSplitter x:Name="LayerSplitter" Grid.Row="2" Height="10"
+                <GridSplitter x:Name="LayerSplitter" Grid.Row="4" Height="10"
                               Style="{StaticResource DashboardSplitter}"
                               HorizontalAlignment="Stretch" VerticalAlignment="Center"
                               ResizeBehavior="PreviousAndNext" ResizeDirection="Rows"
                               Focusable="False" Visibility="Collapsed"
                               DragCompleted="OnLayersResized" />
 
-                <local:LayerPanel x:Name="Layers" Grid.Row="3" Visibility="Collapsed" />
+                <local:LayerPanel x:Name="Layers" Grid.Row="5" Visibility="Collapsed" />
             </Grid>
         </Border>
 

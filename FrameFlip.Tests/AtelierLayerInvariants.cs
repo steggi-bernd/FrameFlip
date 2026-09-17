@@ -1068,6 +1068,33 @@ public static class AtelierLayerInvariants
             Check.That(frame.Mode == AdornerMode.Place,
                        "und zurueck als Greifrahmen", $"{frame.Mode}");
 
+            // Die Eigenschaftsspalte sagt, was das gewaehlte Werkzeug tut - und sie
+            // zeigt die Pipettenwerte nur bei der Pipette. Ein Abschnitt, der bei
+            // jedem Werkzeug dasselbe zeigt, koennte auch weg.
+            var properties = (PropertiesPanel)page.FindName("Properties");
+            var pickBody = (FrameworkElement)properties.FindName("PickBody");
+            var name = (System.Windows.Controls.TextBlock)properties.FindName("ToolName");
+
+            Check.That(properties is not null && pickBody is not null,
+                       "die Eigenschaftsspalte ist Teil der Seite");
+
+            Check.That(pickBody.Visibility != Visibility.Visible,
+                       "beim Verschieben zeigt sie keine Pipettenwerte");
+
+            string moved = name.Text;
+
+            page.HandleToolKey(System.Windows.Input.Key.I);
+            page.UpdateLayout();
+
+            Check.That(pickBody.Visibility == Visibility.Visible,
+                       "bei der Pipette sehr wohl");
+
+            Check.That(name.Text.Length > 0 && name.Text != moved,
+                       "und der Name wechselt mit dem Werkzeug", $"{moved} -> {name.Text}");
+
+            page.HandleToolKey(System.Windows.Input.Key.V);
+            page.UpdateLayout();
+
             TheCropAlwaysLeavesSomething();
         }
         finally
