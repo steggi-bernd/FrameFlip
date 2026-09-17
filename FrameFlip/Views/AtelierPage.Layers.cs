@@ -151,6 +151,11 @@ public partial class AtelierPage
                 foreach (var (name, frame) in read) _sources[name] = frame;
 
                 DropStale(NeededPasses());
+
+                // Jetzt erst gibt es Miniaturen: Die Zeilen standen schon, als die
+                // Dateien noch gelesen wurden, und haben damals nichts bekommen.
+                if (read.Count > 0) Layers.ShowThumbnails();
+
                 Refresh(interim: false, recompose: true);
             });
         });

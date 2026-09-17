@@ -220,6 +220,16 @@ public partial class LayerPanel : UserControl
 
     // ------------------------------------------------------------------- die Liste
 
+    /// <summary>
+    /// Zeichnet die Zeilen neu, weil jetzt Miniaturen da sind.
+    ///
+    /// Die Passe und Bilder einer Ebene werden im Hintergrund gelesen; die Zeile
+    /// steht schon, waehrend sie eintreffen. Wer danach nichts mehr anfasst, hat
+    /// eine Ebene ohne Bildchen - und das sieht aus, als waere die Datei nicht
+    /// angekommen, obwohl sie im Bild steht.
+    /// </summary>
+    public void ShowThumbnails() => Rebuild();
+
     private void Rebuild()
     {
         _filling = true;
