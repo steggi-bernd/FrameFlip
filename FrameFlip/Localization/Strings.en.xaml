@@ -819,4 +819,6 @@
     <sys:String x:Key="S_UseAsFocusHint">Sets the depth of field's focus to the distance just read. Without a picker all you have is a slider in metres and guesswork - and you are guessing at a number you cannot read anywhere.</sys:String>
     <sys:String x:Key="S_FocusSet">Focused at</sys:String>
     <sys:String x:Key="S_NoDepthTool">Depth of field has to be switched on for this - it lives under Optics.</sys:String>
+    <sys:String x:Key="S_Reveal">Under the matte</sys:String>
+    <sys:String x:Key="S_RevealHint">Shows what sits in the file's transparent areas - usually the unmasked original, render noise, or remnants of the layer below. At 0 the layer is cleanly cut out, at 100% it covers everywhere. This layer's MASK decides where it shows: a cryptomatte picks an object, a depth pass picks a distance. A cleanly premultiplied file carries black there - then nothing happens.</sys:String>
 </ResourceDictionary>

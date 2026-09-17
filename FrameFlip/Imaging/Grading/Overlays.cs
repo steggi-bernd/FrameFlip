@@ -17,9 +17,10 @@ namespace FrameFlip.Imaging.Grading;
 public readonly struct OverlayPlan
 {
     public OverlayPlan(FloatFrame frame, LayerPlacement placement, BlendMode mode, float opacity,
-                       float sr, float sg, float sb, float matteFloor)
+                       float sr, float sg, float sb, float matteFloor, float reveal)
     {
         MatteFloor = matteFloor;
+        Reveal = reveal;
         Frame = frame;
         Placement = placement;
         Mode = mode;
@@ -36,6 +37,9 @@ public readonly struct OverlayPlan
 
     /// <summary>Ab welcher Deckung die Ebene als vorhanden gilt - siehe ImageLayer.</summary>
     public readonly float MatteFloor;
+
+    /// <summary>Wieviel von dem gezeigt wird, was unter der Deckung steht.</summary>
+    public readonly float Reveal;
 }
 
 /// <summary>Bereitet die obenauf liegenden Ebenen vor und traegt sie auf.</summary>
@@ -73,7 +77,8 @@ public static class Overlays
                 layer.Mode,
                 Math.Clamp(layer.Opacity, 0f, 1f),
                 gain * layer.Tint.R, gain * layer.Tint.G, gain * layer.Tint.B,
-                layer.MatteFloor));
+                layer.MatteFloor,
+                layer.Reveal));
         }
 
         return plans.Count == 0 ? None : plans.ToArray();
@@ -96,8 +101,10 @@ public static class Overlays
             plan.Placement.Sample(plan.Frame, u, v,
                                   out float or_, out float og, out float ob, out float oa);
 
+            float matte = ImageLayer.CleanMatte(oa, plan.MatteFloor);
+
             float opacity = plan.Opacity * covered *
-                            Math.Clamp(ImageLayer.CleanMatte(oa, plan.MatteFloor), 0f, 1f);
+                            Math.Clamp(ImageLayer.Lift(matte, plan.Reveal), 0f, 1f);
             if (opacity <= 0f) continue;
 
             // Die Anzeigefassung: Hier sind die Werte laengst Anzeigewerte. Die

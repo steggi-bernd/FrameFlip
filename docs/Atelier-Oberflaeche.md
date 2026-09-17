@@ -210,7 +210,7 @@ land on one of them without inventing anything:
 |---|---|---|
 | Dither — Bayer, blue noise, Floyd–Steinberg | place-aware (`IOpticsTool`) | the threshold comes from *where* the pixel is |
 | Wave glitch, displacement mapping | pixel-moving (`IGeometryTool`) | reads from a displaced position, exactly like the lens tools |
-| Reveal what is under the matte | the composer | a switch, not a filter — it is the bug, inverted |
+| ~~Reveal what is under the matte~~ | the composer | **built.** A per-layer amount, 0 to 100%, that lifts the layer's own coverage towards full. Off, the layer is cleanly cut out; at 100% it covers everywhere and whatever sits under its transparency is in the picture. Measured on the test file: 0.00 steps of neighbour noise off, 62.61 at half, 83.78 full. The layer's existing mask decides *where* — so a cryptomatte already steers it, which was the whole point. And the limit is in the test too, because it should surprise nobody: a cleanly premultiplied file carries black under its matte, and then nothing happens. The effect needs material. |
 | **Pixel sorting** | **none of them** | see below |
 
 **The one that does not fit.** Pixel sorting re-orders whole *runs* along a row or a

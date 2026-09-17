@@ -960,6 +960,7 @@ public partial class LayerPanel : UserControl
 
         _selected.Opacity = (float)OpacitySlider.Value;
         _selected.MatteFloor = (float)MatteSlider.Value;
+        _selected.Reveal = (float)RevealSlider.Value;
         _selected.Exposure = (float)LayerExposureSlider.Value;
 
         UpdateValues();
@@ -1006,6 +1007,8 @@ public partial class LayerPanel : UserControl
             OpacitySlider.Value = Math.Clamp(_selected.Opacity, OpacitySlider.Minimum, OpacitySlider.Maximum);
             MatteSlider.Value = Math.Clamp(_selected.MatteFloor,
                                            MatteSlider.Minimum, MatteSlider.Maximum);
+
+            RevealSlider.Value = Math.Clamp(_selected.Reveal, 0, RevealSlider.Maximum);
             BlendSpaceButton.IsChecked = _selected.BlendInDisplay;
             LayerExposureSlider.Value = Math.Clamp(_selected.Exposure,
                                                    LayerExposureSlider.Minimum, LayerExposureSlider.Maximum);
@@ -1035,6 +1038,7 @@ public partial class LayerPanel : UserControl
         // In Stufen von 255 statt in Anteilen: Wer eine Datei befragt, bekommt die
         // Deckung in Stufen genannt, und die beiden Zahlen sollen dieselben sein.
         MatteValue.Text = $"{MatteSlider.Value * 255:0} / 255";
+        RevealValue.Text = $"{RevealSlider.Value * 100:0} %";
         LayerExposureValue.Text = LayerExposureSlider.Value == 0
             ? "0"
             : $"{LayerExposureSlider.Value:+0.00;-0.00}";
@@ -1071,6 +1075,8 @@ public partial class LayerPanel : UserControl
 
         MatteHeader.Visibility = matte;
         MatteSlider.Visibility = matte;
+        RevealHeader.Visibility = matte;
+        RevealSlider.Visibility = matte;
         PlaceBody.Visibility = placeable && PlaceFoldButton.Content as string == "−"
             ? Visibility.Visible : Visibility.Collapsed;
 

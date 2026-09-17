@@ -819,4 +819,6 @@
     <sys:String x:Key="S_UseAsFocusHint">Setzt die Scharfstellung der Tiefenschärfe auf die abgelesene Entfernung. Ohne Pipette bleibt nur ein Regler in Metern und Probieren — und probiert wird an einer Zahl, die man nirgends ablesen kann.</sys:String>
     <sys:String x:Key="S_FocusSet">Scharfgestellt auf</sys:String>
     <sys:String x:Key="S_NoDepthTool">Dafür muss die Tiefenschärfe eingeschaltet sein — sie steht unter Optik.</sys:String>
+    <sys:String x:Key="S_Reveal">Unter der Freistellung</sys:String>
+    <sys:String x:Key="S_RevealHint">Zeigt, was in den durchsichtigen Stellen der Datei steht — meist das unmaskierte Original, Renderrauschen oder Reste der Ebene darunter. Bei 0 ist die Ebene sauber freigestellt, bei 100 % deckt sie überall. Die MASKE dieser Ebene bestimmt, wo es erscheint: eine Kryptomatte wählt ein Objekt, ein Tiefenpass eine Entfernung. Eine sauber vormultiplizierte Datei trägt dort Schwarz — dann passiert nichts.</sys:String>
 </ResourceDictionary>

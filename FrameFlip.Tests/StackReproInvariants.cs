@@ -31,6 +31,7 @@ public static class StackReproInvariants
         ScreenOverBlack(folder);
         ByTheNumbersOfTheRealFiles();
         TheBaseImageIsAPass(folder);
+        RevealUnderTheMatte(folder);
     }
 
     /// <summary>
@@ -230,6 +231,68 @@ public static class StackReproInvariants
             Check.That(noise < 2.0, $"bei Schrittweite {step} rauscht die Ecke nicht",
                        $"{noise:0.00}");
         }
+    }
+
+    /// <summary>
+    /// Aufdecken, was unter der Freistellung steht - der Fehler als Werkzeug.
+    ///
+    /// Es fing als Fehler an: Eine freigestellte PNG, deren Deckung niemand anwandte,
+    /// zeigte die Farbe aus ihren durchsichtigen Stellen. Dort steht in den meisten
+    /// Dateien, was zufaellig im Puffer stand - und das sah nach etwas aus. Jetzt ist
+    /// es ein Regler.
+    ///
+    /// Geprueft wird die ganze Strecke: aus bleibt sauber, ganz auf zeigt den Muell,
+    /// dazwischen liegt ein Schleier. Und die Grenze des Werkzeugs steht mit im Test,
+    /// weil sie niemanden ueberraschen soll: Wo nichts steht, zeigt es nichts.
+    /// </summary>
+    private static void RevealUnderTheMatte(string folder)
+    {
+        Check.Group("Aufdecken, was unter der Freistellung steht");
+
+        var black = Read(folder, "00_grund_schwarz.png");
+        var dirty = Read(folder, "02_freigestellt_muell_unter_deckung.png");
+        var clean = Read(folder, "03_freigestellt_schwarz_unter_deckung.png");
+
+        if (black is null || dirty is null || clean is null) return;
+
+        double At(FloatFrame layer, float reveal)
+        {
+            var stack = Base(black);
+
+            stack.Layers.Add(new ImageLayer
+            {
+                Content = LayerContent.Image, Source = "figur", Name = "Figur",
+                Mode = BlendMode.Normal, Reveal = reveal,
+            });
+
+            var drawn = Draw(stack, Sources(black, ("figur", layer)));
+
+            return drawn is null ? -1 : Noise(drawn, black.Width, 2, 2, 40);
+        }
+
+        double off = At(dirty, 0f);
+        double half = At(dirty, 0.5f);
+        double full = At(dirty, 1f);
+
+        Console.WriteLine($"         aus: {off:0.00}   halb: {half:0.00}   ganz: {full:0.00}");
+
+        Check.That(off < 1.0, "aus bleibt die Ebene sauber freigestellt", $"{off:0.00}");
+
+        Check.That(full > 20.0, "ganz aufgedeckt steht der Muell im Bild", $"{full:0.00}");
+
+        Check.That(half > off + 1.0 && half < full,
+                   "und dazwischen liegt ein Schleier", $"{half:0.00}");
+
+        // Die Grenze: Der Effekt braucht Material. Eine Datei mit Schwarz unter der
+        // Deckung hat nichts aufzudecken, und dann passiert auch nichts - das ist
+        // keine Stoerung, sondern die Eigenschaft, die man kennen muss.
+        double nothing = At(clean, 1f);
+
+        Console.WriteLine($"         mit Schwarz darunter, ganz aufgedeckt: {nothing:0.00}");
+
+        Check.That(nothing < 1.0,
+                   "wo Schwarz unter der Deckung steht, gibt es nichts aufzudecken",
+                   $"{nothing:0.00}");
     }
 
     /// <summary>

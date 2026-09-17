@@ -271,6 +271,37 @@ public sealed class ImageLayer
     [JsonIgnore]
     public bool LiesOnBlack => Mode is BlendMode.Add or BlendMode.Normal;
 
+    /// <summary>
+    /// Wieviel von dem gezeigt wird, was UNTER der Freistellung steht. 0 bis 1.
+    ///
+    /// Das fing als Fehler an. Eine freigestellte PNG, deren Deckung niemand
+    /// anwandte, zeigte die Farbe, die in ihren durchsichtigen Stellen steht - und
+    /// dort steht in den meisten Dateien, was zufaellig im Puffer stand: das
+    /// unmaskierte Original, das Rauschen des Renders, Reste der Ebene darunter. Es
+    /// sah aus wie pixeliger Nebel im Farbschema des Bildes, und das war es auch.
+    ///
+    /// Es sah aber auch nach etwas aus. Deshalb steht es jetzt als Regler da, statt
+    /// als Fehler behoben zu sein - und der entscheidende Unterschied zu einem Filter
+    /// in irgendeinem Programm ist, dass die MASKE dieser Ebene bestimmt, wo es
+    /// erscheint. Eine Kryptomatte waehlt ein Objekt, kein Rechteck; ein Tiefenpass
+    /// waehlt eine Entfernung. Solche Saetze kann ein Prozedurfilter am Regler nicht
+    /// sagen.
+    ///
+    /// Was es NICHT kann: etwas zeigen, das nicht da ist. Eine sauber
+    /// vormultiplizierte Datei traegt unter ihrer Deckung Schwarz, und dann passiert
+    /// nichts. Der Effekt braucht Material.
+    /// </summary>
+    public float Reveal { get; set; }
+
+    /// <summary>
+    /// Zieht eine Deckung zum Vollen hin - der Regler von oben, als Rechnung.
+    ///
+    /// Bei 0 bleibt alles, wie es ist. Bei 1 deckt die Ebene ueberall, und was unter
+    /// ihrer Freistellung steht, steht im Bild. Dazwischen liegt ein Schleier.
+    /// </summary>
+    public static float Lift(float matte, float reveal)
+        => reveal <= 0f ? matte : matte + (1f - matte) * Math.Clamp(reveal, 0f, 1f);
+
     public ImageLayer Clone() => new()
     {
         Source = Source,
@@ -284,6 +315,7 @@ public sealed class ImageLayer
         Content = Content,
         FollowSequence = FollowSequence,
         MatteFloor = MatteFloor,
+        Reveal = Reveal,
         BlendInDisplay = BlendInDisplay,
         Place = Place.Clone(),
         OnTop = OnTop,

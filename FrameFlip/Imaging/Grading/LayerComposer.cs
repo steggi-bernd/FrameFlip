@@ -235,7 +235,8 @@ public static class LayerComposer
                                 gain * layer.Tint.R, gain * layer.Tint.G, gain * layer.Tint.B, clipped,
                                 layer.Mask, maskKind, maskFrame, maskLevels, maskIds,
                                 layer.Content, grade, used[i].Kind, placed, placement,
-                                maskFloor, maskSpan, layer.MatteFloor, layer.BlendInDisplay);
+                                maskFloor, maskSpan, layer.MatteFloor, layer.BlendInDisplay,
+                                layer.Reveal);
         }
 
         // Die Gitterpunkte einmal aufschreiben, statt sie je Bildpunkt auszurechnen.
@@ -459,7 +460,14 @@ public static class LayerComposer
                     // dieselbe Stelle, an der ein Schleier im Alphakanal gesaeubert
                     // wird, falls jemand das eingestellt hat.
                     if (hasOwnAlpha)
-                        opacity *= Math.Clamp(ImageLayer.CleanMatte(ownAlpha, plan.MatteFloor), 0f, 1f);
+                    {
+                        float matte = ImageLayer.CleanMatte(ownAlpha, plan.MatteFloor);
+
+                        // Aufdecken kommt NACH dem Saeubern: Erst wird entschieden,
+                        // was als durchsichtig gilt, dann wird es aufgezogen.
+                        // Andersherum saeuberte man weg, was man gerade zeigen wollte.
+                        opacity *= Math.Clamp(ImageLayer.Lift(matte, plan.Reveal), 0f, 1f);
+                    }
 
                     if (inGroup)
                     {
@@ -739,9 +747,11 @@ public static class LayerComposer
                     FloatFrame[]? maskLevels, float[]? maskIds,
                     LayerContent content, LayerGrade grade, StepKind step,
                     bool placed, LayerPlacement placement,
-                    float maskFloor, float maskSpan, float matteFloor, bool display)
+                    float maskFloor, float maskSpan, float matteFloor, bool display,
+                    float reveal)
         {
             Display = display;
+            Reveal = reveal;
             MatteFloor = matteFloor;
             MaskFloor = maskFloor;
             MaskSpan = maskSpan;
@@ -799,6 +809,9 @@ public static class LayerComposer
 
         /// <summary>Ob diese Ebene im Anzeigeraum mischt - siehe ImageLayer.</summary>
         public readonly bool Display;
+
+        /// <summary>Wieviel von dem gezeigt wird, was unter der Deckung steht.</summary>
+        public readonly float Reveal;
         public readonly float GradientCos, GradientSin, GradientFrom, GradientTo;
     }
 }
