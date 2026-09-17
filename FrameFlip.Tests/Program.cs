@@ -44,6 +44,7 @@ static int RunAll()
     OpticsInvariants.Run();
     RenderDataInvariants.Run();
     PngLayerInvariants.Run();
+    StackReproInvariants.Run();
     LayerPanelInvariants.Run();
     PassRebuildInvariants.Run();
     CryptomatteInvariants.Run();
