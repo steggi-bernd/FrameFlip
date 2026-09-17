@@ -91,6 +91,7 @@ static int RunAll()
     VaultInvariants.Run();
     BrowseInvariants.Run();
     BrowseInvariants.Movies();
+    PaintedMaskInvariants.Run();
     DitherInvariants.Run();
     DitherPipelineInvariants.Run();
     DitherPanelInvariants.Run();

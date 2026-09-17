@@ -51,8 +51,13 @@ public static class LayerComposer
     /// ist in Ordnung, weil sie niemand liest - aber nur solange die Schrittweite
     /// dieselbe ist. Beim Loslassen laeuft ein voller Durchgang und fuellt alles.
     /// </param>
+    /// <param name="number">
+    /// Die Bildnummer. Gebraucht fuer gemalte Masken, die nicht gesperrt sind: Dort
+    /// gilt je Bild ein eigener Anstrich, und ohne die Nummer waere nicht zu sagen,
+    /// welcher.
+    /// </param>
     public static FloatFrame? Compose(LayerStack stack, IReadOnlyDictionary<string, FloatFrame> sources,
-                                      FloatFrame? into = null, int step = 1)
+                                      FloatFrame? into = null, int step = 1, int number = 0)
     {
         step = Math.Clamp(step, 1, 16);
 
@@ -236,7 +241,7 @@ public static class LayerComposer
                                 layer.Mask, maskKind, maskFrame, maskLevels, maskIds,
                                 layer.Content, grade, used[i].Kind, placed, placement,
                                 maskFloor, maskSpan, layer.MatteFloor, layer.BlendInDisplay,
-                                layer.Reveal);
+                                layer.Reveal, layer.Mask.PaintFor(number));
         }
 
         // Die Gitterpunkte einmal aufschreiben, statt sie je Bildpunkt auszurechnen.
@@ -723,6 +728,15 @@ public static class LayerComposer
 
                 return Fit(Masking.Levels(coverage, plan.MaskLow, plan.MaskHigh), plan.MaskInvert);
 
+            case MaskKind.Painted:
+                // Der Anstrich IST der Anteil - wie beim Pass und bei der Kryptomatte.
+                // Schwarz- und Weisspunkt ziehen ihn an, damit sich eine weiche
+                // Pinselkante nachtraeglich haerten oder weiter aufweichen laesst.
+                if (plan.Paint is not { } paint) return plan.MaskInvert ? 1f : 0f;
+
+                return Fit(Masking.Levels(paint.At(x, y), plan.MaskLow, plan.MaskHigh),
+                           plan.MaskInvert);
+
             case MaskKind.Gradient:
                 return Fit(Masking.Gradient(x, y, width, height,
                                             plan.GradientCos, plan.GradientSin,
@@ -748,8 +762,9 @@ public static class LayerComposer
                     LayerContent content, LayerGrade grade, StepKind step,
                     bool placed, LayerPlacement placement,
                     float maskFloor, float maskSpan, float matteFloor, bool display,
-                    float reveal)
+                    float reveal, PaintedMask? paint)
         {
+            Paint = paint;
             Display = display;
             Reveal = reveal;
             MatteFloor = matteFloor;
@@ -803,6 +818,9 @@ public static class LayerComposer
         public readonly FloatFrame[]? MaskLevels;
         public readonly float[]? MaskIds;
         public readonly bool MaskInvert;
+
+        /// <summary>Der Anstrich, der fuer dieses Bild gilt - siehe LayerMask.</summary>
+        public readonly PaintedMask? Paint;
         public readonly float MaskLow, MaskHigh, MaskSoftness;
         public readonly float MaskFloor, MaskSpan;
         public readonly float MatteFloor;

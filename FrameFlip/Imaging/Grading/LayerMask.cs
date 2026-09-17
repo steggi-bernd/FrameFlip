@@ -25,6 +25,15 @@ public enum MaskKind
     /// dieselben.
     /// </summary>
     Cryptomatte,
+
+    /// <summary>
+    /// Eine gemalte Maske - von Hand aufgetragen, mit einem Pinsel.
+    ///
+    /// Die einzige, die nicht abgeleitet ist. Alle anderen sagen "wo es hell ist"
+    /// oder "wo dieses Objekt steht"; diese sagt "genau hier", und das ist die eine
+    /// Frage, die kein Programm fuer einen beantworten kann.
+    /// </summary>
+    Painted,
 }
 
 /// <summary>
@@ -44,6 +53,50 @@ public enum MaskKind
 public sealed class LayerMask
 {
     public MaskKind Kind { get; set; }
+
+    /// <summary>
+    /// Ob die gemalte Maske fuer die ganze Sequenz gilt.
+    ///
+    /// Gesperrt heisst: EIN Anstrich, fuer jedes Bild derselbe. Entsperrt heisst: je
+    /// Bild ein eigener, und man kann ein einzelnes Bild retuschieren, ohne die
+    /// anderen anzufassen.
+    ///
+    /// Nur gemalte Masken brauchen diesen Schalter. Eine Kryptomatte passt sich von
+    /// selbst an jedes Bild an - sie waehlt ein OBJEKT und keinen Ort -, und eine
+    /// Helligkeitsmaske rechnet ohnehin je Bild neu. Statisch ist allein, was jemand
+    /// von Hand aufgetragen hat, und genau das ist fuer eine Animation meistens
+    /// unbrauchbar, solange es nicht gesperrt ist.
+    /// </summary>
+    public bool PaintLocked { get; set; } = true;
+
+    /// <summary>Der eine Anstrich, wenn gesperrt.</summary>
+    public PaintedMask? Paint { get; set; }
+
+    /// <summary>Ein Anstrich je Bildnummer, wenn entsperrt.</summary>
+    public Dictionary<int, PaintedMask> PaintFrames { get; set; } = new();
+
+    /// <summary>
+    /// Der Anstrich, der fuer dieses Bild gilt - oder null.
+    ///
+    /// An einer Stelle, weil die Frage "welcher gilt hier" an vier Stellen aufkommt:
+    /// beim Rechnen, beim Malen, beim Speichern und beim Anzeigen. Vier Antworten
+    /// waeren vier Gelegenheiten, die Sperre zu uebersehen.
+    /// </summary>
+    public PaintedMask? PaintFor(int number)
+        => PaintLocked ? Paint : PaintFrames.GetValueOrDefault(number);
+
+    /// <summary>Legt den Anstrich fuer dieses Bild an, wenn es noch keinen gibt.</summary>
+    public PaintedMask PaintOn(int number, int imageWidth, int imageHeight)
+    {
+        if (PaintFor(number) is { } found) return found;
+
+        var made = PaintedMask.For(imageWidth, imageHeight);
+
+        if (PaintLocked) Paint = made;
+        else PaintFrames[number] = made;
+
+        return made;
+    }
 
     /// <summary>Dreht die Maske um. Aus "nur in den Lichtern" wird "ueberall ausser in den Lichtern".</summary>
     public bool Invert { get; set; }
@@ -133,6 +186,9 @@ public sealed class LayerMask
         Source = Source,
         Levels = new List<string>(Levels),
         Picks = Picks.Select(p => p.Clone()).ToList(),
+        PaintLocked = PaintLocked,
+        Paint = Paint?.Clone(),
+        PaintFrames = PaintFrames.ToDictionary(e => e.Key, e => e.Value.Clone()),
     };
 }
 

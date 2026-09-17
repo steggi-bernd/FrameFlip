@@ -253,7 +253,7 @@ public partial class AtelierPage
         // Der Composer liest aus den Passen, waehrend er schreibt. Deshalb fuehrt
         // die Seite einen eigenen Frame mit, den sonst niemand anfasst.
         _composed = LayerComposer.Compose(Layers.Stack, _sources, _composed,
-                                          _coarse ? CoarseStep : 1);
+                                          _coarse ? CoarseStep : 1, _number);
         _frame = _composed ?? _base;
 
         // Was obenauf liegt, wird nach der Bildwerdung aufgetragen - es steht
