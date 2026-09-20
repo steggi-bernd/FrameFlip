@@ -155,21 +155,27 @@ public sealed class AppHost : IDisposable
     /// </summary>
     private void StartWatch()
     {
-        if (!_settings.WatchEnabled) return;
-
-        // Ohne brauchbaren Relay-Namen gaebe es nur eine Adresse, die niemanden
-        // erreicht. Das faellt spaeter auf und ist dann schwer zu deuten.
-        if (!Remote.PairingInvite.IsUsableHost(_settings.RelayHost))
+        try
         {
-            Notify(Localization.Strings.T("S_WatchNoRelay"));
-            return;
+            if (!_settings.WatchEnabled) return;
+
+            // Ohne brauchbaren Relay-Namen gaebe es nur eine Adresse, die niemanden
+            // erreicht. Das faellt spaeter auf und ist dann schwer zu deuten.
+            if (!Remote.PairingInvite.IsUsableHost(_settings.RelayHost))
+            {
+                Notify(Localization.Strings.T("S_WatchNoRelay"));
+                return;
+            }
+
+            var key = WatchKeyForSettings();
+            _watch = _watchSources.Create(key, _settings.RelayHost);
+
+            _watch.Start();
         }
-
-        var key = WatchKeyForSettings();
-
-        _watch = _watchSources.Create(key, _settings.RelayHost);
-
-        _watch.Start();
+        finally
+        {
+            EnsureLoadMonitor();
+        }
     }
 
     /// <summary>
@@ -349,12 +355,12 @@ public sealed class AppHost : IDisposable
     // ------------------------------------------------------------ Lasterkennung
 
     private void EnsureLoadMonitor()
-        => _load.Ensure(_viewer is not null, _windows.Main is not null, _remote.HasConnection);
+        => _load.Ensure(_viewer is not null, _windows.Main is not null, _remote.HasConnection || _watch is not null);
 
     private int PrepareViewerLoad()
     {
         // Der neue Viewer muss schon vor seiner Konstruktion als Verbraucher zaehlen.
-        _load.Ensure(true, _windows.Main is not null, _remote.HasConnection);
+        _load.Ensure(true, _windows.Main is not null, _remote.HasConnection || _watch is not null);
         return _load.ViewerDecoderThreads;
     }
 

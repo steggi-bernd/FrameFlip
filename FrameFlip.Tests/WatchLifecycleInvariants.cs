@@ -27,6 +27,7 @@ public static class WatchLifecycleInvariants
             ReplaceWithoutWaiting();
             SettingsChanges();
             KeysAndCodes();
+            LoadDemand();
             Shutdown();
         }
         finally
@@ -171,6 +172,30 @@ public static class WatchLifecycleInvariants
         host.Host.RenewWatchLink();
         Check.That(host.Services.Count == count && host.Host.Watch is null,
                    "Linkerneuerung schaltet einen ausgeschalteten Dienst nicht ein");
+    }
+
+    private static void LoadDemand()
+    {
+        Check.Group("Zuschauer-Lebenszyklus - Lastbedarf ohne Fenster oder Handy");
+        using var host = new Harness();
+        host.Host.ApplyWatch();
+        Check.That(host.Monitors.Count == 1 && host.Monitors[0].Starts == 1,
+                   "Zuschauerdienst startet Lastmessung auch ohne adaptive Regelung");
+        host.Host.ApplyWatch();
+        Check.That(host.Monitors.Count == 1 && host.Monitors[0].Disposals == 0,
+                   "Dienstwechsel verwendet die bestehende Messreihe weiter");
+        host.Settings.RelayHost = "https://invalid.example/";
+        host.Host.ApplyWatch();
+        Check.That(host.Monitors.Count == 1 && host.Monitors[0].Disposals == 1,
+                   "fehlgeschlagener Relay-Wechsel beendet den entfallenen Lastbedarf");
+        host.Settings.RelayHost = "relay.example";
+        host.Host.ApplyWatch();
+        Check.That(host.Monitors.Count == 2 && host.Monitors[1].Starts == 1,
+                   "korrigierter Relay beginnt eine neue Messreihe");
+        host.Settings.WatchEnabled = false;
+        host.Host.ApplyWatch();
+        Check.That(host.Monitors.Count == 2 && host.Monitors[1].Disposals == 1,
+                   "Abschalten des letzten Verbrauchers beendet die Lastmessung");
     }
 
     private static void Shutdown()
