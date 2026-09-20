@@ -1544,7 +1544,22 @@ public partial class LayerPanel : UserControl
 
         var mask = _selected.Mask;
         var kinds = MaskKinds;
+        var was = mask.Kind;
+
         mask.Kind = kinds[Math.Clamp(MaskBox.SelectedIndex, 0, kinds.Length - 1)].Kind;
+
+        // Eine NEU gewaehlte Maske auf einer Bildebene begrenzt die Korrektur, nicht
+        // die Sichtbarkeit - dort ist es fast immer das Gemeinte.
+        //
+        // Nur beim Wechsel von "keine", und nur hier im Streifen: Ein gespeichertes
+        // Rezept mit einem Glanz und einer Verlaufsmaske soll nach dem naechsten
+        // Start dasselbe tun wie vorher, und das entscheidet die Grundstellung im
+        // Modell. Umstellen kann man es daneben mit zwei Knoepfen.
+        if (was == MaskKind.None && mask.Kind != MaskKind.None &&
+            _selected.Content != LayerContent.Adjustment)
+        {
+            mask.Scope = MaskScope.Colour;
+        }
 
         // Beim Umschalten gleich die erste Quelle nehmen. Eine Maskenart ohne Quelle
         // waere eine Einstellung, die stillschweigend nichts tut.
@@ -1595,6 +1610,18 @@ public partial class LayerPanel : UserControl
         if (_filling || _selected is null) return;
 
         _selected.Mask.Invert = MaskInvertButton.IsChecked == true;
+        Raise(interim: false);
+    }
+
+    /// <summary>Worauf die Maske wirkt - Sichtbarkeit oder Korrektur.</summary>
+    private void OnMaskScopeChanged(object sender, RoutedEventArgs e)
+    {
+        if (_filling || !IsLoaded || _selected is null) return;
+
+        _selected.Mask.Scope = ReferenceEquals(sender, ScopeColourButton)
+            ? MaskScope.Colour
+            : MaskScope.Visibility;
+
         Raise(interim: false);
     }
 
@@ -1654,6 +1681,14 @@ public partial class LayerPanel : UserControl
         MaskRangeBody.Visibility = range ? Visibility.Visible : Visibility.Collapsed;
         MaskColourBody.Visibility = kind == MaskKind.Colour ? Visibility.Visible : Visibility.Collapsed;
 
+        // Die Frage stellt sich nur dort, wo sie zwei Antworten hat. Eine
+        // Einstellungsebene BESTEHT aus ihrer Korrektur - bei ihr heisst "wo sie zu
+        // sehen ist" und "wo sie korrigiert" dasselbe.
+        MaskScopeRow.Visibility = kind != MaskKind.None &&
+                                  _selected?.Content != LayerContent.Adjustment
+            ? Visibility.Visible
+            : Visibility.Collapsed;
+
         // Tiefen, Mitten und Lichter nur dort, wo sie etwas heissen: an einer
         // Helligkeit. Auf einem Maskenpass oder einem Farbbereich waeren es drei
         // Knoepfe, die etwas anderes tun, als sie sagen.
@@ -1711,6 +1746,9 @@ public partial class LayerPanel : UserControl
         ShowPicks();
 
         MaskInvertButton.IsChecked = mask.Invert;
+
+        ScopeColourButton.IsChecked = mask.Scope == MaskScope.Colour;
+        ScopeShowButton.IsChecked = mask.Scope != MaskScope.Colour;
 
         MaskLowSlider.Value = Math.Clamp(mask.Low, MaskLowSlider.Minimum, MaskLowSlider.Maximum);
         MaskHighSlider.Value = Math.Clamp(mask.High, MaskHighSlider.Minimum, MaskHighSlider.Maximum);

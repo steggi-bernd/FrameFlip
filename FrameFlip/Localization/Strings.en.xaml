@@ -168,6 +168,10 @@
     <sys:String x:Key="S_MaskPass">Pass</sys:String>
     <sys:String x:Key="S_MaskGradient">Gradient</sys:String>
     <sys:String x:Key="S_MaskColour">Colour range</sys:String>
+    <sys:String x:Key="S_MaskScopeColour">Colour</sys:String>
+    <sys:String x:Key="S_MaskScopeColourHint">The mask says WHERE this layer's correction applies. The layer itself stays visible everywhere - as if a copy of it sat on top showing only that area.</sys:String>
+    <sys:String x:Key="S_MaskScopeShow">Visibility</sys:String>
+    <sys:String x:Key="S_MaskScopeShowHint">The mask says WHERE the layer shows. Outside it contributes nothing - right for a glow, a watermark, a second shot.</sys:String>
     <sys:String x:Key="S_MaskHue">Hue</sys:String>
     <sys:String x:Key="S_MaskSpread">Range</sys:String>
     <sys:String x:Key="S_MaskHintColour">Acts only where this hue sits. Pale colours count for less - to take them in full, pull the white point down.</sys:String>

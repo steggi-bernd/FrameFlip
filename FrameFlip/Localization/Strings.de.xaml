@@ -168,6 +168,10 @@
     <sys:String x:Key="S_MaskPass">Pass</sys:String>
     <sys:String x:Key="S_MaskGradient">Verlauf</sys:String>
     <sys:String x:Key="S_MaskColour">Farbbereich</sys:String>
+    <sys:String x:Key="S_MaskScopeColour">Farbe</sys:String>
+    <sys:String x:Key="S_MaskScopeColourHint">Die Maske sagt, WO die Korrektur dieser Ebene gilt. Die Ebene selbst bleibt ueberall zu sehen - als laege eine Kopie von ihr darueber, die nur den Bereich zeigt.</sys:String>
+    <sys:String x:Key="S_MaskScopeShow">Sichtbarkeit</sys:String>
+    <sys:String x:Key="S_MaskScopeShowHint">Die Maske sagt, WO die Ebene zu sehen ist. Ausserhalb traegt sie nichts bei - richtig fuer einen Glanz, ein Wasserzeichen, eine zweite Aufnahme.</sys:String>
     <sys:String x:Key="S_MaskHue">Farbton</sys:String>
     <sys:String x:Key="S_MaskSpread">Bereich</sys:String>
     <sys:String x:Key="S_MaskHintColour">Wirkt nur dort, wo dieser Farbton liegt. Blasse Farben zaehlen weniger mit - wer sie voll dabeihaben will, zieht den Weisspunkt herunter.</sys:String>

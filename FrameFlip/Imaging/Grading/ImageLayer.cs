@@ -262,7 +262,14 @@ public sealed class ImageLayer
     public bool IsNeutral
         => Content == LayerContent.Pass &&
            Opacity >= 0.999f && MathF.Abs(Exposure) < 0.001f && Tint.Near(1f) &&
-           Mask.IsNeutral && Place.IsNeutral;
+           Mask.IsNeutral && Place.IsNeutral &&
+           // Und die eigenen Werkzeuge der Ebene. Sie hier zu uebergehen war die
+           // zweite Haelfte desselben Fehlers: Der Composer reicht einen einzelnen
+           // unveraenderten Pass unbesehen durch, und "unveraendert" hiess bisher
+           // "ohne Maske, ohne Versatz" - eine Kurve an derselben Ebene zaehlte
+           // nicht mit. Man stellte sie ein, und das Bild kam ungerechnet zurueck.
+           (Adjustments is null || Adjustments.IsNeutral) &&
+           (Tools is null || Tools.IsNeutral);
 
     /// <summary>Die Kette dieser Einstellungsebene, fertig vorbereitet.</summary>
     public LayerGrade Grade() => LayerGrade.Prepare(Adjustments, Tools);

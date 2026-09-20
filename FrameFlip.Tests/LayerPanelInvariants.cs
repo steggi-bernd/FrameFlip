@@ -384,6 +384,48 @@ public static class LayerPanelInvariants
         Check.That(soft.Visibility != Visibility.Visible,
                    "die Weichheit nicht - dort sind es Schwarz- und Weisspunkt");
 
+        // Worauf die Maske wirkt.
+        //
+        // Eine NEU gewaehlte Maske auf einer Bildebene begrenzt die Korrektur, nicht
+        // die Sichtbarkeit. Das ist die Falle, um die es ging: Wer sich einen Fleck
+        // auf sein Bild malt, will dort etwas aendern - nicht alles ausser dem Fleck
+        // verlieren.
+        var scopeRow = (FrameworkElement)panel.FindName("MaskScopeRow");
+        var asColour = (System.Windows.Controls.Primitives.ToggleButton)panel.FindName("ScopeColourButton");
+        var asShow = (System.Windows.Controls.Primitives.ToggleButton)panel.FindName("ScopeShowButton");
+
+        Check.That(scopeRow.Visibility == Visibility.Visible,
+                   "an einer Bildebene steht die Wahl bereit");
+
+        Check.That(layer.Mask.Scope == MaskScope.Colour,
+                   "und eine neu gewaehlte Maske begrenzt die Farbe",
+                   layer.Mask.Scope.ToString());
+
+        Check.That(asColour.IsChecked == true, "der Knopf zeigt es auch");
+
+        changes = 0;
+        asShow.IsChecked = true;
+
+        Check.That(changes > 0, "das Umschalten meldet", $"{changes}");
+        Check.That(layer.Mask.Scope == MaskScope.Visibility,
+                   "und die andere Lesart laesst sich waehlen - ein Glanz braucht sie");
+
+        // Der Abbruch am Regler haengt am STIL und nicht an einzelnen Reglern. Wer
+        // ihn dort loest, verliert ihn ueberall auf einmal - und zwar lautlos.
+        Check.That(FrameFlip.Views.SliderGuard.GetCancelOnRightClick(low),
+                   "jeder Regler des Streifens laesst sich mit rechts abbrechen");
+
+        // Und die Vorlage muss sich wirklich aufbauen lassen.
+        //
+        // Ein Auslöser, der auf eine Bewegung mit falschem Namen zeigt, ist im XAML
+        // kein Fehler: Er faellt erst auf, wenn die Vorlage entsteht - also beim
+        // ersten Regler auf dem Bildschirm und nicht im Compiler und nicht in einer
+        // Probe, die nur Werte setzt.
+        low.ApplyTemplate();
+
+        Check.That(low.Template.FindName("PART_Track", low) is not null,
+                   "und die Reglervorlage baut sich auf, samt Griff und Bewegungen");
+
         // Tiefen, Mitten, Lichter: drei Knoepfe, die die Regler darueber stellen.
         //
         // Sie sind der eigentliche Grund, warum es sie gibt - wer "nur die Schatten"

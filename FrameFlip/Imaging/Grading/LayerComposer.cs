@@ -217,11 +217,15 @@ public static class LayerComposer
                 if (maskLevels.Length == 0 || maskIds.Length == 0) maskKind = MaskKind.None;
             }
 
-            // Die Kette einer Einstellungsebene wird EINMAL vorbereitet, nicht je
-            // Bildpunkt. Bei 4K waeren es sonst 25 Millionen Tabellenaufbauten.
-            var grade = layer.Content == LayerContent.Adjustment
-                ? layer.Grade()
-                : default;
+            // Die Kette wird EINMAL vorbereitet, nicht je Bildpunkt. Bei 4K waeren
+            // es sonst 25 Millionen Tabellenaufbauten.
+            //
+            // Fuer JEDE Ebene, nicht nur fuer Einstellungsebenen. Dass es lange nur
+            // fuer die eine Art geschah, war ein stiller Fehler: Der Streifen legte
+            // die Werkzeuge einer gewaehlten Bildebene brav in den Stapel, und der
+            // Composer sah sie nie an. Man stellte an einer Bildebene eine Kurve ein
+            // und nichts geschah - ohne Meldung, ohne gesperrten Regler.
+            var grade = layer.Grade();
 
             // Platziert wird nur, wenn es etwas zu platzieren gibt: eine Ebene in
             // der Groesse der Leinwand und ohne Einstellung geht den geraden Weg
@@ -447,17 +451,53 @@ public static class LayerComposer
                         }
                     }
 
+                    float underR = inGroup ? gr : vr;
+                    float underG = inGroup ? gg : vg;
+                    float underB = inGroup ? gb : vb;
+
+                    // Die Maske wird EINMAL gefragt. Was ihre Antwort dann bedeutet,
+                    // entscheidet die Ebene - siehe MaskScope.
+                    float factor = plan.Mask == MaskKind.None
+                        ? 1f
+                        : Factor(in plan, x, y, width, height, i, lr, lg, lb, underR, underG, underB);
+
+                    // Die eigenen Werkzeuge einer Bild- oder Passebene. Eine
+                    // Einstellungsebene hat ihre Korrektur oben schon angewandt - sie
+                    // BESTEHT aus ihr.
+                    if (plan.Content != LayerContent.Adjustment && !plan.Grade.IsNeutral)
+                    {
+                        float qr = lr, qg = lg, qb = lb;
+
+                        plan.Grade.Apply(ref qr, ref qg, ref qb);
+
+                        if (plan.Scope == MaskScope.Colour)
+                        {
+                            // Die Maske sagt hier, WO korrigiert wird - nicht, wo die
+                            // Ebene zu sehen ist. Gerechnet wird genau das, was eine
+                            // Kopie der Ebene taete, die nur den Bereich zeigt: innen
+                            // die Korrektur, aussen das Bild, dazwischen weich.
+                            lr += (qr - lr) * factor;
+                            lg += (qg - lg) * factor;
+                            lb += (qb - lb) * factor;
+
+                            // Und die Ebene selbst bleibt ganz da. Sie hier ebenfalls
+                            // auszublenden waere die Falle, um die es ging: ein Fleck
+                            // gemalt, und das Bild ausser dem Fleck ist weg.
+                            factor = 1f;
+                        }
+                        else
+                        {
+                            lr = qr;
+                            lg = qg;
+                            lb = qb;
+                        }
+                    }
+
                     // Die Maske greift an genau einer Stelle an: Sie macht die
                     // Deckkraft oertlich. Damit gilt fuer jede Mischung und jede
                     // Schnittmaske dieselbe Regel, und es gibt keinen Fall, in dem
                     // eine Maske etwas anderes bedeutet als sonst.
-                    float opacity = plan.Mask == MaskKind.None
-                        ? plan.Opacity
-                        : plan.Opacity * Factor(in plan, x, y, width, height, i,
-                                                lr, lg, lb,
-                                                inGroup ? gr : vr,
-                                                inGroup ? gg : vg,
-                                                inGroup ? gb : vb);
+                    float opacity = plan.Opacity * factor;
 
                     // Die eigene Deckung wirkt wie eine Maske: Sie macht die
                     // Deckkraft oertlich. Dieselbe Stelle, dieselbe Regel - und
@@ -839,6 +879,7 @@ public static class LayerComposer
             MaskLevels = maskLevels;
             MaskIds = maskIds;
             MaskInvert = mask.Invert;
+            Scope = mask.Scope;
             MaskHue = mask.Hue;
             MaskSpread = mask.Spread;
             MaskLow = mask.Low;
@@ -878,6 +919,9 @@ public static class LayerComposer
 
         /// <summary>Der gesuchte Farbton und seine Weite - nur fuer die Farbbereichsmaske.</summary>
         public readonly float MaskHue, MaskSpread;
+
+        /// <summary>Ob die Maske die Sichtbarkeit oder die Korrektur begrenzt.</summary>
+        public readonly MaskScope Scope;
         public readonly float MaskFloor, MaskSpan;
         public readonly float MatteFloor;
 

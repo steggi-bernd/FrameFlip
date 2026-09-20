@@ -1,6 +1,7 @@
 <ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
                     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-                    xmlns:sys="clr-namespace:System;assembly=System.Runtime">
+                    xmlns:sys="clr-namespace:System;assembly=System.Runtime"
+                    xmlns:views="clr-namespace:FrameFlip.Views">
 
     <!-- ================================================================ Farben
 
@@ -542,11 +543,20 @@
                 </Trigger.ExitActions>
             </Trigger>
 
-            <!-- Beim Ziehen bleibt der Hof stehen, auch wenn der Zeiger den Griff
-                 seitlich verlaesst - genau dann braucht man ihn. -->
+            <!--
+                Beim Ziehen bleibt der Hof stehen, auch wenn der Zeiger den Griff
+                seitlich verlaesst - genau dann braucht man ihn.
+
+                Und er GEHT WIEDER AUS. Eine Animation ohne Gegenstueck haelt ihren
+                Wert fuer immer: Der Hof blieb an dem Regler stehen, den man zuletzt
+                bedient hatte, und beim naechsten stand ein zweiter daneben. Gestoppt
+                statt zurueckanimiert, weil darunter noch der Schwebezustand liegt -
+                wer den Griff nach dem Ziehen nicht verlassen hat, soll den kleinen
+                Hof behalten und nicht gar keinen.
+            -->
             <Trigger Property="IsDragging" Value="True">
                 <Trigger.EnterActions>
-                    <BeginStoryboard>
+                    <BeginStoryboard x:Name="DragGlow">
                         <Storyboard>
                             <DoubleAnimation Storyboard.TargetName="Glow" Storyboard.TargetProperty="Opacity"
                                              To="0.45" Duration="{StaticResource HoverDuration}" />
@@ -557,6 +567,9 @@
                         </Storyboard>
                     </BeginStoryboard>
                 </Trigger.EnterActions>
+                <Trigger.ExitActions>
+                    <StopStoryboard BeginStoryboardName="DragGlow" />
+                </Trigger.ExitActions>
             </Trigger>
         </ControlTemplate.Triggers>
     </ControlTemplate>
@@ -570,6 +583,7 @@
     </Style>
 
     <Style x:Key="Scrubber" TargetType="Slider">
+        <Setter Property="views:SliderGuard.CancelOnRightClick" Value="True" />
         <Setter Property="Focusable" Value="False" />
         <Setter Property="IsMoveToPointEnabled" Value="True" />
         <Setter Property="SmallChange" Value="1" />
@@ -998,6 +1012,7 @@
         Behauptung ueber eine Richtung, die es nicht gibt.
     -->
     <Style x:Key="PanelSliderTinted" TargetType="Slider">
+        <Setter Property="views:SliderGuard.CancelOnRightClick" Value="True" />
         <Setter Property="Focusable" Value="False" />
         <Setter Property="IsMoveToPointEnabled" Value="True" />
         <Setter Property="Height" Value="18" />
@@ -1067,6 +1082,7 @@
     </LinearGradientBrush>
 
     <Style x:Key="PanelSlider" TargetType="Slider">
+        <Setter Property="views:SliderGuard.CancelOnRightClick" Value="True" />
         <Setter Property="Focusable" Value="False" />
         <Setter Property="IsMoveToPointEnabled" Value="True" />
         <Setter Property="Height" Value="18" />

@@ -25,6 +25,7 @@ public static class PaintedMaskInvariants
         TheComposerSeesIt();
         ToolsWorkOnAMaskLayer();
         AColourRangePicksAHue();
+        AMaskOnAPictureScopesTheColour();
     }
 
     private static void AStrokeLandsWhereItWasPut()
@@ -357,6 +358,95 @@ public static class PaintedMaskInvariants
 
         Check.Near(round.R[4], rr[4], 0.02, "tuerkis gegenueber bleibt unberuehrt");
         Check.Near(round.R[7], rr[7], 0.02, "und grau immer noch");
+    }
+
+    /// <summary>
+    /// Eine Maske auf dem BILD begrenzt die Korrektur - sie wirft das Bild nicht weg.
+    ///
+    /// Das war die Falle: Eine Maske machte immer die Deckkraft oertlich. Wer sich
+    /// einen Fleck auf sein Bild malte, um ihn aufzuhellen, verlor alles ausser dem
+    /// Fleck - die Ebene war ja ausserhalb der Maske unsichtbar.
+    ///
+    /// Gemeint ist aber fast immer das andere: als laege ueber der Ebene eine Kopie
+    /// von ihr, die nur den ausgewaehlten Bereich zeigt und nur dort korrigiert ist.
+    /// Beide Lesarten werden gebraucht - ein Glanz soll sehr wohl nur an einer Stelle
+    /// zu SEHEN sein -, und deshalb sagt es die Ebene, statt dass es geraten wird.
+    /// </summary>
+    private static void AMaskOnAPictureScopesTheColour()
+    {
+        Check.Group("Eine Maske auf dem Bild begrenzt die Farbe, nicht die Sicht");
+
+        const int w = 120, h = 100;
+
+        int count = w * h;
+        var rr = new float[count];
+        var gg = new float[count];
+        var bb = new float[count];
+
+        Array.Fill(rr, 0.4f);
+        Array.Fill(gg, 0.4f);
+        Array.Fill(bb, 0.4f);
+
+        var ground = new FloatFrame
+        {
+            Width = w, Height = h, R = rr, G = gg, B = bb,
+            A = null, IsSceneReferred = false,
+        };
+
+        var picture = new ImageLayer
+        {
+            Content = LayerContent.Pass, Source = "", Name = "Bild",
+            Mask = new LayerMask
+            {
+                Kind = MaskKind.Painted, PaintLocked = true, Scope = MaskScope.Colour,
+            },
+            Tools = new GradingStack(),
+        };
+
+        picture.Mask.PaintOn(0, w, h).Stroke(w / 2f, h / 2f, 25f, 1f, 1f);
+
+        // Eine Korrektur, die man nicht uebersehen kann.
+        picture.Tools!.Tools.Add(new HslTool());
+        picture.Adjustments = new ImageAdjustments { Saturation = 1.0, Exposure = 1.0 };
+
+        var stack = new LayerStack { Layers = { picture } };
+        var sources = new Dictionary<string, FloatFrame>(StringComparer.Ordinal) { [""] = ground };
+
+        int middle = h / 2 * w + w / 2;
+        int corner = 5 * w + 5;
+
+        var built = LayerComposer.Compose(stack, sources)!;
+
+        Console.WriteLine($"         Farbe:        Mitte {built.R[middle]:0.000}, Ecke {built.R[corner]:0.000}");
+
+        Check.That(built.R[middle] > 0.7f,
+                   "wo gemalt wurde, greift die Korrektur", $"{built.R[middle]:0.000}");
+
+        Check.Near(built.R[corner], 0.4, 0.01,
+                   "und daneben steht das Bild - unveraendert, aber DA");
+
+        // Und andersherum muss die alte Lesart erhalten bleiben: Ein Glanz soll sehr
+        // wohl nur an einer Stelle zu sehen sein.
+        picture.Mask.Scope = MaskScope.Visibility;
+
+        var hidden = LayerComposer.Compose(stack, sources)!;
+
+        Console.WriteLine($"         Sichtbarkeit: Mitte {hidden.R[middle]:0.000}, Ecke {hidden.R[corner]:0.000}");
+
+        Check.That(hidden.R[middle] > 0.7f, "als Sichtmaske wirkt sie in der Mitte ebenso");
+
+        Check.Near(hidden.R[corner], 0, 0.01,
+                   "aber daneben ist die Ebene weg - genau dafuer gibt es sie");
+
+        // Der stille Fehler dahinter: Die Werkzeuge einer Bildebene wurden nie
+        // angewandt. Ohne Maske muss eine Korrektur ueberall ankommen.
+        picture.Mask.Kind = MaskKind.None;
+
+        var plain = LayerComposer.Compose(stack, sources)!;
+
+        Check.That(plain.R[corner] > 0.7f,
+                   "und ohne Maske greifen die Werkzeuge der Bildebene ueberall",
+                   $"{plain.R[corner]:0.000}");
     }
 
     /// <summary>Und der Composer muss sie auch benutzen.</summary>

@@ -9,6 +9,7 @@ using FrameFlip.Decoding.Exr;
 using FrameFlip.Imaging;
 using FrameFlip.Imaging.Grading;
 using FrameFlip.Localization;
+using CompositionTarget = System.Windows.Media.CompositionTarget;
 using PixelFormats = System.Windows.Media.PixelFormats;
 
 namespace FrameFlip.Views;
@@ -445,20 +446,73 @@ public sealed partial class AtelierPage : UserControl
             _coarse = true;
             _settle.Stop();
             _settle.Start();
-        }
-        else
-        {
-            _settle.Stop();
-            _coarse = false;
+
+            // Je BILD rechnen, nicht je Meldung - und deshalb steht das hier und
+            // nicht an den Reglern.
+            //
+            // Windows liefert Regler- und Mausmeldungen so schnell, wie das Programm
+            // sie abholt. Wer in jeder davon ein Bild zusammensetzt, staut die
+            // Warteschlange, sobald ein Durchgang laenger dauert als der Abstand
+            // zweier Meldungen. Der Regler zieht dann nicht nur nach, er ZUCKT: Der
+            // Griff steht an der Stelle einer alten Meldung, waehrend die Maus schon
+            // woanders ist, und springt beim naechsten Durchgang vor.
+            //
+            // Einmal hier gefasst gilt es fuer alles, was zwischendurch meldet -
+            // jeden Regler, jedes Ziehen, jeden Pinselstrich. An den Reglern selbst
+            // gaebe es das nur dort, wo jemand daran gedacht hat.
+            _pendingCompose |= recompose;
+
+            if (_frameHooked) return;
+
+            _frameHooked = true;
+            CompositionTarget.Rendering += OnRefreshFrame;
+
+            return;
         }
 
+        StopRefreshFrames();
+
+        _settle.Stop();
+        _coarse = false;
+
+        Draw(recompose);
+        Measure();
+    }
+
+    /// <summary>Ein Durchgang je Bildwiederholung - mehr sieht ohnehin niemand.</summary>
+    private void OnRefreshFrame(object? sender, EventArgs e)
+    {
+        bool recompose = _pendingCompose;
+
+        // ERST abhaengen: Was jetzt gezeichnet wird, darf sich fuer das naechste Bild
+        // sofort wieder anmelden. Andersherum bliebe der Haken haengen, wenn niemand
+        // mehr etwas will, und liefe sechzig Mal in der Sekunde ins Leere.
+        StopRefreshFrames();
+
+        Draw(recompose);
+    }
+
+    private void StopRefreshFrames()
+    {
+        _pendingCompose = false;
+
+        if (!_frameHooked) return;
+
+        _frameHooked = false;
+        CompositionTarget.Rendering -= OnRefreshFrame;
+    }
+
+    /// <summary>Zusammensetzen, zeichnen, die Anfasser nachziehen - in dieser Reihenfolge.</summary>
+    private void Draw(bool recompose)
+    {
         if (recompose) Recompose();
 
         Render();
         ShowPlacement();
-
-        if (!interim) Measure();
     }
+
+    private bool _frameHooked;
+    private bool _pendingCompose;
 
     private void Render()
     {

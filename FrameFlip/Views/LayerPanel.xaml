@@ -471,6 +471,29 @@
                                       ToolTip="{DynamicResource S_MaskInvert}" />
                     </Grid>
 
+                    <!--
+                        Worauf die Maske wirkt - und das ist nicht immer dasselbe.
+
+                        Zwei Knoepfe statt einer Liste, weil es genau zwei Faelle gibt
+                        und man beide nebeneinander sehen soll. Wer eine Maske auf
+                        sein Bild malt, will dort etwas AENDERN; wer eine auf einen
+                        Glanz legt, will ihn nur dort SEHEN. Ohne die Wahl war das
+                        erste eine Falle: ein Fleck gemalt, und das Bild ausser dem
+                        Fleck war weg.
+                    -->
+                    <StackPanel x:Name="MaskScopeRow" Orientation="Horizontal"
+                                Visibility="Collapsed" Margin="0,8,0,0">
+                        <RadioButton x:Name="ScopeColourButton" Style="{StaticResource OverlayToggle}"
+                                     Content="{DynamicResource S_MaskScopeColour}"
+                                     ToolTip="{DynamicResource S_MaskScopeColourHint}"
+                                     Checked="OnMaskScopeChanged" />
+                        <RadioButton x:Name="ScopeShowButton" Style="{StaticResource OverlayToggle}"
+                                     Margin="6,0,0,0"
+                                     Content="{DynamicResource S_MaskScopeShow}"
+                                     ToolTip="{DynamicResource S_MaskScopeShowHint}"
+                                     Checked="OnMaskScopeChanged" />
+                    </StackPanel>
+
                     <!-- Welcher Pass die Maske traegt -->
                     <ComboBox x:Name="MaskSourceBox" Style="{StaticResource OverlayCombo}"
                               Margin="0,6,0,0" Visibility="Collapsed"

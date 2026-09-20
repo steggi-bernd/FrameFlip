@@ -223,7 +223,7 @@ public sealed partial class PlacementAdorner
 
     // ---------------------------------------------------------------- Bedienung
 
-    private void PaintDown(MouseButtonEventArgs e, float x, float y)
+    private void PaintDown(MouseButtonEventArgs e, float x, float y, bool erase = false)
     {
         // Jetzt erst wird eine Maske gebraucht - und, wenn noetig, angelegt.
         _mask ??= MaskWanted?.Invoke();
@@ -234,9 +234,8 @@ public sealed partial class PlacementAdorner
 
         _painting = true;
 
-        // Alt nimmt weg statt aufzutragen - derselbe Griff wie in jedem Programm mit
-        // Pinsel, und einer, den man nicht lernen muss.
-        _erasing = (Keyboard.Modifiers & ModifierKeys.Alt) != 0;
+        // Die rechte Taste nimmt weg, Alt ebenso - siehe OnMouseRightButtonDown.
+        _erasing = erase || (Keyboard.Modifiers & ModifierKeys.Alt) != 0;
 
         _lastStroke = new Point(x, y);
 

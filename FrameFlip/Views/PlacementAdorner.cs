@@ -203,6 +203,41 @@ public sealed partial class PlacementAdorner : FrameworkElement
 
     // ---------------------------------------------------------------- Bedienung
 
+    /// <summary>
+    /// Rechts nimmt weg - und zwar OHNE Alt.
+    ///
+    /// Alt war die naheliegende Wahl und die falsche: Windows haelt Alt fuer den
+    /// Anfang eines Menuebefehls und schickt waehrenddessen einen eigenen Strom von
+    /// Meldungen durch das Fenster. Das Radieren hing daran sichtbar hinterher,
+    /// waehrend das Auftragen daneben fluessig lief - derselbe Rechenweg, dieselbe
+    /// Maske, nur eine gedrueckte Taste Unterschied.
+    ///
+    /// Die rechte Taste hat das Problem nicht, ist in jedem Zeichenprogramm ohnehin
+    /// die zweite Farbe und kostet keinen Finger an der Tastatur. Alt tut es
+    /// weiterhin - wer es gewohnt ist, soll es behalten duerfen.
+    /// </summary>
+    protected override void OnMouseRightButtonDown(MouseButtonEventArgs e)
+    {
+        if (_mode != AdornerMode.Paint)
+        {
+            base.OnMouseRightButtonDown(e);
+            return;
+        }
+
+        if (Canvas(e.GetPosition(this), out float px, out float py)) PaintDown(e, px, py, erase: true);
+    }
+
+    protected override void OnMouseRightButtonUp(MouseButtonEventArgs e)
+    {
+        if (_mode == AdornerMode.Paint)
+        {
+            PaintUp(e);
+            return;
+        }
+
+        base.OnMouseRightButtonUp(e);
+    }
+
     protected override void OnMouseLeftButtonDown(MouseButtonEventArgs e)
     {
         if (_mode == AdornerMode.Paint)

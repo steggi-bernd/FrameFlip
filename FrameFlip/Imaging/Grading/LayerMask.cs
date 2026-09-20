@@ -52,6 +52,36 @@ public enum MaskKind
 }
 
 /// <summary>
+/// Worauf eine Maske wirkt - und das ist nicht immer dasselbe.
+/// </summary>
+public enum MaskScope
+{
+    /// <summary>
+    /// Die Maske sagt, WO DIE EBENE ZU SEHEN IST.
+    ///
+    /// Das Richtige fuer alles, was zum Bild hinzukommt: ein Glanz, der nur oben
+    /// links liegen soll, ein Wasserzeichen in einer Ecke, eine zweite Aufnahme, die
+    /// nur halb eingeblendet wird. Ausserhalb der Maske traegt die Ebene nichts bei.
+    /// </summary>
+    Visibility,
+
+    /// <summary>
+    /// Die Maske sagt, WO DIE KORREKTUR DIESER EBENE GILT. Die Ebene selbst bleibt
+    /// ueberall zu sehen.
+    ///
+    /// Das Richtige fuer das Grundbild, und der haeufigere Fall: Wer eine Maske auf
+    /// sein Bild malt, will dort etwas AENDERN - nicht den Rest wegwerfen. Gemeint
+    /// ist dasselbe, als laege ueber der Ebene eine Kopie von ihr, die nur den
+    /// ausgewaehlten Bereich zeigt und nur dort korrigiert ist.
+    ///
+    /// Ohne diese Einstellung war eine Maske auf dem Grundbild eine Falle: Man malte
+    /// einen Fleck, um ihn aufzuhellen, und das ganze Bild ausser dem Fleck
+    /// verschwand.
+    /// </summary>
+    Colour,
+}
+
+/// <summary>
 /// Die Maske einer Ebene: ein Wert zwischen 0 und 1 je Bildpunkt, der sagt, wie
 /// stark die Ebene dort wirkt.
 ///
@@ -115,6 +145,18 @@ public sealed class LayerMask
 
     /// <summary>Dreht die Maske um. Aus "nur in den Lichtern" wird "ueberall ausser in den Lichtern".</summary>
     public bool Invert { get; set; }
+
+    /// <summary>
+    /// Ob die Maske die Sichtbarkeit oder die Korrektur begrenzt - siehe <see
+    /// cref="MaskScope"/>.
+    ///
+    /// Die Grundstellung ist die Sichtbarkeit, und zwar wegen der Rezepte, die es
+    /// schon gibt: Ein gespeicherter Glanz mit Verlaufsmaske soll nach dem naechsten
+    /// Start dasselbe tun wie vorher. Der Streifen stellt bei einer NEU gewaehlten
+    /// Maske auf einer Bildebene von sich aus auf Farbe um - dort ist es fast immer
+    /// das Gemeinte.
+    /// </summary>
+    public MaskScope Scope { get; set; } = MaskScope.Visibility;
 
     // ---------------------------------------------------------------- der Bereich
 
@@ -208,6 +250,7 @@ public sealed class LayerMask
     {
         Kind = Kind,
         Invert = Invert,
+        Scope = Scope,
         Low = Low,
         High = High,
         Softness = Softness,
