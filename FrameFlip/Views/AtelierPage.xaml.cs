@@ -421,9 +421,21 @@ public sealed partial class AtelierPage : UserControl
 
         if (layer)
         {
-            // Die Werkzeuge der Ebene liegen im Stapel selbst - der Streifen hat sie
-            // beim Binden hineingelegt und aendert dasselbe Objekt weiter.
             _editing!.Adjustments = Tools.Adjustments;
+
+            // Und der Stapel dazu - genau wie beim ganzen Bild eine Zeile tiefer.
+            //
+            // Hier stand frueher, der Streifen habe die Werkzeuge beim Binden
+            // "hineingelegt und aendere dasselbe Objekt weiter". Das war falsch:
+            // Snapshot() ist ein Clone, und GradingStack.Clone() kopiert auch die
+            // Werkzeuge selbst. Die Ebene bekam beim Binden EIGENE Objekte, und was
+            // danach am Regler gezogen wurde, erreichte sie nie mehr.
+            //
+            // Sichtbar war das auf die verwirrendste Art, die es gibt: Saettigung und
+            // Belichtung wirkten, Farbbereiche und Zonen nicht. Die einen stehen in
+            // Adjustments - das wurde geschrieben -, die anderen im Stapel.
+            _editing.Tools = Snapshot();
+
             _settings.Layers = Layers.Stack;
         }
         else

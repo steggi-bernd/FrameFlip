@@ -384,6 +384,43 @@ public static class AtelierLayerInvariants
             Check.That(!ReferenceEquals(firstBalance, secondBalance),
                        "die nicht dasselbe Objekt sind");
 
+            // Und jetzt die Luecke, durch die der eigentliche Fehler ging.
+            //
+            // Geprueft wurde hier immer nur die BELICHTUNG - und die steht in
+            // Adjustments. Alles, was im Werkzeugstapel liegt, blieb ungeprueft:
+            // Farbbereiche, Zonen, Kurven, Weissabgleich. Genau die kamen an der
+            // Ebene nie an, weil nur Adjustments zurueckgeschrieben wurde.
+            //
+            // Im Fenster war das die verwirrendste Art von Fehler, die es gibt: Zwei
+            // Regler nebeneinander, einer wirkt, der andere nicht.
+            var zones = (System.Windows.Controls.Slider)tools.FindName("GainBrightSlider");
+
+            zones.Value = zones.Maximum;
+
+            var gain = second.Tools!.Tools.OfType<LiftGammaGainTool>().FirstOrDefault();
+
+            Check.That(gain is not null, "die Ebene fuehrt die Zonen");
+
+            Check.That(gain is not null && !gain.IsNeutral,
+                       "und ein Zonenregler kommt an der Ebene an - nicht nur die Belichtung",
+                       gain is null ? "fehlt" : $"Gain {gain.Gain.R:0.00}");
+
+            var warmth = (System.Windows.Controls.Slider)tools.FindName("TemperatureSlider");
+
+            warmth.Value = warmth.Maximum;
+
+            var balance = second.Tools!.Tools.OfType<WhiteBalanceTool>().FirstOrDefault();
+
+            Check.That(balance is not null && !balance.IsNeutral,
+                       "der Weissabgleich ebenso",
+                       balance is null ? "fehlt" : "neutral geblieben");
+
+            // Und die erste Ebene darf davon nichts abbekommen haben.
+            var firstGain = first.Tools!.Tools.OfType<LiftGammaGainTool>().FirstOrDefault();
+
+            Check.That(firstGain is null || firstGain.IsNeutral,
+                       "waehrend die andere Ebene unberuehrt bleibt");
+
             // Und zurueck: Der Streifen muss die erste wieder so zeigen, wie sie war.
             Select(strip, first);
 
