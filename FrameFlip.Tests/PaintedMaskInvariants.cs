@@ -24,6 +24,7 @@ public static class PaintedMaskInvariants
         TheLockDecidesHowManyFrames();
         TheComposerSeesIt();
         ToolsWorkOnAMaskLayer();
+        AColourRangePicksAHue();
     }
 
     private static void AStrokeLandsWhereItWasPut()
@@ -241,6 +242,121 @@ public static class PaintedMaskInvariants
         Check.That(MathF.Abs(banded.R[middle] - plainMiddle) > 0.02f,
                    "Farbbereiche wirken ebenso",
                    $"{banded.R[middle]:0.000} gegen {plainMiddle:0.000}");
+    }
+
+    /// <summary>
+    /// Der Farbbereich: "nur wo es blau ist".
+    ///
+    /// Die Frage, die eine Helligkeitsmaske nicht beantworten kann - Himmel und
+    /// Hautton koennen gleich hell sein. Drei Dinge muessen stimmen, und das dritte
+    /// ist das, an dem so etwas ueblicherweise bricht:
+    ///
+    /// 1. Die gesuchte Farbe wird getroffen, die gegenueberliegende nicht.
+    /// 2. Grau gehoert nirgends dazu - es hat keinen Farbton.
+    /// 3. Der Kreis SCHLIESST sich. Rot liegt bei 0 und bei 360; wer die Entfernung
+    ///    als schlichte Differenz rechnet, hat um Rot herum einen Bereich, der nur
+    ///    nach einer Seite offen ist.
+    /// </summary>
+    private static void AColourRangePicksAHue()
+    {
+        Check.Group("Der Farbbereich trifft einen Farbton");
+
+        const int w = 8, h = 1;
+
+        // Acht Punkte: rot, orange, gelb, gruen, tuerkis, blau, violett, grau.
+        var (rr, gg, bb) = (new float[w], new float[w], new float[w]);
+
+        void Put(int at, float r, float g, float b)
+        {
+            rr[at] = r; gg[at] = g; bb[at] = b;
+        }
+
+        Put(0, 0.5f, 0.0f, 0.0f);    // rot, 0 Grad
+        Put(1, 0.5f, 0.25f, 0.0f);   // orange, 30
+        Put(2, 0.5f, 0.5f, 0.0f);    // gelb, 60
+        Put(3, 0.0f, 0.5f, 0.0f);    // gruen, 120
+        Put(4, 0.0f, 0.5f, 0.5f);    // tuerkis, 180
+        Put(5, 0.0f, 0.0f, 0.5f);    // blau, 240
+        Put(6, 0.5f, 0.0f, 0.5f);    // violett, 300
+        Put(7, 0.3f, 0.3f, 0.3f);    // grau - gar kein Farbton
+
+        var ground = new FloatFrame
+        {
+            Width = w, Height = h, R = rr, G = gg, B = bb,
+            A = null, IsSceneReferred = false,
+        };
+
+        var bright = new FloatFrame
+        {
+            Width = w, Height = h,
+            R = new float[w], G = new float[w], B = new float[w],
+            A = null, IsSceneReferred = false,
+        };
+
+        Array.Fill(bright.R, 1f);
+        Array.Fill(bright.G, 1f);
+        Array.Fill(bright.B, 1f);
+
+        var layer = new ImageLayer
+        {
+            Content = LayerContent.Image, Source = "hell", Name = "Hell",
+            Mode = BlendMode.Normal,
+            Mask = new LayerMask
+            {
+                Kind = MaskKind.Colour, Hue = 240f, Spread = 30f, Softness = 0.1f,
+            },
+        };
+
+        var stack = new LayerStack
+        {
+            Layers =
+            {
+                new ImageLayer { Content = LayerContent.Pass, Source = "", Name = "Bild" },
+                layer,
+            },
+        };
+
+        var sources = new Dictionary<string, FloatFrame>(StringComparer.Ordinal)
+        {
+            [""] = ground,
+            ["hell"] = bright,
+        };
+
+        var built = LayerComposer.Compose(stack, sources)!;
+
+        Console.WriteLine("         blau gesucht: " +
+                          string.Join(", ", Enumerable.Range(0, w).Select(i => $"{built.R[i]:0.00}")));
+
+        // Wo die Maske nicht greift, steht der UNTERGRUND - nicht null. Rot traegt
+        // dort 0,50 und Grau 0,30, und genau dagegen wird geprueft: Gegen null zu
+        // pruefen hiesse, eine Ebene fuer unsichtbar zu halten, die schlicht nichts
+        // veraendert hat.
+        Check.That(built.R[5] > 0.9f, "blau wird getroffen", $"{built.R[5]:0.00}");
+        Check.Near(built.R[3], rr[3], 0.02, "gruen bleibt, wie es war");
+        Check.Near(built.R[0], rr[0], 0.02, "rot auch");
+
+        Check.Near(built.R[7], rr[7], 0.02,
+                   "und grau gehoert nirgends dazu - es hat keinen Farbton");
+
+        // Der Kreis schliesst sich: Rot bei 0 Grad muss Violett bei 300 und Orange
+        // bei 30 gleichermassen erreichen. Wer schlicht subtrahiert, erwischt nur
+        // eine der beiden Seiten.
+        layer.Mask.Hue = 0f;
+        layer.Mask.Spread = 45f;
+
+        var round = LayerComposer.Compose(stack, sources)!;
+
+        Console.WriteLine("         rot gesucht:  " +
+                          string.Join(", ", Enumerable.Range(0, w).Select(i => $"{round.R[i]:0.00}")));
+
+        Check.That(round.R[0] > 0.9f, "rot wird getroffen");
+        Check.That(round.R[1] > 0.5f, "orange bei 30 Grad auch", $"{round.R[1]:0.00}");
+        Check.That(round.R[6] > 0.5f,
+                   "und violett bei 300 Grad ebenso - der Kreis schliesst sich",
+                   $"{round.R[6]:0.00}");
+
+        Check.Near(round.R[4], rr[4], 0.02, "tuerkis gegenueber bleibt unberuehrt");
+        Check.Near(round.R[7], rr[7], 0.02, "und grau immer noch");
     }
 
     /// <summary>Und der Composer muss sie auch benutzen.</summary>

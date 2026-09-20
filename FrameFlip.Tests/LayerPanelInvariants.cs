@@ -1,5 +1,6 @@
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Controls.Primitives;
 using FrameFlip.Decoding.Exr;
 using FrameFlip.Imaging.Grading;
 using FrameFlip.Views;
@@ -383,6 +384,55 @@ public static class LayerPanelInvariants
         Check.That(soft.Visibility != Visibility.Visible,
                    "die Weichheit nicht - dort sind es Schwarz- und Weisspunkt");
 
+        // Tiefen, Mitten, Lichter: drei Knoepfe, die die Regler darueber stellen.
+        //
+        // Sie sind der eigentliche Grund, warum es sie gibt - wer "nur die Schatten"
+        // will, weiss nicht, dass das "von 0 bis 0,35 mit weicher Kante" heisst. Sie
+        // duerfen deshalb nicht nur die Ebene setzen, sondern muessen auch die Regler
+        // nachziehen: Ein Knopf, nach dem die Anzeige etwas anderes behauptet als das
+        // Bild zeigt, ist schlimmer als keiner.
+        box.SelectedIndex = IndexOf(box, "S_MaskLuminance");
+
+        var zones = (FrameworkElement)panel.FindName("MaskZoneRow");
+
+        Check.That(zones.Visibility == Visibility.Visible,
+                   "an einer Helligkeit stehen Tiefen, Mitten und Lichter bereit");
+
+        changes = 0;
+        Press(panel, zones, "lights");
+
+        Check.That(changes > 0, "ein Bereichsknopf meldet", $"{changes}");
+        Check.Near(layer.Mask.Low, 0.65, 0.001, "Lichter fangen oben an");
+        Check.Near(layer.Mask.High, 1.0, 0.001, "und reichen bis ganz hinauf");
+        Check.Near(low.Value, 0.65, 0.001, "und der Regler zeigt es auch");
+
+        Press(panel, zones, "shadows");
+
+        Check.Near(layer.Mask.High, 0.35, 0.001, "Tiefen hoeren unten auf");
+        Check.That(layer.Mask.Softness > 0.01f, "und haben eine weiche Kante",
+                   $"{layer.Mask.Softness:0.00}");
+
+        // Farbbereich: Farbton und Weite statt eines Helligkeitsfensters.
+        var colour = (FrameworkElement)panel.FindName("MaskColourBody");
+
+        box.SelectedIndex = IndexOf(box, "S_MaskColour");
+
+        Check.That(layer.Mask.Kind == MaskKind.Colour, "der Farbbereich laesst sich waehlen");
+        Check.That(colour.Visibility == Visibility.Visible, "seine Regler zeigen sich");
+        Check.That(zones.Visibility != Visibility.Visible,
+                   "Tiefen und Mitten nicht - an einer Farbe heissen sie nichts");
+
+        // Die Weichheit bleibt: Beim Farbbereich zaehlt sie in Grad um den Farbton.
+        Check.That(soft.Visibility == Visibility.Visible,
+                   "die Weichheit bleibt - hier zaehlt sie in Grad");
+
+        changes = 0;
+        var hue = (Slider)panel.FindName("MaskHueSlider");
+        hue.Value = 240;
+
+        Check.That(changes > 0, "der Farbton meldet", $"{changes}");
+        Check.Near(layer.Mask.Hue, 240, 0.5, "und kommt an");
+
         // Verlauf: nur Richtung, Mitte, Breite.
         box.SelectedIndex = IndexOf(box, "S_MaskGradient");
 
@@ -521,6 +571,15 @@ public static class LayerPanelInvariants
     }
 
     /// <summary>Der Platz eines Eintrags in der Auswahl, ueber seinen uebersetzten Namen.</summary>
+    /// <summary>Drueckt den Knopf mit dieser Kennung - so, wie ein Klick es taete.</summary>
+    private static void Press(LayerPanel panel, FrameworkElement row, string tag)
+    {
+        var button = ((Panel)row).Children.OfType<Button>()
+                                 .First(b => (string)b.Tag == tag);
+
+        button.RaiseEvent(new RoutedEventArgs(ButtonBase.ClickEvent));
+    }
+
     private static int IndexOf(ComboBox box, string key)
     {
         string wanted = FrameFlip.Localization.Strings.T(key);

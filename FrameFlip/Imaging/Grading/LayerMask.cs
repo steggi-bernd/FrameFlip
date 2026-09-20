@@ -21,6 +21,21 @@ public enum MaskKind
     Gradient,
 
     /// <summary>
+    /// Ein Farbbereich - "nur wo es blau ist".
+    ///
+    /// Die Frage, die eine Helligkeitsmaske nicht beantworten kann: Himmel und
+    /// Hautton koennen gleich hell sein und haben trotzdem nichts miteinander zu
+    /// tun. Gemessen wird der Farbton auf dem Farbkreis, nicht der Abstand im
+    /// RGB-Wuerfel - sonst waere ein dunkles Blau ein anderer Bereich als ein
+    /// helles.
+    ///
+    /// Gelesen wird wie bei <see cref="Underlying"/> das, was schon DA ist, nicht
+    /// die Ebene selbst: Eine weisse Flaeche hat keinen Farbton, und eine Korrektur,
+    /// die den Farbton verschiebt, zoege sich sonst die eigene Maske weg.
+    /// </summary>
+    Colour,
+
+    /// <summary>
     /// Eine Kryptomatte - Objekte oder Materialien, ueber die ganze Sequenz hinweg
     /// dieselben.
     /// </summary>
@@ -130,6 +145,22 @@ public sealed class LayerMask
     /// <summary>Wie breit der Uebergang ist. 0 ist eine Kante.</summary>
     public float Width { get; set; } = 0.5f;
 
+    /// <summary>
+    /// Der gesuchte Farbton in Grad auf dem Farbkreis - 0 rot, 120 gruen, 240 blau.
+    ///
+    /// Nur fuer <see cref="MaskKind.Colour"/>. In Grad und nicht als Farbe, weil ein
+    /// Farbbereich keine Helligkeit meint: "blau" ist eine Richtung, kein Punkt.
+    /// </summary>
+    public float Hue { get; set; }
+
+    /// <summary>
+    /// Wie weit um den Farbton herum noch dazugehoert, in Grad.
+    ///
+    /// Dreissig ist ungefaehr ein Sechstel des Kreises - eng genug, um Blau von
+    /// Tuerkis zu trennen, weit genug, um einen Himmel nicht zu zerreissen.
+    /// </summary>
+    public float Spread { get; set; } = 30f;
+
     // ------------------------------------------------------------------ die Quelle
 
     /// <summary>
@@ -183,6 +214,8 @@ public sealed class LayerMask
         Angle = Angle,
         Centre = Centre,
         Width = Width,
+        Hue = Hue,
+        Spread = Spread,
         Source = Source,
         Levels = new List<string>(Levels),
         Picks = Picks.Select(p => p.Clone()).ToList(),

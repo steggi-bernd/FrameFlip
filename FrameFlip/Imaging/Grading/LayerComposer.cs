@@ -736,6 +736,58 @@ public static class LayerComposer
                 return Fit(Masking.Levels(paint.At(x, y), plan.MaskLow, plan.MaskHigh),
                            plan.MaskInvert);
 
+            case MaskKind.Colour:
+            {
+                // Gelesen wird der UNTERGRUND, nicht die Ebene selbst - und das ist
+                // der Unterschied zur Helligkeitsmaske.
+                //
+                // Zwei Gruende. Eine weisse Flaeche hat keinen Farbton; eine
+                // Farbbereichsmaske auf ihr waere immer leer, und niemand kaeme
+                // darauf, warum. Und eine Einstellungsebene, die den Farbton
+                // verschiebt, jagte ihrem eigenen Ergebnis hinterher: Die Maske
+                // waehlt Blau, die Korrektur macht daraus Gruen, die Maske waehlt es
+                // nicht mehr. "Wo das Bild blau IST" ist die Frage, die man stellt.
+                //
+                // Der Farbton des Punktes auf dem Farbkreis - und wie weit er vom
+                // gesuchten entfernt liegt. Die Entfernung geht ueber den KUERZEREN
+                // Weg: Rot liegt bei 0 und bei 360, und ein Bereich um Rot, der bei
+                // 350 aufhoert, waere keiner.
+                float high = MathF.Max(ur, MathF.Max(ug, ub));
+                float low = MathF.Min(ur, MathF.Min(ug, ub));
+                float chroma = high - low;
+
+                // Grau hat keinen Farbton, den man treffen koennte. Nicht "weit weg",
+                // sondern "gar nicht dabei" - sonst faenge jede Maske das halbe Bild.
+                if (chroma <= 1e-6f || high <= 1e-6f) return Fit(0f, plan.MaskInvert);
+
+                float hue = high == ur
+                    ? 60f * (((ug - ub) / chroma) % 6f)
+                    : high == ug
+                        ? 60f * ((ub - ur) / chroma + 2f)
+                        : 60f * ((ur - ug) / chroma + 4f);
+
+                if (hue < 0f) hue += 360f;
+
+                float away = MathF.Abs(hue - plan.MaskHue);
+                if (away > 180f) away = 360f - away;
+
+                // Weich ueber die Kante hinaus. Der Weichzeichner ist derselbe Regler
+                // wie bei der Helligkeitsmaske und zaehlt hier in halben Kreisen.
+                float edge = plan.MaskSoftness * 180f;
+
+                float inside = edge <= 1e-4f
+                    ? away <= plan.MaskSpread ? 1f : 0f
+                    : 1f - Math.Clamp((away - plan.MaskSpread) / edge, 0f, 1f);
+
+                // Je blasser die Farbe, desto weniger gehoert sie dazu. Ein fast
+                // graues Blau IST kaum blau - und wer es doch will, zieht den
+                // Weisspunkt herunter.
+                float pure = Math.Clamp(chroma / high, 0f, 1f);
+
+                return Fit(Masking.Levels(inside * pure, plan.MaskLow, plan.MaskHigh),
+                           plan.MaskInvert);
+            }
+
             case MaskKind.Gradient:
                 return Fit(Masking.Gradient(x, y, width, height,
                                             plan.GradientCos, plan.GradientSin,
@@ -787,6 +839,8 @@ public static class LayerComposer
             MaskLevels = maskLevels;
             MaskIds = maskIds;
             MaskInvert = mask.Invert;
+            MaskHue = mask.Hue;
+            MaskSpread = mask.Spread;
             MaskLow = mask.Low;
             MaskHigh = mask.High;
             MaskSoftness = mask.Softness;
@@ -821,6 +875,9 @@ public static class LayerComposer
         /// <summary>Der Anstrich, der fuer dieses Bild gilt - siehe LayerMask.</summary>
         public readonly PaintedMask? Paint;
         public readonly float MaskLow, MaskHigh, MaskSoftness;
+
+        /// <summary>Der gesuchte Farbton und seine Weite - nur fuer die Farbbereichsmaske.</summary>
+        public readonly float MaskHue, MaskSpread;
         public readonly float MaskFloor, MaskSpan;
         public readonly float MatteFloor;
 

@@ -52,6 +52,7 @@ public partial class LayerPanel : UserControl
         (MaskKind.Luminance, "S_MaskLuminance"),
         (MaskKind.Underlying, "S_MaskUnderlying"),
         (MaskKind.Pass, "S_MaskPass"),
+        (MaskKind.Colour, "S_MaskColour"),
         (MaskKind.Gradient, "S_MaskGradient"),
         (MaskKind.Cryptomatte, "S_MaskCryptomatte"),
         (MaskKind.Painted, "S_MaskPainted"),
@@ -1609,6 +1610,8 @@ public partial class LayerPanel : UserControl
         mask.Angle = (float)MaskAngleSlider.Value;
         mask.Centre = (float)MaskCentreSlider.Value;
         mask.Width = (float)MaskWidthSlider.Value;
+        mask.Hue = (float)MaskHueSlider.Value;
+        mask.Spread = (float)MaskSpreadSlider.Value;
 
         // Von darf Bis nicht ueberholen - sonst laesst die Maske nichts mehr durch,
         // und das sieht aus, als waere die Ebene verschwunden.
@@ -1640,7 +1643,7 @@ public partial class LayerPanel : UserControl
         var kind = _selected?.Mask.Kind ?? MaskKind.None;
 
         bool range = kind is MaskKind.Luminance or MaskKind.Underlying or MaskKind.Pass
-                          or MaskKind.Cryptomatte;
+                          or MaskKind.Cryptomatte or MaskKind.Colour;
         bool gradient = kind == MaskKind.Gradient;
         bool source = kind is MaskKind.Pass or MaskKind.Cryptomatte;
         bool crypto = kind == MaskKind.Cryptomatte;
@@ -1649,6 +1652,14 @@ public partial class LayerPanel : UserControl
         if (!crypto) StopPicking();
 
         MaskRangeBody.Visibility = range ? Visibility.Visible : Visibility.Collapsed;
+        MaskColourBody.Visibility = kind == MaskKind.Colour ? Visibility.Visible : Visibility.Collapsed;
+
+        // Tiefen, Mitten und Lichter nur dort, wo sie etwas heissen: an einer
+        // Helligkeit. Auf einem Maskenpass oder einem Farbbereich waeren es drei
+        // Knoepfe, die etwas anderes tun, als sie sagen.
+        MaskZoneRow.Visibility = kind is MaskKind.Luminance or MaskKind.Underlying
+            ? Visibility.Visible
+            : Visibility.Collapsed;
         MaskGradientBody.Visibility = gradient ? Visibility.Visible : Visibility.Collapsed;
         MaskSourceBox.Visibility = source ? Visibility.Visible : Visibility.Collapsed;
         MaskInvertButton.IsEnabled = kind != MaskKind.None;
@@ -1660,21 +1671,29 @@ public partial class LayerPanel : UserControl
         // Gleich beschriftet waere das eine Falle.
         // Eine Deckung ist wie ein Maskenpass schon ein Anteil - dort sind es
         // Schwarz- und Weisspunkt, nicht ein Fenster.
-        bool levels = kind is MaskKind.Pass or MaskKind.Cryptomatte;
+        // Ein Farbbereich ist wie ein Maskenpass schon ein Anteil: Die Regler sind
+        // dort Schwarz- und Weisspunkt und ziehen an, wie blass eine Farbe noch sein
+        // darf, um dazuzugehoeren.
+        bool levels = kind is MaskKind.Pass or MaskKind.Cryptomatte or MaskKind.Colour;
 
         MaskLowLabel.Text = Strings.T(levels ? "S_MaskBlack" : "S_MaskFrom");
         MaskHighLabel.Text = Strings.T(levels ? "S_MaskWhite" : "S_MaskTo");
 
         // Die Weichheit gehoert zum Fenster. Ein Schwarz- und ein Weisspunkt haben
         // ihre Kante schon im Abstand zueinander.
-        MaskSoftRow.Visibility = levels ? Visibility.Collapsed : Visibility.Visible;
-        MaskSoftSlider.Visibility = levels ? Visibility.Collapsed : Visibility.Visible;
+        // Beim Farbbereich zaehlt sie in Grad um den Farbton herum - gebraucht wird
+        // sie also auch dort, obwohl die beiden anderen Regler Punkte sind.
+        bool soft = !levels || kind == MaskKind.Colour;
+
+        MaskSoftRow.Visibility = soft ? Visibility.Visible : Visibility.Collapsed;
+        MaskSoftSlider.Visibility = soft ? Visibility.Visible : Visibility.Collapsed;
 
         MaskHint.Text = kind switch
         {
             MaskKind.Pass => Strings.T("S_MaskHintPass"),
             MaskKind.Gradient => Strings.T("S_MaskHintGradient"),
             MaskKind.Luminance or MaskKind.Underlying => Strings.T("S_MaskHintLuma"),
+            MaskKind.Colour => Strings.T("S_MaskHintColour"),
             MaskKind.Cryptomatte => Strings.T("S_CryptoHint"),
             _ => "",
         };
@@ -1698,6 +1717,8 @@ public partial class LayerPanel : UserControl
         MaskSoftSlider.Value = Math.Clamp(mask.Softness, MaskSoftSlider.Minimum, MaskSoftSlider.Maximum);
         MaskAngleSlider.Value = Math.Clamp(mask.Angle, MaskAngleSlider.Minimum, MaskAngleSlider.Maximum);
         MaskCentreSlider.Value = Math.Clamp(mask.Centre, MaskCentreSlider.Minimum, MaskCentreSlider.Maximum);
+        MaskHueSlider.Value = Math.Clamp(mask.Hue, MaskHueSlider.Minimum, MaskHueSlider.Maximum);
+        MaskSpreadSlider.Value = Math.Clamp(mask.Spread, MaskSpreadSlider.Minimum, MaskSpreadSlider.Maximum);
         MaskWidthSlider.Value = Math.Clamp(mask.Width, MaskWidthSlider.Minimum, MaskWidthSlider.Maximum);
 
         int source = _maskSources.FindIndex(s => s.Equals(mask.Source, StringComparison.Ordinal));
@@ -1718,5 +1739,49 @@ public partial class LayerPanel : UserControl
         MaskAngleValue.Text = $"{MaskAngleSlider.Value:0} \u00B0";
         MaskCentreValue.Text = $"{MaskCentreSlider.Value:0.00}";
         MaskWidthValue.Text = $"{MaskWidthSlider.Value:0.00}";
+        MaskHueValue.Text = $"{MaskHueSlider.Value:0} °";
+        MaskSpreadValue.Text = $"±{MaskSpreadSlider.Value:0} °";
+    }
+
+    /// <summary>
+    /// Tiefen, Mitten, Lichter - drei Stellungen der Regler darueber.
+    ///
+    /// Sie stellen ein und sperren nicht: Wer danach an den Reglern zieht, verliert
+    /// nichts. Die Zahlen sind die ueblichen Drittel mit weicher Kante, gemessen an
+    /// der wahrgenommenen Helligkeit - nicht am linearen Licht, in dem mittleres Grau
+    /// bei 0,18 laege und "Mitten" damit fast alles waere.
+    /// </summary>
+    private void OnMaskZoneClicked(object sender, RoutedEventArgs e)
+    {
+        if (_selected is null || sender is not Button { Tag: string zone }) return;
+
+        var (low, high) = zone switch
+        {
+            "shadows" => (0f, 0.35f),
+            "lights" => (0.65f, 1f),
+            _ => (0.25f, 0.75f),
+        };
+
+        var mask = _selected.Mask;
+
+        mask.Low = low;
+        mask.High = high;
+        mask.Softness = 0.15f;
+
+        _filling = true;
+
+        try
+        {
+            MaskLowSlider.Value = low;
+            MaskHighSlider.Value = high;
+            MaskSoftSlider.Value = 0.15f;
+        }
+        finally
+        {
+            _filling = false;
+        }
+
+        UpdateMaskValues();
+        Raise(interim: false);
     }
 }

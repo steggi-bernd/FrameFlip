@@ -503,6 +503,64 @@
                         <Slider x:Name="MaskSoftSlider" Style="{StaticResource PanelSlider}"
                                 Minimum="0" Maximum="0.5" Value="0.1" SmallChange="0.01" LargeChange="0.05"
                                 ValueChanged="OnMaskSliderChanged" MouseDoubleClick="OnSliderReset" Tag="0.1" />
+
+                        <!--
+                            Tiefen, Mitten, Lichter - die drei Bereiche, nach denen man
+                            tatsaechlich greift.
+
+                            Sie sind nichts weiter als drei Stellungen der Regler
+                            darueber, und genau deshalb stehen sie hier: Wer "nur die
+                            Schatten" will, weiss nicht, dass das "von 0 bis 0,35 mit
+                            weicher Kante" heisst. Danach darf er die Regler trotzdem
+                            anfassen - die Knoepfe stellen ein, sie sperren nicht.
+                        -->
+                        <StackPanel x:Name="MaskZoneRow" Orientation="Horizontal" Margin="0,10,0,0">
+                            <Button Style="{StaticResource OverlayButton}" Tag="shadows"
+                                    Content="{DynamicResource S_MaskShadows}" Click="OnMaskZoneClicked" />
+                            <Button Style="{StaticResource OverlayButton}" Margin="6,0,0,0" Tag="mids"
+                                    Content="{DynamicResource S_MaskMidtones}" Click="OnMaskZoneClicked" />
+                            <Button Style="{StaticResource OverlayButton}" Margin="6,0,0,0" Tag="lights"
+                                    Content="{DynamicResource S_MaskHighlights}" Click="OnMaskZoneClicked" />
+                        </StackPanel>
+                    </StackPanel>
+
+                    <!--
+                        Der Farbbereich: welcher Farbton, und wie weit darum herum.
+
+                        In Grad auf dem Farbkreis, weil ein Farbbereich keine
+                        Helligkeit meint - "blau" ist eine Richtung, kein Punkt. Der
+                        Streifen unter dem Regler zeigt, wo man steht; eine Zahl in
+                        Grad allein koennte niemand lesen.
+                    -->
+                    <StackPanel x:Name="MaskColourBody" Visibility="Collapsed">
+                        <Grid Margin="0,10,0,2">
+                            <TextBlock Text="{DynamicResource S_MaskHue}" Style="{StaticResource PanelLabel}" />
+                            <TextBlock x:Name="MaskHueValue" Style="{StaticResource PanelValue}" />
+                        </Grid>
+                        <Border Height="8" CornerRadius="4" Margin="0,0,0,4">
+                            <Border.Background>
+                                <LinearGradientBrush StartPoint="0,0" EndPoint="1,0">
+                                    <GradientStop Offset="0" Color="#FF0000" />
+                                    <GradientStop Offset="0.167" Color="#FFFF00" />
+                                    <GradientStop Offset="0.333" Color="#00FF00" />
+                                    <GradientStop Offset="0.5" Color="#00FFFF" />
+                                    <GradientStop Offset="0.667" Color="#0000FF" />
+                                    <GradientStop Offset="0.833" Color="#FF00FF" />
+                                    <GradientStop Offset="1" Color="#FF0000" />
+                                </LinearGradientBrush>
+                            </Border.Background>
+                        </Border>
+                        <Slider x:Name="MaskHueSlider" Style="{StaticResource PanelSlider}"
+                                Minimum="0" Maximum="360" Value="0" SmallChange="1" LargeChange="15"
+                                ValueChanged="OnMaskSliderChanged" MouseDoubleClick="OnSliderReset" Tag="0" />
+
+                        <Grid Margin="0,8,0,2">
+                            <TextBlock Text="{DynamicResource S_MaskSpread}" Style="{StaticResource PanelLabel}" />
+                            <TextBlock x:Name="MaskSpreadValue" Style="{StaticResource PanelValue}" />
+                        </Grid>
+                        <Slider x:Name="MaskSpreadSlider" Style="{StaticResource PanelSlider}"
+                                Minimum="0" Maximum="180" Value="30" SmallChange="1" LargeChange="10"
+                                ValueChanged="OnMaskSliderChanged" MouseDoubleClick="OnSliderReset" Tag="30" />
                     </StackPanel>
 
                     <!--

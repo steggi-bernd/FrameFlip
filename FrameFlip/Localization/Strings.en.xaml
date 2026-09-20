@@ -167,6 +167,13 @@
     <sys:String x:Key="S_MaskUnderlying">Brightness below</sys:String>
     <sys:String x:Key="S_MaskPass">Pass</sys:String>
     <sys:String x:Key="S_MaskGradient">Gradient</sys:String>
+    <sys:String x:Key="S_MaskColour">Colour range</sys:String>
+    <sys:String x:Key="S_MaskHue">Hue</sys:String>
+    <sys:String x:Key="S_MaskSpread">Range</sys:String>
+    <sys:String x:Key="S_MaskHintColour">Acts only where this hue sits. Pale colours count for less - to take them in full, pull the white point down.</sys:String>
+    <sys:String x:Key="S_MaskShadows">Shadows</sys:String>
+    <sys:String x:Key="S_MaskMidtones">Midtones</sys:String>
+    <sys:String x:Key="S_MaskHighlights">Highlights</sys:String>
     <sys:String x:Key="S_MaskCryptomatte">Cryptomatte</sys:String>
     <sys:String x:Key="S_CryptoPick">Click the image to choose</sys:String>
     <sys:String x:Key="S_CryptoPickOn">Stop choosing</sys:String>
