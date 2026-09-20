@@ -155,8 +155,11 @@
     <sys:String x:Key="S_GroupHint">Die Gruppe rechnet durch: Ihre Ebenen sehen, was unter ihr liegt. Maske und Deckkraft gelten für alle zusammen.</sys:String>
     <sys:String x:Key="S_SizeMismatch">andere Bildgröße – wird übersprungen</sys:String>
     <sys:String x:Key="S_AdjustmentLayer">Korrektur</sys:String>
-    <sys:String x:Key="S_ToolsTargetImage">Wirkt auf das ganze Bild</sys:String>
-    <sys:String x:Key="S_ToolsTargetLayer">Wirkt auf: {0}</sys:String>
+    <sys:String x:Key="S_ToolsTargetImage">Ganzes Bild</sys:String>
+    <sys:String x:Key="S_ToolsTargetImageHint">Die Regler wirken auf das fertige Bild - nach allen Ebenen. Masken koennen das nicht begrenzen.</sys:String>
+    <sys:String x:Key="S_ToolsTargetNoLayer">Ebene</sys:String>
+    <sys:String x:Key="S_ToolsTargetLayerHint">Die Regler wirken nur auf die gewaehlte Ebene. Eine Maske an ihr begrenzt dann, WO die Korrektur gilt.</sys:String>
+    <sys:String x:Key="S_ToolsTargetLayer">Ebene: {0}</sys:String>
     <sys:String x:Key="S_AdjustmentHint">Die Werkzeuge unten gehören jetzt dieser Ebene. Mit Schnittmaske (↳) wirkt sie nur auf die eine Ebene darunter.</sys:String>
     <sys:String x:Key="S_ClipLayer">Nur auf die Ebene darunter wirken (Schnittmaske)</sys:String>
 

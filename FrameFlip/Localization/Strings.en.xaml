@@ -155,8 +155,11 @@
     <sys:String x:Key="S_GroupHint">A group passes through: its layers see what lies below it. Mask and opacity apply to all of them together.</sys:String>
     <sys:String x:Key="S_SizeMismatch">different size – skipped</sys:String>
     <sys:String x:Key="S_AdjustmentLayer">Adjustment</sys:String>
-    <sys:String x:Key="S_ToolsTargetImage">Acts on the whole image</sys:String>
-    <sys:String x:Key="S_ToolsTargetLayer">Acts on: {0}</sys:String>
+    <sys:String x:Key="S_ToolsTargetImageHint">The sliders act on the finished picture - after every layer. Masks cannot scope that.</sys:String>
+    <sys:String x:Key="S_ToolsTargetNoLayer">Layer</sys:String>
+    <sys:String x:Key="S_ToolsTargetLayerHint">The sliders act on the selected layer only. A mask on it then scopes WHERE the correction applies.</sys:String>
+    <sys:String x:Key="S_ToolsTargetImage">Whole picture</sys:String>
+    <sys:String x:Key="S_ToolsTargetLayer">Layer: {0}</sys:String>
     <sys:String x:Key="S_AdjustmentHint">The tools below now belong to this layer. With a clipping mask (↳) it acts on the one layer beneath it only.</sys:String>
     <sys:String x:Key="S_ClipLayer">Affect only the layer below (clipping mask)</sys:String>
 

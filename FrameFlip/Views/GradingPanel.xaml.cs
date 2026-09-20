@@ -126,17 +126,52 @@ public partial class GradingPanel : UserControl
     /// die eine Sache an dieser Oberflaeche, die man uebersehen kann, und deshalb
     /// steht sie ueber allem und ausserhalb der Bildlaufflaeche.
     /// </summary>
+    /// <summary>
+    /// Stellt den Schalter ein und sagt, worauf gerechnet wird.
+    ///
+    /// <paramref name="layer"/> ist null, wenn gar keine Ebene gewaehlt ist - dann
+    /// gibt es nichts zu waehlen. <paramref name="locked"/> gilt fuer eine
+    /// Einstellungsebene: Sie BESTEHT aus ihrer Korrektur, und "wirkt auf das ganze
+    /// Bild" waere bei ihr keine zweite Moeglichkeit, sondern ein Widerspruch.
+    /// </summary>
+    public void ShowTarget(string? layer, bool onLayer, bool locked)
+    {
+        _filling = true;
+
+        try
+        {
+            TargetLayerButton.Content = layer is null
+                ? Strings.T("S_ToolsTargetNoLayer")
+                : Strings.T("S_ToolsTargetLayer", layer);
+
+            TargetLayerButton.IsEnabled = layer is not null;
+            TargetImageButton.IsEnabled = !locked;
+
+            TargetLayerButton.IsChecked = onLayer;
+            TargetImageButton.IsChecked = !onLayer;
+        }
+        finally
+        {
+            _filling = false;
+        }
+
+        Target = onLayer ? layer : null;
+    }
+
+    /// <summary>Gewaehlt wurde ein anderes Ziel - wahr heisst "die Ebene".</summary>
+    public event Action<bool>? TargetChanged;
+
+    private void OnTargetChanged(object sender, RoutedEventArgs e)
+    {
+        if (_filling || !IsLoaded) return;
+
+        TargetChanged?.Invoke(ReferenceEquals(sender, TargetLayerButton));
+    }
+
     public string? Target
     {
         set
         {
-            TargetText.Text = value is null
-                ? Strings.T("S_ToolsTargetImage")
-                : Strings.T("S_ToolsTargetLayer", value);
-
-            TargetText.Foreground = (System.Windows.Media.Brush)FindResource(
-                value is null ? "MutedBrush" : "AccentBrush");
-
             // Zwei Gruppen gelten dem fertigen Bild. Die oertlichen Werkzeuge, weil
             // eine Einstellungsebene mitten im Stapel punktweise gerechnet wird und es
             // dort noch gar keine Nachbarschaft gibt. Vignette und Korn, weil sie zur

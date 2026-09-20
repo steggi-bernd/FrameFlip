@@ -128,9 +128,33 @@ public partial class LayerPanel : UserControl
     /// </summary>
     public event Action<ImageLayer?>? Editing;
 
-    /// <summary>Die gewaehlte Ebene, wenn es eine Einstellungsebene ist.</summary>
+    /// <summary>
+    /// Ob die Farbwerkzeuge der GEWAEHLTEN EBENE gelten statt dem ganzen Bild.
+    ///
+    /// Eine Einstellungsebene besteht aus ihrer Korrektur - bei ihr gilt es immer.
+    /// Bei allen anderen ist es eine Wahl, und sie wird im Farbstreifen getroffen.
+    /// </summary>
+    public bool OnLayer { get; set; }
+
+    /// <summary>
+    /// Die Ebene, der die Farbwerkzeuge gerade gehoeren. Null heisst: das ganze Bild.
+    ///
+    /// Dass hier lange nur Einstellungsebenen standen, war der Grund, warum eine
+    /// Maske auf einem Bild nichts bewirkte: Eine Bildebene konnte gar keine eigenen
+    /// Werkzeuge bekommen. Man stellte etwas ein, es landete in der Korrektur des
+    /// ganzen Bildes - die laeuft NACH dem Zusammensetzen -, und keine Maske der Welt
+    /// haette sie noch begrenzen koennen.
+    /// </summary>
     public ImageLayer? EditedLayer
-        => _selected?.Content == LayerContent.Adjustment ? _selected : null;
+        => _selected is not null && (OnLayer || _selected.Content == LayerContent.Adjustment)
+            ? _selected
+            : null;
+
+    /// <summary>Was der Farbstreifen ueber sein Ziel wissen muss.</summary>
+    public (string? Layer, bool OnIt, bool Locked) TargetState
+        => (_selected?.Name,
+            EditedLayer is not null,
+            _selected?.Content == LayerContent.Adjustment);
 
     /// <summary>
     /// Die gewaehlte Ebene, gleich welcher Art. Null, wenn keine gewaehlt ist.

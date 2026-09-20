@@ -384,6 +384,35 @@ public static class LayerPanelInvariants
         Check.That(soft.Visibility != Visibility.Visible,
                    "die Weichheit nicht - dort sind es Schwarz- und Weisspunkt");
 
+        // Worauf die WERKZEUGE wirken - und das war die Stelle, an der alles haengen
+        // blieb.
+        //
+        // Der Farbstreifen band sich nur an Einstellungsebenen. Eine Bildebene konnte
+        // deshalb gar keine eigenen Werkzeuge bekommen: Man stellte etwas ein, es
+        // landete in der Korrektur des ganzen Bildes - die laeuft NACH dem
+        // Zusammensetzen -, und keine Maske haette sie noch begrenzen koennen. Die
+        // Maske sass an der Ebene, die Farbe am Bild, und beide sahen richtig aus.
+        Check.That(layer.Content != LayerContent.Adjustment,
+                   "geprueft wird an einer Bildebene - um die ging es");
+
+        Check.That(panel.EditedLayer is null,
+                   "ohne Zutun gehoeren die Werkzeuge dem ganzen Bild");
+
+        var state = panel.TargetState;
+
+        Check.That(state.Layer == layer.Name && !state.OnIt && !state.Locked,
+                   "und der Schalter bietet die Ebene an",
+                   $"{state.Layer} / {state.OnIt} / {state.Locked}");
+
+        panel.OnLayer = true;
+
+        Check.That(ReferenceEquals(panel.EditedLayer, layer),
+                   "umgeschaltet gehoeren sie der Ebene - erst damit greift eine Maske");
+
+        Check.That(panel.TargetState.OnIt, "und der Schalter zeigt es");
+
+        panel.OnLayer = false;
+
         // Worauf die Maske wirkt.
         //
         // Eine NEU gewaehlte Maske auf einer Bildebene begrenzt die Korrektur, nicht

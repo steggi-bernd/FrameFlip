@@ -134,6 +134,7 @@ public sealed partial class AtelierPage : UserControl
         Properties.FocusWanted += OnFocusWanted;
         Properties.Show(AtelierTool.Move);
         Layers.Editing += Bind;
+        Tools.TargetChanged += OnTargetChosen;
         Layers.Thumbnail = Thumbnail;
 
         Placement.Changed += OnPlacementDragged;
@@ -354,7 +355,7 @@ public sealed partial class AtelierPage : UserControl
             _finalAdjustments = Tools.Adjustments;
             _finalGrading = Tools.Prepared;
 
-            Tools.Target = null;
+            ShowTools();
             return;
         }
 
@@ -362,7 +363,30 @@ public sealed partial class AtelierPage : UserControl
         layer.Tools = Snapshot();
         layer.Adjustments = Tools.Adjustments;
 
-        Tools.Target = layer.Name;
+        ShowTools();
+    }
+
+    /// <summary>Sagt dem Farbstreifen, worauf er gerade wirkt.</summary>
+    private void ShowTools()
+    {
+        var (name, onIt, locked) = Layers.TargetState;
+
+        Tools.ShowTarget(name, onIt, locked);
+    }
+
+    /// <summary>
+    /// Im Farbstreifen wurde ein anderes Ziel gewaehlt.
+    ///
+    /// Neu gebunden und neu gerechnet: Was vorher am Bild stand, bleibt am Bild, und
+    /// was an der Ebene steht, kommt jetzt zum Vorschein. Die Werte wandern NICHT mit
+    /// - sonst haette ein Umschalten still eine Korrektur verschoben.
+    /// </summary>
+    private void OnTargetChosen(bool onLayer)
+    {
+        Layers.OnLayer = onLayer;
+
+        Bind(Layers.EditedLayer);
+        Refresh(interim: false, recompose: true);
     }
 
     /// <summary>

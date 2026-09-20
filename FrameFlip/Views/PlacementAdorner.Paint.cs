@@ -79,16 +79,28 @@ public sealed partial class PlacementAdorner
     /// </summary>
     public void Paint(PaintedMask? mask, int canvasWidth, int canvasHeight, bool uniform)
     {
+        // Wenn sich nichts geaendert hat, darf sich auch nichts neu aufbauen.
+        //
+        // Diese Stelle wird bei JEDEM gezeichneten Bild gerufen - die Anfasser
+        // ziehen nach dem Zusammensetzen nach, und das geschieht waehrend eines
+        // Striches sechzig Mal in der Sekunde. Blind _washStale zu setzen hiess, den
+        // ganzen Schleier jedes zweite Bild vollstaendig neu zu schreiben und damit
+        // genau die Teilflaeche wieder wegzuwerfen, die den Pinsel schnell macht.
+        bool same = ReferenceEquals(_mask, mask) &&
+                    _canvasWidth == canvasWidth && _canvasHeight == canvasHeight &&
+                    _uniform == uniform;
+
         _mask = mask;
         _canvasWidth = canvasWidth;
         _canvasHeight = canvasHeight;
         _uniform = uniform;
-        _washStale = true;
 
-        // Faengt auch OHNE Maske, solange jemand eine liefern kann: Sonst gaebe es
-        // keinen ersten Strich, mit dem sie entstehen koennte - und der Ring am
-        // Zeiger waere auch nicht zu sehen.
         IsHitTestVisible = mask is not null || MaskWanted is not null;
+
+        if (same) return;
+
+        _washStale = true;
+        _dirtyX1 = -1;
 
         InvalidateVisual();
     }

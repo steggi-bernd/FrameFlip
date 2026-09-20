@@ -21,9 +21,26 @@
         <Border x:Name="TargetBar" Grid.Row="0" Padding="14,8"
                 Background="{StaticResource OverlayBackground}"
                 BorderBrush="{StaticResource PanelBorder}" BorderThickness="0,0,0,1">
-            <TextBlock x:Name="TargetText" FontSize="10" TextTrimming="CharacterEllipsis"
-                       Foreground="{StaticResource MutedBrush}"
-                       Text="{DynamicResource S_ToolsTargetImage}" />
+            <!--
+                Zwei Knoepfe statt einer Anzeige.
+
+                Angezeigt wurde es schon lange - aber die Wahl traf der Streifen
+                nebenan, und nur fuer Einstellungsebenen. Eine Bildebene konnte
+                deshalb ueberhaupt keine eigenen Farbwerkzeuge bekommen: Man stellte
+                etwas ein, es landete in der Korrektur des ganzen Bildes, und jede
+                Maske an der Ebene lief ins Leere. Wer eine Maske malt, um DORT etwas
+                zu aendern, braucht diesen Schalter.
+            -->
+            <StackPanel Orientation="Horizontal">
+                <RadioButton x:Name="TargetImageButton" Style="{StaticResource OverlayToggle}"
+                             Content="{DynamicResource S_ToolsTargetImage}"
+                             ToolTip="{DynamicResource S_ToolsTargetImageHint}"
+                             Checked="OnTargetChanged" />
+                <RadioButton x:Name="TargetLayerButton" Style="{StaticResource OverlayToggle}"
+                             Margin="6,0,0,0" MaxWidth="190"
+                             ToolTip="{DynamicResource S_ToolsTargetLayerHint}"
+                             Checked="OnTargetChanged" />
+            </StackPanel>
         </Border>
 
     <!--
