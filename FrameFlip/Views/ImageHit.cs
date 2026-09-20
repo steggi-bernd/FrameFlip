@@ -28,28 +28,70 @@ public static class ImageHit
     {
         x = y = 0;
 
-        if (pixelWidth <= 0 || pixelHeight <= 0) return false;
-        if (elementWidth <= 0 || elementHeight <= 0) return false;
-
-        double scale = 1.0;
-
-        if (uniform)
+        if (!Exact(pointX, pointY, elementWidth, elementHeight,
+                   pixelWidth, pixelHeight, uniform, out double fx, out double fy))
         {
-            // Der kleinere der beiden Faktoren: Das Bild passt ganz hinein, und in
-            // der anderen Richtung bleibt Rand.
-            scale = Math.Min(elementWidth / pixelWidth, elementHeight / pixelHeight);
-            if (scale <= 0) return false;
+            return false;
         }
-
-        double left = (elementWidth - pixelWidth * scale) / 2;
-        double top = (elementHeight - pixelHeight * scale) / 2;
 
         // Abrunden und nicht schneiden: Bei einem Punkt links des Bildes ergaebe das
         // Schneiden eine Null, und der Klick zaehlte als Treffer auf die erste Spalte.
-        x = (int)Math.Floor((pointX - left) / scale);
-        y = (int)Math.Floor((pointY - top) / scale);
+        x = (int)Math.Floor(fx);
+        y = (int)Math.Floor(fy);
 
         return x >= 0 && y >= 0 && x < pixelWidth && y < pixelHeight;
+    }
+
+    /// <summary>
+    /// Der Massstab: wieviele Punkte der Flaeche ein Bildpunkt einnimmt.
+    ///
+    /// Er steht hier und nicht an den drei Stellen, die ihn brauchen. Dreimal
+    /// dieselbe Formel ist dreimal dieselbe Gelegenheit, sie auseinanderlaufen zu
+    /// lassen - und wenn Klick und Zeichnung auseinanderlaufen, zieht man an einer
+    /// Ecke, die nicht dort ist, wo sie aussieht. Genau danach sah der alte Eintrag
+    /// "der Rahmen sitzt an der falschen Stelle" aus.
+    ///
+    /// Null heisst: es gibt keinen brauchbaren Massstab, also auch keine Abbildung.
+    /// </summary>
+    public static double Scale(double elementWidth, double elementHeight,
+                               int pixelWidth, int pixelHeight, bool uniform)
+    {
+        if (pixelWidth <= 0 || pixelHeight <= 0) return 0;
+        if (elementWidth <= 0 || elementHeight <= 0) return 0;
+
+        // Ohne Einpassung steht ein Bildpunkt auf einem Punkt - hundert Prozent, und
+        // das Bild sitzt mittig, notfalls ueber den Rand hinaus.
+        if (!uniform) return 1.0;
+
+        // Der kleinere der beiden Faktoren: Das Bild passt ganz hinein, und in der
+        // anderen Richtung bleibt Rand.
+        double scale = Math.Min(elementWidth / pixelWidth, elementHeight / pixelHeight);
+
+        return scale > 0 ? scale : 0;
+    }
+
+    /// <summary>
+    /// Wie <see cref="PixelAt"/>, aber ungerundet und OHNE Grenze.
+    ///
+    /// Gebraucht beim Ziehen: Eine Ebene darf ueber den Rand hinauslaufen, und die
+    /// Maus darf dabei aus dem Bild geraten. Ein Treffertest waere dort die falsche
+    /// Frage - es wird nicht gefragt, worauf gezeigt wird, sondern wohin gezogen.
+    /// </summary>
+    public static bool Exact(double pointX, double pointY,
+                             double elementWidth, double elementHeight,
+                             int pixelWidth, int pixelHeight,
+                             bool uniform,
+                             out double x, out double y)
+    {
+        x = y = 0;
+
+        double scale = Scale(elementWidth, elementHeight, pixelWidth, pixelHeight, uniform);
+        if (scale <= 0) return false;
+
+        x = (pointX - (elementWidth - pixelWidth * scale) / 2) / scale;
+        y = (pointY - (elementHeight - pixelHeight * scale) / 2) / scale;
+
+        return true;
     }
 
     /// <summary>
@@ -67,16 +109,8 @@ public static class ImageHit
     {
         x = y = 0;
 
-        if (pixelWidth <= 0 || pixelHeight <= 0) return false;
-        if (elementWidth <= 0 || elementHeight <= 0) return false;
-
-        double scale = 1.0;
-
-        if (uniform)
-        {
-            scale = Math.Min(elementWidth / pixelWidth, elementHeight / pixelHeight);
-            if (scale <= 0) return false;
-        }
+        double scale = Scale(elementWidth, elementHeight, pixelWidth, pixelHeight, uniform);
+        if (scale <= 0) return false;
 
         x = (elementWidth - pixelWidth * scale) / 2 + imageX * scale;
         y = (elementHeight - pixelHeight * scale) / 2 + imageY * scale;

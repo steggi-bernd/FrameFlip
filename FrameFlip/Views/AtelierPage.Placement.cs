@@ -61,8 +61,21 @@ public partial class AtelierPage
             !_sources.TryGetValue(layer.Source, out var source))
         {
             Placement.Track(null, 0, 0, 0, 0, false);
+
+            if (!_dragHooked) _placing = null;
+
             return;
         }
+
+        // Wem der Rahmen gehoert - gemerkt, solange kein Zug laeuft.
+        //
+        // Waehrend eines Zuges NICHT: Diese Stelle laeuft je Bildwiederholung, und
+        // die Auswahl kann sich dazwischen verschieben - der Streifen baut sich neu
+        // auf und setzt sie auf die oberste Ebene, wenn eine Ebene dazukommt oder
+        // verschwindet. Der Zug muesste dann mitten in der Bewegung die Ebene
+        // wechseln. Genau das war "Ziehen wirkt auf die falsche Ebene": Man fasste
+        // eine an und bewegte eine andere.
+        if (!_dragHooked) _placing = layer;
 
         // Die Leinwand ist das zusammengesetzte Bild, nicht die Ebene: Die
         // Platzierung rechnet in Anteilen davon.
@@ -215,6 +228,15 @@ public partial class AtelierPage
     /// <summary>Ein Strich, der noch nicht gerechnet ist.</summary>
     private bool _pendingPaint;
 
+    /// <summary>Die Ebene, der der Greifrahmen gerade gehoert. Null: keiner zu sehen.</summary>
+    private ImageLayer? _placing;
+
+    /// <summary>
+    /// Wen der Greifrahmen bewegt. Oeffentlich fuer die Probe - der Zug und der
+    /// Rahmen muessen dieselbe Ebene meinen, und das laesst sich sonst nur ansehen.
+    /// </summary>
+    public ImageLayer? Placing => _placing;
+
     /// <summary>Die zuletzt gezogene Lage, die noch nicht gerechnet ist.</summary>
     private LayerTransform? _pendingPlace;
 
@@ -241,7 +263,11 @@ public partial class AtelierPage
     /// </summary>
     private void OnPlacementDragged(LayerTransform place, bool interim)
     {
-        var layer = Layers.Selection;
+        // Die Ebene, fuer die der Rahmen gebaut wurde - siehe ShowPlacement. Die
+        // AKTUELLE Auswahl zu nehmen war der Fehler: Sie kann sich waehrend des
+        // Zuges verschoben haben, und dann bewegt sich etwas anderes als das, was
+        // unter dem Zeiger liegt.
+        var layer = _placing ?? Layers.Selection;
         if (layer is null) return;
 
         layer.Place = place;

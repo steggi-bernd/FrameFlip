@@ -620,7 +620,17 @@ public partial class LayerPanel : UserControl
     public void SetVisible(ImageLayer layer, bool on)
     {
         layer.Visible = on;
-        _selected = layer;
+
+        // Die AUSWAHL bleibt, wo sie war. Hier stand frueher _selected = layer, und
+        // das war ein stiller Nebeneffekt mit weitem Ausschlag: Ein Klick aufs Auge
+        // waehlte die Zeile mit aus, und damit sprang der Greifrahmen auf eine andere
+        // Ebene - man fasste eine an und bewegte eine andere. Seit die Farbwerkzeuge
+        // einer Ebene gehoeren koennen, haette derselbe Klick auch noch das Ziel der
+        // Regler verschoben.
+        //
+        // Ein- und Ausblenden ist eine Aussage ueber die Ebene, keine darueber, womit
+        // man weiterarbeiten will. Rebuild haelt die Auswahl von sich aus fest,
+        // solange die Ebene noch im Stapel steht.
 
         // Ein neuer Pass kann dadurch gebraucht werden, der noch nicht gelesen ist -
         // deshalb die vollstaendige Meldung und nicht die vorlaeufige.

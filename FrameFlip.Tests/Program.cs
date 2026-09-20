@@ -21,6 +21,7 @@ static int RunAll()
     ExportInvariants.Run();
     ExportInvariants.RequestMath();
     PlacementInvariants.Run();
+    ImageHitInvariants.Run();
     GovernorInvariants.Run();
     ImagingInvariants.Run();
     ViewTransformInvariants.Run();

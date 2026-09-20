@@ -30,6 +30,7 @@ public static class LayerPanelInvariants
             GroupsNestInTheList(panel);
             ListReadsTopDown(panel);
             DraggingReordersTheStack(panel);
+            TheEyeChoosesNothing(panel);
         });
     }
 
@@ -649,6 +650,53 @@ public static class LayerPanelInvariants
                                  .First(b => (string)b.Tag == tag);
 
         button.RaiseEvent(new RoutedEventArgs(ButtonBase.ClickEvent));
+    }
+
+    /// <summary>
+    /// Das Auge blendet ein und aus - und waehlt NICHTS aus.
+    ///
+    /// In SetVisible stand frueher `_selected = layer`, und das war ein stiller
+    /// Nebeneffekt mit weitem Ausschlag: Ein Klick aufs Auge zog die Auswahl mit,
+    /// damit sprang der Greifrahmen auf eine andere Ebene - man fasste eine an und
+    /// bewegte eine andere. Genau so sah der alte Eintrag "Ziehen wirkt auf die
+    /// falsche Ebene" aus. Seit die Farbwerkzeuge einer Ebene gehoeren koennen,
+    /// haette derselbe Klick ausserdem das Ziel der Regler verschoben.
+    ///
+    /// Ein- und Ausblenden ist eine Aussage ueber die Ebene, keine darueber, womit
+    /// man weiterarbeiten will.
+    /// </summary>
+    private static void TheEyeChoosesNothing(LayerPanel panel)
+    {
+        Check.Group("Das Auge blendet um, ohne die Auswahl mitzunehmen");
+
+        panel.AddAdjustment();
+
+        var chosen = panel.Selection;
+
+        Check.That(chosen is not null, "eine Ebene ist gewaehlt");
+        if (chosen is null) return;
+
+        var other = panel.Stack.Layers.FirstOrDefault(l => !ReferenceEquals(l, chosen));
+
+        Check.That(other is not null, "und es gibt eine zweite, die nicht gewaehlt ist");
+        if (other is null) return;
+
+        bool was = other.Visible;
+
+        panel.SetVisible(other, !was);
+
+        Check.That(other.Visible == !was, "das Auge blendet sie um",
+                   $"{was} -> {other.Visible}");
+
+        Check.That(ReferenceEquals(panel.Selection, chosen),
+                   "und die Auswahl bleibt, wo sie war",
+                   panel.Selection?.Name ?? "keine");
+
+        // Auch das eigene Auge darf die Auswahl nicht erst herstellen.
+        panel.SetVisible(other, was);
+
+        Check.That(ReferenceEquals(panel.Selection, chosen),
+                   "auch beim Zurueckblenden");
     }
 
     private static int IndexOf(ComboBox box, string key)

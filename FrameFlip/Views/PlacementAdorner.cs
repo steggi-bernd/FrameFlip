@@ -369,9 +369,8 @@ public sealed partial class PlacementAdorner : FrameworkElement
     /// </summary>
     private double Reach()
     {
-        double scale = _uniform && _canvasWidth > 0 && _canvasHeight > 0
-            ? Math.Min(ActualWidth / _canvasWidth, ActualHeight / _canvasHeight)
-            : 1.0;
+        double scale = ImageHit.Scale(ActualWidth, ActualHeight,
+                                      _canvasWidth, _canvasHeight, _uniform);
 
         return scale <= 0 ? GripReach : GripReach / scale;
     }
@@ -381,23 +380,21 @@ public sealed partial class PlacementAdorner : FrameworkElement
     {
         x = y = 0;
 
-        if (_canvasWidth <= 0 || _canvasHeight <= 0) return false;
-
-        double scale = 1.0;
-
-        if (_uniform)
-        {
-            scale = Math.Min(ActualWidth / _canvasWidth, ActualHeight / _canvasHeight);
-            if (scale <= 0) return false;
-        }
-
-        double left = (ActualWidth - _canvasWidth * scale) / 2;
-        double top = (ActualHeight - _canvasHeight * scale) / 2;
-
+        // Ueber denselben Helfer wie das Zeichnen - siehe ImageHit.Scale. Hier stand
+        // frueher eine eigene Rechnung mit derselben Formel, und zwei Fassungen
+        // derselben Abbildung laufen frueher oder spaeter auseinander.
+        //
         // NICHT auf das Bild begrenzt: Beim Ziehen darf eine Ebene ueber den Rand
         // hinauslaufen, und die Maus darf dabei aus dem Bild geraten.
-        x = (float)((point.X - left) / scale);
-        y = (float)((point.Y - top) / scale);
+        if (!ImageHit.Exact(point.X, point.Y, ActualWidth, ActualHeight,
+                            _canvasWidth, _canvasHeight, _uniform,
+                            out double ex, out double ey))
+        {
+            return false;
+        }
+
+        x = (float)ex;
+        y = (float)ey;
 
         return true;
     }
