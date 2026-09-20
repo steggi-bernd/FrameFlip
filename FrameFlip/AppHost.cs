@@ -27,7 +27,8 @@ public sealed class AppHost : IDisposable
 
     /// <summary>Nimmt Meldungen des Blender-Addons entgegen. Null, wenn abgeschaltet.</summary>
     private Bridge.RenderMonitor? _renderMonitor;
-    private Web.WatchService? _watch;
+    private IAppWatchService? _watch;
+    private readonly AppWatchSources _watchSources;
 
     /// <summary>Besitzt die optionale Verbindung zum Handy.</summary>
     private readonly AppRemoteController _remote;
@@ -43,6 +44,13 @@ public sealed class AppHost : IDisposable
         _createViewer = CreateViewer;
         _load = new AppLoadController(() => _settings,
             AppLoadSources.Default(() => _viewer is { } viewer ? new AppViewerLoadTarget(viewer) : null));
+        _watchSources = new AppWatchSources((key, relay) =>
+        {
+            var newest = new Web.NewestFrame(() => _renderMonitor?.Job,
+                                             FrameDecoderRegistry.CreateDefault());
+            return new AppWatchService(new Web.WatchService(key, relay, _renderMonitor,
+                                        () => _load.LastSnapshot, newest.Path));
+        });
         // Die Verbindung liest Einstellungen und Lastwerte weiter live aus dem Host.
         _remote = new AppRemoteController(() => _settings, new AppRemoteSources(
             () => _renderMonitor is not null,
@@ -60,7 +68,7 @@ public sealed class AppHost : IDisposable
                 Views.AtelierPage.Workers = () => Math.Clamp(_load.ViewerDecoderThreads, 1, 16);
                 return createMain?.Invoke() ?? new MainWindow(_renderMonitor, () => _remote.State,
                     ShowSettings, OpenFile, ShowPairing, _settings, settings => SettingsStore.Save(settings),
-                    ApplySettings, () => _settings, () => _watch, RenewWatchLink, SetWatchCode);
+                    ApplySettings, () => _settings, () => Watch, RenewWatchLink, SetWatchCode);
             },
             createSettings ?? (() => new SettingsWindow(_settings, ApplySettings, () => _remote.State)),
             createPairing ?? (() => new PairingWindow(_settings, ApplySettings, () => _remote.State)),
@@ -76,6 +84,12 @@ public sealed class AppHost : IDisposable
     internal AppHost(AppRemoteSources sources, Action remoteChanged) : this(null, null, null)
     {
         _remote = new AppRemoteController(() => _settings, sources, remoteChanged);
+    }
+
+    internal AppHost(AppWatchSources sources, AppLoadSources? loadSources = null) : this(null, null, null)
+    {
+        _watchSources = sources;
+        if (loadSources is not null) _load = new AppLoadController(() => _settings, loadSources);
     }
 
     internal AppHost(AppLoadSources sources, Func<ViewerOpenRequest, int, ViewerWindow>? createViewer = null) : this(null, null, null)
@@ -153,14 +167,7 @@ public sealed class AppHost : IDisposable
 
         var key = WatchKeyForSettings();
 
-        var newest = new Web.NewestFrame(() => _renderMonitor?.Job,
-                                         Decoding.FrameDecoderRegistry.CreateDefault());
-
-        // newest.Path statt des Objekts: Der Dienst braucht nur den Pfad, und die
-        // Entkopplung macht ihn pruefbar, ohne dass ein Pruefstand je die Merkliste
-        // des Benutzers anfassen muesste.
-        _watch = new Web.WatchService(key, _settings.RelayHost, _renderMonitor,
-                                      () => _load.LastSnapshot, newest.Path);
+        _watch = _watchSources.Create(key, _settings.RelayHost);
 
         _watch.Start();
     }
@@ -221,7 +228,7 @@ public sealed class AppHost : IDisposable
     }
 
     /// <summary>Der Dienst hinter der Zuschauerseite - oder null, wenn er nicht laeuft.</summary>
-    public Web.WatchService? Watch => _watch;
+    public Web.WatchService? Watch => _watch?.Service;
 
     /// <summary>
     /// Ein- und ausschalten, ohne das Programm neu zu starten.

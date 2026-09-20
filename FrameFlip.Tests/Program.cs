@@ -14,6 +14,12 @@ static int RunAll()
 
     LoadDictionaries();
 
+    if (Environment.GetCommandLineArgs().Contains("--watch-lifecycle"))
+    {
+        WatchLifecycleInvariants.Run();
+        return Check.Report();
+    }
+
     ZoomInvariants.Run();
     BufferInvariants.Run();
     LayoutRegression.Run();
@@ -65,6 +71,7 @@ static int RunAll()
     RemoteInvariants.Run();
     RelayClientInvariants.Run();
     WatchInvariants.Run();
+    WatchLifecycleInvariants.Run();
     PaceInvariants.Run();
     ReadinessInvariants.Run();
     MachineInvariants.Run();
