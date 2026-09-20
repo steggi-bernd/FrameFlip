@@ -174,11 +174,11 @@ here so that they do not get folded into a redesign and disappear:
 |---|---|---|
 | 1 | ~~Cut-out PNGs show pixelated fog in the transparent areas~~ | **fixed**, and not where it first looked. Two separate defects had to be closed before it went away, and the second one had been hiding the first: an image layer the same size as the picture ignored its own alpha, **and** the picture itself - the bottom layer - is a *pass*, for which the composer deliberately does not apply coverage, because in an EXR alpha zero means "no ray hit here" while the colour beside it is real light. A PNG opened as the picture was therefore unmatted, and under the matte most files carry whatever was left in the buffer. A third path made the fix invisible: a single unaltered layer is passed straight through rather than copied, so nobody applied a matte on that route either. Measured on one file: 83.78 steps of neighbour noise as the picture, 0.00 as a layer. |
 | 2 | ~~Dragging in the picture lags far behind the mouse~~ | **fixed.** It recomputed once per mouse *message* rather than once per frame, so the queue backed up and the pointer ran away from the picture. |
-| 3 | The placement frame sits in the wrong place | open — comes with the Move tool, where the frame belongs to the tool rather than to the selection |
-| 4 | Dragging affects the wrong layer, or none | open — same: the mode is the fix, not a patch |
+| 3 | ~~The placement frame sits in the wrong place~~ | **fixed.** The Move tool gave the frame an owner, and a later pass found why it could still drift: the mapping between mouse and picture existed **three times** — once for clicks, once for drawing, once for the grab radius. Three copies of one formula are three chances to let them diverge, and when click and drawing diverge you pull a corner that is not where it looks. They now all ask `ImageHit.Scale` / `ImageHit.Exact`. The mapping had no test at all until then; it has 106 now. |
+| 4 | ~~Dragging affects the wrong layer, or none~~ | **fixed**, and it had two causes rather than one. The mode fixed the first. The second was a side effect nobody would look for: `SetVisible` also *selected* the layer, so clicking an eye moved the frame to a different layer — you grabbed one and moved another. The third was that the drag handler re-read the current selection on every message instead of using the layer the frame was built for; the selection can shift mid-drag because the strip rebuilds itself per frame. |
 | 5 | ~~Reopening shows no images until one is added~~ | **fixed.** The recipe was remembered, the picture was not; the Atelier now brings both back the first time it is looked at. |
-| 6 | A newly added layer shows as hidden, and the eye toggles the wrong way | probably a consequence of 1: a layer whose transparent areas covered everything in black looks like a layer that does nothing. To be re-checked against the fixed build. |
-| 7 | Some PNGs do not appear at all | all fourteen test files now read and compose correctly. Same suspicion as 6 — to be re-checked. |
+| 6 | ~~A newly added layer shows as hidden, and the eye toggles the wrong way~~ | **fixed**, and it was a consequence of the canvas gap rather than of the eye: with no *visible* pass layer nobody set a canvas size, so nothing composed at all and every layer looked inert. New layers start visible by default, and the eye uses `Click` with `IsChecked` set before the handler is attached, so it cannot fire on a rebuild. What it *did* do wrong was carry the selection with it — see 4. |
+| 7 | ~~Some PNGs do not appear at all~~ | **fixed.** All fourteen test files read and compose correctly, and the two causes behind it are closed: the missing canvas size (see 6) and the pass-through shortcut, which returned a single "unaltered" layer without applying its matte. `IsNeutral` now also counts the layer's own tools, so a layer carrying a curve is no longer waved through unrendered. |
 
 Also fixed while in there: **dropping a file on the empty Atelier did nothing**, because
 the handler required an open picture — which is what the person was trying to open. The
@@ -285,6 +285,27 @@ the tool list*, not a place you go.
 Steps 1 and 2 are worth doing whatever happens to the rest. Step 3 is the one that
 changes how the program feels. Step 4 is comfort, and comfort is worth less than a
 mouse that does what it looks like it does.
+
+### Where this stands
+
+Steps 1 to 5 are built. Step 6 is half built: the matte switch and dither are in,
+displacement and pixel sorting are not (see `Atelier-Glitch.md`). Step 7 was not chosen.
+
+Three things arrived alongside them that are not in the list above, because they only
+became necessary once masks could be drawn:
+
+- **A colour-range mask.** The question a luminance mask cannot answer — sky and skin
+  can be equally bright. Measured as hue on the colour wheel, reading the *backdrop*
+  rather than the layer itself, so a white fill has something to select and a hue shift
+  does not pull its own mask out from under itself.
+- **What a mask scopes.** A mask used to make opacity local, always. Paint a spot on
+  your picture to brighten it, and everything *except* the spot disappeared. A mask can
+  now say whether it limits *visibility* (right for a glow, a watermark) or *colour*
+  (right for the picture — as if a copy of the layer sat on top showing only that area).
+- **Who the colour tools belong to.** They bound only to adjustment layers, so a picture
+  layer could not own tools at all: you set something, it landed in the whole-picture
+  correction — which runs *after* compositing — and no mask could reach it. The target
+  bar above the sliders is a switch now.
 
 Steps 5 and 6 are the only ones that add something the program cannot do at all today, and
 the gallery

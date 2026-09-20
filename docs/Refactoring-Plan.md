@@ -3,7 +3,49 @@
 Dieser Fahrplan hält die Reihenfolge und den erreichten Stand der Strukturarbeit
 fest. Jeder Schnitt baut auf einem getesteten Sicherheits- und Funktionsstand auf.
 
-## Stand am 9. September 2026
+**Priorität nach Nutzerentscheidung vom 20. September:** Zuerst D2
+(Watch-Lebenszyklus), danach D1 (Dashboard) und die übrigen offenen Schnitte
+(Android, feldweise Protokolltypen, Relay/Bridge nur bei Bedarf).
+**Studio / Atelier kommt erst am Ende.** S0–S6 sind bis dahin vorgemerkt und
+keine Voraussetzung für das übrige Refactoring. Die aktive Atelier-Entwicklung
+läuft separat weiter.
+
+## Aktueller Stand am 20. September 2026
+
+Die ursprünglichen Desktop-Schnitte sind vorhanden. Seitdem sind das Dashboard
+als Hauptoberfläche, die Zuschauerseite und insbesondere **Studio / Atelier**
+hinzugekommen. Deshalb bedeutet „Desktop-Schnitte umgesetzt“ unten nur den
+damaligen Umfang, nicht einen abgeschlossenen Umbau der heutigen Anwendung.
+
+Mit **Studio** ist hier der Bearbeitungsbereich gemeint, der in Oberfläche und
+Quelltext derzeit **Atelier** heißt (`AtelierPage`). Eine Umbenennung ist nicht
+Teil dieses Plans. Der detaillierte Fahrplan steht in
+[Studio / Atelier: Refactoring](Refactoring-Studio.md).
+
+Grundlage dieser Aktualisierung: lokaler Branch `feature/atelier`, Commit
+`fcf6ad1`, zusätzlich der noch uncommittete Masken-Arbeitsstand und das lokale
+Protokoll der laufenden Claude-Code-Sitzung „FrameFlip Mehrschichten und
+Compositing“ bis zum 20. September. Das ist eine Bestandsaufnahme des
+Arbeitsbranches, keine Aussage über den Merge- oder Release-Stand. In dieser
+Planungsrunde wurden keine Anwendungstests ausgeführt.
+
+| Bereich | Tatsächlicher Stand | Folgerung für das Refactoring |
+| --- | --- | --- |
+| Frühere Desktop-Controller | Playback, Projektnavigation/-quellen und App-Lebenszyklen sind getrennt; siehe historischen Stand unten. | Erhalten und gezielt erweitern, nicht erneut aufbauen. |
+| Dashboard und Einstellungen | `MainWindow` trägt jetzt eigene Sequenzwiedergabe, Vorladen, Ordnerbeobachtung und Seitenwechsel; Einstellungen sind integriert. | Neuer Schnitt D1 für die Dashboard-Sitzung; die alte Viewer-Auslagerung deckt diese Logik nicht ab. |
+| Zuschauerseite und Zustimmung | `WatchService`, `WatchState`, `NewestFrame`, Watch-Verbindungsbausteine und `web/` sind hinzugekommen; Start/Austausch des Dienstes liegen in `AppHost`. | Kleiner Lebenszyklus-Schnitt D2; Zustimmung, Schlüssel und Protokolle unverändert halten. |
+| Studio / Atelier | Eigene Seite, Float-/EXR-Verarbeitung, sechs Werkzeugarten, Ebenen/Gruppen, Masken, Bild- und Videoexport, Werkzeug- und Eigenschaftsspalte sind im Branch vorhanden. | Eigene Folge S0–S6 statt Erweiterung des alten `ViewerPlaybackController` um Editoraufgaben. |
+| Aktuelle Studio-Arbeit | Gemalte Masken, Pinselschalter/-einstellungen und Drag-Bündelung sind committed. Farbbereichsmasken und Tiefen-/Mitten-/Lichter-Vorgaben werden gerade ergänzt. | Betroffene Masken-/Panel-Dateien erst nach einem abgeschlossenen Feature-Stand strukturell umbauen. |
+
+Die Produktentwürfe [Atelier](Atelier.md),
+[Atelier-Oberfläche](Atelier-Oberflaeche.md) und
+[Glitch-Galerie](Atelier-Glitch.md) bleiben die Quellen für Produktwünsche.
+Einige Statusangaben sind überholt: gemalte Masken werden dort noch als fehlend
+beschrieben, sind aber implementiert. Offene Wünsche wie Undo, weitere
+Glitch-Effekte oder ablösbare Panels sind keine Voraussetzung für sämtliche
+Refactoring-Schritte und werden nicht als bereits umgesetzt gezählt.
+
+## Historischer Stand der ersten Desktop-Schnitte (9. September 2026)
 
 - Der gemeinsame Ausgangspunkt ist mit `v2-secure-baseline` markiert; die
   v2-Konformitätstests und der Relay-Reconnect-Fix sind integriert.
@@ -88,14 +130,16 @@ fest. Jeder Schnitt baut auf einem getesteten Sicherheits- und Funktionsstand au
   über den echten WPF-Dispatcher ab. Die Mess- und Ressourcenalgorithmen in
   `SystemLoadMonitor` bleiben unverändert.
 
-## Ausgangspunkt und Sperre
+## Ausgangspunkt und weitergeltende Protokollgrenze
 
-Vor dem ersten größeren Refactoring müssen die offenen Fehler- und
-Sicherheits-PRs in `main` sein und der Stand getaggt werden. Die v2-Kopplung ist
-eine gemeinsame Desktop-, Android- und Relay-Schnittstelle. Sie wird erst nach
-einem erfolgreichen echten QR-Kopplungstest gemeinsam zusammengeführt.
+Der ursprüngliche Einstieg verlangte integrierte Fehler-/Sicherheitskorrekturen,
+einen echten QR-Test und den gemeinsamen v2-Ausgangspunkt. Der markierte Stand
+`v2-secure-baseline` und die darauf aufgebauten Schnitte sind oben dokumentiert;
+dieser Einstieg wird durch Studio nicht erneut aufgerollt. Die v2-Kopplung bleibt
+eine gemeinsame Desktop-, Android- und Relay-Schnittstelle. Änderungen daran
+brauchen weiterhin gemeinsame Gegenprüfungen und einen echten QR-Kopplungstest.
 
-Bis dahin bleiben diese Protokollteile unverändert:
+Während der hier geplanten Strukturarbeit bleiben diese Protokollteile unverändert:
 
 - Desktop: `PairingKey`, `SecureChannel`, `RelayClient`, `RelayControl`,
   `Envelope` und `PairingInvite`.
@@ -123,12 +167,30 @@ sofort koppeln, ohne zusätzliche Schritte.
    `ViewerWindow` einen testbaren Sitzungs-/Playback-Controller. Danach folgen
    in separaten PRs Scan/Navigation/Thumbnails aus `ProjectsPage`; erst zum
    Schluss wird der Window-, Tray-, Remote- und Load-Monitor-Lebenszyklus aus
-   `AppHost` aufgeteilt.
+   `AppHost` aufgeteilt. **Dieser ursprüngliche Umfang ist umgesetzt.** Die
+   hinzugekommenen Desktop-Bereiche folgen jetzt als eigene Schnitte:
+
+   - **D1: Dashboard-Sitzung.** Nach einem stabilen UI-Stand Sequenzauswahl und
+     Watcher, danach Vorladen/Cache, danach Playback aus `MainWindow` lösen;
+     jeder Teil ist ein eigener PR. Vor Wiederverwendung von
+     `ViewerPlaybackController` die Unterschiede bei Follow, Lücken,
+     In-/Out-Punkten und vorbereitetem Video charakterisieren. Layout,
+     Zustimmungs-/Kopplungstafeln und WPF-Eingaben bleiben am Fenster.
+   - **D2: Watch-Lebenszyklus.** Start, Austausch und Ende aus `AppHost` in
+     einen kleinen internen Controller verlagern, nach dem Muster von
+     `AppRemoteController`. `WatchService` bleibt die Fassade. Linkerneuerung,
+     Kennwortwechsel, fehlende Zustimmung, alte asynchrone Freigaben und
+     Lastbedarf ohne offenes Hauptfenster sind die Abnahmefälle. Watch-Transport,
+     `web/` und Relay werden dabei nicht umgebaut.
 
 4. **Android: `RemoteHub` als Fassade erhalten.** Aus dem großen Hub werden
    einzeln `ConnectionController`, `LibraryFeature`, `RenderFeature`,
    `VaultFeature`, `PlaybackFeature` und `LiveFeature`. Compose-Screens bleiben
    beim jeweiligen Schritt erreichbar und werden nicht gleichzeitig umgebaut.
+   Dieser Strang bleibt offen. Er kann während laufender Studio-Featurearbeit
+   unabhängig fortgesetzt werden, soweit keine gemeinsamen Protokoll- oder
+   Desktop-Dateien verändert werden müssen. Die alten Nummern sind keine neue
+   Pflicht, erst alle Studio-Produktwünsche fertigzustellen.
 
 5. **Protokoll feldweise typisieren.** Nicht alle JSON-Befehle auf einmal
    ersetzen. Die Umstellung folgt der Funktion: zuerst Bibliothek, dann Render,
@@ -138,6 +200,12 @@ sofort koppeln, ohne zusätzliche Schritte.
 6. **Relay und Bridge zuletzt und nur bei Bedarf.** Das Relay ist bereits klein
    genug; keine Framework- oder DI-Schicht einführen. Bei der Blender-Bridge
    lohnt sich eine weitere Trennung erst nach den Desktop-/Android-Schnitten.
+
+7. **Studio / Atelier erst am Ende.** S0–S6 sind für den Abschluss vorgemerkt:
+   Verhalten und Rezeptkompatibilität, Öffnung/Lebenszyklus, Bearbeitungszustand,
+   Export, Vorschauplanung und stabilisierte Panels. Rechenkerne nur bei
+   nachgewiesenem Bedarf weiter aufteilen.
+   [Arbeitspakete, Abhängigkeiten und Abnahme](Refactoring-Studio.md).
 
 ## Arbeitsregeln
 
@@ -150,11 +218,31 @@ sofort koppeln, ohne zusätzliche Schritte.
   Sicherheitsänderung vermischen.
 - Nach jedem Schritt laufen die Desktop-Tests; bei Protokolländerungen zusätzlich
   die Gegenprüfung auf Android und am Relay.
+- Für Desktop-Codeänderungen gehören die beiden vorhandenen Prüfreihen
+  `FrameFlip.Tests` und `FrameFlip.UiTests` zur Abnahme. Studio-Schritte brauchen
+  zusätzlich die jeweils genannten Verhaltensfälle, nicht nur Tests der
+  Rechenkerne. Eine reine Planänderung verlangt keinen Anwendungsstart.
+- Laufende Featurearbeit und Strukturarbeit bekommen getrennte Branches/PRs.
+  Im gemeinsam benutzten Checkout keine Branchwechsel, Datei-Verschiebungen oder
+  flächigen Formatierungen unter der laufenden Claude-Sitzung. Sobald Codearbeit
+  beginnt, von einem vereinbarten Commit in einem eigenen Git-Worktree arbeiten;
+  keine weiteren vollständigen Ordnerkopien.
+- Der Abschluss eines betroffenen Feature-Pakets reicht für dessen Refactoring.
+  Kein globaler Entwicklungsstopp und kein Warten auf ein „fertiges Studio“.
 
 ## Nächster Startpunkt
 
-Die geplanten Desktop-Schnitte für Fenster, Viewer-Öffnung, Tray, Remote und
-Lastmessung sind umgesetzt. Als Nächstes wird der Android-`RemoteHub` untersucht
-und sein Verbindungs-Lebenszyklus vor der Auslagerung charakterisiert.
-`RemoteHub` bleibt die Fassade; Compose-Screens und das Kopplungsprotokoll
-werden beim ersten Android-Schritt nicht gleichzeitig umgebaut.
+**Aktiv: D2, Watch-Lebenszyklus**, im eigenen Worktree auf
+`codex/refactor-watch-lifecycle`, ausgehend von `1333833`. Zuerst das Verhalten
+am Host charakterisieren, danach Start, Austausch, Einstellungsvergleich und
+Beenden aus `AppHost` herauslösen. Ein vorhandener Fehler beim Lastbedarf wird
+mit einem Regressionstest getrennt behandelt.
+
+**Danach D1, Dashboard-Sitzung**, beginnend mit Auswahl und Ordnerbeobachtung.
+Die Atelier-Seite selbst bleibt außerhalb dieses Schnitts. Danach folgen die
+übrigen offenen Schritte in der oben festgelegten Reihenfolge.
+
+**Erst abschließend S0–S6.** Vor dem Einstieg den dann aktuellen Atelier-Stand
+neu lesen: Die jetzt dokumentierten Codebefunde können durch die laufende
+Featurearbeit bereits verändert oder behoben sein. Für jedes Paket bleiben
+„geplant“, „im Branch implementiert“, „geprüft“ und „gemergt“ getrennte Zustände.
