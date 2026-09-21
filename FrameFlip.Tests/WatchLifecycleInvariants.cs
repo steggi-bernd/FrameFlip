@@ -28,7 +28,9 @@ public static class WatchLifecycleInvariants
             SettingsChanges();
             KeysAndCodes();
             LoadDemand();
+            FailedStarts();
             Shutdown();
+            BoundedShutdown();
         }
         finally
         {
@@ -208,6 +210,67 @@ public static class WatchLifecycleInvariants
         host.Host.Dispose();
         Check.That(current.Disposals == 1 && current.EmptyAtDispose && host.Host.Watch is null,
                    "Host gibt den Dienst einmal frei und entfernt die UI-Referenz zuerst");
+        int monitors = host.Monitors.Count;
+        host.Host.ApplyWatch();
+        var previous = host.Settings.Clone();
+        host.Settings.RelayHost = "after-dispose.example";
+        host.Controller.SettingsChanged(previous);
+        Check.That(host.Host.Watch is null && host.Services.Count == 1 && host.Monitors.Count == monitors,
+                   "spaete Neustart- und Einstellungsaufrufe nach Hostende bleiben wirkungslos");
+    }
+
+    private static void FailedStarts()
+    {
+        Check.Group("Zuschauer-Lebenszyklus - fehlgeschlagener Aufbau");
+        using var host = new Harness();
+        host.Host.ApplyWatch();
+        host.FailCreate = true;
+        Check.Throws<InvalidOperationException>(host.Host.ApplyWatch, "Fabrikfehler bleibt beim Aufrufer");
+        Check.That(host.Host.Watch is null && host.Services[0].Disposals == 1
+                   && host.Monitors[0].Disposals == 1, "Fabrikfehler gibt alten Dienst und Lastbedarf frei");
+        host.FailCreate = false;
+        host.FailStart = true;
+        Check.Throws<InvalidOperationException>(host.Host.ApplyWatch, "Startfehler bleibt beim Aufrufer");
+        Check.That(host.Host.Watch is null && host.Services.Last().Disposals == 1
+                   && host.Monitors.Count == 1, "Startfehler gibt den halben Dienst frei und erzeugt keinen Lastbedarf");
+        host.FailStart = false;
+        host.Host.ApplyWatch();
+        Check.That(host.Host.Watch is not null && host.Monitors.Count == 2,
+                   "erneuter Aufbau nach Fehler ist moeglich");
+        host.Services.Last().ThrowOnDispose = true;
+        host.Host.ApplyWatch();
+        Check.That(ReferenceEquals(host.Host.Watch, host.Services.Last().Service),
+                   "synchrone Freigabeausnahme der alten Leitung verhindert den neuen Dienst nicht");
+        host.Services.Last().FaultOnDispose = true;
+        host.Host.ApplyWatch();
+        Check.That(ReferenceEquals(host.Host.Watch, host.Services.Last().Service),
+                   "asynchrone Freigabeausnahme wird beobachtet und beendet den neuen Dienst nicht");
+    }
+
+    private static void BoundedShutdown()
+    {
+        Check.Group("Zuschauer-Lebenszyklus - begrenztes Ende alter und aktueller Dienste");
+        var key = WatchKey.Create(null);
+        var settings = new AppSettings { WatchEnabled = true, RelayHost = "relay.example" };
+        var services = new List<PendingService>();
+        int changes = 0, invalid = 0;
+        using var controller = new AppWatchController(() => settings,
+            new AppWatchSources((_, _) => { var service = new PendingService(key); services.Add(service); return service; }),
+            () => key, () => invalid++, () => changes++, TimeSpan.Zero);
+        controller.Restart();
+        controller.Restart();
+        var pending = (List<Task>)typeof(AppWatchController).GetField("_closing", Hidden)!.GetValue(controller)!;
+        Check.That(pending.Count == 1 && !pending[0].IsCompleted,
+                   "ein noch schliessender Vorgaenger bleibt bis zum Hostende beruecksichtigt");
+        controller.Dispose();
+        controller.Dispose();
+        controller.Restart();
+        Check.That(services.Count == 2 && services.All(service => service.Disposals == 1)
+                   && !controller.HasService && controller.Service is null,
+                   "Ende schliesst jeden Dienst einmal und kehrt auch ohne Netzwerkantwort zurueck");
+        Check.That(changes == 2 && invalid == 0, "Hostende und spaeter Neustart melden keinen neuen Lastbedarf");
+        foreach (var service in services) service.Disposal.SetResult();
+        Check.That(!controller.HasService, "spaete Freigaben koennen den beendeten Controller nicht wiederbeleben");
     }
 
     private sealed class Harness : IDisposable
@@ -216,6 +279,8 @@ public static class WatchLifecycleInvariants
         internal readonly List<FakeService> Services = new();
         internal readonly List<bool> EmptyAtCreate = new();
         internal readonly List<FakeMonitor> Monitors = new();
+        internal bool FailCreate, FailStart;
+        internal AppWatchController Controller => (AppWatchController)typeof(AppHost).GetField("_watch", Hidden)!.GetValue(Host)!;
         internal AppSettings Settings
         {
             get => (AppSettings)typeof(AppHost).GetField("_settings", Hidden)!.GetValue(Host)!;
@@ -227,6 +292,7 @@ public static class WatchLifecycleInvariants
             Host = new AppHost(new AppWatchSources((key, relay) =>
             {
                 EmptyAtCreate.Add(Host!.Watch is null);
+                if (FailCreate) throw new InvalidOperationException("Synthetischer Fabrikfehler");
                 var service = new FakeService(this, key, relay);
                 Services.Add(service);
                 return service;
@@ -264,20 +330,32 @@ public static class WatchLifecycleInvariants
         internal WatchKey Key => key;
         internal string Relay => relay;
         internal int Starts, Disposals;
-        internal bool CurrentAtStart, EmptyAtDispose, HoldDisposal;
+        internal bool CurrentAtStart, EmptyAtDispose, HoldDisposal, ThrowOnDispose, FaultOnDispose;
         internal readonly TaskCompletionSource Disposal = new(TaskCreationOptions.RunContinuationsAsynchronously);
         public void Start()
         {
             Starts++;
             CurrentAtStart = ReferenceEquals(host.Host.Watch, Service);
+            if (host.FailStart) throw new InvalidOperationException("Synthetischer Startfehler");
         }
         public ValueTask DisposeAsync()
         {
             Disposals++;
             EmptyAtDispose = host.Host.Watch is null;
+            if (ThrowOnDispose) throw new IOException("Synthetischer Freigabefehler");
+            if (FaultOnDispose) return new ValueTask(Task.FromException(new IOException("Synthetischer asynchroner Freigabefehler")));
             if (!HoldDisposal) Disposal.TrySetResult();
             return new ValueTask(Disposal.Task);
         }
+    }
+
+    private sealed class PendingService(WatchKey key) : IAppWatchService
+    {
+        public WatchService Service { get; } = new(key, "relay.example", null, () => null, () => null);
+        internal readonly TaskCompletionSource Disposal = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        internal int Disposals;
+        public void Start() { }
+        public ValueTask DisposeAsync() { Disposals++; return new ValueTask(Disposal.Task); }
     }
 
     private sealed class FakeMonitor : IAppLoadMonitor

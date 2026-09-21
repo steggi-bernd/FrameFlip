@@ -27,8 +27,7 @@ public sealed class AppHost : IDisposable
 
     /// <summary>Nimmt Meldungen des Blender-Addons entgegen. Null, wenn abgeschaltet.</summary>
     private Bridge.RenderMonitor? _renderMonitor;
-    private IAppWatchService? _watch;
-    private readonly AppWatchSources _watchSources;
+    private readonly AppWatchController _watch;
 
     /// <summary>Besitzt die optionale Verbindung zum Handy.</summary>
     private readonly AppRemoteController _remote;
@@ -44,13 +43,13 @@ public sealed class AppHost : IDisposable
         _createViewer = CreateViewer;
         _load = new AppLoadController(() => _settings,
             AppLoadSources.Default(() => _viewer is { } viewer ? new AppViewerLoadTarget(viewer) : null));
-        _watchSources = new AppWatchSources((key, relay) =>
+        _watch = CreateWatchController(new AppWatchSources((key, relay) =>
         {
             var newest = new Web.NewestFrame(() => _renderMonitor?.Job,
                                              FrameDecoderRegistry.CreateDefault());
             return new AppWatchService(new Web.WatchService(key, relay, _renderMonitor,
                                         () => _load.LastSnapshot, newest.Path));
-        });
+        }));
         // Die Verbindung liest Einstellungen und Lastwerte weiter live aus dem Host.
         _remote = new AppRemoteController(() => _settings, new AppRemoteSources(
             () => _renderMonitor is not null,
@@ -88,7 +87,7 @@ public sealed class AppHost : IDisposable
 
     internal AppHost(AppWatchSources sources, AppLoadSources? loadSources = null) : this(null, null, null)
     {
-        _watchSources = sources;
+        _watch = CreateWatchController(sources);
         if (loadSources is not null) _load = new AppLoadController(() => _settings, loadSources);
     }
 
@@ -146,37 +145,11 @@ public sealed class AppHost : IDisposable
 
     // ------------------------------------------------------------ Zusehen im Netz
 
-    /// <summary>
-    /// Die Seite zum Zusehen starten, falls eingeschaltet.
-    ///
-    /// Sie bekommt drei Lesezugriffe und sonst nichts: den Renderzustand, die
-    /// Systemlast und den Pfad des zuletzt geschriebenen Bildes. Der Pfad bleibt im
-    /// Programm - nach draussen geht nur das fertig verkleinerte JPEG.
-    /// </summary>
-    private void StartWatch()
-    {
-        try
-        {
-            if (!_settings.WatchEnabled) return;
+    private AppWatchController CreateWatchController(AppWatchSources sources)
+        => new(() => _settings, sources, WatchKeyForSettings,
+               () => Notify(Localization.Strings.T("S_WatchNoRelay")), EnsureLoadMonitor);
 
-            // Ohne brauchbaren Relay-Namen gaebe es nur eine Adresse, die niemanden
-            // erreicht. Das faellt spaeter auf und ist dann schwer zu deuten.
-            if (!Remote.PairingInvite.IsUsableHost(_settings.RelayHost))
-            {
-                Notify(Localization.Strings.T("S_WatchNoRelay"));
-                return;
-            }
-
-            var key = WatchKeyForSettings();
-            _watch = _watchSources.Create(key, _settings.RelayHost);
-
-            _watch.Start();
-        }
-        finally
-        {
-            EnsureLoadMonitor();
-        }
-    }
+    private void StartWatch() => _watch.Restart();
 
     /// <summary>
     /// Holt das gespeicherte Zuschauer-Geheimnis - oder legt beim ersten Mal eines an.
@@ -234,25 +207,14 @@ public sealed class AppHost : IDisposable
     }
 
     /// <summary>Der Dienst hinter der Zuschauerseite - oder null, wenn er nicht laeuft.</summary>
-    public Web.WatchService? Watch => _watch?.Service;
+    public Web.WatchService? Watch => _watch.Service;
 
     /// <summary>
     /// Ein- und ausschalten, ohne das Programm neu zu starten.
     ///
-    /// Beim Einschalten entsteht ein neues Zeichen in der Adresse. Wer die alte noch
-    /// offen hat, sieht ab dann nichts mehr - und das ist der Sinn eines Schalters.
+    /// Der gespeicherte Link bleibt erhalten, bis RenewWatchLink ihn erneuert.
     /// </summary>
-    public void ApplyWatch()
-    {
-        var closing = _watch;
-        _watch = null;
-
-        // Nicht abwarten: Das Schliessen einer Verbindung kann an einem haengenden
-        // Socket Sekunden dauern, und die Oberflaeche steht sonst so lange.
-        if (closing is not null) _ = closing.DisposeAsync().AsTask();
-
-        StartWatch();
-    }
+    public void ApplyWatch() => _watch.Restart();
 
     // ------------------------------------------------------------ Tray
 
@@ -355,12 +317,15 @@ public sealed class AppHost : IDisposable
     // ------------------------------------------------------------ Lasterkennung
 
     private void EnsureLoadMonitor()
-        => _load.Ensure(_viewer is not null, _windows.Main is not null, _remote.HasConnection || _watch is not null);
+        => _load.Ensure(_viewer is not null, _windows.Main is not null, HasTelemetryConsumer);
+
+    // Handy und Zuschauerseite brauchen Messwerte auch ohne adaptive Regelung.
+    private bool HasTelemetryConsumer => _remote.HasConnection || _watch.HasService;
 
     private int PrepareViewerLoad()
     {
         // Der neue Viewer muss schon vor seiner Konstruktion als Verbraucher zaehlen.
-        _load.Ensure(true, _windows.Main is not null, _remote.HasConnection || _watch is not null);
+        _load.Ensure(true, _windows.Main is not null, HasTelemetryConsumer);
         return _load.ViewerDecoderThreads;
     }
 
@@ -463,15 +428,7 @@ public sealed class AppHost : IDisposable
         // Einstellungsdialog eine stehende Verbindung ab.
         _remote.SettingsChanged(previousSettings);
 
-        // Dasselbe fuer die Seite im Netz: Nur wenn sich Schalter oder Port geaendert
-        // haben. Ein Neuaufbau bei jedem Speichern wuerde das Zeichen in der Adresse
-        // erneuern, und die offene Seite auf dem Handy waere ohne Grund tot.
-        if (previousSettings.WatchEnabled != _settings.WatchEnabled
-            || previousSettings.WatchSecret != _settings.WatchSecret
-            || previousSettings.RelayHost != _settings.RelayHost)
-        {
-            ApplyWatch();
-        }
+        _watch.SettingsChanged(previousSettings);
 
         // Puffer- und Budgetwerte greifen beim naechsten Oeffnen des Viewers.
         return null;
@@ -493,17 +450,7 @@ public sealed class AppHost : IDisposable
 
         _load.Dispose();
 
-        // Beim Beenden warten wir kurz: Die Verbindungen sollen sauber enden,
-        // damit im Raum kein Platz als belegt zurueckbleibt, bis der Leuchtturm die
-        // Leiche selbst bemerkt.
-        var watch = _watch;
-        _watch = null;
-
-        if (watch is not null)
-        {
-            try { watch.DisposeAsync().AsTask().Wait(TimeSpan.FromSeconds(2)); }
-            catch (Exception) { /* beim Beenden ist ein haengender Socket kein Anlass */ }
-        }
+        _watch.Dispose();
 
         _remote.Dispose();
 
