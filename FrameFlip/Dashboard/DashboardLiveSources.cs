@@ -40,7 +40,6 @@ internal sealed record DashboardLiveSources(
 internal interface IDashboardLiveTimer : IDisposable
 {
     void Restart();
-    void Stop();
 }
 
 internal sealed class DashboardLiveTimer : IDashboardLiveTimer
@@ -59,7 +58,6 @@ internal sealed class DashboardLiveTimer : IDashboardLiveTimer
     }
 
     public void Restart() { _timer.Stop(); _timer.Start(); }
-    public void Stop() => _timer.Stop();
     private void OnTick(object? sender, EventArgs e) { _timer.Stop(); _settled(); }
     public void Dispose() { _timer.Stop(); _timer.Tick -= OnTick; }
 }

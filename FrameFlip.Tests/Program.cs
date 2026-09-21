@@ -94,6 +94,7 @@ static int RunAll()
     WatchInvariants.Run();
     WatchLifecycleInvariants.Run();
     DashboardLiveInvariants.Run();
+    DashboardLiveControllerInvariants.Run();
     PaceInvariants.Run();
     ReadinessInvariants.Run();
     MachineInvariants.Run();
