@@ -93,6 +93,7 @@ static int RunAll()
     RelayClientInvariants.Run();
     WatchInvariants.Run();
     WatchLifecycleInvariants.Run();
+    DashboardLiveInvariants.Run();
     PaceInvariants.Run();
     ReadinessInvariants.Run();
     MachineInvariants.Run();
