@@ -11,6 +11,7 @@ using System.Windows.Threading;
 using FrameFlip.Bridge;
 using FrameFlip.Configuration;
 using FrameFlip.Decoding;
+using FrameFlip.Dashboard;
 using FrameFlip.Export;
 using FrameFlip.Diagnostics;
 using FrameFlip.Localization;
@@ -134,11 +135,8 @@ public partial class MainWindow : Window
     /// <summary>Der Zeiger auf der Zeitleiste - wandert, statt neu zu entstehen.</summary>
     private Rectangle? _headMark;
 
-    /// <summary>Sieht dem Ausgabeordner beim Wachsen zu. Einer, und nur fuer die Auswahl.</summary>
-    private FileSystemWatcher? _watcher;
-
-    /// <summary>Sammelt Dateimeldungen ein, statt jede einzeln zu beantworten.</summary>
-    private DispatcherTimer? _settle;
+    /// <summary>Ordnerbeobachtung und Ruhefrist der aktuell gewaehlten Folge.</summary>
+    private readonly DashboardLiveController _live;
 
     /// <summary>Ob der Kopf auf dem neuesten Bild bleiben soll.</summary>
     private bool _follow = true;
@@ -226,6 +224,7 @@ public partial class MainWindow : Window
             return null;
         };
 
+        _live = new DashboardLiveController(DashboardLiveSources.Default(Dispatcher), _decoders.IsSupported, RescanLive);
         _layout = DesktopLayout.Load();
 
         InitializeComponent();
@@ -289,8 +288,7 @@ public partial class MainWindow : Window
             _settingsPage?.Dispose();
             _ticker.Stop();
             _player.Stop();
-            _settle?.Stop();
-            StopWatching();
+            _live.Dispose();
             CancelPreload();
             DropCache();
             _prepping?.Cancel();
@@ -851,7 +849,7 @@ public partial class MainWindow : Window
         if (_sequence is null || _sequence.Count == 0)
         {
             ShowEmptyStage();
-            WatchFolder(entry.Folder);
+            _live.WatchFolder(entry.Folder);
 
             // Der Name bleibt stehen, auch ohne Bild: Die Zeile ist ausgewaehlt,
             // und eine leere Kopfzeile sieht aus wie ein Fehler statt wie ein
@@ -878,7 +876,7 @@ public partial class MainWindow : Window
 
         Note(Strings.T("D_LogOpened", entry.Name, _sequence.Count));
 
-        WatchFolder(entry.Folder);
+        _live.WatchFolder(entry.Folder);
         ShapeStage();
         BuildStrip();
         BuildGaps();
@@ -971,102 +969,6 @@ public partial class MainWindow : Window
     }
 
     // ================================================================ Live
-
-    /// <summary>
-    /// Dem Ausgabeordner zusehen.
-    ///
-    /// Zwei Quellen melden neue Bilder, und beide werden gebraucht: Die Bruecke
-    /// weiss es zuerst, aber nur waehrend eines Renders, den FrameFlip mitbekommt.
-    /// Der Ordnerwaechter weiss es auch dann, wenn Blender ohne Bruecke laeuft oder
-    /// jemand von Hand Dateien hineinlegt. Beide muenden in denselben Sammelpunkt,
-    /// damit doppelte Meldungen nichts doppelt tun.
-    /// </summary>
-    private void WatchFolder(string? folder)
-    {
-        StopWatching();
-
-        if (string.IsNullOrEmpty(folder) || !Directory.Exists(folder)) return;
-
-        try
-        {
-            _watcher = new FileSystemWatcher(folder)
-            {
-                // Die Groesse zaehlt mit: Ein Renderer legt die Datei zuerst leer an
-                // und fuellt sie danach. Nur auf das Anlegen zu hoeren hiesse, das
-                // halbe Bild zu lesen.
-                NotifyFilter = NotifyFilters.FileName | NotifyFilters.Size | NotifyFilters.LastWrite,
-                IncludeSubdirectories = false,
-                EnableRaisingEvents = true,
-            };
-
-            _watcher.Created += OnFolderChanged;
-            _watcher.Changed += OnFolderChanged;
-            _watcher.Renamed += OnFolderChanged;
-        }
-        catch (Exception)
-        {
-            // Ein Netzlaufwerk ohne Benachrichtigungen, ein Ordner ohne Rechte:
-            // Dann bleibt es beim Takt der Bruecke, und mehr passiert nicht.
-            StopWatching();
-        }
-    }
-
-    private void StopWatching()
-    {
-        if (_watcher is null) return;
-
-        try
-        {
-            _watcher.EnableRaisingEvents = false;
-            _watcher.Created -= OnFolderChanged;
-            _watcher.Changed -= OnFolderChanged;
-            _watcher.Renamed -= OnFolderChanged;
-            _watcher.Dispose();
-        }
-        catch (Exception)
-        {
-            // Beim Abbauen ist nichts mehr zu retten.
-        }
-
-        _watcher = null;
-    }
-
-    /// <summary>Kommt vom Waechterfaden, nicht vom Oberflaechenfaden.</summary>
-    private void OnFolderChanged(object sender, FileSystemEventArgs e)
-    {
-        if (!_decoders.IsSupported(Path.GetExtension(e.Name ?? string.Empty))) return;
-
-        Dispatcher.BeginInvoke(new Action(NoteNewFrames));
-    }
-
-    /// <summary>
-    /// Nicht sofort nachsehen, sondern gleich.
-    ///
-    /// Ein Render schreibt in Schueben, und ein Ordner mit tausend Bildern neu
-    /// einzulesen kostet mehr, als das Ergebnis wert ist, wenn es gleich wieder
-    /// veraltet. Die Frist beginnt mit jeder Meldung von vorn; ruht der Ordner eine
-    /// halbe Sekunde, wird einmal gelesen.
-    /// </summary>
-    private void NoteNewFrames()
-    {
-        _settle ??= CreateSettleTimer();
-
-        _settle.Stop();
-        _settle.Start();
-    }
-
-    private DispatcherTimer CreateSettleTimer()
-    {
-        var timer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(500) };
-
-        timer.Tick += (_, _) =>
-        {
-            timer.Stop();
-            RescanLive();
-        };
-
-        return timer;
-    }
 
     /// <summary>Die Sequenz neu einlesen, ohne die Auswahl oder die Stelle zu verlieren.</summary>
     private void RescanLive()
@@ -2979,7 +2881,7 @@ public partial class MainWindow : Window
                 && string.Equals(folder.TrimEnd('\\', '/'), shown.Folder.TrimEnd('\\', '/'),
                                  StringComparison.OrdinalIgnoreCase))
             {
-                NoteNewFrames();
+                _live.NoteNewFrames();
             }
         }));
     }
