@@ -55,9 +55,18 @@ public static class GradingGroupInvariants
 
             Check.That(tabs.Children.Count == 5, "fuenf Reiter", $"{tabs.Children.Count}");
 
-            // Der erste Reiter steht offen und zeigt seine fuenf Werkzeuge.
-            Check.That(tiles.Children.Count == 5,
-                       "die Grundkorrektur zeigt fuenf Kacheln", $"{tiles.Children.Count}");
+            // Der erste Reiter steht offen und zeigt seine Werkzeuge.
+            //
+            // Geprueft wird, WELCHE dort stehen, nicht wieviele: Die Zahl aendert
+            // sich mit jedem neuen Werkzeug, und sie soll es auch. Eine feste Zahl
+            // hier bricht die Probe beim naechsten Werkzeug, ohne dass etwas kaputt
+            // waere - und das ist die Art Probe, die man irgendwann nur noch
+            // nachzieht, statt sie zu lesen.
+            Check.That(tiles.Children.Count > 0 &&
+                       tiles.Children.OfType<ToggleButton>().Any(b => (string)b.Tag == "Curve"),
+                       "die Grundkorrektur zeigt ihre Kacheln",
+                       string.Join(", ", tiles.Children.OfType<ToggleButton>()
+                                               .Select(b => (string)b.Tag)));
 
             // Genau ein Abschnitt ist ausgeschrieben.
             int open = 0;
@@ -84,8 +93,17 @@ public static class GradingGroupInvariants
             optics.IsChecked = true;
             panel.UpdateLayout();
 
-            Check.That(tiles.Children.Count == 5, "die Optik zeigt fuenf Kacheln",
-                       $"{tiles.Children.Count}");
+            // Gezaehlt und nicht aufgezaehlt: Die Zahl aendert sich mit jedem neuen
+            // Werkzeug, und sie soll es auch - die Aussage ist "der Reiter zeigt
+            // ANDERE Kacheln als der erste", nicht "genau diese fuenf". Wer hier eine
+            // feste Zahl hinterlegt, bricht die Probe beim naechsten Werkzeug, ohne
+            // dass etwas kaputt waere.
+            Check.That(tiles.Children.Count > 0 &&
+                       tiles.Children.OfType<ToggleButton>().Any(b => (string)b.Tag == "Vignette") &&
+                       tiles.Children.OfType<ToggleButton>().All(b => (string)b.Tag != "Curve"),
+                       "die Optik zeigt ihre eigenen Kacheln und keine der ersten",
+                       string.Join(", ", tiles.Children.OfType<ToggleButton>()
+                                               .Select(b => (string)b.Tag)));
 
             var basic = (FrameworkElement)panel.FindName("BasicBody");
 

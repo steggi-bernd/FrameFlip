@@ -49,6 +49,7 @@ public partial class GradingPanel
         ("S_GroupLight", "Sharpen", "S_Sharpen"),
 
         ("S_GroupOptics", "Motion", "S_Motion"),
+        ("S_GroupOptics", "Displace", "S_Displace"),
         ("S_GroupOptics", "Depth", "S_DepthField"),
         ("S_GroupOptics", "Distortion", "S_Distortion"),
         ("S_GroupOptics", "Chromatic", "S_Chromatic"),
@@ -227,6 +228,7 @@ public partial class GradingPanel
         "Texture" => !_texture.IsNeutral,
         "Sharpen" => !_sharpen.IsNeutral,
         "Motion" => !_motion.IsNeutral,
+        "Displace" => !_displace.IsNeutral,
         "Depth" => !_depth.IsNeutral,
         "Distortion" => !_distortion.IsNeutral,
         "Chromatic" => !_chromatic.IsNeutral,

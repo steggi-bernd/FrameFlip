@@ -61,6 +61,16 @@
     <sys:String x:Key="S_ClarityAmount">Amount</sys:String>
     <sys:String x:Key="S_ClarityReach">Radius</sys:String>
     <sys:String x:Key="S_ClarityHint">Local contrast: it boosts what a pixel is against its surroundings and leaves flat areas alone. A large radius gives modelling, a small one gives sharpness. Negative takes contrast away.</sys:String>
+    <sys:String x:Key="S_Displace">Displacement</sys:String>
+    <sys:String x:Key="S_DisplaceAmount">Amount</sys:String>
+    <sys:String x:Key="S_DisplaceWave">Wave</sys:String>
+    <sys:String x:Key="S_DisplaceLength">Wavelength</sys:String>
+    <sys:String x:Key="S_DisplaceAngle">Direction</sys:String>
+    <sys:String x:Key="S_DisplaceSpread">Channel offset</sys:String>
+    <sys:String x:Key="S_DisplaceFromNormal">Normal pass</sys:String>
+    <sys:String x:Key="S_DisplaceFromMotion">Vector pass</sys:String>
+    <sys:String x:Key="S_DisplaceFromHint">Where the direction comes from. The normal pass lays the distortion along the geometry: a sphere pushes outward, a wall not at all. The vector pass lays it along the motion: what stands still stays put, what moves tears along its path.</sys:String>
+    <sys:String x:Key="S_DisplaceHint">Needs the chosen pass in the file - without it the tool rests. The wave turns the smooth displacement into bands that push forward and back in turn; the channel offset gives them the colour fringe that reads as interference rather than blur.</sys:String>
     <sys:String x:Key="S_Motion">Motion blur</sys:String>
     <sys:String x:Key="S_MotionShutter">Shutter</sys:String>
     <sys:String x:Key="S_MotionSamples">Samples</sys:String>

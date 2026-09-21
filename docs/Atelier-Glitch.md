@@ -54,14 +54,28 @@ and ends a run and the *key* it sorts by (brightness, hue, saturation).
 
 **Worth doing** — it is the one effect in this family with no substitute.
 
-### 3. Wave glitch and displacement
+### 3. Wave glitch and displacement — **built**
 
-Pixel-moving, so it fits `IGeometryTool` with nothing new. The reason it is interesting
-here rather than in fifty other programs is the same reason as everywhere in this
-document: it can be driven by a **render pass**. Displace by the normal pass and the
-distortion follows the geometry; displace by the vector pass and it follows the motion.
+The reason it is interesting here rather than in fifty other programs held up: it is
+driven by a **render pass**. The normal pass lays the distortion along the geometry — a
+sphere pushes outward, a wall not at all; the vector pass lays it along the motion —
+what stands still stays put, what moves tears along its path. A wave modulates the
+magnitude into bands, and a channel offset gives them the colour fringe that reads as
+interference rather than blur.
 
-**Worth doing**, and cheap.
+The guess in this document was wrong on one point, and it is worth writing down: it does
+**not** fit `IGeometryTool`. That interface is radial — `Factors(radius, ref r, ref g,
+ref b)` — and cannot express an arbitrary displacement field. `IOpticsTool` knows a
+pixel's place but cannot sample from anywhere else. The only kinds that can move pixels
+are `IDataTool`, which gets the whole buffer plus a render pass, and `IFramePass`, which
+gets the finished frame. `IDataTool` was the right home, which also settles the
+behaviour without a file: **it rests when the pass is missing**, exactly like depth of
+field and motion blur.
+
+The cost of that: a plain wave on a PNG is not reachable, because a data tool without its
+pass does not run at all. Closing that would mean letting a tool declare its pass
+optional — a small change to a contract two working tools share, and not worth making
+until someone wants it.
 
 ### 4. Post effects: chromatic aberration on the raster, JPEG glitch, scan lines
 

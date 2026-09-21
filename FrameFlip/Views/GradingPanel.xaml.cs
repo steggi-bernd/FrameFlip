@@ -61,6 +61,7 @@ public partial class GradingPanel : UserControl
     private ChromaticTool _chromatic = new();
     private DepthFieldTool _depth = new();
     private MotionBlurTool _motion = new();
+    private DisplaceTool _displace = new();
 
     private static readonly Color[] CurveColours =
     {
@@ -320,6 +321,7 @@ public partial class GradingPanel : UserControl
 
         // Und die fuenfte: die Werkzeuge, die Renderdaten brauchen.
         _motion = TakeData<MotionBlurTool>();
+        _displace = TakeData<DisplaceTool>();
         _depth = TakeData<DepthFieldTool>();
 
         T TakeLocal<T>() where T : ILocalTool, new()
@@ -614,6 +616,19 @@ public partial class GradingPanel : UserControl
 
             MotionShutterSlider.Value = Math.Clamp(_motion.Shutter,
                                                    MotionShutterSlider.Minimum, MotionShutterSlider.Maximum);
+            DisplaceAmountSlider.Value = Math.Clamp(_displace.Amount,
+                DisplaceAmountSlider.Minimum, DisplaceAmountSlider.Maximum);
+            DisplaceWaveSlider.Value = Math.Clamp(_displace.Wave,
+                DisplaceWaveSlider.Minimum, DisplaceWaveSlider.Maximum);
+            DisplaceLengthSlider.Value = Math.Clamp(_displace.Wavelength,
+                DisplaceLengthSlider.Minimum, DisplaceLengthSlider.Maximum);
+            DisplaceAngleSlider.Value = Math.Clamp(_displace.Angle,
+                DisplaceAngleSlider.Minimum, DisplaceAngleSlider.Maximum);
+            DisplaceSpreadSlider.Value = Math.Clamp(_displace.Spread,
+                DisplaceSpreadSlider.Minimum, DisplaceSpreadSlider.Maximum);
+
+            DisplaceFromBox.SelectedIndex = _displace.From == DisplaceFrom.Motion ? 1 : 0;
+
             MotionSamplesSlider.Value = Math.Clamp(_motion.Samples,
                                                    MotionSamplesSlider.Minimum, MotionSamplesSlider.Maximum);
 
@@ -846,6 +861,12 @@ public partial class GradingPanel : UserControl
         _motion.Shutter = (float)MotionShutterSlider.Value;
         _motion.Samples = (int)Math.Round(MotionSamplesSlider.Value);
 
+        _displace.Amount = (float)DisplaceAmountSlider.Value;
+        _displace.Wave = (float)DisplaceWaveSlider.Value;
+        _displace.Wavelength = (float)DisplaceLengthSlider.Value;
+        _displace.Angle = (float)DisplaceAngleSlider.Value;
+        _displace.Spread = (float)DisplaceSpreadSlider.Value;
+
         _depth.Aperture = (float)DepthApertureSlider.Value;
         _depth.Focus = FocusFrom(DepthFocusSlider.Value);
 
@@ -963,6 +984,11 @@ public partial class GradingPanel : UserControl
         SharpenRadiusValue.Text = $"{SharpenRadiusSlider.Value:0}";
         SharpenThresholdValue.Text = $"{SharpenThresholdSlider.Value:0.000}";
         MotionShutterValue.Text = $"{MotionShutterSlider.Value:0.00}";
+        DisplaceAmountValue.Text = $"{DisplaceAmountSlider.Value:0} px";
+        DisplaceWaveValue.Text = $"{DisplaceWaveSlider.Value:0.00}";
+        DisplaceLengthValue.Text = $"{DisplaceLengthSlider.Value:0} px";
+        DisplaceAngleValue.Text = $"{DisplaceAngleSlider.Value:0} °";
+        DisplaceSpreadValue.Text = $"{DisplaceSpreadSlider.Value:0.00}";
         MotionSamplesValue.Text = $"{MotionSamplesSlider.Value:0}";
         DepthApertureValue.Text = $"{DepthApertureSlider.Value:0.00}";
         DepthFocusValue.Text = FocusFrom(DepthFocusSlider.Value) is var metres && metres < 10
@@ -1204,6 +1230,24 @@ public partial class GradingPanel : UserControl
         Histogram.ShowChannels = !Histogram.ShowChannels;
         HistogramModeButton.Content = Histogram.ShowChannels ? "RGB" : "Luma";
         Histogram.InvalidateVisual();
+    }
+
+    /// <summary>
+    /// Woher die Verschiebung ihre Richtung nimmt.
+    ///
+    /// Eigener Griff und nicht bloss ein Regler mehr, weil dahinter ein anderer PASS
+    /// gelesen wird: Die Wahl entscheidet, welche Datei ueberhaupt gebraucht wird,
+    /// und deshalb muss danach neu gelesen und nicht nur neu gerechnet werden.
+    /// </summary>
+    private void OnDisplaceFromChanged(object sender, SelectionChangedEventArgs e)
+    {
+        if (_filling || !IsLoaded) return;
+
+        _displace.From = DisplaceFromBox.SelectedIndex == 1
+            ? DisplaceFrom.Motion
+            : DisplaceFrom.Normal;
+
+        Raise(interim: false);
     }
 
     private void OnSliderReset(object sender, System.Windows.Input.MouseButtonEventArgs e)

@@ -25,6 +25,7 @@ public static class RenderDataInvariants
         TheSmearFollowsTheVector();
         StillThingsStayStill();
         ThePassIsFound();
+        TheDisplacementFollowsThePass();
         Persistence();
         WhatItCosts();
     }
@@ -265,6 +266,25 @@ public static class RenderDataInvariants
         var colour = new[] { new ExrPass("ViewLayer.Depth", "R", "G", "B", null, Grey: false) };
         Check.That(FramePasses.NameFor(PassNeed.Depth, colour) is null,
                    "ein dreikanaliger Pass gilt nicht als Tiefe");
+
+        // Und die Normale, andersherum: Sie IST eine Richtung und braucht deshalb
+        // drei Kanaele. Ein einkanaliger Pass namens "Normal" enthielte keine, und
+        // ein Verzug daraus zeigte ueberall dorthin, wo zufaellig die Helligkeit
+        // hinzeigt - was aussaehe wie ein Effekt und keiner waere.
+        var normals = new[] { new ExrPass("ViewLayer.Normal", "R", "G", "B", null, Grey: false) };
+
+        Check.That(FramePasses.NameFor(PassNeed.Normal, normals) == "ViewLayer.Normal",
+                   "der Normalpass wird gefunden",
+                   FramePasses.NameFor(PassNeed.Normal, normals) ?? "nichts");
+
+        Check.That(FramePasses.NameFor(PassNeed.Normal, Passes("ViewLayer.Normal")) is null,
+                   "ein einkanaliger Pass gilt nicht als Normale");
+
+        Check.That(FramePasses.NameFor(PassNeed.Normal, colour) is null,
+                   "und ein Tiefenpass auch nicht - der Name entscheidet mit");
+
+        Check.That(FramePasses.NameFor(PassNeed.Depth, normals) is null,
+                   "umgekehrt ebenso");
     }
 
     private static void Persistence()
@@ -289,6 +309,40 @@ public static class RenderDataInvariants
 
         Check.Near(copy.Data.OfType<DepthFieldTool>().First().Focus, 3.5, 1e-5,
                    "eine Kopie bewegt sich nicht mit");
+
+        // Die Verschiebung ebenso - und mit ihr die Wahl des Passes, denn die
+        // entscheidet, welche Datei ueberhaupt gelesen wird.
+        var verzug = new GradingStack
+        {
+            Data =
+            {
+                new DisplaceTool
+                {
+                    From = DisplaceFrom.Motion, Amount = 25f,
+                    Wave = 0.6f, Wavelength = 55f, Angle = 210f, Spread = 0.3f,
+                },
+            },
+        };
+
+        var againVerzug = JsonSerializer.Deserialize<GradingStack>(JsonSerializer.Serialize(verzug));
+        var back = againVerzug?.Data.OfType<DisplaceTool>().FirstOrDefault();
+
+        Check.That(back is not null, "die Verschiebung kommt zurueck");
+
+        if (back is not null)
+        {
+            Check.That(back.From == DisplaceFrom.Motion, "samt gewaehltem Pass",
+                       back.From.ToString());
+
+            Check.Near(back.Amount, 25f, 1e-4, "die Staerke");
+            Check.Near(back.Wave, 0.6f, 1e-4, "die Welle");
+            Check.Near(back.Wavelength, 55f, 1e-4, "die Wellenlaenge");
+            Check.Near(back.Angle, 210f, 1e-4, "die Richtung");
+            Check.Near(back.Spread, 0.3f, 1e-4, "und der Kanalversatz");
+
+            Check.That(back.Needs == PassNeed.Motion,
+                       "und sie verlangt danach den Vektorpass, nicht die Normale");
+        }
 
         // In Grundstellung zaehlt es nicht mit - sonst zoege eine Blende von null
         // jedes Bild durch den Puffer und laese den Tiefenpass dazu.
@@ -333,6 +387,188 @@ public static class RenderDataInvariants
         Check.That(coarse < 60, "beim Ziehen bleibt es bedienbar", $"{coarse:0.0} ms");
         Check.That(motionCoarse < 80, "auch mit Bewegung ueber dem ganzen Bild",
                    $"{motionCoarse:0.0} ms");
+    }
+
+    /// <summary>
+    /// Die Verschiebung folgt dem Pass - und nur ihm.
+    ///
+    /// Das ist der ganze Grund, warum es dieses Werkzeug hier gibt und nicht in
+    /// fuenfzig anderen Programmen: Ein Wellenfilter im Bildbearbeiter kennt nur das
+    /// fertige Bild und schiebt deshalb alles gleich weit - Vordergrund, Hintergrund
+    /// und Himmel. Hier steht in der Datei, wohin jede Flaeche zeigt.
+    ///
+    /// Geprueft wird deshalb vor allem die Trennung: Wo der Pass eine Richtung nennt,
+    /// muss sich etwas bewegen, und wo er schweigt, darf sich NICHTS bewegen. Ein
+    /// Verzug, der auch den unbeschriebenen Himmel mitnimmt, waere derselbe Filter
+    /// wie ueberall sonst.
+    /// </summary>
+    private static void TheDisplacementFollowsThePass()
+    {
+        Check.Group("Die Verschiebung folgt dem Pass");
+
+        const int w = 200, h = 120;
+
+        // Genau EINE harte Kante in der Mitte - links dunkel, rechts hell.
+        //
+        // Kein Schachbrett: Dort waere in jeder zweiten Zeilenreihe die helle Seite
+        // links, und die Kantensuche faende die falsche Kante. Die Zahlen saehen dann
+        // nach einem viel groesseren Ausschlag aus, als wirklich da ist - eine Probe,
+        // die aus dem falschen Grund gruen ist.
+        static FloatFrame Edge(int width, int height)
+        {
+            int count = width * height;
+
+            var r = new float[count];
+
+            for (int y = 0; y < height; y++)
+                for (int x = 0; x < width; x++)
+                    r[y * width + x] = x < width / 2 ? 0.05f : 0.9f;
+
+            return new FloatFrame
+            {
+                Width = width, Height = height,
+                R = r, G = (float[])r.Clone(), B = (float[])r.Clone(),
+                A = null, IsSceneReferred = true,
+            };
+        }
+
+        var frame = Edge(w, h);
+
+        // Ein Normalpass, der nur in der unteren Haelfte nach rechts zeigt. Oben
+        // steht null - dort darf nichts geschehen.
+        static FloatFrame Normals(int width, int height, float nx, float ny, bool lowerOnly)
+        {
+            int count = width * height;
+
+            var r = new float[count];
+            var g = new float[count];
+            var b = new float[count];
+
+            for (int y = 0; y < height; y++)
+            {
+                if (lowerOnly && y < height / 2) continue;
+
+                for (int x = 0; x < width; x++)
+                {
+                    int i = y * width + x;
+
+                    r[i] = nx;
+                    g[i] = ny;
+                    b[i] = 1f;
+                }
+            }
+
+            return new FloatFrame
+            {
+                Width = width, Height = height, R = r, G = g, B = b,
+                A = null, IsSceneReferred = true,
+            };
+        }
+
+        static GradingStack Shift(float amount, float wave = 0f, float spread = 0f)
+            => new()
+            {
+                Data =
+                {
+                    new DisplaceTool
+                    {
+                        From = DisplaceFrom.Normal, Amount = amount,
+                        Wave = wave, Wavelength = 40f, Angle = 90f, Spread = spread,
+                    },
+                },
+            };
+
+        var plain = Draw(frame, new GradingStack());
+
+        var pass = Normals(w, h, 1f, 0f, lowerOnly: true);
+        var shifted = Draw(frame, Shift(30f), new FloatFrame?[] { pass });
+
+        static int Row(byte[] pixels, int width, int y)
+        {
+            // Wo die Kante liegt: die erste Spalte, ab der es hell wird.
+            for (int x = 1; x < width; x++)
+                if (pixels[(y * width + x) * 4] > 128) return x;
+
+            return -1;
+        }
+
+        int topPlain = Row(plain, w, h / 4);
+        int topShifted = Row(shifted, w, h / 4);
+
+        int lowPlain = Row(plain, w, h * 3 / 4);
+        int lowShifted = Row(shifted, w, h * 3 / 4);
+
+        Console.WriteLine($"         Kante oben {topPlain} -> {topShifted}, " +
+                          $"unten {lowPlain} -> {lowShifted}");
+
+        Check.That(topShifted == topPlain,
+                   "wo der Pass schweigt, bleibt die Kante stehen",
+                   $"{topPlain} gegen {topShifted}");
+
+        Check.That(lowShifted != lowPlain,
+                   "wo er eine Richtung nennt, wandert sie",
+                   $"{lowPlain} gegen {lowShifted}");
+
+        Check.That(Math.Abs(Math.Abs(lowShifted - lowPlain) - 30) <= 3,
+                   "und zwar um die eingestellte Strecke",
+                   $"{Math.Abs(lowShifted - lowPlain)} statt 30");
+
+        // Ohne Staerke zaehlt es nicht mit - sonst zoege eine Null jedes Bild durch
+        // den Puffer und laese den Normalpass dazu.
+        var quiet = Shift(0f);
+
+        Check.That(quiet.Prepare().Data.Length == 0, "abgedreht zaehlt es nicht");
+        Check.That(quiet.IsNeutral, "und der Stapel gilt als neutral");
+
+        // Die Welle macht aus dem glatten Verzug Baender. Bei voller Welle schwingt
+        // sie um null - dann muss es Zeilen geben, die weiter geschoben sind als der
+        // Schnitt, und Zeilen, die zurueckgeschoben sind.
+        var waved = Draw(frame, Shift(30f, wave: 1f),
+                         new FloatFrame?[] { Normals(w, h, 1f, 0f, lowerOnly: false) });
+
+        int least = int.MaxValue, most = int.MinValue;
+
+        for (int y = 0; y < h; y++)
+        {
+            int at = Row(waved, w, y);
+            if (at < 0) continue;
+
+            least = Math.Min(least, at);
+            most = Math.Max(most, at);
+        }
+
+        Console.WriteLine($"         mit Welle: Kante zwischen {least} und {most}");
+
+        // Bei voller Welle schwingt die Staerke zwischen -30 und +30, die Kante also
+        // zwischen 70 und 130. Geprueft wird beides: dass sie ueberhaupt in Baender
+        // zerfaellt UND dass sie dabei nicht weiter laeuft, als eingestellt ist.
+        Check.That(most - least > 20,
+                   "die Welle legt die Kante in Baender", $"{most - least} Punkte Spanne");
+
+        Check.That(least >= 100 - 33 && most <= 100 + 33,
+                   "und keine davon laeuft weiter als die Staerke erlaubt",
+                   $"{least} bis {most}");
+
+        // Der Kanalversatz schiebt die Kanaele verschieden weit - das ist der
+        // Farbsaum, der den Riss nach Stoerung aussehen laesst.
+        var spread = Draw(frame, Shift(30f, spread: 0.4f),
+                          new FloatFrame?[] { Normals(w, h, 1f, 0f, lowerOnly: false) });
+
+        int apart = 0;
+
+        for (int y = 0; y < h; y++)
+        {
+            for (int x = 0; x < w; x++)
+            {
+                int i = (y * w + x) * 4;
+
+                if (Math.Abs(spread[i] - spread[i + 2]) > 60) apart++;
+            }
+        }
+
+        Console.WriteLine($"         Kanalversatz: {apart} Punkte mit Farbsaum");
+
+        Check.That(apart > 0, "mit Versatz laufen Rot und Blau auseinander", $"{apart}");
     }
 
     // ------------------------------------------------------------------- Handwerk

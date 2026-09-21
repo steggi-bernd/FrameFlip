@@ -61,6 +61,16 @@
     <sys:String x:Key="S_ClarityAmount">Stärke</sys:String>
     <sys:String x:Key="S_ClarityReach">Radius</sys:String>
     <sys:String x:Key="S_ClarityHint">Örtlicher Kontrast: Er verstärkt, was ein Punkt gegenüber seiner Umgebung ist, und lässt gleichmäßige Flächen in Ruhe. Großer Radius gibt Plastizität, kleiner gibt Schärfe. Negativ nimmt Kontrast weg.</sys:String>
+    <sys:String x:Key="S_Displace">Verschiebung</sys:String>
+    <sys:String x:Key="S_DisplaceAmount">Staerke</sys:String>
+    <sys:String x:Key="S_DisplaceWave">Welle</sys:String>
+    <sys:String x:Key="S_DisplaceLength">Wellenlaenge</sys:String>
+    <sys:String x:Key="S_DisplaceAngle">Richtung</sys:String>
+    <sys:String x:Key="S_DisplaceSpread">Kanalversatz</sys:String>
+    <sys:String x:Key="S_DisplaceFromNormal">Normalpass</sys:String>
+    <sys:String x:Key="S_DisplaceFromMotion">Vektorpass</sys:String>
+    <sys:String x:Key="S_DisplaceFromHint">Woher die Richtung kommt. Der Normalpass legt den Verzug an die Geometrie: Eine Kugel schiebt nach aussen, eine Wand gar nicht. Der Vektorpass legt ihn an die Bewegung: Was steht, bleibt stehen, was laeuft, zerreisst in Laufrichtung.</sys:String>
+    <sys:String x:Key="S_DisplaceHint">Braucht den gewaehlten Pass in der Datei - ohne ihn ruht das Werkzeug. Die Welle macht aus dem glatten Verzug Baender, die abwechselnd vor- und zurueckschieben; der Kanalversatz gibt ihnen den Farbsaum, der nach Stoerung aussieht statt nach Weichzeichner.</sys:String>
     <sys:String x:Key="S_Motion">Bewegungsunschärfe</sys:String>
     <sys:String x:Key="S_MotionShutter">Verschluss</sys:String>
     <sys:String x:Key="S_MotionSamples">Abtastungen</sys:String>

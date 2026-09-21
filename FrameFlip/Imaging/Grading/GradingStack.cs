@@ -183,6 +183,8 @@ public sealed class GradingStack
 
         MotionBlurTool motion => new MotionBlurTool { Shutter = motion.Shutter, Samples = motion.Samples },
 
+        DisplaceTool displace => displace.Clone(),
+
         // Wie oben: Ein Werkzeug, das hier fehlt, wuerde geteilt statt kopiert.
         _ => throw new NotSupportedException($"Kein Kopierweg fuer {tool.GetType().Name}."),
     };

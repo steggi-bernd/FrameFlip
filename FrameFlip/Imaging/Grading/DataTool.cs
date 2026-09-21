@@ -18,6 +18,9 @@ public enum PassNeed
 
     /// <summary>Bewegung je Bildpunkt - der Vektorpass mit vier Kanaelen.</summary>
     Motion,
+
+    /// <summary>Wohin eine Flaeche zeigt - der Normalpass mit drei Kanaelen.</summary>
+    Normal,
 }
 
 /// <summary>
@@ -50,6 +53,7 @@ public enum DataStage
                  UnknownDerivedTypeHandling = JsonUnknownDerivedTypeHandling.FailSerialization)]
 [JsonDerivedType(typeof(DepthFieldTool), DepthFieldTool.KindName)]
 [JsonDerivedType(typeof(MotionBlurTool), MotionBlurTool.KindName)]
+[JsonDerivedType(typeof(DisplaceTool), DisplaceTool.KindName)]
 public interface IDataTool
 {
     /// <summary>Kennung fuer die Speicherung. Bleibt stabil, auch wenn der Anzeigename wechselt.</summary>
@@ -445,6 +449,7 @@ public static class FramePasses
 {
     private static readonly string[] DepthNames = { "Depth", "Z", "Mist" };
     private static readonly string[] MotionNames = { "Vector", "Motion", "Speed" };
+    private static readonly string[] NormalNames = { "Normal", "N" };
 
     /// <summary>
     /// Liest zu jedem Werkzeug seinen Pass. Fehlt er, bleibt der Platz leer und das
@@ -472,12 +477,18 @@ public static class FramePasses
     {
         if (passes.Count == 0) return null;
 
-        var names = need == PassNeed.Depth ? DepthNames : MotionNames;
+        var names = need switch
+        {
+            PassNeed.Depth => DepthNames,
+            PassNeed.Normal => NormalNames,
+            _ => MotionNames,
+        };
 
         // Eine Entfernung ist eine Groesse je Bildpunkt, eine Bewegung eine Richtung.
         // Die Unterscheidung ist nicht kosmetisch: Ein dreikanaliger Pass namens
         // "Depth" waere etwas anderes als der Tiefenpass, und ein einkanaliger namens
-        // "Vector" enthielte keine Richtung.
+        // "Vector" enthielte keine Richtung. Eine Normale ist wie eine Bewegung eine
+        // Richtung.
         bool grey = need == PassNeed.Depth;
 
         foreach (string wanted in names)
