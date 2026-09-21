@@ -457,6 +457,23 @@ public sealed partial class AtelierPage : UserControl
             _finalGrading = Tools.Prepared;
         }
 
+        // Ein Werkzeug mit Renderdaten kann einen Pass verlangen, den noch niemand
+        // gelesen hat - und dann tut es nichts, ohne das zu sagen.
+        //
+        // Das war ein alter Fehler und nicht nur einer der Verschiebung: Gelesen
+        // wurde bisher NUR ueber den Ebenenstreifen. Wer die Tiefenschaerfe
+        // aufdrehte, nachdem die Datei offen war, bekam sie deshalb erst zu sehen,
+        // wenn er nebenbei eine Ebene anfasste - vorher lag der Tiefenpass nicht im
+        // Vorrat, und ein Werkzeug ohne seinen Pass ruht.
+        //
+        // Geprueft wird erst beim Loslassen: Waehrend des Zuges darf keine Datei im
+        // Weg liegen, und die Frage kostet einen Durchgang durch die Werkzeugliste.
+        if (!interim && !layer && DataPasses().Any(name => !_sources.ContainsKey(name)))
+        {
+            OnLayersChanged(interim: false);
+            return;
+        }
+
         // Eine Einstellungsebene sitzt IM Stapel - was sie aendert, aendert das
         // zusammengesetzte Bild und nicht erst die Korrektur am Ende.
         Refresh(interim, recompose: layer);

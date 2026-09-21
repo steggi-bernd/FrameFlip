@@ -22,7 +22,148 @@ namespace FrameFlip.Tests;
 /// </summary>
 public static class GradingGroupInvariants
 {
-    public static void Run() => TilesShowWhatIsThereAndWhatIsOn();
+    public static void Run()
+    {
+        TilesShowWhatIsThereAndWhatIsOn();
+        ALayerLocksWhatCannotRunOnIt();
+    }
+
+    /// <summary>
+    /// Was auf einer Ebene nicht gerechnet werden kann, darf dort auch nicht
+    /// bedienbar sein.
+    ///
+    /// Eine Ebene bekommt nur die PUNKTWEISEN Werkzeuge - LayerGrade reicht
+    /// SceneLinear und Display durch, sonst nichts. Alles andere - oertliche
+    /// Werkzeuge, Optik, Renderdaten, Raster - wird an einer Ebene nie gerechnet.
+    ///
+    /// Ein Abschnitt, der trotzdem bedienbar bleibt, schreibt in den Stapel der Ebene
+    /// und verschwindet dort. Im Fenster sieht das aus wie "der Regler tut nichts",
+    /// und zwar ohne Meldung und ohne gesperrten Regler - die unangenehmste Art
+    /// Fehler, die dieses Programm kennt.
+    ///
+    /// Genau das ist hier schon ZWEIMAL passiert: beim Rastern und bei der
+    /// Verschiebung. Beide Male stand der Abschnitt im Streifen und fehlte in der
+    /// Sperrliste. Diese Probe zaehlt deshalb nicht Namen auf, sondern geht die
+    /// Reiter ab: Was in einem der Reiter fuer das ganze Bild steht, MUSS gesperrt
+    /// sein, sobald eine Ebene gewaehlt ist. Ein neues Werkzeug faellt damit von
+    /// selbst auf.
+    /// </summary>
+    private static void ALayerLocksWhatCannotRunOnIt()
+    {
+        Check.Group("Eine gewaehlte Ebene sperrt, was auf ihr nicht rechnen kann");
+
+        var panel = new GradingPanel();
+
+        var window = new Window
+        {
+            Content = panel,
+            Width = 420,
+            Height = 900,
+            ShowInTaskbar = false,
+            WindowStyle = WindowStyle.None,
+            ShowActivated = false,
+            Left = -4000,
+            Top = -4000,
+        };
+
+        try
+        {
+            window.Show();
+            panel.UpdateLayout();
+
+            var tabs = (WrapPanel)panel.FindName("Tabs");
+            var tiles = (WrapPanel)panel.FindName("Tiles");
+
+            if (tabs is null || tiles is null)
+            {
+                Check.That(false, "Reiterleiste und Kachelfeld sind da");
+                return;
+            }
+
+            // Die drei Reiter, deren Werkzeuge dem ganzen Bild gelten - und die
+            // beiden, deren Werkzeuge punktweise rechnen und deshalb auch auf einer
+            // Ebene gelten.
+            var forThePicture = new[] { "S_GroupLight", "S_GroupOptics", "S_GroupFilm" };
+            var forBoth = new[] { "S_GroupBasics", "S_GroupTable" };
+
+            static string[] TagsOf(WrapPanel tiles)
+                => tiles.Children.OfType<ToggleButton>()
+                        .Select(b => (string)b.Tag)
+                        .Where(tag => tag is not null)
+                        .ToArray();
+
+            void Open(string tab)
+            {
+                var button = tabs.Children.OfType<ToggleButton>()
+                                 .First(b => (string)b.Tag == tab);
+
+                button.IsChecked = true;
+                panel.UpdateLayout();
+            }
+
+            // Erst ohne Ebene: Alles muss bedienbar sein, sonst misst die zweite
+            // Haelfte nur, dass ohnehin nichts geht.
+            panel.ShowTarget(null, onLayer: false, locked: false);
+            panel.UpdateLayout();
+
+            foreach (string tab in forThePicture.Concat(forBoth))
+            {
+                Open(tab);
+
+                foreach (string tag in TagsOf(tiles))
+                {
+                    if (panel.FindName(tag + "Body") is not FrameworkElement body) continue;
+
+                    Check.That(body.IsEnabled,
+                               $"ohne Ebene ist {tag} bedienbar");
+                }
+            }
+
+            // Und jetzt mit.
+            panel.ShowTarget("Glanz", onLayer: true, locked: false);
+            panel.UpdateLayout();
+
+            int locked = 0, open = 0;
+
+            foreach (string tab in forThePicture)
+            {
+                Open(tab);
+
+                foreach (string tag in TagsOf(tiles))
+                {
+                    if (panel.FindName(tag + "Body") is not FrameworkElement body)
+                    {
+                        Check.That(false, $"zu {tag} gehoert ein Abschnitt");
+                        continue;
+                    }
+
+                    if (body.IsEnabled) open++; else locked++;
+
+                    Check.That(!body.IsEnabled,
+                               $"{tag} ist an einer Ebene gesperrt - es wuerde dort nie gerechnet");
+                }
+            }
+
+            Console.WriteLine($"         an einer Ebene gesperrt: {locked}, offen geblieben: {open}");
+
+            foreach (string tab in forBoth)
+            {
+                Open(tab);
+
+                foreach (string tag in TagsOf(tiles))
+                {
+                    if (panel.FindName(tag + "Body") is not FrameworkElement body) continue;
+
+                    Check.That(body.IsEnabled,
+                               $"{tag} bleibt bedienbar - es rechnet punktweise und gilt auch auf einer Ebene");
+                }
+            }
+        }
+        finally
+        {
+            window.Close();
+        }
+    }
 
     private static void TilesShowWhatIsThereAndWhatIsOn()
     {

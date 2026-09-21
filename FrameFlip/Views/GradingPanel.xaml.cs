@@ -207,6 +207,7 @@ public partial class GradingPanel : UserControl
         TextureBody.IsEnabled = enabled;
         SharpenBody.IsEnabled = enabled;
         MotionBody.IsEnabled = enabled;
+        DisplaceBody.IsEnabled = enabled;
         DepthBody.IsEnabled = enabled;
         DistortionBody.IsEnabled = enabled;
         ChromaticBody.IsEnabled = enabled;
