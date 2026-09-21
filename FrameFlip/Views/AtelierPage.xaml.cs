@@ -240,6 +240,13 @@ public sealed partial class AtelierPage : UserControl
         _unreadable.Clear();
         _composed = null;
         _passes = passes;
+
+        // Welche Renderdaten diese Datei fuehrt. Der Streifen sagt es an den
+        // Werkzeugen, die sie brauchen - sonst zieht man an einem Regler, es
+        // passiert nichts, und man sucht den Fehler im Programm statt in der Datei.
+        Tools.ShowPasses(FramePasses.NameFor(PassNeed.Depth, passes) is not null,
+                         FramePasses.NameFor(PassNeed.Motion, passes) is not null,
+                         FramePasses.NameFor(PassNeed.Normal, passes) is not null);
         _cryptomattes = cryptomattes;
 
         // Die Miniaturen liegen unter dem Namen der Quelle - und derselbe Name meint

@@ -159,6 +159,43 @@ public partial class GradingPanel : UserControl
         Target = onLayer ? layer : null;
     }
 
+    /// <summary>
+    /// Welche Renderdaten die Datei fuehrt - damit ein Werkzeug sagen kann, warum es
+    /// nichts tut.
+    ///
+    /// Das ist der Unterschied zwischen "ruht" und "kaputt". Ein Werkzeug mit
+    /// Renderdaten ruht, wenn sein Pass fehlt, und das ist richtig so - eine Datei
+    /// ohne Tiefe ist kein Fehler, sondern eine Datei ohne Tiefe. Nur merkt das
+    /// niemand: Man zieht am Regler, es passiert nichts, und dann sucht man den
+    /// Fehler im Programm statt in der Datei.
+    /// </summary>
+    public void ShowPasses(bool depth, bool motion, bool normal)
+    {
+        _hasDepth = depth;
+        _hasMotion = motion;
+        _hasNormal = normal;
+
+        ShowMissingPasses();
+    }
+
+    private bool _hasDepth = true, _hasMotion = true, _hasNormal = true;
+
+    private void ShowMissingPasses()
+    {
+        MotionMissing.Visibility = _hasMotion ? Visibility.Collapsed : Visibility.Visible;
+        DepthMissing.Visibility = _hasDepth ? Visibility.Collapsed : Visibility.Visible;
+
+        // Bei der Verschiebung haengt es daran, welcher Pass gerade gewaehlt ist.
+        bool wantsMotion = DisplaceFromBox.SelectedIndex == 1;
+        bool there = wantsMotion ? _hasMotion : _hasNormal;
+
+        DisplaceMissing.Text = Strings.T(wantsMotion
+            ? "S_PassMissingMotion"
+            : "S_PassMissingNormal");
+
+        DisplaceMissing.Visibility = there ? Visibility.Collapsed : Visibility.Visible;
+    }
+
     /// <summary>Gewaehlt wurde ein anderes Ziel - wahr heisst "die Ebene".</summary>
     public event Action<bool>? TargetChanged;
 
@@ -1248,6 +1285,7 @@ public partial class GradingPanel : UserControl
             ? DisplaceFrom.Motion
             : DisplaceFrom.Normal;
 
+        ShowMissingPasses();
         Raise(interim: false);
     }
 

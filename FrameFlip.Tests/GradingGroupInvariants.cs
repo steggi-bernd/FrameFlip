@@ -101,6 +101,55 @@ public static class GradingGroupInvariants
                 panel.UpdateLayout();
             }
 
+            // Der Unterschied zwischen "ruht" und "kaputt".
+            //
+            // Ein Werkzeug mit Renderdaten ruht, wenn sein Pass fehlt - das ist
+            // richtig. Nur merkt das niemand: Man zieht am Regler, es passiert
+            // nichts, und dann sucht man den Fehler im Programm statt in der Datei.
+            // Genau dieser Weg hat hier schon einmal eine Runde gekostet.
+            var missing = new[] { "MotionMissing", "DepthMissing", "DisplaceMissing" };
+
+            panel.ShowPasses(depth: true, motion: true, normal: true);
+            panel.UpdateLayout();
+
+            foreach (string name in missing)
+            {
+                var note = (FrameworkElement)panel.FindName(name);
+
+                Check.That(note.Visibility != Visibility.Visible,
+                           $"mit allen Passen schweigt {name}");
+            }
+
+            panel.ShowPasses(depth: false, motion: false, normal: false);
+            panel.UpdateLayout();
+
+            foreach (string name in missing)
+            {
+                var note = (FrameworkElement)panel.FindName(name);
+
+                Check.That(note.Visibility == Visibility.Visible,
+                           $"ohne sie sagt {name}, woran es liegt");
+            }
+
+            // Und bei der Verschiebung haengt es daran, welcher Pass gewaehlt ist:
+            // Wer den Vektorpass waehlt, will nichts ueber die Normale hoeren.
+            var displaceNote = (TextBlock)panel.FindName("DisplaceMissing");
+
+            panel.ShowPasses(depth: true, motion: true, normal: false);
+            panel.UpdateLayout();
+
+            Check.That(displaceNote.Visibility == Visibility.Visible,
+                       "ohne Normalpass meldet sich die Verschiebung");
+
+            panel.ShowPasses(depth: true, motion: false, normal: true);
+            panel.UpdateLayout();
+
+            Check.That(displaceNote.Visibility != Visibility.Visible,
+                       "mit Normalpass schweigt sie - der fehlende Vektorpass ist nicht ihrer");
+
+            panel.ShowPasses(depth: true, motion: true, normal: true);
+            panel.UpdateLayout();
+
             // Erst ohne Ebene: Alles muss bedienbar sein, sonst misst die zweite
             // Haelfte nur, dass ohnehin nichts geht.
             panel.ShowTarget(null, onLayer: false, locked: false);

@@ -61,6 +61,9 @@
     <sys:String x:Key="S_ClarityAmount">Stärke</sys:String>
     <sys:String x:Key="S_ClarityReach">Radius</sys:String>
     <sys:String x:Key="S_ClarityHint">Örtlicher Kontrast: Er verstärkt, was ein Punkt gegenüber seiner Umgebung ist, und lässt gleichmäßige Flächen in Ruhe. Großer Radius gibt Plastizität, kleiner gibt Schärfe. Negativ nimmt Kontrast weg.</sys:String>
+    <sys:String x:Key="S_PassMissingDepth">Diese Datei fuehrt keinen Tiefenpass - das Werkzeug ruht. In Blender: Ansichtsebene, Passe, Data, Z.</sys:String>
+    <sys:String x:Key="S_PassMissingMotion">Diese Datei fuehrt keinen Vektorpass - das Werkzeug ruht. In Blender: Ansichtsebene, Passe, Data, Vector (und die Bewegungsunschaerfe im Rendern ausgeschaltet).</sys:String>
+    <sys:String x:Key="S_PassMissingNormal">Diese Datei fuehrt keinen Normalpass - das Werkzeug ruht. In Blender: Ansichtsebene, Passe, Data, Normal.</sys:String>
     <sys:String x:Key="S_Displace">Verschiebung</sys:String>
     <sys:String x:Key="S_DisplaceAmount">Staerke</sys:String>
     <sys:String x:Key="S_DisplaceWave">Welle</sys:String>

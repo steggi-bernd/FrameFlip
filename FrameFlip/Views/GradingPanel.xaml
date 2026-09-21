@@ -622,6 +622,11 @@
                         Minimum="2" Maximum="48" Value="12" SmallChange="1" LargeChange="4"
                         ValueChanged="OnChanged" MouseDoubleClick="OnSliderReset" Tag="12" />
 
+                <TextBlock x:Name="MotionMissing" Margin="0,8,0,0" FontSize="10"
+                           TextWrapping="Wrap" Visibility="Collapsed"
+                           Foreground="{StaticResource AccentBrush}"
+                           Text="{DynamicResource S_PassMissingMotion}" />
+
                 <TextBlock Margin="0,8,0,0" FontSize="10" TextWrapping="Wrap"
                            Foreground="{StaticResource MutedBrush}"
                            Text="{DynamicResource S_MotionHint}" />
@@ -689,6 +694,10 @@
                         Minimum="0" Maximum="0.6" Value="0" SmallChange="0.01" LargeChange="0.05"
                         ValueChanged="OnChanged" MouseDoubleClick="OnSliderReset" Tag="0" />
 
+                <TextBlock x:Name="DisplaceMissing" Margin="0,8,0,0" FontSize="10"
+                           TextWrapping="Wrap" Visibility="Collapsed"
+                           Foreground="{StaticResource AccentBrush}" />
+
                 <TextBlock Margin="0,8,0,0" FontSize="10" TextWrapping="Wrap"
                            Foreground="{StaticResource MutedBrush}"
                            Text="{DynamicResource S_DisplaceHint}" />
@@ -715,6 +724,11 @@
                 <Slider x:Name="DepthFocusSlider" Style="{StaticResource PanelSlider}"
                         Minimum="0" Maximum="1" Value="0.515" SmallChange="0.01" LargeChange="0.05"
                         ValueChanged="OnChanged" MouseDoubleClick="OnSliderReset" Tag="0.515" />
+
+                <TextBlock x:Name="DepthMissing" Margin="0,8,0,0" FontSize="10"
+                           TextWrapping="Wrap" Visibility="Collapsed"
+                           Foreground="{StaticResource AccentBrush}"
+                           Text="{DynamicResource S_PassMissingDepth}" />
 
                 <TextBlock Margin="0,8,0,0" FontSize="10" TextWrapping="Wrap"
                            Foreground="{StaticResource MutedBrush}"

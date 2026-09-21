@@ -61,6 +61,9 @@
     <sys:String x:Key="S_ClarityAmount">Amount</sys:String>
     <sys:String x:Key="S_ClarityReach">Radius</sys:String>
     <sys:String x:Key="S_ClarityHint">Local contrast: it boosts what a pixel is against its surroundings and leaves flat areas alone. A large radius gives modelling, a small one gives sharpness. Negative takes contrast away.</sys:String>
+    <sys:String x:Key="S_PassMissingDepth">This file carries no depth pass - the tool rests. In Blender: View Layer, Passes, Data, Z.</sys:String>
+    <sys:String x:Key="S_PassMissingMotion">This file carries no vector pass - the tool rests. In Blender: View Layer, Passes, Data, Vector (with motion blur off in the render settings).</sys:String>
+    <sys:String x:Key="S_PassMissingNormal">This file carries no normal pass - the tool rests. In Blender: View Layer, Passes, Data, Normal.</sys:String>
     <sys:String x:Key="S_Displace">Displacement</sys:String>
     <sys:String x:Key="S_DisplaceAmount">Amount</sys:String>
     <sys:String x:Key="S_DisplaceWave">Wave</sys:String>
