@@ -83,6 +83,31 @@ public static class DashboardSelectionInvariants
         Check.That(h.Current("BlendPath") == known.Path, "auch der Ausgabeordner ist ein Auswahlziel");
     }
 
+    public static void EmptyTransitions()
+    {
+        Check.Group("Dashboard - erster Frame und geleerte Bibliothek");
+        using var h = new Harness();
+        string folder = h.Folder("waiting");
+        h.Save(h.Known("waiting", folder));
+        var window = h.Open();
+        h.Frame(folder, 1);
+        var watch = Stopwatch.StartNew();
+        h.PumpUntil(() => watch.ElapsedMilliseconds >= 900);
+        Check.That(h.Sequence is { Count: 1, StartNumber: 1 },
+            "der erste geschriebene Frame erscheint in der ausgewaehlten leeren Ausgabe");
+        Set(window, "_playing", true);
+        h.Save();
+        h.Call("ReloadSequencesKeepingSelection");
+        Check.That(h.Buttons.Length == 0 && h.Sequence is null && Read(window, "_current") is null,
+            "eine geleerte Bibliothek gibt auch Auswahl und Sequenz frei");
+        Check.That(Read(window, "_playing") is false, "ohne Auswahl endet die Wiedergabe");
+        h.Frame(folder, 2);
+        watch.Restart();
+        h.PumpUntil(() => watch.ElapsedMilliseconds >= 900);
+        Check.That(h.Sequence is null && h.Text("SequenceName") == Strings.T("D_StageTitle"),
+            "Dateimeldungen aus dem entfernten Projekt oeffnen keine alte Auswahl erneut");
+    }
+
     internal static object? Read(object target, string name)
         => target.GetType().GetField(name, BindingFlags.Instance | BindingFlags.NonPublic)?.GetValue(target)
            ?? target.GetType().GetProperty(name, BindingFlags.Instance | BindingFlags.NonPublic)?.GetValue(target);

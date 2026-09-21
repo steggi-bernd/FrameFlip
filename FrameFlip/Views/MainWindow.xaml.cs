@@ -592,6 +592,9 @@ public partial class MainWindow : Window
 
         if (entries.Count == 0)
         {
+            _current = null;
+            Pause();
+            _live.WatchFolder(null);
             SequenceList.Children.Add(new TextBlock
             {
                 Text = Strings.T("D_NoRenders"),
@@ -973,7 +976,14 @@ public partial class MainWindow : Window
     /// <summary>Die Sequenz neu einlesen, ohne die Auswahl oder die Stelle zu verlieren.</summary>
     private void RescanLive()
     {
-        if (_current is null || _sequence is null) return;
+        if (_current is null) return;
+        if (_sequence is null)
+        {
+            // Auch der erste Frame eines gerade begonnenen Renders gehoert
+            // zur ausgewaehlten Ausgabe, die bisher noch keine Folge hatte.
+            Select(_current);
+            return;
+        }
 
         ImageSequence? fresh;
 
