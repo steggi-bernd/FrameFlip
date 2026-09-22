@@ -42,11 +42,12 @@ public static class FloatFrameProcessor
     /// sie hier auf, weil das Bild dabei sichtbar umspringt.
     /// </summary>
     private static void RunFrame(in PreparedGrading grading, IntPtr destination,
-                                 int width, int height, int stride)
+                                 int width, int height, int stride, int number)
     {
         var passes = grading.Frame;
 
-        for (int i = 0; i < passes.Length; i++) passes[i].Apply(destination, width, height, stride);
+        for (int i = 0; i < passes.Length; i++)
+            passes[i].Apply(destination, width, height, stride, number);
     }
 
     /// <summary>
@@ -144,7 +145,7 @@ public static class FloatFrameProcessor
                 }
             });
 
-            RunFrame(in grading, destination, width, height, destinationStride);
+            RunFrame(in grading, destination, width, height, destinationStride, number);
 
             return;
         }
@@ -244,7 +245,8 @@ public static class FloatFrameProcessor
                 // dem Pass.
                 if (pass is null && !grading.Data[i].Optional) continue;
 
-                grading.Data[i].Run(scratch, pass, columns, rows, imageWidth, step);
+                grading.Data[i].Run(scratch, pass, columns, rows, imageWidth, step,
+                                    plan.Place.Number);
             }
 
             LocalPass.Run(scratch, grading.LocalLight, gridWidth, gridHeight, imageWidth, step);
@@ -510,7 +512,7 @@ public static class FloatFrameProcessor
             // stand nur im geraden. Sobald also Glanz, Klarheit oder Schaerfe an
             // waren, lief die Fehlerdiffusion nicht mehr - und zwar ohne Meldung,
             // weil an dem Bild ja trotzdem gerechnet wurde.
-            RunFrame(in grading, destination, width, height, destinationStride);
+            RunFrame(in grading, destination, width, height, destinationStride, number);
 
             return;
         }

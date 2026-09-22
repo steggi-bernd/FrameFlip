@@ -656,6 +656,30 @@
                                   Content="{DynamicResource S_DisplaceFromScreen}" />
                 </ComboBox>
 
+                <!--
+                    Die Form. Die ersten vier schwingen, die letzten beiden SPRINGEN -
+                    und das ist der Unterschied zwischen einer Wasseroberflaeche und
+                    einem kaputten Signal. Sie steht gleich unter der Quelle, weil sie
+                    mehr ueber das Aussehen entscheidet als jeder Regler darunter.
+                -->
+                <ComboBox x:Name="DisplaceShapeBox" Style="{StaticResource OverlayCombo}"
+                          HorizontalAlignment="Left" Width="180" Margin="0,0,0,8"
+                          SelectedIndex="0" SelectionChanged="OnDisplaceShapeChanged"
+                          ToolTip="{DynamicResource S_DisplaceShapeHint}">
+                    <ComboBoxItem Style="{StaticResource OverlayComboItem}"
+                                  Content="{DynamicResource S_ShapeSine}" />
+                    <ComboBoxItem Style="{StaticResource OverlayComboItem}"
+                                  Content="{DynamicResource S_ShapeTriangle}" />
+                    <ComboBoxItem Style="{StaticResource OverlayComboItem}"
+                                  Content="{DynamicResource S_ShapeSquare}" />
+                    <ComboBoxItem Style="{StaticResource OverlayComboItem}"
+                                  Content="{DynamicResource S_ShapeSaw}" />
+                    <ComboBoxItem Style="{StaticResource OverlayComboItem}"
+                                  Content="{DynamicResource S_ShapeSlices}" />
+                    <ComboBoxItem Style="{StaticResource OverlayComboItem}"
+                                  Content="{DynamicResource S_ShapeBlocks}" />
+                </ComboBox>
+
                 <Grid Margin="0,0,0,2">
                     <TextBlock Text="{DynamicResource S_DisplaceAmount}" Style="{StaticResource PanelLabel}" />
                     <TextBlock x:Name="DisplaceAmountValue" Style="{StaticResource PanelValue}" />
@@ -665,20 +689,39 @@
                         ValueChanged="OnChanged" MouseDoubleClick="OnSliderReset" Tag="0" />
 
                 <Grid Margin="0,10,0,2">
-                    <TextBlock Text="{DynamicResource S_DisplaceWave}" Style="{StaticResource PanelLabel}" />
-                    <TextBlock x:Name="DisplaceWaveValue" Style="{StaticResource PanelValue}" />
-                </Grid>
-                <Slider x:Name="DisplaceWaveSlider" Style="{StaticResource PanelSlider}"
-                        Minimum="0" Maximum="1" Value="0" SmallChange="0.02" LargeChange="0.1"
-                        ValueChanged="OnChanged" MouseDoubleClick="OnSliderReset" Tag="0" />
-
-                <Grid Margin="0,10,0,2">
-                    <TextBlock Text="{DynamicResource S_DisplaceLength}" Style="{StaticResource PanelLabel}" />
+                    <TextBlock x:Name="DisplaceLengthLabel" Text="{DynamicResource S_DisplaceLength}"
+                               Style="{StaticResource PanelLabel}" />
                     <TextBlock x:Name="DisplaceLengthValue" Style="{StaticResource PanelValue}" />
                 </Grid>
                 <Slider x:Name="DisplaceLengthSlider" Style="{StaticResource PanelSlider}"
-                        Minimum="4" Maximum="600" Value="80" SmallChange="2" LargeChange="20"
+                        Minimum="2" Maximum="600" Value="80" SmallChange="2" LargeChange="20"
                         ValueChanged="OnChanged" MouseDoubleClick="OnSliderReset" Tag="80" />
+
+                <!-- Nur bei Streifen und Bloecken: welcher Anteil sich ueberhaupt bewegt. -->
+                <StackPanel x:Name="DisplaceDensityRow" Visibility="Collapsed">
+                    <Grid Margin="0,10,0,2">
+                        <TextBlock Text="{DynamicResource S_DisplaceDensity}" Style="{StaticResource PanelLabel}" />
+                        <TextBlock x:Name="DisplaceDensityValue" Style="{StaticResource PanelValue}" />
+                    </Grid>
+                    <Slider x:Name="DisplaceDensitySlider" Style="{StaticResource PanelSlider}"
+                            Minimum="0" Maximum="1" Value="1" SmallChange="0.02" LargeChange="0.1"
+                            ValueChanged="OnChanged" MouseDoubleClick="OnSliderReset" Tag="1"
+                            ToolTip="{DynamicResource S_DisplaceDensityHint}" />
+                </StackPanel>
+
+                <!--
+                    Das Tempo. Fuer eine Sequenz der wichtigste Regler nach der Staerke:
+                    Eine Verschiebung, die ueber alle Bilder gleich steht, sieht aus wie
+                    ein Aufkleber auf der Linse.
+                -->
+                <Grid Margin="0,10,0,2">
+                    <TextBlock Text="{DynamicResource S_DisplaceSpeed}" Style="{StaticResource PanelLabel}" />
+                    <TextBlock x:Name="DisplaceSpeedValue" Style="{StaticResource PanelValue}" />
+                </Grid>
+                <Slider x:Name="DisplaceSpeedSlider" Style="{StaticResource PanelSlider}"
+                        Minimum="-1" Maximum="1" Value="0" SmallChange="0.01" LargeChange="0.05"
+                        ValueChanged="OnChanged" MouseDoubleClick="OnSliderReset" Tag="0"
+                        ToolTip="{DynamicResource S_DisplaceSpeedHint}" />
 
                 <Grid Margin="0,10,0,2">
                     <TextBlock Text="{DynamicResource S_DisplaceAngle}" Style="{StaticResource PanelLabel}" />
@@ -689,12 +732,46 @@
                         ValueChanged="OnChanged" MouseDoubleClick="OnSliderReset" Tag="90" />
 
                 <Grid Margin="0,10,0,2">
+                    <TextBlock Text="{DynamicResource S_DisplaceWave}" Style="{StaticResource PanelLabel}" />
+                    <TextBlock x:Name="DisplaceWaveValue" Style="{StaticResource PanelValue}" />
+                </Grid>
+                <Slider x:Name="DisplaceWaveSlider" Style="{StaticResource PanelSlider}"
+                        Minimum="0" Maximum="1" Value="1" SmallChange="0.02" LargeChange="0.1"
+                        ValueChanged="OnChanged" MouseDoubleClick="OnSliderReset" Tag="1"
+                        ToolTip="{DynamicResource S_DisplaceWaveHint}" />
+
+                <Grid Margin="0,10,0,2">
+                    <TextBlock Text="{DynamicResource S_DisplacePhase}" Style="{StaticResource PanelLabel}" />
+                    <TextBlock x:Name="DisplacePhaseValue" Style="{StaticResource PanelValue}" />
+                </Grid>
+                <Slider x:Name="DisplacePhaseSlider" Style="{StaticResource PanelSlider}"
+                        Minimum="0" Maximum="360" Value="0" SmallChange="1" LargeChange="15"
+                        ValueChanged="OnChanged" MouseDoubleClick="OnSliderReset" Tag="0" />
+
+                <Grid Margin="0,10,0,2">
                     <TextBlock Text="{DynamicResource S_DisplaceSpread}" Style="{StaticResource PanelLabel}" />
                     <TextBlock x:Name="DisplaceSpreadValue" Style="{StaticResource PanelValue}" />
                 </Grid>
                 <Slider x:Name="DisplaceSpreadSlider" Style="{StaticResource PanelSlider}"
                         Minimum="0" Maximum="0.6" Value="0" SmallChange="0.01" LargeChange="0.05"
                         ValueChanged="OnChanged" MouseDoubleClick="OnSliderReset" Tag="0" />
+
+                <!--
+                    Umschlagen und neu wuerfeln. Das zweite ist der Knopf, den jeder
+                    Glitch-Baukasten hat und der hier eine Zahl ersetzt: Niemand sucht
+                    einen Riss ueber einen Startwert aus, man wuerfelt, bis er passt.
+                -->
+                <StackPanel Orientation="Horizontal" Margin="0,10,0,0">
+                    <ToggleButton x:Name="DisplaceWrapButton" Style="{StaticResource OverlayToggle}"
+                                  Content="{DynamicResource S_DisplaceWrap}"
+                                  ToolTip="{DynamicResource S_DisplaceWrapHint}"
+                                  Checked="OnDisplaceFlagChanged" Unchecked="OnDisplaceFlagChanged" />
+                    <Button x:Name="DisplaceReseedButton" Style="{StaticResource OverlayButton}"
+                            Margin="6,0,0,0" Visibility="Collapsed"
+                            Content="{DynamicResource S_Reseed}"
+                            ToolTip="{DynamicResource S_ReseedHint}"
+                            Click="OnDisplaceReseed" />
+                </StackPanel>
 
                 <TextBlock x:Name="DisplaceMissing" Margin="0,8,0,0" FontSize="10"
                            TextWrapping="Wrap" Visibility="Collapsed"

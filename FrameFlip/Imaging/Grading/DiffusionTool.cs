@@ -175,7 +175,7 @@ public sealed class DiffusionTool : IFramePass
         foreach (var (_, y, _) in _spread) _reach = Math.Max(_reach, y);
     }
 
-    public unsafe void Apply(IntPtr pixels, int width, int height, int stride)
+    public unsafe void Apply(IntPtr pixels, int width, int height, int stride, int number = 0)
     {
         if (width <= 0 || height <= 0) return;
 

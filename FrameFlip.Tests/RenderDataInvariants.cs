@@ -26,6 +26,7 @@ public static class RenderDataInvariants
         StillThingsStayStill();
         ThePassIsFound();
         TheDisplacementFollowsThePass();
+        ShapesTearsAndTime();
         Persistence();
         WhatItCosts();
     }
@@ -629,6 +630,267 @@ public static class RenderDataInvariants
         Console.WriteLine($"         Kanalversatz: {apart} Punkte mit Farbsaum");
 
         Check.That(apart > 0, "mit Versatz laufen Rot und Blau auseinander", $"{apart}");
+    }
+
+    /// <summary>
+    /// Die Formen, der Riss und die Zeit - jede mit dem, was sie verspricht.
+    ///
+    /// Gemessen wird an einer einzigen harten Kante: Wo sie nach dem Schieben steht,
+    /// sagt je Zeile genau, wie weit geschoben wurde. Daraus laesst sich fuer jede
+    /// Form eine Zusage ablesen, die keine andere Form erfuellt - und nur so eine
+    /// Probe unterscheidet "die Form wirkt" von "irgendetwas bewegt sich".
+    /// </summary>
+    private static void ShapesTearsAndTime()
+    {
+        Check.Group("Formen, Risse und Zeit");
+
+        const int w = 200, h = 160;
+        const float amount = 30f;
+
+        static FloatFrame Edges(int width, int height, params int[] at)
+        {
+            // Hell und dunkel im Wechsel, mit harten Kanten an den genannten Stellen.
+            int count = width * height;
+            var r = new float[count];
+
+            for (int y = 0; y < height; y++)
+            {
+                for (int x = 0; x < width; x++)
+                {
+                    int crossed = at.Count(edge => x >= edge);
+                    r[y * width + x] = crossed % 2 == 1 ? 0.9f : 0.05f;
+                }
+            }
+
+            return new FloatFrame
+            {
+                Width = width, Height = height,
+                R = r, G = (float[])r.Clone(), B = (float[])r.Clone(),
+                A = null, IsSceneReferred = true,
+            };
+        }
+
+        static GradingStack Tool(WaveShape shape, float speed = 0f, int seed = 0,
+                                 float density = 1f, float wave = 1f, bool wrap = false,
+                                 float length = 20f, float move = amount)
+            => new()
+            {
+                Data =
+                {
+                    new DisplaceTool
+                    {
+                        From = DisplaceFrom.Screen, Amount = move, Shape = shape,
+                        Wavelength = length, Wave = wave, Angle = 90f,
+                        Speed = speed, Seed = seed, Density = density, Wrap = wrap,
+                    },
+                },
+            };
+
+        // Die Kante in jeder Zeile - wo es von dunkel nach hell geht, nach einer Stelle.
+        static int[] EdgeAt(byte[] pixels, int width, int height, int from)
+        {
+            var found = new int[height];
+
+            for (int y = 0; y < height; y++)
+            {
+                found[y] = -1;
+
+                for (int x = Math.Max(1, from); x < width; x++)
+                {
+                    if (pixels[(y * width + x) * 4] > 128 && pixels[(y * width + x - 1) * 4] <= 128)
+                    {
+                        found[y] = x;
+                        break;
+                    }
+                }
+            }
+
+            return found;
+        }
+
+        var frame = Edges(w, h, 100);
+
+        // --- Rechteck: nur zwei Stellungen, nichts dazwischen ------------------
+        var square = EdgeAt(Draw(frame, Tool(WaveShape.Square)), w, h, 0);
+        var squarePlaces = square.Where(x => x >= 0).Distinct().OrderBy(x => x).ToArray();
+
+        Console.WriteLine($"         Rechteck: Kante an {string.Join(", ", squarePlaces)}");
+
+        Check.That(squarePlaces.Length == 2,
+                   "Rechteck kennt genau zwei Stellungen",
+                   string.Join(", ", squarePlaces));
+
+        Check.That(squarePlaces.Length == 2 &&
+                   Math.Abs(squarePlaces[0] - 70) <= 1 && Math.Abs(squarePlaces[1] - 130) <= 1,
+                   "und zwar um die volle Staerke nach beiden Seiten");
+
+        // --- Dreieck: dieselbe Spanne, aber alles dazwischen -------------------
+        var triangle = EdgeAt(Draw(frame, Tool(WaveShape.Triangle)), w, h, 0);
+        var trianglePlaces = triangle.Where(x => x >= 0).Distinct().ToArray();
+
+        Check.That(trianglePlaces.Length > 4,
+                   "Dreieck laeuft durch viele Stellungen",
+                   $"{trianglePlaces.Length}");
+
+        Check.That(trianglePlaces.Min() >= 69 && trianglePlaces.Max() <= 131,
+                   "und bleibt dabei in derselben Spanne",
+                   $"{trianglePlaces.Min()} bis {trianglePlaces.Max()}");
+
+        // --- Streifen: innerhalb eines Bandes gleich, zwischen Baendern nicht --
+        //
+        // Das ist die Zusage des Glitch: ein Band springt als GANZES. Eine Welle, die
+        // innerhalb eines Bandes weiterschwingt, waere ein Sinus mit Zacken.
+        var slices = EdgeAt(Draw(frame, Tool(WaveShape.Slices, length: 20f)), w, h, 0);
+
+        int torn = 0, bands = 0;
+
+        for (int band = 0; band < h / 20; band++)
+        {
+            var inBand = Enumerable.Range(band * 20, 20).Select(y => slices[y]).Distinct().Count();
+
+            if (inBand != 1) torn++;
+            bands++;
+        }
+
+        var bandPlaces = Enumerable.Range(0, h / 20).Select(b => slices[b * 20 + 10]).Distinct().Count();
+
+        Console.WriteLine($"         Streifen: {bandPlaces} verschiedene Stellungen in {bands} Baendern, " +
+                          $"{torn} Baender in sich zerrissen");
+
+        Check.That(torn == 0, "jedes Band springt als Ganzes", $"{torn} Baender nicht");
+        Check.That(bandPlaces > 3, "und die Baender springen verschieden weit", $"{bandPlaces}");
+
+        // Dichte null: nichts bewegt sich. Das ist der Regler, der aus "alles
+        // zittert" einen Riss macht - bei null muss er ganz zu sein.
+        var none = EdgeAt(Draw(frame, Tool(WaveShape.Slices, density: 0f)), w, h, 0);
+
+        Check.That(none.All(x => x == 100), "bei Dichte null bleibt alles stehen");
+
+        var sparse = EdgeAt(Draw(frame, Tool(WaveShape.Slices, density: 0.3f)), w, h, 0);
+        int still = sparse.Count(x => x == 100);
+
+        Console.WriteLine($"         Dichte 0,3: {still} von {h} Zeilen unbewegt");
+
+        Check.That(still > h / 3 && still < h,
+                   "bei wenig Dichte steht der groessere Teil still, aber nicht alles",
+                   $"{still} von {h}");
+
+        // --- Bloecke: ein Band zerfaellt in Stuecke ------------------------------
+        //
+        // Zwei Kanten hundert Punkte auseinander. Bei Streifen verschieben sich beide
+        // immer gleich weit - ein Band ist ein Band. Bei Bloecken liegen sie oft in
+        // verschiedenen Stuecken und springen verschieden.
+        var two = Edges(w, h, 50, 100, 150);
+
+        int Apart(GradingStack stack)
+        {
+            var pixels = Draw(two, stack);
+
+            var first = EdgeAt(pixels, w, h, 0);
+            var second = EdgeAt(pixels, w, h, 125);
+
+            int differ = 0;
+
+            for (int y = 0; y < h; y++)
+            {
+                if (first[y] < 0 || second[y] < 0) continue;
+                if (Math.Abs((first[y] - 50) - (second[y] - 150)) > 1) differ++;
+            }
+
+            return differ;
+        }
+
+        int slicesApart = Apart(Tool(WaveShape.Slices, length: 10f));
+        int blocksApart = Apart(Tool(WaveShape.Blocks, length: 10f));
+
+        Console.WriteLine($"         zwei Kanten verschieden weit: Streifen {slicesApart}, Bloecke {blocksApart} Zeilen");
+
+        Check.That(slicesApart == 0, "bei Streifen springen zwei Kanten derselben Zeile gleich",
+                   $"{slicesApart}");
+        Check.That(blocksApart > 0, "bei Bloecken zerfaellt das Band in Stuecke",
+                   $"{blocksApart}");
+
+        // --- Wuerfeln: anderer Startwert, anderer Riss ---------------------------
+        var again = EdgeAt(Draw(frame, Tool(WaveShape.Slices, seed: 0)), w, h, 0);
+        var other = EdgeAt(Draw(frame, Tool(WaveShape.Slices, seed: 1)), w, h, 0);
+
+        Check.That(again.SequenceEqual(slices),
+                   "derselbe Startwert gibt denselben Riss - jedes Mal");
+
+        Check.That(!other.SequenceEqual(slices), "ein anderer gibt einen anderen");
+
+        // --- Zeit: das Tempo laesst es wandern -----------------------------------
+        //
+        // Eine Verschiebung, die ueber alle Bilder gleich steht, sieht aus wie ein
+        // Aufkleber auf der Linse.
+        byte[] AtFrame(GradingStack stack, int number)
+        {
+            int stride = w * 4;
+            var pixels = new byte[stride * h];
+            var buffer = System.Runtime.InteropServices.Marshal.AllocHGlobal(pixels.Length);
+
+            try
+            {
+                FloatFrameProcessor.Apply(frame, ImageAdjustments.Neutral, new StandardViewTransform(),
+                                          stack.Prepare(), buffer, stride, 1, null, number, null);
+
+                System.Runtime.InteropServices.Marshal.Copy(buffer, pixels, 0, pixels.Length);
+            }
+            finally
+            {
+                System.Runtime.InteropServices.Marshal.FreeHGlobal(buffer);
+            }
+
+            return pixels;
+        }
+
+        var moving = Tool(WaveShape.Sine, speed: 0.1f);
+        var frozen = Tool(WaveShape.Sine, speed: 0f);
+
+        Check.That(!AtFrame(moving, 0).SequenceEqual(AtFrame(moving, 7)),
+                   "mit Tempo steht die Welle in Bild 7 woanders als in Bild 0");
+
+        Check.That(AtFrame(frozen, 0).SequenceEqual(AtFrame(frozen, 7)),
+                   "ohne Tempo steht sie still");
+
+        // Eine ganze Wellenlaenge weiter ist wieder dieselbe Welle. Bei Tempo 0,1
+        // ist das nach zehn Bildern - und genau dann muss das Bild gleich sein.
+        Check.That(AtFrame(moving, 0).SequenceEqual(AtFrame(moving, 10)),
+                   "und nach einer vollen Wellenlaenge ist sie wieder, wo sie war");
+
+        // Beim Riss wechselt der Startwert in ganzen Schritten: Bei Tempo 0,5 steht
+        // er zwei Bilder lang und springt dann.
+        var flicker = Tool(WaveShape.Slices, speed: 0.5f);
+
+        Check.That(AtFrame(flicker, 0).SequenceEqual(AtFrame(flicker, 1)),
+                   "bei Tempo 0,5 haelt ein Riss zwei Bilder");
+
+        Check.That(!AtFrame(flicker, 0).SequenceEqual(AtFrame(flicker, 2)),
+                   "und springt im dritten");
+
+        // --- Umschlagen: was links hinausgeht, kommt rechts herein ---------------
+        //
+        // Glatt um fuenfzig Punkte nach LINKS geschoben (die Staerke ist negativ, und
+        // auf 90 Grad zeigt die Richtung nach links). Rechts muss dann etwas
+        // nachkommen: Festgehalten ist das die Randfarbe - hell. Umgeschlagen ist es,
+        // was links hinausgeschoben wurde - dunkel.
+        var held = Draw(frame, Tool(WaveShape.Sine, wave: 0f, move: -50f));
+        var rolled = Draw(frame, Tool(WaveShape.Sine, wave: 0f, move: -50f, wrap: true));
+
+        int row = h / 2;
+        int right = row * w + (w - 5);
+
+        Console.WriteLine($"         rechts aussen: festgehalten {held[right * 4]}, " +
+                          $"umgeschlagen {rolled[right * 4]}");
+
+        Check.That(held[right * 4] > 192, "festgehalten bleibt rechts der helle Rand");
+        Check.That(rolled[right * 4] < 64,
+                   "umgeschlagen kommt dort herein, was links hinausging");
+
+        // Und die Kante selbst ist in beiden Faellen um dieselbe Strecke gewandert -
+        // Umschlagen aendert nur, was am Rand nachkommt.
+        Check.That(EdgeAt(held, w, h, 0)[row] == EdgeAt(rolled, w, h, 0)[row],
+                   "die Kante wandert in beiden Faellen gleich weit");
     }
 
     // ------------------------------------------------------------------- Handwerk

@@ -677,6 +677,17 @@ public partial class GradingPanel : UserControl
                 DisplaceAngleSlider.Minimum, DisplaceAngleSlider.Maximum);
             DisplaceSpreadSlider.Value = Math.Clamp(_displace.Spread,
                 DisplaceSpreadSlider.Minimum, DisplaceSpreadSlider.Maximum);
+            DisplaceDensitySlider.Value = Math.Clamp(_displace.Density,
+                DisplaceDensitySlider.Minimum, DisplaceDensitySlider.Maximum);
+            DisplaceSpeedSlider.Value = Math.Clamp(_displace.Speed,
+                DisplaceSpeedSlider.Minimum, DisplaceSpeedSlider.Maximum);
+            DisplacePhaseSlider.Value = Math.Clamp(_displace.Phase,
+                DisplacePhaseSlider.Minimum, DisplacePhaseSlider.Maximum);
+
+            DisplaceShapeBox.SelectedIndex = (int)_displace.Shape;
+            DisplaceWrapButton.IsChecked = _displace.Wrap;
+
+            ShowDisplaceShape();
 
             SortLowSlider.Value = Math.Clamp(_sort.Low,
                 SortLowSlider.Minimum, SortLowSlider.Maximum);
@@ -933,6 +944,9 @@ public partial class GradingPanel : UserControl
         _displace.Wavelength = (float)DisplaceLengthSlider.Value;
         _displace.Angle = (float)DisplaceAngleSlider.Value;
         _displace.Spread = (float)DisplaceSpreadSlider.Value;
+        _displace.Density = (float)DisplaceDensitySlider.Value;
+        _displace.Speed = (float)DisplaceSpeedSlider.Value;
+        _displace.Phase = (float)DisplacePhaseSlider.Value;
 
         _sort.Low = (float)SortLowSlider.Value;
         _sort.High = (float)SortHighSlider.Value;
@@ -1060,6 +1074,11 @@ public partial class GradingPanel : UserControl
         DisplaceLengthValue.Text = $"{DisplaceLengthSlider.Value:0} px";
         DisplaceAngleValue.Text = $"{DisplaceAngleSlider.Value:0} °";
         DisplaceSpreadValue.Text = $"{DisplaceSpreadSlider.Value:0.00}";
+        DisplaceDensityValue.Text = $"{DisplaceDensitySlider.Value * 100:0} %";
+        DisplacePhaseValue.Text = $"{DisplacePhaseSlider.Value:0} \u00B0";
+        DisplaceSpeedValue.Text = Math.Abs(DisplaceSpeedSlider.Value) < 0.005
+            ? Strings.T("S_DisplaceStill")
+            : $"{DisplaceSpeedSlider.Value:0.00}";
         SortLowValue.Text = $"{SortLowSlider.Value:0.00}";
         SortHighValue.Text = $"{SortHighSlider.Value:0.00}";
         SortLongestValue.Text = SortLongestSlider.Value < 1
@@ -1327,6 +1346,61 @@ public partial class GradingPanel : UserControl
         };
 
         ShowMissingPasses();
+        Raise(interim: false);
+    }
+
+    /// <summary>
+    /// Die Form der Welle - und mit ihr, welche Regler etwas bedeuten.
+    ///
+    /// Wer auf Streifen oder Bloecke umstellt, waehrend die Welle auf null steht,
+    /// saehe nur das ganze Bild verrueckt: Diese Formen SIND die Welle, ohne sie
+    /// bleibt eine glatte Verschiebung. Deshalb wird sie dann aufgedreht - sichtbar,
+    /// am Regler, nicht heimlich.
+    /// </summary>
+    private void OnDisplaceShapeChanged(object sender, SelectionChangedEventArgs e)
+    {
+        if (_filling || !IsLoaded) return;
+
+        _displace.Shape = (WaveShape)Math.Clamp(DisplaceShapeBox.SelectedIndex, 0, 5);
+
+        if (_displace.Shape is WaveShape.Slices or WaveShape.Blocks && DisplaceWaveSlider.Value < 0.5)
+        {
+            DisplaceWaveSlider.Value = 1;
+            _displace.Wave = 1f;
+        }
+
+        ShowDisplaceShape();
+        Raise(interim: false);
+    }
+
+    /// <summary>
+    /// Zeigt, was zur Form gehoert: Dichte und Wuerfel nur bei den zerrissenen, und
+    /// die Wellenlaenge heisst dort, was sie dort ist - die Hoehe eines Bandes.
+    /// </summary>
+    private void ShowDisplaceShape()
+    {
+        bool torn = _displace.Shape is WaveShape.Slices or WaveShape.Blocks;
+
+        DisplaceDensityRow.Visibility = torn ? Visibility.Visible : Visibility.Collapsed;
+        DisplaceReseedButton.Visibility = torn ? Visibility.Visible : Visibility.Collapsed;
+
+        DisplaceLengthLabel.Text = Strings.T(torn ? "S_DisplaceBand" : "S_DisplaceLength");
+    }
+
+    private void OnDisplaceFlagChanged(object sender, RoutedEventArgs e)
+    {
+        if (_filling || !IsLoaded) return;
+
+        _displace.Wrap = DisplaceWrapButton.IsChecked == true;
+
+        Raise(interim: false);
+    }
+
+    /// <summary>Ein neuer Riss - derselbe Aufbau, andere Baender.</summary>
+    private void OnDisplaceReseed(object sender, RoutedEventArgs e)
+    {
+        _displace.Seed++;
+
         Raise(interim: false);
     }
 

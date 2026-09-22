@@ -102,8 +102,13 @@ public interface IDataTool
     /// </param>
     /// <param name="columns">Zu welcher Bildspalte eine Gitterspalte gehoert.</param>
     /// <param name="rows">Dasselbe fuer die Zeilen.</param>
+    /// <param name="number">
+    /// Die Nummer des Bildes in der Sequenz. Gebraucht von allem, was sich ueber die
+    /// Zeit bewegen soll - eine Welle, die ueber alle Bilder gleich steht, sieht aus
+    /// wie ein Aufkleber auf der Linse.
+    /// </param>
     void Run(LocalPass.Scratch scratch, FloatFrame? data, int[] columns, int[] rows,
-             int imageWidth, int step);
+             int imageWidth, int step, int number = 0);
 }
 
 /// <summary>
@@ -177,7 +182,7 @@ public sealed class DepthFieldTool : IDataTool
     }
 
     public void Run(LocalPass.Scratch scratch, FloatFrame? data, int[] columns, int[] rows,
-                    int imageWidth, int step)
+                    int imageWidth, int step, int number = 0)
     {
         // Ohne Tiefenpass gibt es keine Entfernung, nach der sich die Schaerfe
         // richten koennte. Der Aufrufer laesst das Werkzeug dann ohnehin ruhen -
@@ -332,7 +337,7 @@ public sealed class MotionBlurTool : IDataTool
     }
 
     public void Run(LocalPass.Scratch scratch, FloatFrame? data, int[] columns, int[] rows,
-                    int imageWidth, int step)
+                    int imageWidth, int step, int number = 0)
     {
         // Ohne Vektorpass gibt es keine Bewegung zu verschmieren. Der Aufrufer laesst
         // das Werkzeug dann ohnehin ruhen - siehe Optional -, aber die Zusage steht

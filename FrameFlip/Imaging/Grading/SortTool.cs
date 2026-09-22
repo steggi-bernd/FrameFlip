@@ -94,7 +94,7 @@ public sealed class SortTool : IFramePass
         _longest = Math.Max(0, Longest);
     }
 
-    public unsafe void Apply(IntPtr pixels, int width, int height, int stride)
+    public unsafe void Apply(IntPtr pixels, int width, int height, int stride, int number = 0)
     {
         if (width <= 0 || height <= 0) return;
 

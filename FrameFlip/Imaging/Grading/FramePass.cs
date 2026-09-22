@@ -44,5 +44,9 @@ public interface IFramePass
     /// Der ganze Rahmen, in Bgra32 und der Reihe nach.
     /// </summary>
     /// <param name="pixels">Der Zielpuffer - dieselben Bytes, die gleich gezeigt werden.</param>
-    void Apply(IntPtr pixels, int width, int height, int stride);
+    /// <param name="number">
+    /// Die Nummer des Bildes - fuer alles, was je Bild anders ausfallen darf. Ein
+    /// Glitch, der ueber die ganze Sequenz an derselben Stelle steht, ist keiner.
+    /// </param>
+    void Apply(IntPtr pixels, int width, int height, int stride, int number = 0);
 }
