@@ -99,6 +99,7 @@ static int RunAll()
     DashboardSelectionInvariants.EmptyTransitions();
     DashboardSequenceControllerInvariants.Run();
     DashboardFrameInvariants.Run();
+    DashboardFrameInvariants.RetiredWork();
     PaceInvariants.Run();
     ReadinessInvariants.Run();
     MachineInvariants.Run();

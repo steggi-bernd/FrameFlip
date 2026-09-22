@@ -119,6 +119,9 @@ public partial class MainWindow : Window
 
     /// <summary>Ob gerade ein Bild gelesen wird. Es laeuft immer hoechstens eines.</summary>
     private bool _decoding;
+    private long _frameGeneration;
+    private long _displayGeneration;
+    private bool _framesClosed;
 
     /// <summary>Format und Farbtiefe der Sequenz - einmal ermittelt, dann angezeigt.</summary>
     private string _format = string.Empty;
@@ -293,6 +296,7 @@ public partial class MainWindow : Window
 
         Closed += (_, _) =>
         {
+            _framesClosed = true;
             Strings.Changed -= OnLanguageChanged;
             _layout.Changed -= OnLayoutChanged;
             _settingsPage?.Dispose();
@@ -719,6 +723,7 @@ public partial class MainWindow : Window
     private void ApplySequenceSelection()
     {
         Pause();
+        DropCache();
         foreach (var (button, other) in _sequenceButtons)
             button.IsChecked = ReferenceEquals(other, _current);
 
@@ -748,10 +753,6 @@ public partial class MainWindow : Window
         _missing = _sequence.MissingNumbers();
         _inPoint = _sequence.StartNumber;
         _outPoint = _sequence.EndNumber;
-
-        // Eine andere Folge, andere Bilder. Was noch im Speicher liegt, gehoert nicht
-        // mehr hierher.
-        DropCache();
 
         RefreshSequenceItem(entry);
 
@@ -880,6 +881,10 @@ public partial class MainWindow : Window
     /// </summary>
     private void DropCache()
     {
+        _frameGeneration++;
+        _wanted = null;
+        if (_preloader is not null) CancelPreload();
+        _lastPreload = null;
         // Eine Vorbereitung, die zu einer anderen Folge gehoert, ist wertlos.
         _prepping?.Cancel();
         _prepared = null;
@@ -1006,6 +1011,7 @@ public partial class MainWindow : Window
             StageEmpty.Visibility = Visibility.Collapsed;
             StageDecode.Text = _format;
             _wanted = null;
+            _displayGeneration++;
             return;
         }
 
@@ -1028,10 +1034,12 @@ public partial class MainWindow : Window
     /// </summary>
     private void Decode()
     {
-        if (_decoding || _wanted is not { Length: > 0 } path) return;
+        if (_framesClosed || _decoding || _wanted is not { Length: > 0 } path) return;
 
         _wanted = null;
         _decoding = true;
+        long generation = _frameGeneration;
+        long display = _displayGeneration;
 
         // Dieselbe Breite wie beim Vorausladen, damit ein einzelnes Bild nicht
         // schaerfer oder gröber aussieht als die abgespielte Folge. Vorher standen
@@ -1057,7 +1065,7 @@ public partial class MainWindow : Window
             {
                 _decoding = false;
 
-                if (image is not null)
+                if (!_framesClosed && generation == _frameGeneration && display == _displayGeneration && image is not null)
                 {
                     StageImage.Source = image;
                     StageEmpty.Visibility = Visibility.Collapsed;
@@ -1334,12 +1342,21 @@ public partial class MainWindow : Window
 
     private async void StartPreload()
     {
-        if (_sequence is null || _preloader is not null) return;
+        if (_framesClosed || _sequence is null || _preloader is not null) return;
 
         var sequence = _sequence;
         var paths = sequence.Frames.Select(f => f.Path).ToList();
 
-        var loader = _frameSources.CreatePreloader(paths, CurrentPace, ShowPreloadProgress);
+        IDashboardPreloader? loader = null;
+        loader = _frameSources.CreatePreloader(paths, CurrentPace, progress =>
+        {
+            void Apply()
+            {
+                if (!_framesClosed && ReferenceEquals(_preloader, loader)) ShowPreloadProgress(progress);
+            }
+            if (Dispatcher.CheckAccess()) Apply();
+            else Dispatcher.BeginInvoke(new Action(Apply));
+        });
         _preloader = loader;
 
         ShowPlayGlyph(playing: true);

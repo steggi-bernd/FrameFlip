@@ -112,6 +112,82 @@ public static class DashboardFrameInvariants
                    && reports.Last().Loaded == 2, "echte Bitmaps sind eingefroren und der Fortschritt zaehlt gelesene Bilder");
     }
 
+    public static void RetiredWork()
+    {
+        Check.Group("Dashboard-Bilder - Decoder nach leerer Auswahl und Schliessen");
+        using (var h = new Harness(blockReads: true))
+        {
+            h.Open();
+            h.Until(() => h.Pending.Count == 1);
+            h.Call("Select", h.Empty);
+            h.Pending.First().Result.SetResult(h.Picture);
+            h.Until(() => h.Workers == 0);
+            h.Pump();
+            Check.That(h.Image.Source is null && ((TextBlock)h.Window.FindName("StageEmpty")).Visibility == Visibility.Visible,
+                "ein altes Decoder-Ergebnis fuellt eine leere Auswahl nicht erneut");
+            h.Call("Select", h.Render);
+            h.Until(() => h.Pending.Count == 2);
+            var before = h.Image.Source;
+            h.Close();
+            h.Pending.Last().Result.SetResult(Picture(90));
+            h.Until(() => h.Workers == 0);
+            h.Pump();
+            Check.That(ReferenceEquals(before, h.Image.Source), "ein geschlossenes Fenster erhaelt kein spaetes Decoderbild");
+        }
+
+        Check.Group("Dashboard-Bilder - Cache-Treffer vor altem Decoder");
+        using (var h = new Harness(blockReads: true))
+        {
+            h.Open();
+            h.Until(() => h.Pending.Count == 1);
+            h.Call("StartPreload");
+            var loader = h.Loaders.Single();
+            var cached = Picture(200);
+            loader.Frames = new BitmapSource?[] { cached, cached, cached };
+            loader.Complete(true);
+            h.Until(() => loader.Disposals == 1);
+            h.Call("Pause");
+            h.Pending.First().Result.SetResult(h.Picture);
+            h.Until(() => h.Workers == 0);
+            h.Pump();
+            Check.That(ReferenceEquals(h.Image.Source, cached), "ein langsamer Decoder ueberschreibt keinen neueren Cache-Treffer");
+            h.Call("Select", h.Empty);
+            Check.That(h.Read("_cache") is BitmapSource?[] { Length: 0 }, "eine leere Auswahl gibt auch den Bildspeicher frei");
+        }
+
+        Check.Group("Dashboard-Bilder - Fortschritt abgeloester Vorlader");
+        using (var h = new Harness())
+        {
+            h.Open();
+            h.Until(() => h.Image.Source is not null);
+            h.Call("StartPreload");
+            var old = h.Loaders.Single();
+            Task.Run(() => old.Report(new PreloadProgress(3, 3, PreloadPace.Fast, 100))).GetAwaiter().GetResult();
+            h.Call("CancelPreload");
+            h.Call("StartPreload");
+            var current = h.Loaders.Last();
+            old.Complete(true);
+            h.Until(() => old.Disposals == 1);
+            Check.That(h.Text("PreloadCount").StartsWith("0 / 3"),
+                "schon eingereihter alter Fortschritt veraendert den neuen Ladevorgang nicht");
+            h.Call("Select", h.Empty);
+            Check.That(current.Cancels == 1 && h.Bar.Visibility == Visibility.Collapsed,
+                "ein Wechsel zur leeren Ausgabe bricht den Vorlader sofort ab");
+            current.Complete(true);
+            h.Until(() => current.Disposals == 1);
+            Check.That(h.Read("_playing") is false, "die alte Folge startet nach dem Wechsel nicht wieder");
+            h.Call("Select", h.Render);
+            h.Call("StartPreload");
+            var closing = h.Loaders.Last();
+            string before = h.Text("PreloadCount");
+            h.Close();
+            Task.Run(() => closing.Report(new PreloadProgress(3, 3, PreloadPace.Fast, 100))).GetAwaiter().GetResult();
+            closing.Complete(false);
+            h.Until(() => closing.Disposals == 1);
+            Check.That(h.Text("PreloadCount") == before, "nach dem Schliessen bleibt auch spaeter Ladefortschritt wirkungslos");
+        }
+    }
+
     internal static BitmapSource Picture(byte value)
     {
         var image = BitmapSource.Create(1, 1, 96, 96, PixelFormats.Bgra32, null, new byte[] { value, 0, 0, 255 }, 4);
