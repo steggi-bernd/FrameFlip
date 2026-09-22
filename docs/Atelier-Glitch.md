@@ -66,11 +66,30 @@ pale from vivid and leaves the form standing). Plus rows or columns, ascending o
 descending, and a **longest run** that turns an effect into a composition — without it a
 single run eats half a row of flat sky.
 
-Measured: 1080p 58 ms and 4K 221 ms with the window fully open, 19 ms for the usual narrow
-window with a run limit. One thread, full resolution, and out entirely while a slider is
-dragged — the order *is* the method.
+**Revised against the established toolkits** — satyarth's `pixelsort`, Kim Asendorf's
+original ASDFPixelSort, and the glitch apps. What they all have and this lacked:
 
-### 3. Wave glitch and displacement — **built**
+- **What limits a run.** Besides the threshold: *edges* (a run also ends where brightness
+  jumps, so outlines hold while surfaces melt — the difference between "the picture
+  melts" and "the surfaces in the picture melt") and *random lengths* around a mean.
+- **Skip** — a share of runs left unsorted. The control that does most for the look: if
+  every line melts alike the picture looks combed; if some stay, it looks disturbed.
+- **Any angle**, not just rows and columns. This needed care: rotated lines with rounded
+  coordinates hit some pixels twice and others never, and sorting then duplicates one
+  and loses another. The lines are a *shear* instead — along the major axis every line
+  stands on every position exactly once, and the minor offset is shared by all lines, so
+  pixel (m, n) belongs to line n − offset(m) and to no other. Twelve angles are tested
+  for exactly that.
+- **Crosswise** — a second pass turned by 90°, as Asendorf does it: columns, then rows.
+- Two more keys: **intensity** (unweighted sum) and **minimum** (how much grey is in it).
+- **Speed** — random lengths and skipping change over the sequence.
+
+Lines are independent of each other, so they now run in parallel; only *within* a line
+does order matter. Measured: 4K with the window fully open 221 → 45 ms; at 30° and
+crosswise, the most expensive new case, 96 ms. Old recipes with the *columns* switch sort
+byte for byte as before — the switch is translated into 90° on load.
+
+### 3. Wave glitch and displacement — **built, and revised**
 
 The reason it is interesting here rather than in fifty other programs held up: it is
 driven by a **render pass**. The normal pass lays the distortion along the geometry — a
@@ -98,6 +117,29 @@ should be looked for, so no pass is read that nobody will look at.
 
 Depth of field and motion blur keep the old rule: without their pass they rest, because a
 slider that invents a distance is worse than one that does nothing.
+
+**Revised against After Effects** (Wave Warp, Displacement Map) **and the glitch
+apps** (Glitch Lab's slice, shift and block glitch). Taken over:
+
+- **Wave shapes** — sine, triangle, square, sawtooth, as in Wave Warp. And the two actual
+  glitch shapes, which do not oscillate but *jump*: **slices** (each band offset by its own
+  random amount) and **blocks** (each band cut again into pieces of varying length). A
+  **density** says what share of bands moves at all — a real signal fault hits a few
+  lines and leaves the rest.
+- **Time.** For a sequence the most important point: a displacement that stands still
+  across all frames looks like a sticker on the lens. **Speed** moves waves along and
+  makes the tear change in whole steps. For that the data tools and frame passes now
+  receive the frame number.
+- **Wrap around**, as in Displacement Map: what goes out on one side comes back on the
+  other — a television that cannot hold the picture.
+- **Phase**, and **reroll** instead of a seed number — nobody picks a tear by number; one
+  rolls until it fits.
+
+The tests found a real bug on the way: in float, sin(90°) is 0.99999994 and cos(90°)
+is −4.4e-8. Every band boundary sat one row off, and in some boundary rows the tiny
+x-term tipped the left and right half of a row into *different* bands — a row tearing in
+the middle when a band should jump as a whole. Values are now snapped to exact 0 and ±1
+where exact ones are meant.
 
 A related gap closed with it: **a resting tool now says why it rests.** All three name the
 missing pass and where it is switched on in Blender. A tool that quietly does nothing is

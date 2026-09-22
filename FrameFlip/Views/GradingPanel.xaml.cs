@@ -696,9 +696,26 @@ public partial class GradingPanel : UserControl
             SortLongestSlider.Value = Math.Clamp(_sort.Longest,
                 SortLongestSlider.Minimum, SortLongestSlider.Maximum);
 
+            // Der alte Schalter "Spalten" wird zum Winkel. Hier und nicht im Werkzeug,
+            // weil erst der Streifen den Winkel zeigt - und ein Rezept, das beides
+            // traegt, einen Regler haette, der nichts tut.
+            if (_sort.Vertical)
+            {
+                _sort.Angle = 90f;
+                _sort.Vertical = false;
+            }
+
+            SortAngleSlider.Value = Math.Clamp(_sort.Angle, SortAngleSlider.Minimum, SortAngleSlider.Maximum);
+            SortEdgeSlider.Value = Math.Clamp(_sort.Edge, SortEdgeSlider.Minimum, SortEdgeSlider.Maximum);
+            SortSkipSlider.Value = Math.Clamp(_sort.Skip, SortSkipSlider.Minimum, SortSkipSlider.Maximum);
+            SortSpeedSlider.Value = Math.Clamp(_sort.Speed, SortSpeedSlider.Minimum, SortSpeedSlider.Maximum);
+
             SortKeyBox.SelectedIndex = (int)_sort.Key;
-            SortVerticalButton.IsChecked = _sort.Vertical;
+            SortIntervalBox.SelectedIndex = (int)_sort.Interval;
+            SortCrossButton.IsChecked = _sort.Cross;
             SortDescendingButton.IsChecked = _sort.Descending;
+
+            ShowSortInterval();
 
             DisplaceFromBox.SelectedIndex = _displace.From switch
             {
@@ -951,6 +968,10 @@ public partial class GradingPanel : UserControl
         _sort.Low = (float)SortLowSlider.Value;
         _sort.High = (float)SortHighSlider.Value;
         _sort.Longest = (int)Math.Round(SortLongestSlider.Value);
+        _sort.Angle = (float)SortAngleSlider.Value;
+        _sort.Edge = (float)SortEdgeSlider.Value;
+        _sort.Skip = (float)SortSkipSlider.Value;
+        _sort.Speed = (float)SortSpeedSlider.Value;
 
         _depth.Aperture = (float)DepthApertureSlider.Value;
         _depth.Focus = FocusFrom(DepthFocusSlider.Value);
@@ -1082,8 +1103,14 @@ public partial class GradingPanel : UserControl
         SortLowValue.Text = $"{SortLowSlider.Value:0.00}";
         SortHighValue.Text = $"{SortHighSlider.Value:0.00}";
         SortLongestValue.Text = SortLongestSlider.Value < 1
-            ? Strings.T("S_SortLongestOff")
+            ? Strings.T(_sort.Interval == SortInterval.Random ? "S_SortLongestAuto" : "S_SortLongestOff")
             : $"{SortLongestSlider.Value:0} px";
+        SortAngleValue.Text = $"{SortAngleSlider.Value:0} \u00B0";
+        SortEdgeValue.Text = $"{SortEdgeSlider.Value:0.00}";
+        SortSkipValue.Text = $"{SortSkipSlider.Value * 100:0} %";
+        SortSpeedValue.Text = SortSpeedSlider.Value < 0.005
+            ? Strings.T("S_DisplaceStill")
+            : $"{SortSpeedSlider.Value:0.00}";
         MotionSamplesValue.Text = $"{MotionSamplesSlider.Value:0}";
         DepthApertureValue.Text = $"{DepthApertureSlider.Value:0.00}";
         DepthFocusValue.Text = FocusFrom(DepthFocusSlider.Value) is var metres && metres < 10
@@ -1409,18 +1436,53 @@ public partial class GradingPanel : UserControl
     {
         if (_filling || !IsLoaded) return;
 
-        _sort.Key = (SortKey)Math.Clamp(SortKeyBox.SelectedIndex, 0, 2);
+        _sort.Key = (SortKey)Math.Clamp(SortKeyBox.SelectedIndex, 0, 4);
 
         Raise(interim: false);
     }
 
-    /// <summary>Richtung und Reihenfolge - zwei Schalter, ein Weg.</summary>
+    /// <summary>Kreuzweise und Reihenfolge - zwei Schalter, ein Weg.</summary>
     private void OnSortFlagChanged(object sender, RoutedEventArgs e)
     {
         if (_filling || !IsLoaded) return;
 
-        _sort.Vertical = SortVerticalButton.IsChecked == true;
+        _sort.Cross = SortCrossButton.IsChecked == true;
         _sort.Descending = SortDescendingButton.IsChecked == true;
+
+        Raise(interim: false);
+    }
+
+    /// <summary>Was einen Lauf begrenzt.</summary>
+    private void OnSortIntervalChanged(object sender, SelectionChangedEventArgs e)
+    {
+        if (_filling || !IsLoaded) return;
+
+        _sort.Interval = (SortInterval)Math.Clamp(SortIntervalBox.SelectedIndex, 0, 2);
+
+        ShowSortInterval();
+        UpdateValues();
+        Raise(interim: false);
+    }
+
+    /// <summary>
+    /// Die Kantenschwelle nur bei Kanten, und die Lauflaenge heisst, was sie ist:
+    /// bei Zufallslaengen der Mittelwert, sonst die Grenze.
+    /// </summary>
+    private void ShowSortInterval()
+    {
+        SortEdgeRow.Visibility = _sort.Interval == SortInterval.Edges
+            ? Visibility.Visible
+            : Visibility.Collapsed;
+
+        SortLongestLabel.Text = Strings.T(_sort.Interval == SortInterval.Random
+            ? "S_SortMean"
+            : "S_SortLongest");
+    }
+
+    /// <summary>Anderer Zufall, dieselben Einstellungen.</summary>
+    private void OnSortReseed(object sender, RoutedEventArgs e)
+    {
+        _sort.Seed++;
 
         Raise(interim: false);
     }

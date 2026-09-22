@@ -26,6 +26,108 @@ public static class GradingGroupInvariants
     {
         TilesShowWhatIsThereAndWhatIsOn();
         ALayerLocksWhatCannotRunOnIt();
+        GlitchControlsShowWhatTheyMean();
+    }
+
+    /// <summary>
+    /// Die Glitch-Abschnitte zeigen nur, was bei der gewaehlten Art etwas bedeutet -
+    /// und alte Rezepte kommen richtig an.
+    ///
+    /// Ein Regler, der bei der gewaehlten Art nichts tut, ist schlimmer als keiner:
+    /// Man zieht daran, nichts passiert, und sucht den Fehler. Und ein Rezept mit dem
+    /// alten Schalter "Spalten" muss als 90 Grad ankommen - sonst stuende der Winkel
+    /// auf null, waehrend der unsichtbare Schalter weiter Spalten sortiert.
+    /// </summary>
+    private static void GlitchControlsShowWhatTheyMean()
+    {
+        Check.Group("Die Glitch-Regler zeigen, was sie bedeuten");
+
+        var panel = new GradingPanel();
+
+        var window = new Window
+        {
+            Content = panel,
+            Width = 420,
+            Height = 900,
+            ShowInTaskbar = false,
+            WindowStyle = WindowStyle.None,
+            ShowActivated = false,
+            Left = -4000,
+            Top = -4000,
+        };
+
+        try
+        {
+            window.Show();
+            panel.UpdateLayout();
+
+            // --- Ein altes Rezept: Pixel Sorting mit dem Schalter "Spalten" ------
+            var old = new GradingStack
+            {
+                Frame = { new SortTool { Low = 0.2f, High = 0.8f, Vertical = true } },
+            };
+
+            panel.Load(ImageAdjustments.Neutral, old);
+            panel.UpdateLayout();
+
+            var sort = panel.Stack.Frame.OfType<SortTool>().First();
+            var angle = (Slider)panel.FindName("SortAngleSlider");
+
+            Check.That(!sort.Vertical && Math.Abs(sort.Angle - 90f) < 0.01f,
+                       "der alte Schalter 'Spalten' kommt als 90 Grad an",
+                       $"Vertical={sort.Vertical}, Winkel={sort.Angle}");
+
+            Check.Near(angle.Value, 90, 0.01, "und der Winkelregler zeigt es");
+
+            // --- Kantenschwelle nur bei Kanten ----------------------------------
+            var interval = (ComboBox)panel.FindName("SortIntervalBox");
+            var edgeRow = (FrameworkElement)panel.FindName("SortEdgeRow");
+
+            Check.That(edgeRow.Visibility != Visibility.Visible,
+                       "bei der Schwelle steht keine Kantenschwelle da");
+
+            interval.SelectedIndex = (int)SortInterval.Edges;
+            panel.UpdateLayout();
+
+            Check.That(sort.Interval == SortInterval.Edges, "die Wahl kommt im Werkzeug an");
+            Check.That(edgeRow.Visibility == Visibility.Visible, "und bei Kanten erscheint sie");
+
+            // --- Verschiebung: Dichte und Wuerfel nur bei den zerrissenen Formen --
+            var shape = (ComboBox)panel.FindName("DisplaceShapeBox");
+            var density = (FrameworkElement)panel.FindName("DisplaceDensityRow");
+            var reseed = (FrameworkElement)panel.FindName("DisplaceReseedButton");
+            var wave = (Slider)panel.FindName("DisplaceWaveSlider");
+
+            shape.SelectedIndex = (int)WaveShape.Sine;
+            panel.UpdateLayout();
+
+            Check.That(density.Visibility != Visibility.Visible && reseed.Visibility != Visibility.Visible,
+                       "beim Sinus gibt es weder Dichte noch Wuerfel");
+
+            // Und wer auf Streifen wechselt, waehrend die Welle auf null steht, saehe
+            // nur das ganze Bild verrueckt - deshalb wird sie sichtbar aufgedreht.
+            wave.Value = 0;
+            shape.SelectedIndex = (int)WaveShape.Slices;
+            panel.UpdateLayout();
+
+            var displace = panel.Stack.Data.OfType<DisplaceTool>().First();
+
+            Check.That(displace.Shape == WaveShape.Slices, "die Form kommt im Werkzeug an");
+            Check.That(density.Visibility == Visibility.Visible && reseed.Visibility == Visibility.Visible,
+                       "bei Streifen erscheinen Dichte und Wuerfel");
+            Check.Near(wave.Value, 1, 0.01, "und die Welle wird aufgedreht, sichtbar am Regler");
+
+            int before = displace.Seed;
+
+            ((System.Windows.Controls.Button)reseed).RaiseEvent(
+                new RoutedEventArgs(System.Windows.Controls.Primitives.ButtonBase.ClickEvent));
+
+            Check.That(displace.Seed != before, "Neu wuerfeln gibt einen anderen Startwert");
+        }
+        finally
+        {
+            window.Close();
+        }
     }
 
     /// <summary>

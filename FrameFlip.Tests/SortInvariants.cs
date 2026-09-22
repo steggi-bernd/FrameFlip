@@ -26,6 +26,10 @@ public static class SortInvariants
         TheWindowDecidesWhatMoves();
         RunsStayWithinTheirLimit();
         ColumnsSortDownward();
+        EveryAngleKeepsEveryPixel();
+        OldRecipesSortAsBefore();
+        EdgesHoldTheOutline();
+        SkipAndChanceBehave();
         Persistence();
         WhatItCosts();
     }
@@ -415,6 +419,323 @@ public static class SortInvariants
         Check.That(usual < full,
                    "ein schmales Fenster kostet weniger als ein offenes",
                    $"{usual:0.0} gegen {full:0.0} ms");
+
+        // Schraeg und kreuzweise ist der teuerste neue Fall: zwei Durchgaenge, und die
+        // Linien laufen nicht mehr den Speicher entlang.
+        double diagonal = Cost(3840, 2160, new SortTool { Low = 0f, High = 1f, Angle = 30f, Cross = true });
+
+        Console.WriteLine($"         4K {diagonal:0.0} ms - 30 Grad, kreuzweise, Fenster ganz offen");
+
+        Check.That(diagonal < 1600, "auch schraeg und kreuzweise bleibt 4K benutzbar",
+                   $"{diagonal:0.0} ms");
+    }
+
+    /// <summary>Wieviele Punkte es von jeder Farbe gibt - ueber das ganze Bild.</summary>
+    private static Dictionary<int, int> Whole(byte[] pixels)
+    {
+        var count = new Dictionary<int, int>();
+
+        for (int i = 0; i < pixels.Length / 4; i++)
+        {
+            int at = i * 4;
+            int colour = pixels[at] | (pixels[at + 1] << 8) | (pixels[at + 2] << 16);
+
+            count[colour] = count.GetValueOrDefault(colour) + 1;
+        }
+
+        return count;
+    }
+
+    private static bool Same(Dictionary<int, int> a, Dictionary<int, int> b)
+        => a.Count == b.Count && a.All(e => b.GetValueOrDefault(e.Key) == e.Value);
+
+    /// <summary>
+    /// Jeder Winkel behaelt jeden Bildpunkt.
+    ///
+    /// Die Zusage, auf die es beim schraegen Sortieren ankommt. Eine gedrehte Linie
+    /// mit gerundeten Koordinaten trifft manche Punkte zweimal und manche nie - und
+    /// dann verdoppelt das Sortieren den einen und verliert den anderen. Gezaehlt wird
+    /// ueber das GANZE Bild, weil Punkte jetzt zwischen den Zeilen wandern.
+    /// </summary>
+    private static void EveryAngleKeepsEveryPixel()
+    {
+        Check.Group("Jeder Winkel behaelt jeden Bildpunkt");
+
+        var before = Noise(3);
+        var counted = Whole(before);
+
+        int broken = 0, idle = 0;
+
+        foreach (float angle in new[] { 0f, 17f, 30f, 45f, 60f, 90f, 120f, 135f, 180f, 211f, 270f, 333f })
+        {
+            var after = Sorted(before, new SortTool { Low = 0f, High = 1f, Angle = angle });
+
+            if (!Same(counted, Whole(after))) broken++;
+            if (after.SequenceEqual(before)) idle++;
+        }
+
+        Check.That(broken == 0, "bei keinem von zwoelf Winkeln geht ein Punkt verloren oder doppelt",
+                   $"{broken} Winkel");
+        Check.That(idle == 0, "und bei jedem wird wirklich umsortiert", $"{idle} ohne Wirkung");
+
+        // Und die Punkte wandern ENTLANG der Linie: Ein einzelner heller Punkt in
+        // dunklem Grund wandert bei 45 Grad aufsteigend an das Ende seiner Diagonale -
+        // und bleibt dabei auf ihr.
+        var dot = new byte[Width * Height * 4];
+
+        for (int i = 0; i < Width * Height; i++) dot[i * 4 + 3] = 255;
+
+        int sx = 10, sy = 5;
+        int start = (sy * Width + sx) * 4;
+
+        dot[start] = dot[start + 1] = dot[start + 2] = 250;
+
+        var slid = Sorted(dot, new SortTool { Low = 0f, High = 1f, Angle = 45f });
+
+        int ex = -1, ey = -1;
+
+        for (int y = 0; y < Height; y++)
+            for (int x = 0; x < Width; x++)
+                if (slid[(y * Width + x) * 4] == 250) (ex, ey) = (x, y);
+
+        Console.WriteLine($"         45 Grad: heller Punkt von ({sx},{sy}) nach ({ex},{ey})");
+
+        Check.That(ex - ey == sx - sy, "bei 45 Grad bleibt er auf seiner Diagonale",
+                   $"{sx - sy} gegen {ex - ey}");
+        Check.That(ex > sx && ey > sy, "und wandert nach rechts unten, ans Ende",
+                   $"({ex},{ey})");
+
+        // Kreuzweise: erst in der Richtung, dann quer dazu - genau so, als liefe man
+        // beide Durchgaenge nacheinander.
+        var crossed = Sorted(before, new SortTool { Low = 0f, High = 1f, Angle = 30f, Cross = true });
+        var stepwise = Sorted(Sorted(before, new SortTool { Low = 0f, High = 1f, Angle = 30f }),
+                              new SortTool { Low = 0f, High = 1f, Angle = 120f, Seed = 7919 });
+
+        Check.That(crossed.SequenceEqual(stepwise),
+                   "kreuzweise ist dasselbe wie zwei Durchgaenge nacheinander");
+        Check.That(Same(counted, Whole(crossed)), "und behaelt ebenso jeden Punkt");
+    }
+
+    /// <summary>
+    /// Alte Rezepte sortieren wie vorher.
+    ///
+    /// Der Schalter "Spalten" ist jetzt ein Winkel von 90 Grad. Ein Rezept, das ihn
+    /// noch traegt, muss Byte fuer Byte dasselbe ergeben - sonst sieht jemandes
+    /// gespeicherter Look nach dem Update anders aus, ohne dass er etwas getan hat.
+    /// </summary>
+    private static void OldRecipesSortAsBefore()
+    {
+        Check.Group("Alte Rezepte sortieren wie vorher");
+
+        var before = Noise(5);
+
+        var legacy = Sorted(before, new SortTool { Low = 0.2f, High = 0.9f, Vertical = true, Longest = 7 });
+        var angled = Sorted(before, new SortTool { Low = 0.2f, High = 0.9f, Angle = 90f, Longest = 7 });
+
+        Check.That(legacy.SequenceEqual(angled), "Spalten ist dasselbe wie 90 Grad");
+
+        // Und ohne alles ist es die alte Zeilensortierung: jede Zeile steigt.
+        var rows = Sorted(before, new SortTool { Low = 0f, High = 1f });
+
+        bool rising = true;
+
+        for (int y = 0; y < Height; y++)
+            for (int x = 1; x < Width; x++)
+                if (rows[(y * Width + x) * 4] < rows[(y * Width + x - 1) * 4]) rising = false;
+
+        Check.That(rising, "ohne Winkel wird zeilenweise sortiert wie vorher");
+    }
+
+    /// <summary>
+    /// Kanten halten den Umriss.
+    ///
+    /// Links dunkles Rauschen, rechts helles, mit einer harten Grenze dazwischen.
+    /// Absteigend sortiert und ohne Kanten wandert das Helle ueber die Grenze nach
+    /// links - das Bild schmilzt. Mit Kanten bleibt jede Seite bei sich: Es schmelzen
+    /// die Flaechen, nicht das Bild.
+    /// </summary>
+    private static void EdgesHoldTheOutline()
+    {
+        Check.Group("Kanten halten den Umriss");
+
+        var halves = new byte[Width * Height * 4];
+        int state = 17;
+
+        for (int y = 0; y < Height; y++)
+        {
+            for (int x = 0; x < Width; x++)
+            {
+                state = state * 1103515245 + 12345;
+                int noise = (state >> 16) & 0x1F;
+
+                byte grey = (byte)(x < Width / 2 ? 10 + noise : 200 + noise);
+                int at = (y * Width + x) * 4;
+
+                halves[at] = halves[at + 1] = halves[at + 2] = grey;
+                halves[at + 3] = 255;
+            }
+        }
+
+        int Crossed(byte[] pixels)
+        {
+            int wrong = 0;
+
+            for (int y = 0; y < Height; y++)
+                for (int x = 0; x < Width / 2; x++)
+                    if (pixels[(y * Width + x) * 4] > 128) wrong++;
+
+            return wrong;
+        }
+
+        var melted = Sorted(halves, new SortTool { Low = 0f, High = 1f, Descending = true });
+        var held = Sorted(halves, new SortTool
+        {
+            Low = 0f, High = 1f, Descending = true, Interval = SortInterval.Edges, Edge = 0.3f,
+        });
+
+        Console.WriteLine($"         helle Punkte links der Grenze: ohne Kanten {Crossed(melted)}, " +
+                          $"mit Kanten {Crossed(held)}");
+
+        Check.That(Crossed(melted) > 0, "ohne Kanten wandert das Helle ueber die Grenze");
+        Check.That(Crossed(held) == 0, "mit Kanten bleibt jede Seite bei sich", $"{Crossed(held)}");
+
+        // Und innerhalb jeder Seite wird trotzdem sortiert - sonst hielte die Kante
+        // nur, weil gar nichts geschieht.
+        Check.That(!held.SequenceEqual(halves), "und innerhalb der Seiten wird trotzdem sortiert");
+        Check.That(Same(Whole(halves), Whole(held)), "wobei kein Punkt verloren geht");
+    }
+
+    /// <summary>
+    /// Auslassen, Zufall und Zeit.
+    ///
+    /// Alles Zufaellige muss sich wie eine Einstellung verhalten: derselbe Startwert,
+    /// dasselbe Bild - bei jedem Rechnen, im Export ebenso wie auf dem Schirm.
+    /// </summary>
+    private static void SkipAndChanceBehave()
+    {
+        Check.Group("Auslassen, Zufall und Zeit");
+
+        var before = Noise(9);
+
+        var all = new SortTool { Low = 0f, High = 1f, Longest = 10 };
+        var none = new SortTool { Low = 0f, High = 1f, Longest = 10, Skip = 1f };
+        var some = new SortTool { Low = 0f, High = 1f, Longest = 10, Skip = 0.5f };
+
+        Check.That(Sorted(before, none).SequenceEqual(before), "alles ausgelassen heisst nichts sortiert");
+
+        var partly = Sorted(before, some);
+        var fully = Sorted(before, all);
+
+        int untouchedRuns = 0, sortedRuns = 0;
+
+        for (int y = 0; y < Height; y++)
+        {
+            for (int run = 0; run < Width / 10; run++)
+            {
+                bool same = true;
+
+                for (int x = run * 10; x < run * 10 + 10; x++)
+                    if (partly[(y * Width + x) * 4] != before[(y * Width + x) * 4]) same = false;
+
+                if (same) untouchedRuns++; else sortedRuns++;
+            }
+        }
+
+        Console.WriteLine($"         Auslassen 0,5: {untouchedRuns} Laeufe stehen, {sortedRuns} sortiert");
+
+        Check.That(untouchedRuns > 0 && sortedRuns > 0,
+                   "bei der Haelfte bleibt ein Teil stehen und ein Teil wird sortiert");
+
+        Check.That(!partly.SequenceEqual(fully), "und das ist etwas anderes als alles zu sortieren");
+
+        // Zufallslaengen: derselbe Startwert dasselbe Bild, ein anderer ein anderes.
+        var randomA = new SortTool { Low = 0f, High = 1f, Interval = SortInterval.Random, Longest = 12 };
+        var randomB = new SortTool { Low = 0f, High = 1f, Interval = SortInterval.Random, Longest = 12, Seed = 4 };
+
+        Check.That(Sorted(before, randomA).SequenceEqual(Sorted(before, randomA)),
+                   "Zufallslaengen: derselbe Startwert gibt dasselbe Bild");
+        Check.That(!Sorted(before, randomA).SequenceEqual(Sorted(before, randomB)),
+                   "ein anderer ein anderes");
+        Check.That(Same(Whole(before), Whole(Sorted(before, randomA))),
+                   "und kein Punkt geht verloren");
+
+        // Die Laufe streuen wirklich: Bei festen Laengen steigen alle Abschnitte gleich
+        // lang, bei Zufallslaengen verschieden. Gemessen an den Bruchstellen einer
+        // aufsteigend sortierten Zeile.
+        static List<int> Pieces(byte[] pixels, int row)
+        {
+            var lengths = new List<int>();
+            int run = 1;
+
+            for (int x = 1; x < Width; x++)
+            {
+                if (pixels[(row * Width + x) * 4] >= pixels[(row * Width + x - 1) * 4])
+                {
+                    run++;
+                    continue;
+                }
+
+                lengths.Add(run);
+                run = 1;
+            }
+
+            return lengths;
+        }
+
+        var spread = Enumerable.Range(0, Height)
+                               .SelectMany(y => Pieces(Sorted(before, randomA), y))
+                               .Distinct().Count();
+
+        Console.WriteLine($"         Zufallslaengen: {spread} verschiedene Abschnittslaengen");
+
+        Check.That(spread > 5, "die Laeufe sind verschieden lang", $"{spread}");
+
+        // Zeit: Mit Tempo wechselt das Zufaellige ueber die Sequenz, ohne nicht.
+        var moving = new SortTool
+        {
+            Low = 0f, High = 1f, Interval = SortInterval.Random, Longest = 12, Speed = 1f,
+        };
+
+        var still = new SortTool { Low = 0f, High = 1f, Interval = SortInterval.Random, Longest = 12 };
+
+        Check.That(!SortedAt(before, moving, 0).SequenceEqual(SortedAt(before, moving, 1)),
+                   "mit Tempo sortiert Bild 1 anders als Bild 0");
+        Check.That(SortedAt(before, still, 0).SequenceEqual(SortedAt(before, still, 1)),
+                   "ohne Tempo gleich");
+
+        // Die zwei neuen Schluessel sortieren ebenso, ohne etwas zu verlieren.
+        foreach (var key in new[] { SortKey.Intensity, SortKey.Minimum })
+        {
+            var sorted = Sorted(before, new SortTool { Low = 0f, High = 1f, Key = key });
+
+            Check.That(Same(Whole(before), Whole(sorted)) && !sorted.SequenceEqual(before),
+                       $"{key} sortiert und behaelt jeden Punkt");
+        }
+    }
+
+    /// <summary>Wie Sorted, aber mit einer Bildnummer.</summary>
+    private static byte[] SortedAt(byte[] pixels, SortTool tool, int number)
+    {
+        var copy = (byte[])pixels.Clone();
+
+        tool.Prepare();
+
+        var buffer = Marshal.AllocHGlobal(copy.Length);
+
+        try
+        {
+            Marshal.Copy(copy, 0, buffer, copy.Length);
+
+            tool.Apply(buffer, Width, Height, Width * 4, number);
+
+            Marshal.Copy(buffer, copy, 0, copy.Length);
+        }
+        finally
+        {
+            Marshal.FreeHGlobal(buffer);
+        }
+
+        return copy;
     }
 
     private static void Persistence()
@@ -429,6 +750,8 @@ public static class SortInvariants
                 {
                     Key = SortKey.Saturation, Vertical = true,
                     Low = 0.2f, High = 0.8f, Descending = true, Longest = 120,
+                    Interval = SortInterval.Edges, Angle = 33f, Cross = true,
+                    Edge = 0.2f, Skip = 0.4f, Seed = 12, Speed = 0.25f,
                 },
             },
         };
@@ -444,7 +767,14 @@ public static class SortInvariants
         Check.That(tool.Descending, "die Reihenfolge");
         Check.Near(tool.Low, 0.2, 1e-5, "die Untergrenze");
         Check.Near(tool.High, 0.8, 1e-5, "die Obergrenze");
-        Check.That(tool.Longest == 120, "und die Laengengrenze", $"{tool.Longest}");
+        Check.That(tool.Longest == 120, "die Laengengrenze", $"{tool.Longest}");
+        Check.That(tool.Interval == SortInterval.Edges, "die Art der Laeufe");
+        Check.Near(tool.Angle, 33, 1e-5, "der Winkel");
+        Check.That(tool.Cross, "kreuzweise");
+        Check.Near(tool.Edge, 0.2, 1e-5, "die Kantenschwelle");
+        Check.Near(tool.Skip, 0.4, 1e-5, "das Auslassen");
+        Check.That(tool.Seed == 12, "der Startwert");
+        Check.Near(tool.Speed, 0.25, 1e-5, "und das Tempo");
 
         // Eine Kopie darf sich nicht mitbewegen.
         var copy = stack.Clone();
