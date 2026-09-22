@@ -152,7 +152,7 @@ public static class DashboardFrameInvariants
             h.Pump();
             Check.That(ReferenceEquals(h.Image.Source, cached), "ein langsamer Decoder ueberschreibt keinen neueren Cache-Treffer");
             h.Call("Select", h.Empty);
-            Check.That(h.Read("_cache") is BitmapSource?[] { Length: 0 }, "eine leere Auswahl gibt auch den Bildspeicher frei");
+            Check.That(h.Read("_frames") is DashboardFrameController { CachedFrameCount: 0 }, "eine leere Auswahl gibt auch den Bildspeicher frei");
         }
 
         Check.Group("Dashboard-Bilder - Fortschritt abgeloester Vorlader");

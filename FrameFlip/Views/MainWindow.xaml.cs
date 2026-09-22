@@ -72,7 +72,7 @@ public partial class MainWindow : Window
     private Web.WatchService? _watched;
 
     private readonly FrameDecoderRegistry _decoders = FrameDecoderRegistry.CreateDefault();
-    private readonly DashboardFrameSources _frameSources;
+    private readonly DashboardFrameController _frames;
 
     private readonly DispatcherTimer _ticker;
     private readonly DispatcherTimer _player;
@@ -96,14 +96,8 @@ public partial class MainWindow : Window
     private bool _playing;
     private bool _scrubbing;
 
-    /// <summary>Der Pfad, der als naechstes auf die Buehne soll - oder null.</summary>
-    private string? _wanted;
 
-    /// <summary>Die vorausgeladene Folge, an derselben Stelle wie ihre Bilder.</summary>
-    private BitmapSource?[] _cache = Array.Empty<BitmapSource?>();
 
-    /// <summary>Laeuft, solange vorausgeladen wird.</summary>
-    private IDashboardPreloader? _preloader;
 
     /// <summary>Ob Abspielen erst vorauslaedt. Wird mit den Einstellungen gemerkt.</summary>
     private bool _prebuffer = true;
@@ -117,11 +111,6 @@ public partial class MainWindow : Window
     /// <summary>Die zuletzt fertiggestellte Vorbereitung - oder null.</summary>
     private string? _prepared;
 
-    /// <summary>Ob gerade ein Bild gelesen wird. Es laeuft immer hoechstens eines.</summary>
-    private bool _decoding;
-    private long _frameGeneration;
-    private long _displayGeneration;
-    private bool _framesClosed;
 
     /// <summary>Format und Farbtiefe der Sequenz - einmal ermittelt, dann angezeigt.</summary>
     private string _format = string.Empty;
@@ -176,7 +165,8 @@ public partial class MainWindow : Window
         Func<AppSettings>? getSettings = null, Func<Web.WatchService?>? watch = null,
         Action? renewWatch = null, Action<string?>? setWatchCode = null)
     {
-        _frameSources = frameSources;
+        _frames = new DashboardFrameController(frameSources, DispatchFrame, ShowDecodedFrame,
+            ShowPreloadProgress, () => DecodeWidth(atLeast: 960), CurrentPace);
         _watch = watch ?? (() => null);
         _renewWatch = renewWatch;
         _setWatchCode = setWatchCode;
@@ -296,7 +286,7 @@ public partial class MainWindow : Window
 
         Closed += (_, _) =>
         {
-            _framesClosed = true;
+            _frames.Dispose();
             Strings.Changed -= OnLanguageChanged;
             _layout.Changed -= OnLayoutChanged;
             _settingsPage?.Dispose();
@@ -881,21 +871,12 @@ public partial class MainWindow : Window
     /// </summary>
     private void DropCache()
     {
-        _frameGeneration++;
-        _wanted = null;
-        if (_preloader is not null) CancelPreload();
+        if (_frames.IsPreloading) CancelPreload();
+        _frames.Reset(_sequence);
         _lastPreload = null;
-        // Eine Vorbereitung, die zu einer anderen Folge gehoert, ist wertlos.
         _prepping?.Cancel();
         _prepared = null;
-
-        if (_cache.Length == 0) return;
-
-        _cache = Array.Empty<BitmapSource?>();
-
-        GC.Collect(2, GCCollectionMode.Optimized, blocking: false);
     }
-
     private void ShowEmptyStage()
     {
         _missing = Array.Empty<int>();
@@ -1003,83 +984,21 @@ public partial class MainWindow : Window
         UpdateStripSelection();
         MoveHead();
 
-        // Liegt das Bild schon im Speicher, ist Anzeigen alles, was zu tun ist -
-        // kein Faden, keine Platte, kein Warten. Genau dafuer wurde vorausgeladen.
-        if (index < _cache.Length && _cache[index] is { } ready)
-        {
-            StageImage.Source = ready;
-            StageEmpty.Visibility = Visibility.Collapsed;
-            StageDecode.Text = _format;
-            _wanted = null;
-            _displayGeneration++;
-            return;
-        }
-
-        _wanted = frame.Path;
-        Decode();
+        _frames.Request(index);
     }
 
-    /// <summary>
-    /// Das zuletzt verlangte Bild lesen - und immer nur eines auf einmal.
-    ///
-    /// Beim Abspielen kommt der naechste Wunsch, bevor der vorige gelesen ist. Alle
-    /// zu lesen hiesse bei 60 fps sechzig Dekodierungen je Sekunde, von denen die
-    /// meisten ungesehen weggeworfen wuerden - Arbeit, die der Renderer nebenan
-    /// besser gebrauchen kann.
-    ///
-    /// Gespeichert wird darum nur der WUNSCH, nicht der Auftrag: Waehrend gelesen
-    /// wird, ueberschreiben spaetere Wuensche einander, und sobald der Leser frei
-    /// ist, nimmt er den letzten. So bleibt hoechstens ein Bild Rueckstand, und der
-    /// holt sich selbst wieder ein.
-    /// </summary>
-    private void Decode()
+    private void ShowDecodedFrame(BitmapSource image)
     {
-        if (_framesClosed || _decoding || _wanted is not { Length: > 0 } path) return;
-
-        _wanted = null;
-        _decoding = true;
-        long generation = _frameGeneration;
-        long display = _displayGeneration;
-
-        // Dieselbe Breite wie beim Vorausladen, damit ein einzelnes Bild nicht
-        // schaerfer oder gröber aussieht als die abgespielte Folge. Vorher standen
-        // hier feste 1280 Punkte - auf einem breiten Fenster sichtbar zu wenig.
-        int crisp = DecodeWidth(atLeast: 960);
-
-        // Gelesen wird abseits des Oberflaechenfadens: Ein 4K-PNG kostet
-        // zweistellige Millisekunden, und die faellt bei jedem Schritt an.
-        Task.Run(() =>
-        {
-            BitmapSource? image = null;
-
-            try
-            {
-                image = _frameSources.Read(path, crisp);
-            }
-            catch (Exception)
-            {
-                // Halb geschrieben oder gesperrt - dann bleibt der vorige Frame stehen.
-            }
-
-            Dispatcher.BeginInvoke(new Action(() =>
-            {
-                _decoding = false;
-
-                if (!_framesClosed && generation == _frameGeneration && display == _displayGeneration && image is not null)
-                {
-                    StageImage.Source = image;
-                    StageEmpty.Visibility = Visibility.Collapsed;
-                    StageDecode.Text = _format;
-                }
-
-                // Waehrend gelesen wurde, kann laengst ein neueres Bild gewuenscht
-                // sein. Dann gleich weiter - sonst bliebe die Buehne stehen, bis der
-                // naechste Takt kommt.
-                Decode();
-            }));
-        });
+        StageImage.Source = image;
+        StageEmpty.Visibility = Visibility.Collapsed;
+        StageDecode.Text = _format;
     }
 
+    private void DispatchFrame(Action action)
+    {
+        if (Dispatcher.CheckAccess()) action();
+        else Dispatcher.BeginInvoke(action);
+    }
     // ================================================================ Zeitleiste
 
     /// <summary>
@@ -1310,7 +1229,7 @@ public partial class MainWindow : Window
     {
         // Waehrend geladen wird, bricht derselbe Knopf ab. Sonst muesste man auf
         // etwas warten, das man gar nicht mehr will.
-        if (_preloader is not null)
+        if (_frames.IsPreloading)
         {
             CancelPreload();
             return;
@@ -1324,98 +1243,28 @@ public partial class MainWindow : Window
     // ================================================================ Vorausladen
 
     /// <summary>Ob fuer den gewaehlten Bereich noch Bilder fehlen.</summary>
-    private bool NeedsPreload()
-    {
-        if (_sequence is null || _sequence.Count < 2) return false;
-        if (_cache.Length != _sequence.Count) return true;
-
-        for (int i = 0; i < _sequence.Count; i++)
-        {
-            var frame = _sequence.Frames[i];
-
-            if (frame.Number < _inPoint || frame.Number > _outPoint) continue;
-            if (_cache[i] is null) return true;
-        }
-
-        return false;
-    }
+    private bool NeedsPreload() => _frames.NeedsPreload(_inPoint, _outPoint);
 
     private async void StartPreload()
     {
-        if (_framesClosed || _sequence is null || _preloader is not null) return;
-
-        var sequence = _sequence;
-        var paths = sequence.Frames.Select(f => f.Path).ToList();
-
-        IDashboardPreloader? loader = null;
-        loader = _frameSources.CreatePreloader(paths, CurrentPace, progress =>
-        {
-            void Apply()
-            {
-                if (!_framesClosed && ReferenceEquals(_preloader, loader)) ShowPreloadProgress(progress);
-            }
-            if (Dispatcher.CheckAccess()) Apply();
-            else Dispatcher.BeginInvoke(new Action(Apply));
-        });
-        _preloader = loader;
-
+        if (_sequence is null || _frames.IsPreloading) return;
+        int total = _sequence.Count;
         ShowPlayGlyph(playing: true);
         PreloadBar.Visibility = Visibility.Visible;
         PreloadNote.Text = string.Empty;
-        ShowPreloadProgress(new PreloadProgress(0, paths.Count, CurrentPace(), 0));
+        ShowPreloadProgress(new PreloadProgress(0, total, CurrentPace(), 0));
+        Note(Strings.T("D_LogPreload", total));
 
-        Note(Strings.T("D_LogPreload", paths.Count));
-
-        bool whole;
-
-        try
-        {
-            whole = await loader.RunAsync(DecodeWidth(), PreloadBudget(), StageAspect());
-        }
-        catch (Exception)
-        {
-            whole = false;
-        }
-
-        bool cancelled = !ReferenceEquals(_preloader, loader);
-
-        if (cancelled)
-        {
-            loader.Dispose();
-            return;
-        }
-
-        _preloader = null;
+        var result = await _frames.PreloadAsync(DecodeWidth(), PreloadBudget(), StageAspect());
+        // Zwischen Rueckgabe und Fortsetzung kann schon eine neue Auswahl gelten.
+        if (result is null || !_frames.IsCurrent(result)) return;
         PreloadBar.Visibility = Visibility.Collapsed;
-
-        // Die Folge kann sich waehrend des Ladens geaendert haben - ein Render
-        // schreibt weiter. Dann gehoeren die gelesenen Bilder nicht mehr zu dem,
-        // was hier steht.
-        if (!ReferenceEquals(_sequence, sequence))
-        {
-            loader.Dispose();
-            return;
-        }
-
-        _cache = loader.Frames;
-
-        // Hier stand ein Aufruf des Speicheraufraeumers. Er war falsch am Platz: Er
-        // gibt den Arbeitssatz ans Betriebssystem zurueck - also genau die Seiten, die
-        // eben mit Bildern gefuellt wurden. Gemessen blieben von 1594 MB geladener
-        // Bilder 344 MB im Arbeitssatz stehen; der Rest waere beim Abspielen einzeln
-        // zurueckgeholt worden, und dafuer wurde nicht vorausgeladen. Aufgeraeumt wird
-        // beim Verwerfen des Zwischenspeichers, nicht beim Fuellen.
-
-        Note(whole
-            ? Strings.T("D_LogPreloadDone", loader.Loaded)
-            : Strings.T("D_LogPreloadPart", loader.Loaded, paths.Count));
-
-        loader.Dispose();
-
+        Note(result.Whole
+            ? Strings.T("D_LogPreloadDone", result.Loaded)
+            : Strings.T("D_LogPreloadPart", result.Loaded, result.Total));
         ShowFrame(_inPoint);
         Play();
     }
-
     /// <summary>
     /// Nebenher schon das Video kodieren.
     ///
@@ -1622,10 +1471,7 @@ public partial class MainWindow : Window
 
     private void CancelPreload()
     {
-        var loader = _preloader;
-        _preloader = null;
-
-        loader?.Cancel();
+        _frames.CancelPreload();
 
         PreloadBar.Visibility = Visibility.Collapsed;
         ShowPlayGlyph(playing: false);
