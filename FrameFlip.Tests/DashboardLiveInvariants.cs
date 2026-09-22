@@ -120,7 +120,7 @@ public static class DashboardLiveInvariants
         encoder.Save(stream);
     }
     private static ImageSequence Sequence(MainWindow window) => Field<ImageSequence>(window, "_sequence");
-    private static T Field<T>(MainWindow window, string name) => (T)typeof(MainWindow).GetField(name, Hidden)!.GetValue(window)!;
+    private static T Field<T>(MainWindow window, string name) => (T)DashboardSelectionInvariants.Read(window, name)!;
     private static void Set(MainWindow window, string name, object value) => typeof(MainWindow).GetField(name, Hidden)!.SetValue(window, value);
     private static object? Call(MainWindow window, string name, params object[] args)
         => typeof(MainWindow).GetMethod(name, Hidden)!.Invoke(window, args);

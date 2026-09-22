@@ -76,18 +76,14 @@ public partial class MainWindow : Window
     private readonly DispatcherTimer _ticker;
     private readonly DispatcherTimer _player;
 
-    private readonly List<(ToggleButton Button, RenderEntry Entry)> _sequenceButtons = new();
+    private readonly List<(ToggleButton Button, DashboardSequenceEntry Entry)> _sequenceButtons = new();
 
-    /// <summary>Von Hand geoeffnete Ordner - leben nur, solange das Fenster offen ist.</summary>
-    private readonly List<RenderEntry> _adhoc = new();
+    private readonly DashboardSequenceController _sequences;
     private readonly List<string> _log = new();
     private readonly List<MetricTile> _tiles = new();
 
-    private ImageSequence? _sequence;
-    private RenderEntry? _current;
-
-    /// <summary>Laeuft mit jedem Neuaufbau der Liste hoch; spaete Zaehlungen verfallen.</summary>
-    private int _listGeneration;
+    private ImageSequence? _sequence => _sequences.Sequence;
+    private DashboardSequenceEntry? _current => _sequences.Current;
 
     /// <summary>Die zuletzt gesehene Auftragsnummer - daran haengt der Neuaufbau der Liste.</summary>
     private string _lastJobId = string.Empty;
@@ -224,6 +220,8 @@ public partial class MainWindow : Window
             return null;
         };
 
+        _sequences = new DashboardSequenceController(DashboardSequenceSources.Default(_decoders),
+            action => Dispatcher.BeginInvoke(action), RefreshSequenceItem);
         _live = new DashboardLiveController(DashboardLiveSources.Default(Dispatcher), _decoders.IsSupported, RescanLive);
         _layout = DesktopLayout.Load();
 
@@ -289,6 +287,7 @@ public partial class MainWindow : Window
             _ticker.Stop();
             _player.Stop();
             _live.Dispose();
+            _sequences.Dispose();
             CancelPreload();
             DropCache();
             _prepping?.Cancel();
@@ -526,75 +525,21 @@ public partial class MainWindow : Window
 
     // ================================================================ Sequenzen
 
-    /// <summary>
-    /// Eine Zeile in der Sequenzspalte: eine Blender-Datei, die gerendert hat.
-    ///
-    /// Nicht jeder Bildordner auf der Platte, sondern die Renders, die FrameFlip
-    /// mitbekommen hat. Ein Ordner voller Bilder sagt nicht, woraus er entstanden
-    /// ist; die Bruecke sagt es, und das ist der Unterschied zwischen einer Liste
-    /// von Ordnern und einer Liste von Arbeit.
-    /// </summary>
-    private sealed class RenderEntry
+    private void LoadSequences() => LoadSequenceList(keepSelection: false);
+
+    private void LoadSequenceList(bool keepSelection)
     {
-        public string Name { get; init; } = string.Empty;
-        public string BlendPath { get; init; } = string.Empty;
-        public string Folder { get; init; } = string.Empty;
-        public string Seed { get; init; } = string.Empty;
-        public int Width { get; set; }
-        public int Height { get; set; }
-        public DateTime SeenUtc { get; init; }
-
-        /// <summary>Von Hand geoeffnet statt protokolliert - nur fuer diese Sitzung.</summary>
-        public bool Adhoc { get; init; }
-
-        /// <summary>Nachgetragen vom Hintergrunddurchgang; null, solange ungezaehlt.</summary>
-        public int? Frames { get; set; }
-
-        public int Missing { get; set; }
-
-        public bool HasOutput => Folder.Length > 0 && Directory.Exists(Folder);
-    }
-
-    private void LoadSequences()
-    {
+        _sequences.Reload(keepSelection);
         SequenceList.Children.Clear();
         _sequenceButtons.Clear();
-
-        var entries = new List<RenderEntry>();
-
-        // Was von Hand geoeffnet wurde, bleibt oben stehen, solange das Fenster
-        // offen ist. Sonst waere ein gerade geoeffneter Ordner ausgewaehlt, ohne
-        // dass er irgendwo in der Liste steht - Auswahl ohne Zeile.
-        entries.AddRange(_adhoc);
-
-        foreach (var known in ProjectLibrary.Load().Files)
-        {
-            if (!BlendProjects.IsBlendFile(known.Path)) continue;
-
-            entries.Add(new RenderEntry
-            {
-                Name = Path.GetFileName(known.Path),
-                BlendPath = known.Path,
-                Folder = known.Output,
-                Seed = known.Seed,
-                Width = known.Width,
-                Height = known.Height,
-                SeenUtc = known.SeenUtc,
-            });
-        }
-
-        foreach (var entry in entries)
+        foreach (var entry in _sequences.Entries)
         {
             var button = BuildSequenceItem(entry);
             SequenceList.Children.Add(button);
             _sequenceButtons.Add((button, entry));
         }
-
-        if (entries.Count == 0)
+        if (_sequences.Entries.Count == 0)
         {
-            _current = null;
-            Pause();
-            _live.WatchFolder(null);
             SequenceList.Children.Add(new TextBlock
             {
                 Text = Strings.T("D_NoRenders"),
@@ -603,72 +548,11 @@ public partial class MainWindow : Window
                 FontSize = 11.5,
                 Foreground = (Brush)FindResource("DesktopFaint"),
             });
-
-            ShowEmptyStage();
-            return;
         }
-
-        CountFramesInBackground(entries);
-
-        var first = entries.FirstOrDefault(e => e.HasOutput) ?? entries[0];
-        Select(first);
+        ApplySequenceSelection();
     }
 
-    /// <summary>
-    /// Die Bildzahl je Zeile nachtragen.
-    ///
-    /// Abseits des Oberflaechenfadens, und erst nachdem die Liste steht: Ein Dutzend
-    /// Ordner zu zaehlen dauert laenger, als das Fenster auf sich warten lassen darf,
-    /// und die Zahl ist Beiwerk - der Name ist die Auskunft.
-    /// </summary>
-    private void CountFramesInBackground(List<RenderEntry> entries)
-    {
-        var pending = entries.Where(e => e.Frames is null && e.HasOutput).ToList();
-        if (pending.Count == 0) return;
-
-        int generation = ++_listGeneration;
-
-        Task.Run(() =>
-        {
-            foreach (var entry in pending)
-            {
-                if (generation != _listGeneration) return;
-
-                try
-                {
-                    // Derselbe Leser wie bei der Auswahl. Die Zahl von Hand zu
-                    // ermitteln waere schneller, muesste aber dieselbe Namensregel
-                    // ein zweites Mal treffen - und zwei Regeln driften auseinander.
-                    string seed = entry.Seed.Length > 0 && File.Exists(entry.Seed)
-                        ? entry.Seed
-                        : SequenceScanner.FindFirstImage(entry.Folder, _decoders) ?? string.Empty;
-
-                    if (seed.Length == 0) continue;
-
-                    var scanned = SequenceScanner.Scan(seed, _decoders);
-                    if (scanned is null) continue;
-
-                    int count = scanned.Count;
-                    int gaps = scanned.MissingNumbers().Count;
-
-                    Dispatcher.BeginInvoke(new Action(() =>
-                    {
-                        if (generation != _listGeneration) return;
-
-                        entry.Frames = count;
-                        entry.Missing = gaps;
-                        RefreshSequenceItem(entry);
-                    }));
-                }
-                catch (Exception)
-                {
-                    // Ein Ordner, der nicht lesbar ist, bleibt eben ohne Zahl.
-                }
-            }
-        });
-    }
-
-    private ToggleButton BuildSequenceItem(RenderEntry entry)
+    private ToggleButton BuildSequenceItem(DashboardSequenceEntry entry)
     {
         var row = new Grid();
         row.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
@@ -762,7 +646,7 @@ public partial class MainWindow : Window
     }
 
     /// <summary>Beschriftung und Marke einer Zeile - getrennt, weil sie nachgetragen werden.</summary>
-    private void Dress(RenderEntry entry, TextBlock meta, Border tag)
+    private void Dress(DashboardSequenceEntry entry, TextBlock meta, Border tag)
     {
         meta.Text = entry.HasOutput
             ? Path.GetFileName(entry.Folder.TrimEnd('\\', '/')) + " \u00b7 " + Ago(entry.SeenUtc)
@@ -780,7 +664,7 @@ public partial class MainWindow : Window
         label.Foreground = (Brush)FindResource(warn ? "DesktopWarn" : "DesktopMuted");
     }
 
-    private void RefreshSequenceItem(RenderEntry entry)
+    private void RefreshSequenceItem(DashboardSequenceEntry entry)
     {
         foreach (var (button, other) in _sequenceButtons)
         {
@@ -809,44 +693,28 @@ public partial class MainWindow : Window
 
     private bool Select(string seedOrFolder)
     {
-        foreach (var (button, entry) in _sequenceButtons)
-        {
-            if (!string.Equals(entry.Folder, seedOrFolder, StringComparison.OrdinalIgnoreCase) &&
-                !string.Equals(entry.Seed, seedOrFolder, StringComparison.OrdinalIgnoreCase) &&
-                !string.Equals(entry.BlendPath, seedOrFolder, StringComparison.OrdinalIgnoreCase))
-                continue;
-
-            button.IsChecked = true;
-            return true;
-        }
-
-        return false;
+        var entry = _sequences.Find(seedOrFolder);
+        if (entry is null) return false;
+        Select(entry);
+        return true;
     }
 
-    private void Select(RenderEntry entry)
+    private void Select(DashboardSequenceEntry entry)
     {
-        _current = entry;
+        if (_sequences.Select(entry)) ApplySequenceSelection();
+    }
 
-        foreach (var (button, other) in _sequenceButtons)
-            button.IsChecked = ReferenceEquals(other, entry);
-
+    private void ApplySequenceSelection()
+    {
         Pause();
-        _sequence = null;
+        foreach (var (button, other) in _sequenceButtons)
+            button.IsChecked = ReferenceEquals(other, _current);
 
-        try
+        if (_current is not { } entry)
         {
-            string seed = entry.Seed.Length > 0 && File.Exists(entry.Seed)
-                ? entry.Seed
-                : entry.HasOutput
-                    ? SequenceScanner.FindFirstImage(entry.Folder, _decoders) ?? string.Empty
-                    : string.Empty;
-
-            if (seed.Length > 0) _sequence = SequenceScanner.Scan(seed, _decoders);
-        }
-        catch (Exception)
-        {
-            // Ein Ordner, der inzwischen weg ist, darf das Fenster nicht mitnehmen.
-            _sequence = null;
+            _live.WatchFolder(null);
+            ShowEmptyStage();
+            return;
         }
 
         if (_sequence is null || _sequence.Count == 0)
@@ -873,8 +741,6 @@ public partial class MainWindow : Window
         // mehr hierher.
         DropCache();
 
-        entry.Frames = _sequence.Count;
-        entry.Missing = _missing.Count;
         RefreshSequenceItem(entry);
 
         Note(Strings.T("D_LogOpened", entry.Name, _sequence.Count));
@@ -894,14 +760,7 @@ public partial class MainWindow : Window
     /// Ohne das Merken spraenge waehrend eines laufenden Renders die Auswahl auf die
     /// oberste Zeile zurueck - mitten im Zusehen.
     /// </summary>
-    private void ReloadSequencesKeepingSelection()
-    {
-        string? keep = _current?.BlendPath.Length > 0 ? _current.BlendPath : _current?.Folder;
-
-        LoadSequences();
-
-        if (keep is { Length: > 0 }) Select(keep);
-    }
+    private void ReloadSequencesKeepingSelection() => LoadSequenceList(keepSelection: true);
 
     /// <summary>
     /// Eine Bildsequenz von Hand oeffnen.
@@ -932,23 +791,7 @@ public partial class MainWindow : Window
     /// </summary>
     private bool OpenPath(string path)
     {
-        if (path.Length == 0 || !File.Exists(path)) return false;
-        if (!_decoders.IsSupported(Path.GetExtension(path))) return false;
-
-        string? folder = Path.GetDirectoryName(path);
-        if (folder is null) return false;
-
-        var entry = new RenderEntry
-        {
-            Name = Path.GetFileName(folder.TrimEnd('\\', '/')),
-            Folder = folder,
-            Seed = path,
-            SeenUtc = DateTime.UtcNow,
-            Adhoc = true,
-        };
-
-        _adhoc.RemoveAll(a => string.Equals(a.Folder, folder, StringComparison.OrdinalIgnoreCase));
-        _adhoc.Insert(0, entry);
+        if (!_sequences.AddPath(path)) return false;
 
         LoadSequences();
         Select(path);
@@ -959,7 +802,7 @@ public partial class MainWindow : Window
         // hier, weil erst die Auswahl weiss, wieviele Bilder es geworden sind.
         RecentSequences.Remember(new RecentSequence
         {
-            Folder = folder,
+            Folder = _current!.Folder,
             Seed = path,
             First = opened.StartNumber,
             Last = opened.EndNumber,
@@ -976,43 +819,17 @@ public partial class MainWindow : Window
     /// <summary>Die Sequenz neu einlesen, ohne die Auswahl oder die Stelle zu verlieren.</summary>
     private void RescanLive()
     {
-        if (_current is null) return;
-        if (_sequence is null)
+        var change = _sequences.Rescan();
+        if (change is null) return;
+        if (change.Previous is null)
         {
-            // Auch der erste Frame eines gerade begonnenen Renders gehoert
-            // zur ausgewaehlten Ausgabe, die bisher noch keine Folge hatte.
-            Select(_current);
+            ApplySequenceSelection();
             return;
         }
-
-        ImageSequence? fresh;
-
-        try
-        {
-            string seed = _sequence.Frames[0].Path;
-
-            fresh = File.Exists(seed)
-                ? SequenceScanner.Scan(seed, _decoders)
-                : SequenceScanner.FindFirstImage(_current.Folder, _decoders) is { } other
-                    ? SequenceScanner.Scan(other, _decoders)
-                    : null;
-        }
-        catch (Exception)
-        {
-            return;
-        }
-
-        if (fresh is null || fresh.Count == 0) return;
-        if (fresh.Count == _sequence.Count && fresh.EndNumber == _sequence.EndNumber) return;
-
-        bool grewAtEnd = fresh.EndNumber > _sequence.EndNumber;
-
-        // Stand das Ende auf dem letzten Bild, wandert es mit. Hatte jemand den
-        // Bereich von Hand gesetzt, bleibt er stehen - ein laufender Render darf die
-        // Auswahl des Benutzers nicht ueberschreiben.
-        bool outWasAtEnd = _outPoint == _sequence.EndNumber;
-
-        _sequence = fresh;
+        var fresh = change.Current;
+        bool grewAtEnd = fresh.EndNumber > change.Previous.EndNumber;
+        // Ein von Hand gesetztes Ende bleibt stehen; nur das offene Ende waechst mit.
+        bool outWasAtEnd = _outPoint == change.Previous.EndNumber;
         _missing = fresh.MissingNumbers();
 
         // Der Render hat weitergeschrieben: Die Stellen stimmen nicht mehr ueberein.
@@ -1021,9 +838,7 @@ public partial class MainWindow : Window
         if (outWasAtEnd) _outPoint = fresh.EndNumber;
         if (_inPoint < fresh.StartNumber) _inPoint = fresh.StartNumber;
 
-        _current.Frames = fresh.Count;
-        _current.Missing = _missing.Count;
-        RefreshSequenceItem(_current);
+        RefreshSequenceItem(_current!);
 
         BuildStrip();
         BuildGaps();
@@ -1066,7 +881,6 @@ public partial class MainWindow : Window
 
     private void ShowEmptyStage()
     {
-        _sequence = null;
         _missing = Array.Empty<int>();
 
         StageImage.Source = null;
