@@ -72,10 +72,21 @@ gets the finished frame. `IDataTool` was the right home, which also settles the
 behaviour without a file: **it rests when the pass is missing**, exactly like depth of
 field and motion blur.
 
-The cost of that: a plain wave on a PNG is not reachable, because a data tool without its
-pass does not run at all. Closing that would mean letting a tool declare its pass
-optional — a small change to a contract two working tools share, and not worth making
-until someone wants it.
+That cost one thing, and it was worth closing straight away: a plain wave on a PNG was
+not reachable, because a data tool without its pass does not run at all. A tool can now
+declare its pass **optional**, and the displacement has a third setting — *wave only* —
+which needs nothing but the picture. It then pushes across the wave's direction of
+travel: with a wave running top to bottom, horizontal bands slide sideways, which is the
+tear people mean. Along it would be a zoom in stripes. `PassNeed.None` says that nothing
+should be looked for, so no pass is read that nobody will look at.
+
+Depth of field and motion blur keep the old rule: without their pass they rest, because a
+slider that invents a distance is worse than one that does nothing.
+
+A related gap closed with it: **a resting tool now says why it rests.** All three name the
+missing pass and where it is switched on in Blender. A tool that quietly does nothing is
+the worst failure mode this program has — it sends you looking for the bug in the program
+instead of in the file, and it did exactly that here.
 
 ### 4. Post effects: chromatic aberration on the raster, JPEG glitch, scan lines
 
