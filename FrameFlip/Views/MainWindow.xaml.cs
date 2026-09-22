@@ -72,6 +72,7 @@ public partial class MainWindow : Window
     private Web.WatchService? _watched;
 
     private readonly FrameDecoderRegistry _decoders = FrameDecoderRegistry.CreateDefault();
+    private readonly DashboardFrameSources _frameSources;
 
     private readonly DispatcherTimer _ticker;
     private readonly DispatcherTimer _player;
@@ -102,7 +103,7 @@ public partial class MainWindow : Window
     private BitmapSource?[] _cache = Array.Empty<BitmapSource?>();
 
     /// <summary>Laeuft, solange vorausgeladen wird.</summary>
-    private SequencePreloader? _preloader;
+    private IDashboardPreloader? _preloader;
 
     /// <summary>Ob Abspielen erst vorauslaedt. Wird mit den Einstellungen gemerkt.</summary>
     private bool _prebuffer = true;
@@ -161,7 +162,18 @@ public partial class MainWindow : Window
         Action<AppSettings>? persist = null, Func<AppSettings, string?>? applySettings = null,
         Func<AppSettings>? getSettings = null, Func<Web.WatchService?>? watch = null,
         Action? renewWatch = null, Action<string?>? setWatchCode = null)
+        : this(DashboardFrameSources.Default, monitor, remoteState, showSettings, openSequence, showPairing,
+            settings, persist, applySettings, getSettings, watch, renewWatch, setWatchCode)
     {
+    }
+
+    internal MainWindow(DashboardFrameSources frameSources, RenderMonitor? monitor, Func<RelayState?> remoteState,
+        Action showSettings, Action<string> openSequence, Action showPairing, AppSettings? settings = null,
+        Action<AppSettings>? persist = null, Func<AppSettings, string?>? applySettings = null,
+        Func<AppSettings>? getSettings = null, Func<Web.WatchService?>? watch = null,
+        Action? renewWatch = null, Action<string?>? setWatchCode = null)
+    {
+        _frameSources = frameSources;
         _watch = watch ?? (() => null);
         _renewWatch = renewWatch;
         _setWatchCode = setWatchCode;
@@ -1034,15 +1046,7 @@ public partial class MainWindow : Window
 
             try
             {
-                var bitmap = new BitmapImage();
-                bitmap.BeginInit();
-                bitmap.UriSource = new Uri(path);
-                bitmap.CacheOption = BitmapCacheOption.OnLoad;
-                bitmap.CreateOptions = BitmapCreateOptions.IgnoreColorProfile;
-                bitmap.DecodePixelWidth = crisp;
-                bitmap.EndInit();
-                bitmap.Freeze();
-                image = bitmap;
+                image = _frameSources.Read(path, crisp);
             }
             catch (Exception)
             {
@@ -1335,7 +1339,7 @@ public partial class MainWindow : Window
         var sequence = _sequence;
         var paths = sequence.Frames.Select(f => f.Path).ToList();
 
-        var loader = new SequencePreloader(paths, CurrentPace, ShowPreloadProgress);
+        var loader = _frameSources.CreatePreloader(paths, CurrentPace, ShowPreloadProgress);
         _preloader = loader;
 
         ShowPlayGlyph(playing: true);
