@@ -45,7 +45,7 @@ beschrieben, sind aber implementiert. Offene Wünsche wie Undo, weitere
 Glitch-Effekte oder ablösbare Panels sind keine Voraussetzung für sämtliche
 Refactoring-Schritte und werden nicht als bereits umgesetzt gezählt.
 
-## Fortschritt am 21. September 2026
+## Fortschritt am 22. September 2026
 
 Die Strukturarbeit liegt separat auf `codex/refactor-watch-lifecycle`, inzwischen
 auf Claudes gespeichertem Feature-Stand `7e92276`. Der gemeinsam benutzte
@@ -66,9 +66,25 @@ implementiert und geprüft**, noch nicht in `feature/atelier` oder `main` gemerg
   Neun zunächst fehlgeschlagene Zusicherungen haben verspätete Rückrufe
   nach Auswahlwechsel oder Schließen nachgewiesen; die Korrektur ist ein
   eigener Commit nach der reinen Auslagerung.
-- **D1 bleibt offen:** Sequenzauswahl und Scan-Zustand, danach Vorladen/Cache
-  und zuletzt Playback sind die nächsten getrennten Schnitte. Rescan,
-  Follow-Entscheidungen und WPF-Darstellung liegen noch in `MainWindow`.
+- **D1b abgeschlossen:** `DashboardSequenceController` besitzt Bibliotheks-
+  und Sitzungseinträge, Auswahl, Seed-/Ordnersuche, Live-Scan und die
+  Hintergrundzählungen. `MainWindow` zeichnet die Zeilen und hält weiterhin
+  Abspielposition, Follow, Bereiche und Bildspeicher. 22 Prüfungen am echten
+  Dashboard sichern Auswahl, Verlauf, Neuaufbau und leere Ausgaben; 33
+  Controller-Prüfungen sichern Lesefehler, Dispatcher-Zustellung und verspätete
+  Ergebnisse. Höchstens eine Hintergrundzählung liest gleichzeitig; überholte
+  Listen beginnen nach einem blockierten Zugriff keinen weiteren Scan.
+  Listen- und Eintragsrevisionen verhindern, dass alte Zählungen neuere
+  Auswahl-/Live-Ergebnisse überschreiben. Schließen wartet nicht auf den
+  Dateizugriff und verwirft seine Rückgaben.
+  Zwei vorhandene Fehler wurden vor der Auslagerung separat korrigiert und
+  mit drei zunächst fehlgeschlagenen Zusicherungen nachgewiesen: Der erste
+  Frame erscheint jetzt auch in einer zuvor leeren Ausgabe, und eine geleerte
+  Bibliothek gibt Auswahl und Wiedergabestatus frei.
+- **D1 bleibt offen:** Vorladen/Cache und danach Playback sind die nächsten
+  getrennten Schnitte. Follow-Entscheidungen und WPF-Darstellung bleiben
+  zunächst in `MainWindow`. Auswahl- und Live-Scans laufen wie bisher synchron;
+  die Begrenzung der Leser betrifft die beiläufigen Zeilenzählungen.
 - **S0–S6 bleiben zurückgestellt:** Atelier-Dateien und die gemeinsamen
   Kopplungs-/Watch-Protokolle wurden in diesen Schnitten nicht geändert.
 
@@ -77,7 +93,7 @@ Der Testläufer unterstützt jetzt `--only=Klasse` beziehungsweise
 in kurzen Gruppen laufen können. Ohne Filter bleibt der bisherige Gesamtlauf
 erhalten. Tests verwenden eigene Konfigurationen und synthetische Bilder.
 
-Abnahme dieses Branchstands: **3.546 Zusicherungen aus 89 registrierten
+Abnahme dieses Branchstands: **3.601 Zusicherungen aus 92 registrierten
 Kern-Testaufrufen** in zehn Gruppen (jede unter 55 Sekunden) sowie **227
 UI-Prüfungen** erfolgreich; beide Projekte bauen in Release. Vier bereits
 vorhandene Nullable-Warnungen bleiben in `AtelierLayerInvariants` und
@@ -272,13 +288,13 @@ sofort koppeln, ohne zusätzliche Schritte.
 
 ## Nächster Startpunkt
 
-**Aktiv: D1, Dashboard-Sitzung.** D2 und D1a (Ordnerbeobachtung/Ruhefrist)
-sind im separaten Branch umgesetzt. Als Nächstes Auswahl und Scan-Zustand
-charakterisieren und aus `MainWindow` lösen, insbesondere leere Ausgabeordner,
-Auswahl nach Listen-Neuaufbau und verspätete Frame-Zählungen. Danach folgen
-Vorladen/Cache und Playback jeweils separat, dann die übrigen offenen Schritte
-in der oben festgelegten Reihenfolge. Die Atelier-Seite bleibt außerhalb
-dieser Schnitte.
+**Aktiv: D1, Dashboard-Sitzung.** D2, D1a (Ordnerbeobachtung/Ruhefrist) und
+D1b (Auswahl/Scan-Zustand) sind im separaten Branch umgesetzt. Als Nächstes
+Vorladen und Bildspeicher charakterisieren und aus `MainWindow` lösen:
+Wechsel auf andere oder leere Folgen, verspätete Decoder-/Preloader-Rückgaben,
+Abbruch beim Schließen und vorbereitete Videos. Danach folgt Playback als
+eigener Schnitt, dann die übrigen offenen Schritte in der oben festgelegten
+Reihenfolge. Die Atelier-Seite bleibt außerhalb dieser Schnitte.
 
 **Erst abschließend S0–S6.** Vor dem Einstieg den dann aktuellen Atelier-Stand
 neu lesen: Die jetzt dokumentierten Codebefunde können durch die laufende
