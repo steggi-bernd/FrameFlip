@@ -652,6 +652,8 @@
                                   Content="{DynamicResource S_DisplaceFromNormal}" />
                     <ComboBoxItem Style="{StaticResource OverlayComboItem}"
                                   Content="{DynamicResource S_DisplaceFromMotion}" />
+                    <ComboBoxItem Style="{StaticResource OverlayComboItem}"
+                                  Content="{DynamicResource S_DisplaceFromScreen}" />
                 </ComboBox>
 
                 <Grid Margin="0,0,0,2">

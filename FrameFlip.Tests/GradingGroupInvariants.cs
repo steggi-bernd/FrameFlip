@@ -147,6 +147,19 @@ public static class GradingGroupInvariants
             Check.That(displaceNote.Visibility != Visibility.Visible,
                        "mit Normalpass schweigt sie - der fehlende Vektorpass ist nicht ihrer");
 
+            // Und auf "nur Welle" gestellt schweigt sie auch ohne jeden Pass - dort
+            // ist "der Pass fehlt" keine Erklaerung mehr, sondern eine Irrefuehrung.
+            var fromBox = (ComboBox)panel.FindName("DisplaceFromBox");
+
+            fromBox.SelectedIndex = 2;
+            panel.ShowPasses(depth: false, motion: false, normal: false);
+            panel.UpdateLayout();
+
+            Check.That(displaceNote.Visibility != Visibility.Visible,
+                       "auf 'nur Welle' schweigt sie auch ganz ohne Passe");
+
+            fromBox.SelectedIndex = 0;
+
             panel.ShowPasses(depth: true, motion: true, normal: true);
             panel.UpdateLayout();
 

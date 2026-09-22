@@ -513,6 +513,66 @@ public static class RenderDataInvariants
                    "und zwar um die eingestellte Strecke",
                    $"{Math.Abs(lowShifted - lowPlain)} statt 30");
 
+        // "Nur Welle": Der eine Fall dieser Werkzeugfamilie, der OHNE Renderdaten
+        // laeuft - und damit auf jedem Bild, auch auf einem PNG.
+        //
+        // Geprueft wird mit data = null, also genau so, wie der Aufrufer es liefert,
+        // wenn die Datei den Pass nicht fuehrt. Mit einem leeren Pass zu pruefen
+        // waere die falsche Probe: Sie liefe auch dann gruen, wenn das Werkzeug
+        // weiterhin einen verlangte.
+        var alone = new GradingStack
+        {
+            Data =
+            {
+                new DisplaceTool
+                {
+                    From = DisplaceFrom.Screen, Amount = 30f,
+                    Wave = 0f, Wavelength = 40f, Angle = 90f,
+                },
+            },
+        };
+
+        var without = Draw(frame, alone, data: null);
+
+        int aloneEdge = Row(without, w, h / 2);
+
+        Console.WriteLine($"         nur Welle, ohne jeden Pass: Kante {lowPlain} -> {aloneEdge}");
+
+        Check.That(aloneEdge != lowPlain,
+                   "auf 'nur Welle' schiebt es auch ganz ohne Pass",
+                   $"{lowPlain} gegen {aloneEdge}");
+
+        Check.That(Math.Abs(Math.Abs(aloneEdge - lowPlain) - 30) <= 3,
+                   "und zwar um die eingestellte Strecke",
+                   $"{Math.Abs(aloneEdge - lowPlain)} statt 30");
+
+        // Und es verlangt dann auch keinen mehr - sonst laese das Programm einen
+        // Normalpass, den niemand ansieht.
+        var tool = alone.Data.OfType<DisplaceTool>().First();
+
+        Check.That(tool.Needs == PassNeed.None, "es verlangt keinen Pass mehr",
+                   tool.Needs.ToString());
+
+        Check.That(tool.Optional, "und sagt, dass es ohne einen laufen darf");
+
+        Check.That(FramePasses.NameFor(PassNeed.None, Passes("ViewLayer.Normal")) is null,
+                   "und fuer 'keinen' wird auch keiner gesucht");
+
+        // Die beiden anderen bleiben dabei, was sie waren: Ohne ihren Pass ruhen sie.
+        var needs = new GradingStack
+        {
+            Data = { new DisplaceTool { From = DisplaceFrom.Normal, Amount = 30f } },
+        };
+
+        var nothing = Draw(frame, needs, data: null);
+
+        Check.That(Row(nothing, w, h / 2) == lowPlain,
+                   "mit Normalpass gewaehlt und ohne Datei bleibt alles stehen",
+                   $"{Row(nothing, w, h / 2)}");
+
+        Check.That(!needs.Data.OfType<DisplaceTool>().First().Optional,
+                   "und es sagt auch nicht, dass es ohne einen laufen duerfte");
+
         // Ohne Staerke zaehlt es nicht mit - sonst zoege eine Null jedes Bild durch
         // den Puffer und laese den Normalpass dazu.
         var quiet = Shift(0f);

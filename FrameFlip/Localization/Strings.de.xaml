@@ -72,6 +72,7 @@
     <sys:String x:Key="S_DisplaceSpread">Kanalversatz</sys:String>
     <sys:String x:Key="S_DisplaceFromNormal">Normalpass</sys:String>
     <sys:String x:Key="S_DisplaceFromMotion">Vektorpass</sys:String>
+    <sys:String x:Key="S_DisplaceFromScreen">nur Welle</sys:String>
     <sys:String x:Key="S_DisplaceFromHint">Woher die Richtung kommt. Der Normalpass legt den Verzug an die Geometrie: Eine Kugel schiebt nach aussen, eine Wand gar nicht. Der Vektorpass legt ihn an die Bewegung: Was steht, bleibt stehen, was laeuft, zerreisst in Laufrichtung.</sys:String>
     <sys:String x:Key="S_DisplaceHint">Braucht den gewaehlten Pass in der Datei - ohne ihn ruht das Werkzeug. Die Welle macht aus dem glatten Verzug Baender, die abwechselnd vor- und zurueckschieben; der Kanalversatz gibt ihnen den Farbsaum, der nach Stoerung aussieht statt nach Weichzeichner.</sys:String>
     <sys:String x:Key="S_Motion">Bewegungsunschärfe</sys:String>

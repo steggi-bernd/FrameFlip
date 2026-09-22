@@ -24,6 +24,19 @@ public enum DisplaceFrom
     /// dort, wo sich wirklich etwas bewegt.
     /// </summary>
     Motion,
+
+    /// <summary>
+    /// Keine Renderdaten: Die Welle allein schiebt, quer zu ihrer Laufrichtung.
+    ///
+    /// Der klassische Wellenfilter, und der einzige der drei, der auf JEDEM Bild
+    /// laeuft - auch auf einem PNG. Er weiss nichts ueber die Szene und schiebt
+    /// deshalb alles gleich: Vordergrund, Hintergrund und Himmel.
+    ///
+    /// Quer und nicht laengs, weil das der Riss ist, den man meint: Bei einer Welle,
+    /// die von oben nach unten laeuft, verschieben sich waagerechte Baender nach
+    /// links und rechts. Laengs waere ein Zoom in Streifen und sieht nach nichts aus.
+    /// </summary>
+    Screen,
 }
 
 /// <summary>
@@ -45,8 +58,10 @@ public enum DisplaceFrom
 /// geschoben. Ein Riss ohne Farbsaum sieht nach Fehler in der Datei aus, einer mit
 /// nach einem Fehler im Signal - und das ist das Bild, das gemeint ist.
 ///
-/// RUHT OHNE SEINEN PASS, wie alle Werkzeuge dieser Art. Eine Datei ohne Normalpass
-/// ist kein Fehler, sondern eine Datei ohne Normalpass.
+/// RUHT OHNE SEINEN PASS, wie alle Werkzeuge dieser Art - ausser auf "nur Welle"
+/// gestellt. Dann braucht es nichts als das Bild und laeuft auch auf einem PNG. Eine
+/// Datei ohne Normalpass ist kein Fehler, sondern eine Datei ohne Normalpass; ein
+/// Werkzeug, das deswegen gar nicht zu gebrauchen ist, schon eher.
 /// </summary>
 public sealed class DisplaceTool : IDataTool
 {
@@ -59,7 +74,19 @@ public sealed class DisplaceTool : IDataTool
 
     /// <inheritdoc />
     [JsonIgnore]
-    public PassNeed Needs => From == DisplaceFrom.Motion ? PassNeed.Motion : PassNeed.Normal;
+    public PassNeed Needs => From switch
+    {
+        DisplaceFrom.Motion => PassNeed.Motion,
+        DisplaceFrom.Screen => PassNeed.None,
+        _ => PassNeed.Normal,
+    };
+
+    /// <summary>
+    /// Auf "nur Welle" gestellt braucht es keinen Pass - und darf dann auch ohne
+    /// einen laufen.
+    /// </summary>
+    [JsonIgnore]
+    public bool Optional => From == DisplaceFrom.Screen;
 
     /// <summary>
     /// Vor der Tiefenschaerfe, zusammen mit der Bewegungsunschaerfe.
@@ -113,7 +140,7 @@ public sealed class DisplaceTool : IDataTool
         _cos = MathF.Cos(radians);
     }
 
-    public void Run(LocalPass.Scratch scratch, FloatFrame data, int[] columns, int[] rows,
+    public void Run(LocalPass.Scratch scratch, FloatFrame? data, int[] columns, int[] rows,
                     int imageWidth, int step)
     {
         int gridWidth = columns.Length;
@@ -125,11 +152,17 @@ public sealed class DisplaceTool : IDataTool
         var alpha = scratch.Alpha;
         var alphaTarget = scratch.AlphaWork;
 
-        var passX = data.R;
-        var passY = data.G;
+        // Ohne Pass schiebt die Welle allein - quer zu ihrer Laufrichtung. Das gilt
+        // auch, wenn jemand den Pass verlangt hat und die Datei ihn nicht fuehrt:
+        // Dann kaeme das Werkzeug hier ohnehin nicht an, ausser es ist auf "nur
+        // Welle" gestellt.
+        bool flat = data is null;
 
-        int dataWidth = data.Width;
-        int dataHeight = data.Height;
+        var passX = data?.R;
+        var passY = data?.G;
+
+        int dataWidth = data?.Width ?? 1;
+        int dataHeight = data?.Height ?? 1;
 
         float amount = _amount;
         float wave = _wave;
@@ -146,37 +179,52 @@ public sealed class DisplaceTool : IDataTool
             int line = Math.Min(rows[gy], dataHeight - 1) * dataWidth;
             int row = gy * gridWidth;
 
+
             for (int gx = 0; gx < gridWidth; gx++)
             {
-                int at = line + Math.Min(columns[gx], dataWidth - 1);
+                float dirX, dirY;
 
-                float dirX = Finite(passX[at]);
-                float dirY = Finite(passY[at]);
-
-                // Y umgedreht, und zwar bei beiden Passen aus demselben Grund: In
-                // einem Bild zaehlt Y nach UNTEN, in einer Szene nach oben. Ohne das
-                // schoebe eine nach oben zeigende Flaeche nach unten - was niemand
-                // als Fehler erkennt, weil verzogen ja ohnehin verzogen aussieht.
-                dirY = -dirY;
-
-                float length = MathF.Sqrt(dirX * dirX + dirY * dirY);
-
-                // Wo der Pass nichts sagt, wird nichts geschoben. Das ist der
-                // Normalfall im Himmel und bei allem, was steht.
-                if (length < 1e-4f)
+                if (flat)
                 {
-                    int flat = (row + gx) * 3;
-
-                    target[flat] = source[flat];
-                    target[flat + 1] = source[flat + 1];
-                    target[flat + 2] = source[flat + 2];
-
-                    alphaTarget[row + gx] = alpha[row + gx];
-                    continue;
+                    // Quer zur Laufrichtung der Welle: Laeuft sie von oben nach
+                    // unten, schieben sich waagerechte Baender seitwaerts. Laengs
+                    // waere ein Zoom in Streifen.
+                    dirX = -sin;
+                    dirY = cos;
                 }
+                else
+                {
+                    int at = line + Math.Min(columns[gx], dataWidth - 1);
 
-                dirX /= length;
-                dirY /= length;
+                    dirX = Finite(passX![at]);
+                    dirY = Finite(passY![at]);
+
+                    // Y umgedreht, und zwar bei beiden Passen aus demselben Grund: In
+                    // einem Bild zaehlt Y nach UNTEN, in einer Szene nach oben. Ohne
+                    // das schoebe eine nach oben zeigende Flaeche nach unten - was
+                    // niemand als Fehler erkennt, weil verzogen ja ohnehin verzogen
+                    // aussieht.
+                    dirY = -dirY;
+
+                    float length = MathF.Sqrt(dirX * dirX + dirY * dirY);
+
+                    // Wo der Pass nichts sagt, wird nichts geschoben. Das ist der
+                    // Normalfall im Himmel und bei allem, was steht.
+                    if (length < 1e-4f)
+                    {
+                        int quiet = (row + gx) * 3;
+
+                        target[quiet] = source[quiet];
+                        target[quiet + 1] = source[quiet + 1];
+                        target[quiet + 2] = source[quiet + 2];
+
+                        alphaTarget[row + gx] = alpha[row + gx];
+                        continue;
+                    }
+
+                    dirX /= length;
+                    dirY /= length;
+                }
 
                 // Die Welle laeuft in ihrer eigenen Richtung ueber das BILD, nicht
                 // ueber das Gitter: Beim Reglerzug ist das Gitter groeber, und eine

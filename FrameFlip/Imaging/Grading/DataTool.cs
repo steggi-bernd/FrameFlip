@@ -21,6 +21,17 @@ public enum PassNeed
 
     /// <summary>Wohin eine Flaeche zeigt - der Normalpass mit drei Kanaelen.</summary>
     Normal,
+
+    /// <summary>
+    /// Gar keine. Fuer ein Werkzeug, das auch ohne Renderdaten etwas zu tun hat.
+    ///
+    /// Es steht hier und nicht als eigene Werkzeugart, weil sonst dasselbe Werkzeug
+    /// zweimal existieren muesste - einmal mit Pass und einmal ohne, mit denselben
+    /// Reglern und derselben Rechnung. Wer die Verschiebung von der Geometrie auf
+    /// "nur Welle" umstellt, will kein anderes Werkzeug, sondern dasselbe ohne
+    /// Datei.
+    /// </summary>
+    None,
 }
 
 /// <summary>
@@ -62,6 +73,19 @@ public interface IDataTool
     /// <summary>Welche Renderdaten gebraucht werden.</summary>
     PassNeed Needs { get; }
 
+    /// <summary>
+    /// True, wenn das Werkzeug auch OHNE seinen Pass etwas zu tun hat.
+    ///
+    /// Die Grundstellung ist false, und das ist die richtige: Eine Tiefenschaerfe
+    /// ohne Tiefe muesste sich die Entfernung ausdenken, und ein Regler, der etwas
+    /// erfindet, ist schlimmer als einer, der ruht.
+    ///
+    /// Die Verschiebung ist der Fall, fuer den es die Ausnahme gibt: Ihre Welle
+    /// braucht nichts als das Bild. Nur die RICHTUNG kommt aus dem Pass, und wer auf
+    /// "nur Welle" stellt, hat sie schon anders beantwortet.
+    /// </summary>
+    bool Optional => false;
+
     /// <summary>Wann das Werkzeug an der Reihe ist - die Liste entscheidet nicht.</summary>
     DataStage Stage { get; }
 
@@ -73,10 +97,12 @@ public interface IDataTool
     /// <summary>
     /// Rechnet auf dem ganzen Puffer.
     /// </summary>
-    /// <param name="data">Der Pass, in voller Bildgroesse.</param>
+    /// <param name="data">
+    /// Der Pass, in voller Bildgroesse. Null nur bei <see cref="Optional"/>.
+    /// </param>
     /// <param name="columns">Zu welcher Bildspalte eine Gitterspalte gehoert.</param>
     /// <param name="rows">Dasselbe fuer die Zeilen.</param>
-    void Run(LocalPass.Scratch scratch, FloatFrame data, int[] columns, int[] rows,
+    void Run(LocalPass.Scratch scratch, FloatFrame? data, int[] columns, int[] rows,
              int imageWidth, int step);
 }
 
@@ -150,9 +176,14 @@ public sealed class DepthFieldTool : IDataTool
         _reach = Math.Clamp(Aperture, 0f, 1f) * 4f * _focus;
     }
 
-    public void Run(LocalPass.Scratch scratch, FloatFrame data, int[] columns, int[] rows,
+    public void Run(LocalPass.Scratch scratch, FloatFrame? data, int[] columns, int[] rows,
                     int imageWidth, int step)
     {
+        // Ohne Tiefenpass gibt es keine Entfernung, nach der sich die Schaerfe
+        // richten koennte. Der Aufrufer laesst das Werkzeug dann ohnehin ruhen -
+        // siehe Optional -, aber die Zusage steht besser hier.
+        if (data is null) return;
+
         int gridWidth = columns.Length;
         int gridHeight = rows.Length;
         int count = gridWidth * gridHeight * 3;
@@ -300,9 +331,14 @@ public sealed class MotionBlurTool : IDataTool
         _samples = Math.Clamp(Samples, 2, 48);
     }
 
-    public void Run(LocalPass.Scratch scratch, FloatFrame data, int[] columns, int[] rows,
+    public void Run(LocalPass.Scratch scratch, FloatFrame? data, int[] columns, int[] rows,
                     int imageWidth, int step)
     {
+        // Ohne Vektorpass gibt es keine Bewegung zu verschmieren. Der Aufrufer laesst
+        // das Werkzeug dann ohnehin ruhen - siehe Optional -, aber die Zusage steht
+        // besser hier als in einem Kommentar dort.
+        if (data is null) return;
+
         int gridWidth = columns.Length;
         int gridHeight = rows.Length;
 
@@ -475,6 +511,11 @@ public static class FramePasses
     /// <summary>Der Name des Passes, der einen Bedarf deckt - oder null.</summary>
     public static string? NameFor(PassNeed need, IReadOnlyList<ExrPass> passes)
     {
+        // Wer nichts braucht, bekommt nichts gesucht - und belegt damit auch keinen
+        // Platz im Vorrat. Sonst laese das Programm einen Normalpass, den niemand
+        // ansieht, nur weil das Werkzeug ihn frueher einmal wollte.
+        if (need == PassNeed.None) return null;
+
         if (passes.Count == 0) return null;
 
         var names = need switch

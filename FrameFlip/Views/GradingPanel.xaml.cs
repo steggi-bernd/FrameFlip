@@ -185,11 +185,18 @@ public partial class GradingPanel : UserControl
         MotionMissing.Visibility = _hasMotion ? Visibility.Collapsed : Visibility.Visible;
         DepthMissing.Visibility = _hasDepth ? Visibility.Collapsed : Visibility.Visible;
 
-        // Bei der Verschiebung haengt es daran, welcher Pass gerade gewaehlt ist.
-        bool wantsMotion = DisplaceFromBox.SelectedIndex == 1;
-        bool there = wantsMotion ? _hasMotion : _hasNormal;
+        // Bei der Verschiebung haengt es daran, welcher Pass gerade gewaehlt ist -
+        // und auf "nur Welle" gestellt braucht sie gar keinen.
+        int from = DisplaceFromBox.SelectedIndex;
 
-        DisplaceMissing.Text = Strings.T(wantsMotion
+        bool there = from switch
+        {
+            1 => _hasMotion,
+            2 => true,
+            _ => _hasNormal,
+        };
+
+        DisplaceMissing.Text = Strings.T(from == 1
             ? "S_PassMissingMotion"
             : "S_PassMissingNormal");
 
@@ -665,7 +672,12 @@ public partial class GradingPanel : UserControl
             DisplaceSpreadSlider.Value = Math.Clamp(_displace.Spread,
                 DisplaceSpreadSlider.Minimum, DisplaceSpreadSlider.Maximum);
 
-            DisplaceFromBox.SelectedIndex = _displace.From == DisplaceFrom.Motion ? 1 : 0;
+            DisplaceFromBox.SelectedIndex = _displace.From switch
+            {
+                DisplaceFrom.Motion => 1,
+                DisplaceFrom.Screen => 2,
+                _ => 0,
+            };
 
             MotionSamplesSlider.Value = Math.Clamp(_motion.Samples,
                                                    MotionSamplesSlider.Minimum, MotionSamplesSlider.Maximum);
@@ -1281,9 +1293,12 @@ public partial class GradingPanel : UserControl
     {
         if (_filling || !IsLoaded) return;
 
-        _displace.From = DisplaceFromBox.SelectedIndex == 1
-            ? DisplaceFrom.Motion
-            : DisplaceFrom.Normal;
+        _displace.From = DisplaceFromBox.SelectedIndex switch
+        {
+            1 => DisplaceFrom.Motion,
+            2 => DisplaceFrom.Screen,
+            _ => DisplaceFrom.Normal,
+        };
 
         ShowMissingPasses();
         Raise(interim: false);

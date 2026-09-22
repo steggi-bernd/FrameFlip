@@ -237,7 +237,12 @@ public static class FloatFrameProcessor
             for (int i = 0; i < grading.Data.Length; i++)
             {
                 var pass = data is not null && i < data.Length ? data[i] : null;
-                if (pass is null) continue;
+
+                // Fehlt der Pass, ruht das Werkzeug - es sei denn, es sagt selbst,
+                // dass es auch ohne etwas zu tun hat. Die Verschiebung ist der Fall:
+                // Ihre Welle braucht nichts als das Bild, nur ihre RICHTUNG kommt aus
+                // dem Pass.
+                if (pass is null && !grading.Data[i].Optional) continue;
 
                 grading.Data[i].Run(scratch, pass, columns, rows, imageWidth, step);
             }
