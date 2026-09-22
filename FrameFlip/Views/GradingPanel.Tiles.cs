@@ -56,6 +56,7 @@ public partial class GradingPanel
         ("S_GroupOptics", "Vignette", "S_Vignette"),
 
         ("S_GroupFilm", "Dither", "S_Dither"),
+        ("S_GroupFilm", "Sort", "S_Sort"),
         ("S_GroupFilm", "Grain", "S_Grain"),
 
         ("S_GroupTable", "Lut", "S_Lut"),
@@ -230,6 +231,7 @@ public partial class GradingPanel
         "Motion" => !_motion.IsNeutral,
         "Displace" => !_displace.IsNeutral,
         "Depth" => !_depth.IsNeutral,
+        "Sort" => !_sort.IsNeutral,
         "Distortion" => !_distortion.IsNeutral,
         "Chromatic" => !_chromatic.IsNeutral,
         "Vignette" => !_vignette.IsNeutral,

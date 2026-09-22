@@ -62,6 +62,7 @@ public partial class GradingPanel : UserControl
     private DepthFieldTool _depth = new();
     private MotionBlurTool _motion = new();
     private DisplaceTool _displace = new();
+    private SortTool _sort = new();
 
     private static readonly Color[] CurveColours =
     {
@@ -268,6 +269,10 @@ public partial class GradingPanel : UserControl
         // gerechnet. Im Fenster sah das aus wie "hat keinen Effekt", und zwar bei
         // jedem Verfahren gleichzeitig.
         DitherBody.IsEnabled = enabled;
+
+        // Pixel Sorting ist derselbe Fall: ein Durchgang ueber den fertigen Rahmen,
+        // und auf einer Ebene gibt es keinen fertigen Rahmen.
+        SortBody.IsEnabled = enabled;
     }
 
     /// <summary>
@@ -359,6 +364,7 @@ public partial class GradingPanel : UserControl
         _grain = TakeOptics<GrainTool>();
         _dither = TakeOptics<DitherTool>();
         _diffusion = TakeFrame<DiffusionTool>();
+        _sort = TakeFrame<SortTool>();
 
         // Und die vierte Liste: die Werkzeuge, die Bildpunkte verschieben.
         _distortion = TakeGeometry<DistortionTool>();
@@ -672,6 +678,17 @@ public partial class GradingPanel : UserControl
             DisplaceSpreadSlider.Value = Math.Clamp(_displace.Spread,
                 DisplaceSpreadSlider.Minimum, DisplaceSpreadSlider.Maximum);
 
+            SortLowSlider.Value = Math.Clamp(_sort.Low,
+                SortLowSlider.Minimum, SortLowSlider.Maximum);
+            SortHighSlider.Value = Math.Clamp(_sort.High,
+                SortHighSlider.Minimum, SortHighSlider.Maximum);
+            SortLongestSlider.Value = Math.Clamp(_sort.Longest,
+                SortLongestSlider.Minimum, SortLongestSlider.Maximum);
+
+            SortKeyBox.SelectedIndex = (int)_sort.Key;
+            SortVerticalButton.IsChecked = _sort.Vertical;
+            SortDescendingButton.IsChecked = _sort.Descending;
+
             DisplaceFromBox.SelectedIndex = _displace.From switch
             {
                 DisplaceFrom.Motion => 1,
@@ -917,6 +934,10 @@ public partial class GradingPanel : UserControl
         _displace.Angle = (float)DisplaceAngleSlider.Value;
         _displace.Spread = (float)DisplaceSpreadSlider.Value;
 
+        _sort.Low = (float)SortLowSlider.Value;
+        _sort.High = (float)SortHighSlider.Value;
+        _sort.Longest = (int)Math.Round(SortLongestSlider.Value);
+
         _depth.Aperture = (float)DepthApertureSlider.Value;
         _depth.Focus = FocusFrom(DepthFocusSlider.Value);
 
@@ -1039,6 +1060,11 @@ public partial class GradingPanel : UserControl
         DisplaceLengthValue.Text = $"{DisplaceLengthSlider.Value:0} px";
         DisplaceAngleValue.Text = $"{DisplaceAngleSlider.Value:0} °";
         DisplaceSpreadValue.Text = $"{DisplaceSpreadSlider.Value:0.00}";
+        SortLowValue.Text = $"{SortLowSlider.Value:0.00}";
+        SortHighValue.Text = $"{SortHighSlider.Value:0.00}";
+        SortLongestValue.Text = SortLongestSlider.Value < 1
+            ? Strings.T("S_SortLongestOff")
+            : $"{SortLongestSlider.Value:0} px";
         MotionSamplesValue.Text = $"{MotionSamplesSlider.Value:0}";
         DepthApertureValue.Text = $"{DepthApertureSlider.Value:0.00}";
         DepthFocusValue.Text = FocusFrom(DepthFocusSlider.Value) is var metres && metres < 10
@@ -1301,6 +1327,27 @@ public partial class GradingPanel : UserControl
         };
 
         ShowMissingPasses();
+        Raise(interim: false);
+    }
+
+    /// <summary>Wonach sortiert wird.</summary>
+    private void OnSortKeyChanged(object sender, SelectionChangedEventArgs e)
+    {
+        if (_filling || !IsLoaded) return;
+
+        _sort.Key = (SortKey)Math.Clamp(SortKeyBox.SelectedIndex, 0, 2);
+
+        Raise(interim: false);
+    }
+
+    /// <summary>Richtung und Reihenfolge - zwei Schalter, ein Weg.</summary>
+    private void OnSortFlagChanged(object sender, RoutedEventArgs e)
+    {
+        if (_filling || !IsLoaded) return;
+
+        _sort.Vertical = SortVerticalButton.IsChecked == true;
+        _sort.Descending = SortDescendingButton.IsChecked == true;
+
         Raise(interim: false);
     }
 

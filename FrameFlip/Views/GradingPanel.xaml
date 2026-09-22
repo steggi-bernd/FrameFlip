@@ -980,6 +980,77 @@
                            Text="{DynamicResource S_DitherHint}" />
             </StackPanel>
 
+            <!--
+                Pixel Sorting. Steht beim Rastern, weil es dieselbe Art Durchgang ist:
+                ueber den fertigen Rahmen, der Reihe nach, und beim Ziehen gar nicht.
+            -->
+            <Grid x:Name="SortHead" Margin="0,16,0,0">
+                <TextBlock Text="{DynamicResource S_Sort}" Style="{StaticResource PanelHeading}" />
+                <Button Style="{StaticResource LinkButton}" HorizontalAlignment="Right"
+                        Content="+" Tag="SortBody" Click="OnSectionToggled" />
+            </Grid>
+            <StackPanel x:Name="SortBody" Visibility="Collapsed" Margin="0,6,0,0">
+
+                <ComboBox x:Name="SortKeyBox" Style="{StaticResource OverlayCombo}"
+                          HorizontalAlignment="Left" Width="180"
+                          SelectedIndex="0" SelectionChanged="OnSortKeyChanged"
+                          ToolTip="{DynamicResource S_SortKeyHint}">
+                    <ComboBoxItem Style="{StaticResource OverlayComboItem}"
+                                  Content="{DynamicResource S_SortByBrightness}" />
+                    <ComboBoxItem Style="{StaticResource OverlayComboItem}"
+                                  Content="{DynamicResource S_SortByHue}" />
+                    <ComboBoxItem Style="{StaticResource OverlayComboItem}"
+                                  Content="{DynamicResource S_SortBySaturation}" />
+                </ComboBox>
+
+                <!--
+                    Das Fenster IST der Staerkeregler.
+
+                    Geschlossen wird nichts umsortiert; aufgezogen zerfaellt das Bild in
+                    Laeufe. Deshalb stehen die beiden ganz oben und nicht unter
+                    "Weiteres": Wer sie nicht findet, haelt das Werkzeug fuer kaputt.
+                -->
+                <Grid Margin="0,10,0,2">
+                    <TextBlock Text="{DynamicResource S_SortFrom}" Style="{StaticResource PanelLabel}" />
+                    <TextBlock x:Name="SortLowValue" Style="{StaticResource PanelValue}" />
+                </Grid>
+                <Slider x:Name="SortLowSlider" Style="{StaticResource PanelSlider}"
+                        Minimum="0" Maximum="1" Value="0" SmallChange="0.01" LargeChange="0.05"
+                        ValueChanged="OnChanged" MouseDoubleClick="OnSliderReset" Tag="0" />
+
+                <Grid Margin="0,8,0,2">
+                    <TextBlock Text="{DynamicResource S_SortTo}" Style="{StaticResource PanelLabel}" />
+                    <TextBlock x:Name="SortHighValue" Style="{StaticResource PanelValue}" />
+                </Grid>
+                <Slider x:Name="SortHighSlider" Style="{StaticResource PanelSlider}"
+                        Minimum="0" Maximum="1" Value="0" SmallChange="0.01" LargeChange="0.05"
+                        ValueChanged="OnChanged" MouseDoubleClick="OnSliderReset" Tag="0" />
+
+                <Grid Margin="0,10,0,2">
+                    <TextBlock Text="{DynamicResource S_SortLongest}" Style="{StaticResource PanelLabel}" />
+                    <TextBlock x:Name="SortLongestValue" Style="{StaticResource PanelValue}" />
+                </Grid>
+                <Slider x:Name="SortLongestSlider" Style="{StaticResource PanelSlider}"
+                        Minimum="0" Maximum="1000" Value="0" SmallChange="10" LargeChange="50"
+                        ValueChanged="OnChanged" MouseDoubleClick="OnSliderReset" Tag="0" />
+
+                <StackPanel Orientation="Horizontal" Margin="0,10,0,0">
+                    <ToggleButton x:Name="SortVerticalButton" Style="{StaticResource OverlayToggle}"
+                                  Content="{DynamicResource S_SortVertical}"
+                                  ToolTip="{DynamicResource S_SortVerticalHint}"
+                                  Checked="OnSortFlagChanged" Unchecked="OnSortFlagChanged" />
+                    <ToggleButton x:Name="SortDescendingButton" Style="{StaticResource OverlayToggle}"
+                                  Margin="6,0,0,0"
+                                  Content="{DynamicResource S_SortDescending}"
+                                  ToolTip="{DynamicResource S_SortDescendingHint}"
+                                  Checked="OnSortFlagChanged" Unchecked="OnSortFlagChanged" />
+                </StackPanel>
+
+                <TextBlock Margin="0,8,0,0" FontSize="10" TextWrapping="Wrap"
+                           Foreground="{StaticResource MutedBrush}"
+                           Text="{DynamicResource S_SortHint}" />
+            </StackPanel>
+
             <Grid x:Name="GrainHead" Margin="0,16,0,0">
                 <TextBlock Text="{DynamicResource S_Grain}" Style="{StaticResource PanelHeading}" />
                 <Button Style="{StaticResource LinkButton}" HorizontalAlignment="Right"

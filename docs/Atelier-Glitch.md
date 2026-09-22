@@ -45,14 +45,30 @@ adding, reordering, sampling from the picture, saving a set.
 **Worth doing when** someone wants more than two colours. Until then the duotone covers
 the common case.
 
-### 2. Pixel sorting
+### 2. Pixel sorting — **built**
 
-Needs the sixth pass kind, which now exists — so the blocker is gone. What remains is
-that it re-orders whole **runs** along a row: it is neither point-wise nor a
-neighbourhood, it is slow, and the interesting parameters are the *threshold* that starts
-and ends a run and the *key* it sorts by (brightness, hue, saturation).
+The one effect in this family with no substitute, and the reason is worth stating as an
+invariant rather than a description: it **invents nothing and loses nothing**. A raster
+decides per pixel, a displacement fetches from elsewhere — both make up values. Sorting
+moves pixels along a line; what comes out holds exactly the same colours as what went in,
+only in a different order. That is what the tests measure, and it is strict enough to
+catch almost any mistake: write back one index off and you duplicate one pixel and lose
+another.
 
-**Worth doing** — it is the one effect in this family with no substitute.
+**The threshold is the whole tool.** Sorting a row completely gives a gradient, not a
+picture — boring by the second try. Only pixels whose key lies *between* two thresholds
+join a run, so the image falls into runs with everything else standing still, and the form
+stays readable while the surfaces run. The window is therefore the strength control, and
+it starts closed.
+
+Keys: brightness (runs become gradients), hue (runs become bands), saturation (separates
+pale from vivid and leaves the form standing). Plus rows or columns, ascending or
+descending, and a **longest run** that turns an effect into a composition — without it a
+single run eats half a row of flat sky.
+
+Measured: 1080p 58 ms and 4K 221 ms with the window fully open, 19 ms for the usual narrow
+window with a run limit. One thread, full resolution, and out entirely while a slider is
+dragged — the order *is* the method.
 
 ### 3. Wave glitch and displacement — **built**
 

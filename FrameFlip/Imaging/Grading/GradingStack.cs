@@ -211,6 +211,8 @@ public sealed class GradingStack
             Saturation = diffusion.Saturation,
         },
 
+        SortTool sort => sort.Clone(),
+
         _ => throw new NotSupportedException($"Kein Kopierweg fuer {pass.GetType().Name}."),
     };
 
