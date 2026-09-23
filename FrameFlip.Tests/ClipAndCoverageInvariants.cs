@@ -20,6 +20,49 @@ public static class ClipAndCoverageInvariants
         AClippedLayerStaysOnItsPlacedCarrier();
         AGroupCoversWithItsOpacity();
         AClippedLayerSharesItsCarriersCoverage();
+        OnlyAnAdjustmentVisible();
+    }
+
+    /// <summary>
+    /// Das Bild ausgeblendet, eine Einstellungsebene sichtbar - ein Stapel ohne eine
+    /// einzige Ebene mit eigenem Bild. Das darf nicht abstuerzen.
+    ///
+    /// Der Composer suchte die erste Ebene mit Bild, um zu erfahren, ob in Licht oder
+    /// in Anzeigewerten gerechnet wird - und fand keine. Das Ausblenden der untersten
+    /// Ebene ist ein gewoehnlicher Handgriff.
+    /// </summary>
+    private static void OnlyAnAdjustmentVisible()
+    {
+        Check.Group("Ein Stapel ohne sichtbares Bild stuerzt nicht ab");
+
+        var sources = new Dictionary<string, FloatFrame>
+        {
+            [""] = Flat(Size, Size, 0.4f, 0.4f, 0.4f, sceneReferred: true),
+        };
+
+        var stack = new LayerStack
+        {
+            Layers =
+            {
+                new ImageLayer { Content = LayerContent.Pass, Source = "", Visible = false },
+                new ImageLayer { Content = LayerContent.Adjustment, Adjustments = new ImageAdjustments { Exposure = 1 } },
+            },
+        };
+
+        FloatFrame? built = null;
+        string? error = null;
+
+        try
+        {
+            built = LayerComposer.Compose(stack, sources);
+        }
+        catch (Exception e)
+        {
+            error = e.GetType().Name;
+        }
+
+        Check.That(error is null, "das Zusammensetzen laeuft durch", error);
+        Check.That(built is null || built.IsSceneReferred, "und rechnet weiter in Licht, wie das Bild der Datei");
     }
 
     /// <summary>

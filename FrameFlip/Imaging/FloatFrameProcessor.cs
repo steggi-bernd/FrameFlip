@@ -307,7 +307,7 @@ public static class FloatFrameProcessor
     /// Durchgang, also fuer nichts. Ueber die Bloecke zu laufen statt ueber die
     /// Bildpunkte macht beides ueberfluessig.
     /// </summary>
-    private static unsafe void Expand(byte* gridPtr, int gridWidth, int gridHeight,
+    internal static unsafe void Expand(byte* gridPtr, int gridWidth, int gridHeight,
                                       byte* target, int destinationStride,
                                       int width, int height, int step)
     {
@@ -624,26 +624,7 @@ public static class FloatFrameProcessor
     {
         // --- lineare Seite ---
 
-        if (plan.Gain != 1f)
-        {
-            vr *= plan.Gain;
-            vg *= plan.Gain;
-            vb *= plan.Gain;
-        }
-
-        if (!Same(plan.Saturation, 1f))
-        {
-            float luma = LumaR * vr + LumaG * vg + LumaB * vb;
-            vr = luma + (vr - luma) * plan.Saturation;
-            vg = luma + (vg - luma) * plan.Saturation;
-            vb = luma + (vb - luma) * plan.Saturation;
-
-            // Uebersaettigung kann unter null druecken; negatives Licht gibt es
-            // nicht, und die Sichtumwandlung koennte damit nichts anfangen.
-            if (vr < 0) vr = 0;
-            if (vg < 0) vg = 0;
-            if (vb < 0) vb = 0;
-        }
+        Light(plan.Gain, plan.Saturation, ref vr, ref vg, ref vb);
 
         var linear = plan.Linear;
         for (int t = 0; t < linear.Length; t++) linear[t].Apply(ref vr, ref vg, ref vb);
@@ -653,6 +634,38 @@ public static class FloatFrameProcessor
         // erst danach - dazwischen liegt alles, was die Linse sonst noch tut.
         var lens = plan.Lens;
         for (int t = 0; t < lens.Length; t++) lens[t].Apply(in plan.Place, x, y, ref vr, ref vg, ref vb);
+    }
+
+    /// <summary>
+    /// Belichtung und Saettigung - der Anfang der linearen Seite.
+    ///
+    /// Fuer sich, weil auch der Knoten "Belichtung &amp; Saettigung" sie rechnet. Zwei
+    /// Abschriften liefen beim naechsten Griff auseinander, und ein in Knoten
+    /// umgewandeltes Bild saehe anders aus als der Stapel, aus dem es kam.
+    /// </summary>
+    [System.Runtime.CompilerServices.MethodImpl(System.Runtime.CompilerServices.MethodImplOptions.AggressiveInlining)]
+    internal static void Light(float gain, float saturation, ref float vr, ref float vg, ref float vb)
+    {
+        if (gain != 1f)
+        {
+            vr *= gain;
+            vg *= gain;
+            vb *= gain;
+        }
+
+        if (!Same(saturation, 1f))
+        {
+            float luma = LumaR * vr + LumaG * vg + LumaB * vb;
+            vr = luma + (vr - luma) * saturation;
+            vg = luma + (vg - luma) * saturation;
+            vb = luma + (vb - luma) * saturation;
+
+            // Uebersaettigung kann unter null druecken; negatives Licht gibt es
+            // nicht, und die Sichtumwandlung koennte damit nichts anfangen.
+            if (vr < 0) vr = 0;
+            if (vg < 0) vg = 0;
+            if (vb < 0) vb = 0;
+        }
     }
 
     /// <summary>
@@ -862,7 +875,7 @@ public static class FloatFrameProcessor
                              new OpticsPlace(frame.Width, frame.Height, number));
     }
 
-    private static ushort ToUShort(float value)
+    internal static ushort ToUShort(float value)
         => (ushort)Math.Clamp(MathF.Round(value * 65535f), 0f, 65535f);
 
     /// <summary>
@@ -870,7 +883,7 @@ public static class FloatFrameProcessor
     /// Ganzzahlpfad, nur ohne die Tabelle mit 256 Eintraegen: die Werte sind hier
     /// nicht mehr abzaehlbar.
     /// </summary>
-    private static float Tone(float v, float black, float span, float inverseGamma, float contrast)
+    internal static float Tone(float v, float black, float span, float inverseGamma, float contrast)
     {
         v = (v - black) / span;
         v = Math.Clamp(v, 0f, 1f);
@@ -974,8 +987,8 @@ public static class FloatFrameProcessor
         histogram.AboveWhite = sampled > 0 ? aboveWhite / (double)sampled : 0;
     }
 
-    private static bool Same(float value, float reference) => MathF.Abs(value - reference) < 0.001f;
+    internal static bool Same(float value, float reference) => MathF.Abs(value - reference) < 0.001f;
 
-    private static byte ToByte(float value)
+    internal static byte ToByte(float value)
         => (byte)Math.Clamp(MathF.Round(value * 255f), 0f, 255f);
 }

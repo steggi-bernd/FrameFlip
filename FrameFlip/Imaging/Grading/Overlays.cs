@@ -126,7 +126,7 @@ public static class Overlays
     /// Auslegung und keine Umkehrung, aber ein Wasserzeichen liegt ohnehin als
     /// fertiges Bild vor.
     /// </summary>
-    private static FloatFrame ToDisplay(FloatFrame frame)
+    internal static FloatFrame ToDisplay(FloatFrame frame)
     {
         if (!frame.IsSceneReferred && frame.Display is not null) return frame.Display;
 
