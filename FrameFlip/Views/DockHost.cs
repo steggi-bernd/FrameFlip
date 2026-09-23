@@ -34,7 +34,8 @@ namespace FrameFlip.Views;
 /// Bedienung: einen Reiter greifen und ziehen. Ueber einer Gruppe landet er dort als
 /// Reiter; an einem Rand - oben oder unten in einer Seitenzone, links oder rechts in
 /// der unteren, oder am Bildrand, wo noch keine Zone ist - wird er eine eigene Gruppe.
-/// Rechtsklick oder Escape bricht ab.
+/// Rechtsklick oder Escape bricht ab. Ein Klick holt ein Feld nach vorn, ein zweiter
+/// klappt seine Gruppe ein.
 /// </summary>
 [ContentProperty(nameof(Panels))]
 public sealed class DockHost : Border
@@ -106,11 +107,36 @@ public sealed class DockHost : Border
 
         var group = Layout.Zone(at.Zone)[at.Group];
 
-        if (group.Active == panel) return;
+        if (group.Active == panel && !group.Collapsed) return;
+
+        // Aufklappen aendert die Form der Zone, nicht nur die Gruppe - dann alles.
+        bool reshape = group.Collapsed;
 
         group.Active = panel;
+        group.Collapsed = false;
 
-        RebuildGroup(at.Zone, at.Group);
+        if (reshape) Rebuild();
+        else RebuildGroup(at.Zone, at.Group);
+
+        LayoutChanged?.Invoke(Layout);
+    }
+
+    /// <summary>
+    /// Ein Klick auf einen Reiter: das Feld nach vorn - oder, wenn es schon vorn und
+    /// offen liegt, seine Gruppe einklappen. Siehe <see cref="DockLayout.Toggle"/>.
+    /// </summary>
+    public void Toggle(string panel)
+    {
+        if (Layout.Find(panel) is not { } at) return;
+
+        var group = Layout.Zone(at.Zone)[at.Group];
+        bool was = group.Collapsed;
+
+        Layout.Toggle(panel);
+
+        if (group.Collapsed != was) Rebuild();
+        else RebuildGroup(at.Zone, at.Group);
+
         LayoutChanged?.Invoke(Layout);
     }
 
@@ -190,7 +216,8 @@ public sealed class DockHost : Border
     /// <summary>Ob ein Feld gerade vorn liegt und zu sehen ist.</summary>
     public bool IsShown(string panel)
         => PanelOf(panel) is { } element && element.Parent is not null && !_hints.ContainsKey(panel) &&
-           Layout.Find(panel) is { } at && Layout.Zone(at.Zone)[at.Group].Active == panel;
+           Layout.Find(panel) is { } at && Layout.Zone(at.Zone)[at.Group] is { Collapsed: false } group &&
+           group.Active == panel;
 
     // ------------------------------------------------------------ Aufbau
 
@@ -228,23 +255,34 @@ public sealed class DockHost : Border
         bool right = Layout.Right.Count > 0;
         bool bottom = Layout.Bottom.Count > 0;
 
-        _leftColumn = new ColumnDefinition { Width = left ? new GridLength(Layout.LeftWidth) : new GridLength(0) };
-        _rightColumn = new ColumnDefinition { Width = right ? new GridLength(Layout.RightWidth) : new GridLength(0) };
-        _bottomRow = new RowDefinition { Height = bottom ? new GridLength(Layout.BottomHeight) : new GridLength(0) };
+        // Eine ganz eingeklappte Zone ist nur so breit (oder hoch) wie ihr Streifen.
+        // Ihre Groesse bleibt in der Anordnung stehen und gilt wieder beim Aufklappen.
+        bool leftFolded = Layout.IsFolded(DockZone.Left);
+        bool rightFolded = Layout.IsFolded(DockZone.Right);
+        bool bottomFolded = Layout.IsFolded(DockZone.Bottom);
 
-        if (left) _leftColumn.MinWidth = 180;
-        if (right) _rightColumn.MinWidth = 200;
-        if (bottom) _bottomRow.MinHeight = 120;
+        _leftColumn = new ColumnDefinition { Width = Size(left, leftFolded, Layout.LeftWidth) };
+        _rightColumn = new ColumnDefinition { Width = Size(right, rightFolded, Layout.RightWidth) };
+        _bottomRow = new RowDefinition { Height = Size(bottom, bottomFolded, Layout.BottomHeight) };
+
+        if (left && !leftFolded) _leftColumn.MinWidth = 180;
+        if (right && !rightFolded) _rightColumn.MinWidth = 200;
+        if (bottom && !bottomFolded) _bottomRow.MinHeight = 120;
 
         root.ColumnDefinitions.Add(_leftColumn);
-        root.ColumnDefinitions.Add(new ColumnDefinition { Width = left ? new GridLength(12) : new GridLength(0) });
+        root.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(Gap(left, leftFolded)) });
         root.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star), MinWidth = 240 });
-        root.ColumnDefinitions.Add(new ColumnDefinition { Width = right ? new GridLength(12) : new GridLength(0) });
+        root.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(Gap(right, rightFolded)) });
         root.ColumnDefinitions.Add(_rightColumn);
 
         root.RowDefinitions.Add(new RowDefinition { Height = new GridLength(1, GridUnitType.Star), MinHeight = 200 });
-        root.RowDefinitions.Add(new RowDefinition { Height = bottom ? new GridLength(12) : new GridLength(0) });
+        root.RowDefinitions.Add(new RowDefinition { Height = new GridLength(Gap(bottom, bottomFolded)) });
         root.RowDefinitions.Add(_bottomRow);
+
+        static GridLength Size(bool there, bool folded, double size)
+            => !there ? new GridLength(0) : folded ? GridLength.Auto : new GridLength(size);
+
+        static double Gap(bool there, bool folded) => !there ? 0 : folded ? 6 : 12;
 
         if (Center is not null)
         {
@@ -255,44 +293,57 @@ public sealed class DockHost : Border
 
         if (left)
         {
-            var zone = ZoneView(DockZone.Left, Layout.Left, vertical: true);
+            var zone = leftFolded ? FoldedStrip(DockZone.Left, Layout.Left)
+                                  : ZoneView(DockZone.Left, Layout.Left, vertical: true);
             Grid.SetColumn(zone, 0);
             Grid.SetRowSpan(zone, 3);
             root.Children.Add(zone);
 
-            root.Children.Add(Splitter(column: 1, row: 0, rowSpan: 3, columns: true, () =>
+            if (!leftFolded)
             {
-                Layout.LeftWidth = _leftColumn.ActualWidth;
-                LayoutChanged?.Invoke(Layout);
-            }));
+                root.Children.Add(Splitter(column: 1, row: 0, rowSpan: 3, columns: true, () =>
+                {
+                    Layout.LeftWidth = _leftColumn.ActualWidth;
+                    LayoutChanged?.Invoke(Layout);
+                }));
+            }
         }
 
         if (right)
         {
-            var zone = ZoneView(DockZone.Right, Layout.Right, vertical: true);
+            var zone = rightFolded ? FoldedStrip(DockZone.Right, Layout.Right)
+                                   : ZoneView(DockZone.Right, Layout.Right, vertical: true);
             Grid.SetColumn(zone, 4);
             Grid.SetRowSpan(zone, 3);
             root.Children.Add(zone);
 
-            root.Children.Add(Splitter(column: 3, row: 0, rowSpan: 3, columns: true, () =>
+            if (!rightFolded)
             {
-                Layout.RightWidth = _rightColumn.ActualWidth;
-                LayoutChanged?.Invoke(Layout);
-            }));
+                root.Children.Add(Splitter(column: 3, row: 0, rowSpan: 3, columns: true, () =>
+                {
+                    Layout.RightWidth = _rightColumn.ActualWidth;
+                    LayoutChanged?.Invoke(Layout);
+                }));
+            }
         }
 
         if (bottom)
         {
+            // Unten gibt es keinen eigenen Streifen: Eingeklappt stehen die
+            // Reiterleisten nebeneinander, und die Zeile ist so hoch wie sie.
             var zone = ZoneView(DockZone.Bottom, Layout.Bottom, vertical: false);
             Grid.SetColumn(zone, 2);
             Grid.SetRow(zone, 2);
             root.Children.Add(zone);
 
-            root.Children.Add(Splitter(column: 2, row: 1, rowSpan: 1, columns: false, () =>
+            if (!bottomFolded)
             {
-                Layout.BottomHeight = _bottomRow.ActualHeight;
-                LayoutChanged?.Invoke(Layout);
-            }));
+                root.Children.Add(Splitter(column: 2, row: 1, rowSpan: 1, columns: false, () =>
+                {
+                    Layout.BottomHeight = _bottomRow.ActualHeight;
+                    LayoutChanged?.Invoke(Layout);
+                }));
+            }
         }
 
         // Die Markierung beim Ziehen - ueber allem, und ohne selbst die Maus zu fangen.
@@ -403,47 +454,19 @@ public sealed class DockHost : Border
                 if (vertical) grid.RowDefinitions.Add(new RowDefinition { Height = new GridLength(10) });
                 else grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(10) });
 
-                var splitter = new GridSplitter
-                {
-                    Style = (Style)FindResource("DashboardSplitter"),
-                    ResizeDirection = vertical ? GridResizeDirection.Rows : GridResizeDirection.Columns,
-                    ResizeBehavior = GridResizeBehavior.PreviousAndNext,
-                    HorizontalAlignment = vertical ? HorizontalAlignment.Stretch : HorizontalAlignment.Center,
-                    VerticalAlignment = vertical ? VerticalAlignment.Center : VerticalAlignment.Stretch,
-                    Width = vertical ? double.NaN : 10,
-                    Height = vertical ? 10 : double.NaN,
-                    Focusable = false,
-                };
-
-                if (vertical) Grid.SetRow(splitter, grid.RowDefinitions.Count - 1);
-                else Grid.SetColumn(splitter, grid.ColumnDefinitions.Count - 1);
-
-                // Nach dem Loslassen die Anteile aus den tatsaechlichen Groessen lesen.
-                // Pixel als Gewichte: Das Verhaeltnis ist, was zaehlt, und es bleibt
-                // richtig, wenn das Fenster spaeter eine andere Hoehe hat.
-                splitter.DragCompleted += (_, _) =>
-                {
-                    int g = 0;
-
-                    for (int d = 0; d < (vertical ? grid.RowDefinitions.Count : grid.ColumnDefinitions.Count); d += 2)
-                    {
-                        double size = vertical ? grid.RowDefinitions[d].ActualHeight
-                                               : grid.ColumnDefinitions[d].ActualWidth;
-
-                        if (g < groups.Count && size > 0) groups[g].Weight = size;
-                        g++;
-                    }
-
-                    LayoutChanged?.Invoke(Layout);
-                };
-
-                grid.Children.Add(splitter);
+                // Ein Griff nur zwischen zwei offenen Gruppen. Eine eingeklappte ist so
+                // gross wie ihre Leiste; sie groesser zu ziehen hiesse, sie aufzuklappen,
+                // ohne dass das Modell davon weiss.
+                if (!groups[i - 1].Collapsed && !groups[i].Collapsed)
+                    grid.Children.Add(GroupSplitter(grid, groups, vertical));
             }
 
-            var size = new GridLength(Math.Max(0.01, groups[i].Weight), GridUnitType.Star);
+            var size = groups[i].Collapsed
+                ? GridLength.Auto
+                : new GridLength(Math.Max(0.01, groups[i].Weight), GridUnitType.Star);
 
-            if (vertical) grid.RowDefinitions.Add(new RowDefinition { Height = size, MinHeight = 90 });
-            else grid.ColumnDefinitions.Add(new ColumnDefinition { Width = size, MinWidth = 160 });
+            if (vertical) grid.RowDefinitions.Add(new RowDefinition { Height = size, MinHeight = groups[i].Collapsed ? 0 : 90 });
+            else grid.ColumnDefinitions.Add(new ColumnDefinition { Width = size, MinWidth = groups[i].Collapsed ? 0 : 160 });
 
             var view = GroupView(zone, i, groups[i]);
 
@@ -459,79 +482,127 @@ public sealed class DockHost : Border
         return grid;
     }
 
-    /// <summary>Eine Gruppe: die Reiter oben, das vordere Feld darunter.</summary>
+    /// <summary>Der Griff zwischen zwei offenen Gruppen - am Ende der Definitionen, die es bis hierher gibt.</summary>
+    private GridSplitter GroupSplitter(Grid grid, List<DockGroup> groups, bool vertical)
+    {
+        var splitter = new GridSplitter
+        {
+            Style = (Style)FindResource("DashboardSplitter"),
+            ResizeDirection = vertical ? GridResizeDirection.Rows : GridResizeDirection.Columns,
+            ResizeBehavior = GridResizeBehavior.PreviousAndNext,
+            HorizontalAlignment = vertical ? HorizontalAlignment.Stretch : HorizontalAlignment.Center,
+            VerticalAlignment = vertical ? VerticalAlignment.Center : VerticalAlignment.Stretch,
+            Width = vertical ? double.NaN : 10,
+            Height = vertical ? 10 : double.NaN,
+            Focusable = false,
+        };
+
+        if (vertical) Grid.SetRow(splitter, grid.RowDefinitions.Count - 1);
+        else Grid.SetColumn(splitter, grid.ColumnDefinitions.Count - 1);
+
+        // Nach dem Loslassen die Anteile aus den tatsaechlichen Groessen lesen.
+        // Pixel als Gewichte: Das Verhaeltnis ist, was zaehlt, und es bleibt
+        // richtig, wenn das Fenster spaeter eine andere Hoehe hat. Eingeklappte
+        // Gruppen behalten ihr Gewicht - ihre Leistenhoehe ist keine Wahl.
+        splitter.DragCompleted += (_, _) =>
+        {
+            int g = 0;
+
+            for (int d = 0; d < (vertical ? grid.RowDefinitions.Count : grid.ColumnDefinitions.Count); d += 2)
+            {
+                double size = vertical ? grid.RowDefinitions[d].ActualHeight
+                                       : grid.ColumnDefinitions[d].ActualWidth;
+
+                if (g < groups.Count && size > 0 && !groups[g].Collapsed) groups[g].Weight = size;
+                g++;
+            }
+
+            LayoutChanged?.Invoke(Layout);
+        };
+
+        return splitter;
+    }
+
+    /// <summary>
+    /// Eine Seitenzone, in der alles eingeklappt ist: ein schmaler Streifen mit
+    /// senkrechten Reitern, wie die Seitenleisten in Blender. Ein Klick auf einen
+    /// holt das Feld zurueck, und die Zone bekommt ihre alte Breite wieder.
+    /// </summary>
+    private FrameworkElement FoldedStrip(DockZone zone, List<DockGroup> groups)
+    {
+        var stack = new StackPanel { Margin = new Thickness(0, 4, 0, 4) };
+
+        for (int i = 0; i < groups.Count; i++)
+        {
+            if (i > 0)
+            {
+                stack.Children.Add(new Border
+                {
+                    Height = 1,
+                    Margin = new Thickness(6, 4, 6, 4),
+                    Background = (Brush)FindResource("PanelBorder"),
+                });
+            }
+
+            foreach (string id in groups[i].Panels)
+            {
+                var tab = Tab(id, active: false);
+
+                // Vor dem Drehen: Die Breite wird zur Hoehe.
+                tab.MinWidth = 72;
+                tab.LayoutTransform = new RotateTransform(zone == DockZone.Left ? -90 : 90);
+
+                stack.Children.Add(tab);
+            }
+        }
+
+        var view = new Border
+        {
+            Background = (Brush)FindResource("PanelBackground"),
+            BorderBrush = (Brush)FindResource("PanelBorder"),
+            BorderThickness = new Thickness(1),
+            CornerRadius = new CornerRadius(4),
+            Child = stack,
+            ContextMenu = LayoutMenu(),
+        };
+
+        _zoneViews[zone] = view;
+
+        return view;
+    }
+
+    /// <summary>
+    /// Eine Gruppe: die Reiter oben, das vordere Feld darunter. Eingeklappt nur die
+    /// Reiter - ohne Linie, denn vorn liegt dann nichts.
+    /// </summary>
     private FrameworkElement GroupView(DockZone zone, int index, DockGroup group)
     {
         var tabs = new UniformGrid { Rows = 1 };
 
         foreach (string id in group.Panels)
-        {
-            var element = PanelOf(id);
-            string title = element is null ? id : Strings.T(GetTitleKey(element));
-
-            var label = new StackPanel { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Center };
-
-            label.Children.Add(new TextBlock
-            {
-                Text = title,
-                VerticalAlignment = VerticalAlignment.Center,
-            });
-
-            var badge = new TextBlock
-            {
-                Text = _badges.TryGetValue(id, out var b) ? b : "",
-                Margin = new Thickness(6, 0, 0, 0),
-                Foreground = (Brush)FindResource("FaintBrush"),
-                VerticalAlignment = VerticalAlignment.Center,
-            };
-
-            label.Children.Add(badge);
-            _badgeBlocks[id] = badge;
-
-            bool active = group.Active == id;
-
-            var line = new Border
-            {
-                Height = 2,
-                Margin = new Thickness(10, 0, 10, 0),
-                CornerRadius = new CornerRadius(1),
-                VerticalAlignment = VerticalAlignment.Bottom,
-                Background = (Brush)FindResource("AccentBrush"),
-                Visibility = active ? Visibility.Visible : Visibility.Hidden,
-            };
-
-            var tab = new Grid
-            {
-                Height = 34,
-                Background = Brushes.Transparent,
-                Cursor = Cursors.Hand,
-                Tag = id,
-                ToolTip = Strings.T("S_DockTabHint"),
-            };
-
-            TextElement.SetFontSize(tab, 12);
-            TextElement.SetFontWeight(tab, FontWeights.SemiBold);
-            TextElement.SetForeground(tab, (Brush)FindResource(active ? "ForegroundBrush" : "MutedBrush"));
-
-            tab.Children.Add(label);
-            tab.Children.Add(line);
-
-            tab.MouseLeftButtonDown += OnTabDown;
-            tab.MouseMove += OnTabMove;
-            tab.MouseLeftButtonUp += OnTabUp;
-            tab.MouseRightButtonDown += OnTabRight;
-            tab.LostMouseCapture += OnTabLost;
-
-            tabs.Children.Add(tab);
-        }
+            tabs.Children.Add(Tab(id, active: !group.Collapsed && group.Active == id));
 
         var strip = new Border
         {
             BorderBrush = (Brush)FindResource("PanelBorder"),
-            BorderThickness = new Thickness(0, 0, 0, 1),
+            BorderThickness = new Thickness(0, 0, 0, group.Collapsed ? 0 : 1),
             Child = tabs,
             ContextMenu = LayoutMenu(),
         };
+
+        if (group.Collapsed)
+        {
+            return new Border
+            {
+                Background = (Brush)FindResource("PanelBackground"),
+                BorderBrush = (Brush)FindResource("PanelBorder"),
+                BorderThickness = new Thickness(1),
+                CornerRadius = new CornerRadius(4),
+                VerticalAlignment = VerticalAlignment.Top,
+                Child = strip,
+                Tag = (zone, index),
+            };
+        }
 
         var host = new Border();
 
@@ -568,6 +639,71 @@ public sealed class DockHost : Border
             Child = grid,
             Tag = (zone, index),
         };
+    }
+
+    /// <summary>Ein Reiter: Name, Zaehler, und die Linie unter dem vorderen.</summary>
+    private FrameworkElement Tab(string id, bool active)
+    {
+        var element = PanelOf(id);
+        string title = element is null ? id : Strings.T(GetTitleKey(element));
+
+        var label = new StackPanel
+        {
+            Orientation = Orientation.Horizontal,
+            HorizontalAlignment = HorizontalAlignment.Center,
+            Margin = new Thickness(10, 0, 10, 0),
+        };
+
+        label.Children.Add(new TextBlock
+        {
+            Text = title,
+            VerticalAlignment = VerticalAlignment.Center,
+        });
+
+        var badge = new TextBlock
+        {
+            Text = _badges.TryGetValue(id, out var b) ? b : "",
+            Margin = new Thickness(6, 0, 0, 0),
+            Foreground = (Brush)FindResource("FaintBrush"),
+            VerticalAlignment = VerticalAlignment.Center,
+        };
+
+        label.Children.Add(badge);
+        _badgeBlocks[id] = badge;
+
+        var line = new Border
+        {
+            Height = 2,
+            Margin = new Thickness(10, 0, 10, 0),
+            CornerRadius = new CornerRadius(1),
+            VerticalAlignment = VerticalAlignment.Bottom,
+            Background = (Brush)FindResource("AccentBrush"),
+            Visibility = active ? Visibility.Visible : Visibility.Hidden,
+        };
+
+        var tab = new Grid
+        {
+            Height = 34,
+            Background = Brushes.Transparent,
+            Cursor = Cursors.Hand,
+            Tag = id,
+            ToolTip = Strings.T("S_DockTabHint"),
+        };
+
+        TextElement.SetFontSize(tab, 12);
+        TextElement.SetFontWeight(tab, FontWeights.SemiBold);
+        TextElement.SetForeground(tab, (Brush)FindResource(active ? "ForegroundBrush" : "MutedBrush"));
+
+        tab.Children.Add(label);
+        tab.Children.Add(line);
+
+        tab.MouseLeftButtonDown += OnTabDown;
+        tab.MouseMove += OnTabMove;
+        tab.MouseLeftButtonUp += OnTabUp;
+        tab.MouseRightButtonDown += OnTabRight;
+        tab.LostMouseCapture += OnTabLost;
+
+        return tab;
     }
 
     private ContextMenu LayoutMenu()
@@ -650,7 +786,7 @@ public sealed class DockHost : Border
 
         if (!dragged)
         {
-            Activate(panel);
+            Toggle(panel);
             return;
         }
 
@@ -788,6 +924,28 @@ public sealed class DockHost : Border
             }
 
             if (!own) found.Add(new Drop(zone, index, true, area, area));
+        }
+
+        // Der Streifen einer ganz eingeklappten Seitenzone - samt einem Rand ins Bild
+        // hinein, denn 34 Punkte trifft man beim Ziehen nicht auf Anhieb. Das Feld
+        // wird dort eine eigene, offene Gruppe, und die Zone geht damit wieder auf.
+        foreach (var zone in new[] { DockZone.Left, DockZone.Right })
+        {
+            if (!Layout.IsFolded(zone) || !_zoneViews.TryGetValue(zone, out var folded)) continue;
+
+            var area = Bounds(folded);
+            if (area.IsEmpty) continue;
+
+            double wide = zone == DockZone.Left ? Layout.LeftWidth : Layout.RightWidth;
+            const double reach = 52;
+
+            var (hit, show) = zone == DockZone.Left
+                ? (new Rect(area.Left, area.Top, area.Width + reach, area.Height),
+                   new Rect(area.Left, area.Top, wide, area.Height))
+                : (new Rect(area.Left - reach, area.Top, area.Width + reach, area.Height),
+                   new Rect(area.Right - wide, area.Top, wide, area.Height));
+
+            found.Add(new Drop(zone, 0, false, hit, show));
         }
 
         Rect centre = Center is not null && Center.IsLoaded ? Bounds(Center) : Rect.Empty;

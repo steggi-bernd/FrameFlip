@@ -22,6 +22,7 @@ public static class DockLayoutInvariants
         EmptyGroupsVanish();
         ABrokenFileIsRepaired();
         TheLayoutSurvivesSaving();
+        ASecondClickFolds();
     }
 
     /// <summary>Jedes bekannte Feld genau einmal, keine leere Gruppe, jede Gruppe mit einem Feld vorn.</summary>
@@ -100,8 +101,8 @@ public static class DockLayoutInvariants
         var layout = DockLayout.Default();
         var random = new Random(3);
 
-        int moves = 0, broken = 0;
-        string first = "";
+        int moves = 0, broken = 0, hidden = 0;
+        string first = "", firstHidden = "";
 
         for (int round = 0; round < 400; round++)
         {
@@ -110,6 +111,10 @@ public static class DockLayoutInvariants
             int groups = layout.Zone(zone).Count;
             int group = random.Next(groups + 2) - 1;   // auch daneben: -1 und hinter dem Ende
             bool asTab = random.Next(2) == 0;
+
+            // Zwischendurch Klicks auf Reiter - eingeklappte Gruppen sind die
+            // Ausgangslage, aus der ein Zug am ehesten etwas verschluckt.
+            if (random.Next(3) == 0) layout.Toggle(Known[random.Next(Known.Length)]);
 
             layout.Move(panel, zone, group, asTab);
             layout.Normalise(Known);
@@ -120,9 +125,19 @@ public static class DockLayoutInvariants
                 broken++;
                 if (first.Length == 0) first = $"Zug {moves}: {panel} nach {zone}/{group}/{asTab} - {why}";
             }
+
+            // Wer ein Feld gerade gezogen hat, will es sehen: vorn, und offen.
+            if (layout.Find(panel) is { } at &&
+                layout.Zone(at.Zone)[at.Group] is var landed &&
+                (landed.Collapsed || landed.Active != panel))
+            {
+                hidden++;
+                if (firstHidden.Length == 0) firstHidden = $"Zug {moves}: {panel} nach {zone}/{group}/{asTab}";
+            }
         }
 
         Check.That(broken == 0, $"in {moves} zufaelligen Zuegen bleibt jedes Feld genau einmal", first);
+        Check.That(hidden == 0, "und ein gezogenes Feld liegt danach vorn und offen", firstHidden);
 
         // Und die Zuege tun, was sie sagen.
         var fresh = DockLayout.Default();
@@ -205,6 +220,49 @@ public static class DockLayoutInvariants
         Check.That(broken.Right.All(g => g.Weight > 0), "unsinnige Gewichte werden eins");
         Check.That(broken.RightWidth > 120 && broken.BottomHeight > 120,
                    "und unsinnige Groessen bekommen ihren Grundwert");
+    }
+
+    /// <summary>
+    /// Ein Klick holt ein Feld, ein zweiter nimmt es weg - derselbe Griff in beide
+    /// Richtungen. Und was eingeklappt war, bleibt es auch nach dem Speichern.
+    /// </summary>
+    private static void ASecondClickFolds()
+    {
+        Check.Group("Andocken: ein zweiter Klick klappt ein");
+
+        var layout = DockLayout.Default();
+
+        layout.Toggle("colour");
+
+        Check.That(layout.Right[1] is { Collapsed: true, Active: "colour" },
+                   "ein Klick auf den vorderen Reiter klappt seine Gruppe ein");
+        Check.That(!layout.IsFolded(DockZone.Right), "die Zone bleibt offen, solange oben noch etwas offen ist");
+
+        layout.Toggle("layers");
+
+        Check.That(layout.Right[1] is { Collapsed: false, Active: "layers" },
+                   "ein Klick auf einen anderen Reiter der eingeklappten Gruppe holt ihn und klappt auf");
+
+        layout.Toggle("layers");
+        layout.Toggle("histogram");
+
+        Check.That(layout.IsFolded(DockZone.Right), "ist alles eingeklappt, ist die Zone nur noch ein Streifen");
+        Check.That(!layout.IsFolded(DockZone.Left), "eine leere Zone ist nicht eingeklappt, sondern gar nicht da");
+
+        var read = JsonSerializer.Deserialize<DockLayout>(JsonSerializer.Serialize(layout))!;
+        read.Normalise(Known);
+
+        Check.That(read.IsFolded(DockZone.Right) && read.Right[1].Active == "layers",
+                   "eingeklappt ueberlebt das Speichern - samt dem, was vorn lag");
+        Check.That(layout.Clone().IsFolded(DockZone.Right), "und die Kopie fuer die Einstellungen");
+
+        // In eine eingeklappte Gruppe gezogen: Sie geht auf, und das Feld liegt vorn.
+        layout.Move("histogram", DockZone.Right, 1, asTab: true);
+        layout.Normalise(Known);
+
+        Check.That(layout.Right.Count == 1 && layout.Right[0] is { Collapsed: false, Active: "histogram" },
+                   "wer in eine eingeklappte Gruppe zieht, klappt sie auf",
+                   string.Join(" | ", layout.Right.Select(g => $"{string.Join(",", g.Panels)}{(g.Collapsed ? " (zu)" : "")}")));
     }
 
     private static void TheLayoutSurvivesSaving()

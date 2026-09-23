@@ -1245,6 +1245,42 @@ public static class AtelierLayerInvariants
                        "wo kein Ziel ist, aendert sich nichts");
 
             dock.ResetLayout();
+            page.UpdateLayout();
+
+            // Gemeldet: Die Felder liessen sich ueber ihre Reiter holen, aber nicht
+            // wieder wegnehmen. Ein zweiter Klick klappt jetzt ein - und der Platz
+            // geht an die Nachbarn, zuletzt an das Bild.
+            double histogramHigh = slot.ActualHeight;
+            double pictureWide = centre.ActualWidth;
+
+            dock.Toggle("colour");
+            page.UpdateLayout();
+
+            Check.That(!dock.IsShown("colour") && !dock.IsShown("layers") && dock.IsShown("histogram"),
+                       "ein zweiter Klick auf den vorderen Reiter klappt die Gruppe ein");
+            Check.That(slot.ActualHeight > histogramHigh + 200,
+                       "und die Verteilung darueber bekommt den Platz",
+                       $"{histogramHigh:0} -> {slot.ActualHeight:0}");
+
+            dock.Toggle("histogram");
+            page.UpdateLayout();
+
+            Check.That(centre.ActualWidth > pictureWide + 250,
+                       "ist die ganze Zone eingeklappt, wird sie ein Streifen - und das Bild bekommt die Breite",
+                       $"{pictureWide:0} -> {centre.ActualWidth:0}");
+
+            dock.Toggle("layers");
+            page.UpdateLayout();
+
+            Check.That(dock.IsShown("layers") && !dock.IsShown("histogram") &&
+                       Math.Abs(centre.ActualWidth - pictureWide) < 2,
+                       "ein Klick im Streifen holt das Feld - und die Zone kommt in alter Breite zurueck",
+                       $"{centre.ActualWidth:0} statt {pictureWide:0}");
+
+            Check.That(settings.AtelierDock?.Right[0].Collapsed == true,
+                       "was eingeklappt bleibt, merken sich die Einstellungen");
+
+            dock.ResetLayout();
         }
         finally
         {

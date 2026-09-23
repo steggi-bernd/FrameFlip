@@ -889,7 +889,7 @@
     <sys:String x:Key="S_EffectReset">Zuruecksetzen: alle Werte auf Anfang, die Karte bleibt.</sys:String>
     <sys:String x:Key="S_EffectRemove">Entfernen: zuruecksetzen und die Karte wegnehmen.</sys:String>
     <sys:String x:Key="S_LayersUnavailable">Ebenen gibt es, sobald ein Bild offen ist.</sys:String>
-    <sys:String x:Key="S_DockTabHint">Klicken zum Zeigen. Ziehen, um das Feld woanders anzudocken - links, rechts oder unter das Bild. Rechtsklick oder Escape bricht ab.</sys:String>
+    <sys:String x:Key="S_DockTabHint">Klicken zeigt das Feld, ein zweiter Klick klappt es ein. Ziehen, um es woanders anzudocken - links, rechts oder unter das Bild. Rechtsklick oder Escape bricht ab.</sys:String>
     <sys:String x:Key="S_DockReset">Anordnung zurücksetzen</sys:String>
     <sys:String x:Key="S_DockAsTab">als Reiter hier</sys:String>
     <sys:String x:Key="S_DockAsGroup">als eigenes Feld hier</sys:String>

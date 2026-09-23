@@ -889,7 +889,7 @@
     <sys:String x:Key="S_EffectReset">Reset: every value back to start, the card stays.</sys:String>
     <sys:String x:Key="S_EffectRemove">Remove: reset and take the card away.</sys:String>
     <sys:String x:Key="S_LayersUnavailable">Layers are available once a picture is open.</sys:String>
-    <sys:String x:Key="S_DockTabHint">Click to show. Drag to dock the panel elsewhere - left, right or below the picture. Right-click or Escape cancels.</sys:String>
+    <sys:String x:Key="S_DockTabHint">Click to show the panel, click again to collapse it. Drag to dock it elsewhere - left, right or below the picture. Right-click or Escape cancels.</sys:String>
     <sys:String x:Key="S_DockReset">Reset layout</sys:String>
     <sys:String x:Key="S_DockAsTab">as a tab here</sys:String>
     <sys:String x:Key="S_DockAsGroup">as its own panel here</sys:String>

@@ -26,6 +26,13 @@ public sealed class DockGroup
     /// wie hoch das Fenster gerade ist.
     /// </summary>
     public double Weight { get; set; } = 1;
+
+    /// <summary>
+    /// Ob die Gruppe eingeklappt ist: Nur ihre Reiterleiste steht noch da, und ihr
+    /// Platz gehoert den anderen. Stehen alle Gruppen einer Seitenzone so, schrumpft
+    /// die Zone auf einen schmalen Streifen mit senkrechten Reitern.
+    /// </summary>
+    public bool Collapsed { get; set; }
 }
 
 /// <summary>
@@ -91,6 +98,32 @@ public sealed class DockLayout
         yield return (DockZone.Bottom, Bottom);
     }
 
+    /// <summary>
+    /// Ein Klick auf einen Reiter. Liegt das Feld schon vorn und offen, klappt die
+    /// Gruppe ein; sonst kommt es nach vorn, und die Gruppe geht auf.
+    ///
+    /// Derselbe Griff holt ein Feld und nimmt es wieder weg - wer ein Feld nicht
+    /// braucht, soll nicht erst ein Menue suchen muessen.
+    /// </summary>
+    public void Toggle(string panel)
+    {
+        if (Find(panel) is not { } at) return;
+
+        var group = Zone(at.Zone)[at.Group];
+
+        if (group.Active == panel && !group.Collapsed)
+        {
+            group.Collapsed = true;
+            return;
+        }
+
+        group.Active = panel;
+        group.Collapsed = false;
+    }
+
+    /// <summary>Ob in einer Zone alles eingeklappt ist - dann ist sie nur noch ein Streifen.</summary>
+    public bool IsFolded(DockZone zone) => Zone(zone) is { Count: > 0 } groups && groups.All(g => g.Collapsed);
+
     /// <summary>Wo ein Feld steht - oder null, wenn nirgends.</summary>
     public (DockZone Zone, int Group)? Find(string panel)
     {
@@ -120,9 +153,12 @@ public sealed class DockLayout
         DockGroup? into = asTab && group >= 0 && group < targets.Count ? targets[group] : null;
 
         // Als Reiter in die eigene Gruppe: nichts zu tun, ausser es nach vorn zu holen.
+        // Wer ein Feld gerade gezogen hat, will es sehen - auch aus einer eingeklappten
+        // Gruppe heraus.
         if (into is not null && into.Panels.Contains(panel))
         {
             into.Active = panel;
+            into.Collapsed = false;
             return;
         }
 
@@ -152,6 +188,7 @@ public sealed class DockLayout
         {
             into.Panels.Add(panel);
             into.Active = panel;
+            into.Collapsed = false;
         }
         else
         {
@@ -236,5 +273,6 @@ public sealed class DockLayout
         Panels = new List<string>(group.Panels),
         Active = group.Active,
         Weight = group.Weight,
+        Collapsed = group.Collapsed,
     };
 }
