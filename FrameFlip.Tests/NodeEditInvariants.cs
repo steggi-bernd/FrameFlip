@@ -38,6 +38,7 @@ public static class NodeEditInvariants
         RemovingClosesTheGap(sources);
         InsertingMatchesTheStack(sources);
         TheEditorWires(sources);
+        DroppingFallsIntoWires(sources);
         DuplicatingKeepsTheInputs(sources);
         ThePageBuildsAndUndoes();
         ThePageWiresPassesAndPicks();
@@ -219,6 +220,91 @@ public static class NodeEditInvariants
         }
     }
 
+    /// <summary>
+    /// Ein freier Knoten, ueber ein Kabel gezogen, faellt hinein - wie in Blender. Es
+    /// reicht, dass das Kabel unter seinem Koerper hindurchlaeuft; die Titelzeile muss
+    /// nicht darauf liegen.
+    /// </summary>
+    private static void DroppingFallsIntoWires(Dictionary<string, FloatFrame> sources)
+    {
+        Check.Group("Knoten bauen: ein freier Knoten faellt in ein Kabel");
+
+        var graph = StackToGraph.Convert(Stack(), Adjust(), new GradingStack());
+        var editor = new NodeEditor { Graph = graph, Translate = key => key };
+        var window = Window(editor);
+
+        try
+        {
+            editor.Frame();
+            editor.UpdateLayout();
+
+            // Ein Kabel, das vorwaerts laeuft - die Anordnung bricht lange Graphen in
+            // Reihen um, und dann springt eines zurueck an den Anfang der naechsten.
+            var forward = graph.Links.First(l => graph.Find(l.From) is PointNode from && graph.Find(l.To) is PointNode to &&
+                                                 to.X > from.X + NodeEditor.NodeWidth);
+            var view = graph.Find(forward.From)!;
+            var tone = graph.Find(forward.To)!;
+
+            // Die Mitte des Kabels zwischen den beiden.
+            Point Middle(Node from, Node to)
+            {
+                var a = editor.ScreenOf(from, "Bild", input: false);
+                var b = editor.ScreenOf(to, "Bild", input: true);
+                return new Point((a.X + b.X) / 2, (a.Y + b.Y) / 2);
+            }
+
+            // Knapp ueber der Unterkante des Koerpers liegt das Kabel - weit weg von der Titelzeile.
+            void Over(Node node, Point middle)
+            {
+                var at = editor.ToGraph(middle);
+                node.X = Math.Round(at.X - NodeEditor.NodeWidth / 2);
+                node.Y = Math.Round(at.Y - NodeLayout.Height(node) + 6);
+            }
+
+            var middle = Middle(view, tone);
+            var light = graph.Add(new LightNode { Exposure = 0.5 });
+            Over(light, middle);
+
+            var landing = editor.LandingFor(light, middle);
+
+            Check.That(landing is { } found && found.From == view.Id && found.To == tone.Id,
+                       "das Kabel unter dem Koerper ist gemeint, nicht nur eines unter der Titelzeile");
+
+            int changed = 0;
+            editor.GraphChanged += () => changed++;
+
+            Check.That(landing is not null && editor.Land(light, landing) &&
+                       graph.Into(light.Id, "Bild")?.From == view.Id && graph.Into(tone.Id, "Bild")?.From == light.Id &&
+                       changed == 1,
+                       "losgelassen, faellt er hinein - und der Graph meldet sich");
+            Check.That(tone.X >= light.X + NodeLayout.ColumnStep - 0.5, "was dahinter liegt, rueckt so weit, dass er Platz hat",
+                       $"{tone.X} gegen {light.X}");
+
+            // Eine Maske ist kein Bild - sie faellt in kein Bildkabel.
+            var mask = graph.Add(new MaskNode { Mask = new LayerMask { Kind = MaskKind.Gradient } });
+            var between = Middle(light, tone);
+            Over(mask, between);
+
+            Check.That(editor.LandingFor(mask, between) is null, "eine Maske faellt in kein Bildkabel");
+
+            // Ein Knoten, an dem schon die Tiefe steckt, hat einen freien Bildweg.
+            var depth = graph.Add(new DataNode { Tool = new DepthFieldTool { Aperture = 0.5f } });
+            NodeCatalog.WireData(graph, depth);
+            Over(depth, between);
+
+            Check.That(graph.Links.Any(l => l.To == depth.Id) && editor.LandingFor(depth, between) is { } withData &&
+                       withData.From == light.Id,
+                       "ein Knoten mit Renderdaten faellt trotzdem - sein Bildweg ist frei");
+
+            // Einer, dessen Bild schon jemand liest, bleibt, wo er ist.
+            Check.That(editor.LandingFor(light, Middle(view, light)) is null, "ein Knoten, dessen Bild schon gelesen wird, faellt nicht");
+        }
+        finally
+        {
+            window.Close();
+        }
+    }
+
     private static void DuplicatingKeepsTheInputs(Dictionary<string, FloatFrame> sources)
     {
         Check.Group("Knoten bauen: verdoppeln");
@@ -393,6 +479,37 @@ public static class NodeEditInvariants
             // Ohne Wahl davor naehme Rueckgaengig den Knoten selbst weg - deshalb kein Single.
             Check.That(page.Graph!.Nodes.OfType<MaskNode>().FirstOrDefault(m => m.Mask.Kind == MaskKind.Cryptomatte)?.Mask.Picks.Count == 1,
                        "Rueckgaengig holt die Wahl zurueck");
+
+            // Aus der Palette hereingezogen und auf das Kabel vor der Ausgabe gelegt.
+            var output = page.Graph!.Output!;
+            var last = page.Graph.Find(page.Graph.Into(output.Id, "Bild")!.From)!;
+
+            editor.UpdateLayout();
+            var a = editor.ScreenOf(last, NodeEdits.Through(last).Output!, input: false);
+            var b = editor.ScreenOf(output, "Bild", input: true);
+            byte[] beforeDrop = Pixels(page);
+
+            editor.DropSection("Vignette", new Point((a.X + b.X) / 2, (a.Y + b.Y) / 2));
+            Pump(TimeSpan.FromSeconds(3), () => !Pixels(page).AsSpan().SequenceEqual(beforeDrop));
+
+            var dropped = page.Graph.Nodes.OfType<OpticsNode>().SingleOrDefault();
+
+            Check.That(dropped is not null && page.Graph.Into(output.Id, "Bild")?.From == dropped.Id &&
+                       page.Graph.Into(dropped.Id, "Bild")?.From == last.Id && ReferenceEquals(editor.Selected, dropped),
+                       "ein Effekt aus der Palette, auf das Kabel gezogen, faellt hinein und ist gewaehlt");
+
+            page.StepNodes(back: true);
+
+            Check.That(!page.Graph!.Nodes.OfType<OpticsNode>().Any(), "und Rueckgaengig nimmt ihn wieder heraus");
+
+            // Neben jedes Kabel gezogen, steht er frei da.
+            editor.DropSection("Vignette", new Point(8, 8));
+
+            Check.That(page.Graph!.Nodes.OfType<OpticsNode>().SingleOrDefault() is { } loose &&
+                       !page.Graph.Links.Any(l => l.From == loose.Id || l.To == loose.Id),
+                       "ins Leere gezogen, steht er frei");
+
+            page.StepNodes(back: true);
 
             // Verdoppeln auf der Seite: Umschalt+D gibt es im Editor, hier der Weg dahinter.
             // Dass das Bild dabei bleibt, prueft das Modell oben.

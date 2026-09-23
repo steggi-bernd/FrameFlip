@@ -204,6 +204,8 @@ public partial class GradingPanel
                 };
 
                 tile.Click += OnPaletteClicked;
+                tile.PreviewMouseLeftButtonDown += OnPalettePressed;
+                tile.PreviewMouseMove += OnPaletteDragged;
 
                 _paletteTiles[prefix] = tile;
                 _activeBars[prefix] = bar;
@@ -213,6 +215,39 @@ public partial class GradingPanel
 
             Palette.Children.Add(row);
         }
+    }
+
+    /// <summary>Wo auf der Palette gedrueckt wurde - ein Zug beginnt erst ein paar Punkte weiter.</summary>
+    private System.Windows.Point? _pressedAt;
+
+    private void OnPalettePressed(object sender, MouseButtonEventArgs e) => _pressedAt = e.GetPosition(this);
+
+    /// <summary>
+    /// Im Knotenmodus laesst sich ein Effekt aus der Palette in den Editor ziehen - frei
+    /// ablegen oder direkt auf ein Kabel. Ein Klick setzt ihn weiter hinter den gewaehlten
+    /// Knoten.
+    /// </summary>
+    private void OnPaletteDragged(object sender, MouseEventArgs e)
+    {
+        if (_focus is null || _pressedAt is not { } start || e.LeftButton != MouseButtonState.Pressed) return;
+        if (sender is not ToggleButton { Tag: string prefix } tile) return;
+
+        var delta = e.GetPosition(this) - start;
+
+        if (Math.Abs(delta.X) < SystemParameters.MinimumHorizontalDragDistance &&
+            Math.Abs(delta.Y) < SystemParameters.MinimumVerticalDragDistance)
+        {
+            return;
+        }
+
+        _pressedAt = null;
+
+        // Die Kachel gibt die Maus ab - sonst kaeme beim Loslassen noch ein Klick, und
+        // der Effekt stuende zweimal im Graphen.
+        tile.ReleaseMouseCapture();
+        DragDrop.DoDragDrop(tile, new DataObject(NodeEditor.SectionFormat, prefix), DragDropEffects.Copy);
+
+        ShowActive();
     }
 
     /// <summary>

@@ -31,6 +31,7 @@ public partial class AtelierPage
         NodeView.Translate = key => Strings.T(key);
         NodeView.Editing += RememberNodes;
         NodeView.MenuWanted += ShowNodeMenu;
+        NodeView.SectionDropped += DropFromPalette;
         NodeView.UndoWanted += () => StepNodes(back: true);
         NodeView.RedoWanted += () => StepNodes(back: false);
 
@@ -128,6 +129,30 @@ public partial class AtelierPage
         NodeView.Select(node);
         NodeView.InvalidateVisual();
 
+        AfterNodeEdit();
+    }
+
+    /// <summary>
+    /// Ein Effekt aus der Palette, in den Editor gezogen: frei dort, wo er losgelassen
+    /// wurde - oder in das Kabel darunter, wie ein freier Knoten, den man darauf legt.
+    /// </summary>
+    private void DropFromPalette(string section, Point at, NodeLink? link)
+    {
+        if (_graph is null || NodeCatalog.ForSection(section) is not { } kind) return;
+
+        RememberNodes();
+
+        var node = _graph.Add(kind.Create());
+        node.X = at.X;
+        node.Y = at.Y;
+
+        NodeCatalog.WireData(_graph, node);
+        NodeView.Select(node);
+
+        // Faellt er ins Kabel, meldet der Editor die Aenderung selbst.
+        if (link is not null && NodeView.Land(node, link)) return;
+
+        NodeView.InvalidateVisual();
         AfterNodeEdit();
     }
 

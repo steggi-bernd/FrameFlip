@@ -32,6 +32,10 @@ namespace FrameFlip.Views;
 /// Ein Kabel, das man an seinem Eingang packt, loest sich und laesst sich woanders
 /// anstecken oder ins Leere fallen lassen. Schon waehrend des Ziehens leuchten nur die
 /// Anschluesse auf, an die es passt.
+///
+/// Ein Knoten, dessen Bildweg frei ist, faellt in ein Kabel, ueber dem er losgelassen
+/// wird - das Kabel leuchtet vorher auf. Dasselbe gilt fuer einen Effekt, der aus der
+/// Palette des Farbstreifens hereingezogen wird.
 /// </summary>
 public sealed class NodeEditor : FrameworkElement
 {
@@ -46,11 +50,15 @@ public sealed class NodeEditor : FrameworkElement
 
     private NodeGraph? _graph;
 
+    /// <summary>Unter diesem Namen traegt ein Zug aus der Palette seinen Effekt.</summary>
+    public const string SectionFormat = "FrameFlip.NodeSection";
+
     public NodeEditor()
     {
         Focusable = true;
         ClipToBounds = true;
         FocusVisualStyle = null;
+        AllowDrop = true;
 
         SizeChanged += (_, _) =>
         {
@@ -96,6 +104,12 @@ public sealed class NodeEditor : FrameworkElement
 
     /// <summary>Ein Menue zum Hinzufuegen ist gewuenscht - an dieser Stelle im Graphen.</summary>
     public event Action<Point>? MenuWanted;
+
+    /// <summary>
+    /// Ein Effekt aus der Palette wurde hereingezogen: welcher, wohin (die linke obere
+    /// Ecke des Knotens im Graphen) und in welches Kabel er fallen soll - oder in keines.
+    /// </summary>
+    public event Action<string, Point, NodeLink?>? SectionDropped;
 
     public event Action? UndoWanted;
 
@@ -262,6 +276,13 @@ public sealed class NodeEditor : FrameworkElement
     private Point _wireEnd;
     private Dictionary<(string, string, bool), string?>? _fits;
     private (Node Node, Socket Socket, bool Input)? _hover;
+
+    /// <summary>Das Kabel, in das der gezogene Knoten beim Loslassen fiele - es leuchtet.</summary>
+    private NodeLink? _landing;
+
+    /// <summary>Der Knoten, der gerade aus der Palette hereingezogen wird - noch nicht im Graphen.</summary>
+    private Node? _ghost;
+    private string? _ghostSection;
 
     /// <summary>
     /// Der Anschluss unter einem Punkt auf dem Schirm - mit etwas Spielraum, denn ein
@@ -488,6 +509,8 @@ public sealed class NodeEditor : FrameworkElement
         Selected.X = Math.Round(_origin.X + delta.X / Zoom);
         Selected.Y = Math.Round(_origin.Y + delta.Y / Zoom);
 
+        _landing = LandingFor(Selected, at);
+
         InvalidateVisual();
     }
 
@@ -505,24 +528,200 @@ public sealed class NodeEditor : FrameworkElement
 
         bool moved = _drag == Drag.Node && _moved;
         var node = Selected;
+        var landing = _landing;
 
         EndDrag();
 
         if (!moved || node is null) return;
 
         // Ein freier Knoten, auf ein Kabel gelegt, faellt hinein - wie in Blender.
-        if (!_graph!.Links.Any(l => l.From == node.Id || l.To == node.Id))
-        {
-            var centre = ToScreen(new Point(node.X + NodeWidth / 2, node.Y + Header / 2));
-
-            if (LinkAt(centre, 14) is { } link && NodeEdits.InsertInto(_graph, link, node))
-            {
-                GraphChanged?.Invoke();
-                return;
-            }
-        }
+        if (landing is not null && Land(node, landing)) return;
 
         LayoutChanged?.Invoke();
+    }
+
+    /// <summary>
+    /// Ob der Bildweg eines Knotens frei ist: sein Bildeingang ohne Kabel, und niemand
+    /// liest ihn. Ein Knoten, an dem schon Renderdaten stecken, zaehlt als frei - er
+    /// soll genauso in ein Kabel fallen koennen wie einer ganz ohne.
+    /// </summary>
+    private bool Free(Node node)
+    {
+        var (input, output) = NodeEdits.Through(node);
+
+        return input is not null && output is not null &&
+               _graph!.Into(node.Id, input) is null &&
+               !_graph.Links.Any(l => l.From == node.Id);
+    }
+
+    /// <summary>
+    /// Das Kabel, in das ein Knoten fiele, laege er hier: eines, das unter seinem Koerper
+    /// hindurchlaeuft und an beiden Enden zu ihm passt - von mehreren das, das dem Zeiger
+    /// am naechsten ist. Nur fuer einen Knoten mit freiem Bildweg; der Knoten muss noch
+    /// nicht im Graphen stehen.
+    /// </summary>
+    internal NodeLink? LandingFor(Node node, Point pointer)
+    {
+        if (_graph is null || !Free(node)) return null;
+
+        var (input, output) = NodeEdits.Through(node);
+
+        var corner = ToScreen(new Point(node.X, node.Y));
+        var body = new Rect(corner.X, corner.Y, NodeWidth * Zoom, NodeLayout.Height(node) * Zoom);
+        body.Inflate(4, 4);
+
+        NodeLink? best = null;
+        double nearest = double.MaxValue;
+
+        foreach (var link in _graph.Links)
+        {
+            if (link.From == node.Id || link.To == node.Id) continue;
+            if (Curve(link) is not var (a, b)) continue;
+
+            double closest = double.MaxValue;
+
+            for (int s = 0; s <= 32; s++)
+            {
+                var p = Bezier(a, b, s / 32.0);
+                if (body.Contains(p)) closest = Math.Min(closest, (p - pointer).Length);
+            }
+
+            if (closest >= nearest) continue;
+
+            if (_graph.Find(link.From) is not { } from || _graph.Find(link.To) is not { } to) continue;
+
+            if (NodeEdits.CannotConnect(_graph, from, link.Output, node, input!) is not null ||
+                NodeEdits.CannotConnect(_graph, node, output!, to, link.Input) is not null)
+            {
+                continue;
+            }
+
+            nearest = closest;
+            best = link;
+        }
+
+        return best;
+    }
+
+    /// <summary>
+    /// Legt einen Knoten in ein Kabel und schafft dahinter so viel Platz, wie er braucht -
+    /// die Knoten rechts von ihm ruecken nach rechts, wenn er sie ueberdeckt. Ein Kabel,
+    /// das in die naechste Reihe zurueckspringt, schiebt nichts: Dort liegt der Leser
+    /// links, und Platz nach rechts hilft ihm nicht.
+    /// </summary>
+    internal bool Land(Node node, NodeLink link)
+    {
+        if (_graph is null || !NodeEdits.InsertInto(_graph, link, node)) return false;
+
+        double need = _graph.Links
+            .Where(l => l.From == node.Id)
+            .Select(l => _graph.Find(l.To))
+            .OfType<Node>()
+            .Where(reader => reader.X > node.X - 1)
+            .Select(reader => node.X + NodeLayout.ColumnStep - reader.X)
+            .DefaultIfEmpty(0)
+            .Max();
+
+        if (need > 0) NodeEdits.MakeRoom(_graph, node, need);
+
+        GraphChanged?.Invoke();
+        return true;
+    }
+
+    // ------------------------------------------------------------ Aus der Palette
+
+    protected override void OnDragEnter(DragEventArgs e)
+    {
+        base.OnDragEnter(e);
+        Follow(e);
+    }
+
+    protected override void OnDragOver(DragEventArgs e)
+    {
+        base.OnDragOver(e);
+        Follow(e);
+    }
+
+    protected override void OnDragLeave(DragEventArgs e)
+    {
+        base.OnDragLeave(e);
+
+        _ghost = null;
+        _ghostSection = null;
+        _landing = null;
+        InvalidateVisual();
+    }
+
+    protected override void OnDrop(DragEventArgs e)
+    {
+        base.OnDrop(e);
+
+        if (e.Data.GetData(SectionFormat) is string section) DropSection(section, e.GetPosition(this));
+
+        e.Handled = true;
+    }
+
+    /// <summary>Der Zug steht ueber dem Editor: ein Geist zeigt, wo der Knoten hinkaeme.</summary>
+    private void Follow(DragEventArgs e)
+    {
+        e.Handled = true;
+
+        if (_graph is null || e.Data.GetData(SectionFormat) is not string section)
+        {
+            e.Effects = DragDropEffects.None;
+            return;
+        }
+
+        e.Effects = DragDropEffects.Copy;
+
+        if (_ghostSection != section)
+        {
+            _ghost = NodeCatalog.ForSection(section)?.Create();
+            _ghostSection = section;
+        }
+
+        if (_ghost is null) return;
+
+        Hover(_ghost, e.GetPosition(this));
+    }
+
+    /// <summary>Stellt den Geist an den Zeiger und sucht das Kabel darunter.</summary>
+    private void Hover(Node ghost, Point pointer)
+    {
+        var at = ToGraph(pointer);
+
+        ghost.X = Math.Round(at.X - NodeWidth / 2);
+        ghost.Y = Math.Round(at.Y - Header / 2);
+
+        _landing = LandingFor(ghost, pointer);
+        InvalidateVisual();
+    }
+
+    /// <summary>
+    /// Ein Effekt wird an einem Punkt auf dem Schirm abgelegt - derselbe Weg wie beim
+    /// Loslassen der Maus. Fuer die Probe, die nicht ziehen kann.
+    /// </summary>
+    internal void DropSection(string section, Point pointer)
+    {
+        var ghost = NodeCatalog.ForSection(section)?.Create();
+
+        _ghost = null;
+        _ghostSection = null;
+
+        if (ghost is null || _graph is null)
+        {
+            _landing = null;
+            InvalidateVisual();
+            return;
+        }
+
+        Hover(ghost, pointer);
+
+        var landing = _landing;
+        _landing = null;
+
+        SectionDropped?.Invoke(section, new Point(ghost.X, ghost.Y), landing);
+        InvalidateVisual();
     }
 
     /// <summary>
@@ -614,6 +813,7 @@ public sealed class NodeEditor : FrameworkElement
     {
         _drag = Drag.None;
         _lifted = null;
+        _landing = null;
         _wireNode = null;
         _wireSocket = null;
         _fits = null;
@@ -791,6 +991,13 @@ public sealed class NodeEditor : FrameworkElement
 
         if (Selected is not null) DrawNode(dc, Selected);
 
+        if (_ghost is not null)
+        {
+            dc.PushOpacity(0.55);
+            DrawNode(dc, _ghost);
+            dc.Pop();
+        }
+
         if (_drag == Drag.Wire) DrawWire(dc);
 
         if (_warning is { Length: > 0 } warning)
@@ -901,11 +1108,16 @@ public sealed class NodeEditor : FrameworkElement
         var from = _graph!.Find(link.From)!;
         var to = _graph.Find(link.To)!;
 
-        var pen = new Pen(SocketBrush(from.Outputs[IndexOf(from.Outputs, link.Output)].Type),
-                          Math.Max(1.2, 2 * Math.Min(1, Zoom)));
+        // Das Kabel, in das ein Knoten gleich faellt, leuchtet - wie in Blender.
+        bool landing = ReferenceEquals(link, _landing);
+
+        var pen = landing
+            ? new Pen(Brushes.White, Math.Max(2.5, 3.5 * Math.Min(1, Zoom)))
+            : new Pen(SocketBrush(from.Outputs[IndexOf(from.Outputs, link.Output)].Type),
+                      Math.Max(1.2, 2 * Math.Min(1, Zoom)));
         pen.Freeze();
 
-        dc.PushOpacity(from.Muted || to.Muted ? 0.35 : 0.85);
+        dc.PushOpacity(landing ? 1 : from.Muted || to.Muted ? 0.35 : 0.85);
         dc.DrawGeometry(null, pen, Path(a, b));
         dc.Pop();
     }
