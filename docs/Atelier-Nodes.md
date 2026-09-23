@@ -117,6 +117,17 @@ Only the alpha channel of exports changes, and only in those cases.
 
 1. **Model and engine without an interface.** Converter, engine, and the equality test
    above. Nothing to click yet.
+
+   *Done (2026-09-23).* All named cases and 264 random stacks give the same bytes as the
+   stack: full grid, coarse grid and 16-bit. A saved and reloaded graph computes the same
+   picture. At 1920×1080, a typical graph (5 layers, 5 picture tools, 24 nodes) takes
+   150 ms against the stack's 85 ms (1.8×), and 13 ms against 8 ms while dragging. It
+   is usable before phase 5.
+
+   Found and fixed in the stack along the way: the 16-bit export dropped geometry and
+   render data, and took no moved alpha from them; clipped layers leaked outside placed
+   carriers; groups and clipping reported the wrong coverage; hiding the picture layer
+   while an adjustment layer was visible crashed the composer.
 2. **Overlay.** The node button in the tool column shows the graph over the dimmed picture.
    You can show, move, zoom and select nodes. The selected node's settings appear in the
    colour panel. The first thing to try in the app.
