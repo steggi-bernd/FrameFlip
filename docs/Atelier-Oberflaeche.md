@@ -307,6 +307,26 @@ became necessary once masks could be drawn:
   correction — which runs *after* compositing — and no mask could reach it. The target
   bar above the sliders is a switch now.
 
+### The right column, second pass
+
+Looked at with synthetic test data rather than read from XAML, the right column had one
+root problem: **three sections stacked in one narrow column fought for the same height.**
+Give the layers room and the colour section shrank to its tab row — not a single slider
+left. Pick a tool in the colour section and its sliders sat below the edge.
+
+- **Two tabs, Colour and Layers, each with the full height.** Which layer the colour tools
+  mean is shown by the target switch at the top of the colour tab; the layers tab shows
+  how many layers there are.
+- **Tool settings moved to a bar above the canvas**, as in every image editor. The brush
+  size sits where one paints; the old properties section spent a permanent hundred
+  points on a description.
+- **Colour tab:** histogram fixed at the top, categories in one row with short names,
+  tiles as an actual grid. Idle tiles used to be drawn at 62 % opacity — which reads as
+  *disabled*, and most tiles are idle. They are fully legible now; an active tool carries
+  an accent dot.
+- Found on the way: the *vibrance* slider sat outside every section and appeared under
+  every tab. It is with saturation now.
+
 Steps 5 and 6 are the only ones that add something the program cannot do at all today, and
 the gallery
 is deliberately last — not because it matters least, but because a gallery of
