@@ -23,6 +23,7 @@ public static class NodeCatalog
     public const string Layers = "S_NodeMenuLayers";
     public const string Masks = "S_NodeMenuMasks";
     public const string Picture = "S_NodeMenuPicture";
+    public const string Convert = "S_NodeMenuConvert";
 
     public static readonly IReadOnlyList<NodeKind> All = new NodeKind[]
     {
@@ -38,6 +39,11 @@ public static class NodeCatalog
         new(Masks, "S_MaskColour", () => new MaskNode { Mask = new LayerMask { Kind = MaskKind.Colour } }),
         new(Masks, "S_MaskGradient", () => new MaskNode { Mask = new LayerMask { Kind = MaskKind.Gradient } }),
         new(Masks, "S_MaskPainted", () => new MaskNode { Mask = new LayerMask { Kind = MaskKind.Painted } }),
+        new(Masks, "S_NodeMaskMath", () => new MaskMathNode()),
+        new(Masks, "S_NodeMaskShape", () => new MaskShapeNode()),
+
+        new(Convert, "S_NodeMapRange", () => new MapRangeNode()),
+        new(Convert, "S_NodeColorRamp", () => new ColorRampNode()),
 
         new(Picture, "S_NodeLight", () => new LightNode()),
         new(Picture, "S_NodeView", () => new ViewNode()),

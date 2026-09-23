@@ -107,6 +107,8 @@ public partial class GradingPanel
         ChoiceField choice => ChoiceRow(choice),
         SwitchField toggle => SwitchRow(toggle),
         ButtonField button => ButtonRow(button),
+        NumberField number => NumberRow(number),
+        RampField ramp => new RampEditor(ramp.Node, interim => Raise(interim), key => FindResource(key)),
         InfoField info => new TextBlock
         {
             Text = info.Text,
@@ -230,6 +232,58 @@ public partial class GradingPanel
         };
 
         return toggle;
+    }
+
+    /// <summary>
+    /// Eine Zahl zum Eintippen. Uebernommen wird sie mit der Eingabetaste oder beim
+    /// Verlassen des Feldes; was sich nicht lesen laesst, springt auf den alten Wert zurueck.
+    /// </summary>
+    private UIElement NumberRow(NumberField field)
+    {
+        var panel = new StackPanel();
+
+        panel.Children.Add(new TextBlock
+        {
+            Text = Strings.T(field.LabelKey),
+            Style = (Style)FindResource("PanelLabel"),
+            Margin = new Thickness(0, 0, 0, 4),
+        });
+
+        var box = new TextBox
+        {
+            Style = (Style)FindResource("DialogTextBox"),
+            Text = field.Get().ToString(field.Format, CultureInfo.CurrentCulture),
+        };
+
+        void Take()
+        {
+            string text = box.Text.Trim();
+
+            if (double.TryParse(text, NumberStyles.Float, CultureInfo.CurrentCulture, out double value) ||
+                double.TryParse(text, NumberStyles.Float, CultureInfo.InvariantCulture, out value))
+            {
+                if (value != field.Get())
+                {
+                    field.Set(value);
+                    Raise(interim: false);
+                }
+            }
+
+            box.Text = field.Get().ToString(field.Format, CultureInfo.CurrentCulture);
+        }
+
+        box.LostKeyboardFocus += (_, _) => Take();
+        box.KeyDown += (_, e) =>
+        {
+            if (e.Key != System.Windows.Input.Key.Enter) return;
+
+            Take();
+            e.Handled = true;
+        };
+
+        panel.Children.Add(box);
+
+        return panel;
     }
 
     private UIElement ButtonRow(ButtonField field)

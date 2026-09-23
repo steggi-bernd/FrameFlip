@@ -358,6 +358,27 @@ public static class NodeParityInvariants
         Check.That(differDepth == 0, "umgesteckt rechnet die Maske mit dem neuen Pass",
                    $"{differDepth} Bytes anders, bis {worstDepth} Stufen");
 
+        // Ein Wertebereich an der Tiefe rechnet in der Grundstellung wie die Passmaske -
+        // dieselbe Spanne, derselbe Schwarz- und Weisspunkt.
+        foreach (int step in new[] { 1, 3 })
+        {
+            var ranged = StackToGraph.Convert(depth, ImageAdjustments.Neutral, new GradingStack());
+            var passMask = ranged.Nodes.OfType<MaskNode>().Single();
+            var feed = ranged.Into(passMask.Id, "Pass")!;
+            var reader = ranged.Links.Single(l => l.From == passMask.Id);
+
+            var map = ranged.Add(new MapRangeNode { FromLow = 0.1f, FromHigh = 0.8f });
+            ranged.Connect(ranged.Find(feed.From)!, feed.Output, map, "Wert");
+            ranged.Connect(map, "Wert", ranged.Find(reader.To)!, reader.Input);
+            NodeEdits.Remove(ranged, passMask, reconnect: false);
+
+            var (differRange, worstRange) = Diff(RenderStack(world, depth, ImageAdjustments.Neutral, new GradingStack(), step, 0, sixteen: false),
+                                                 RenderGraph(world, ranged, step, 0, sixteen: false), 1);
+
+            Check.That(differRange == 0, $"ein Wertebereich an der Tiefe rechnet wie die Passmaske{(step > 1 ? " (grob)" : "")}",
+                       $"{differRange} Bytes anders, bis {worstRange} Stufen");
+        }
+
         NodeEdits.ShowPass(wired, file, "depth", on: false);
 
         Check.That(wired.Into(mask.Id, "Pass") is null && wired.Problems().Count == 0,

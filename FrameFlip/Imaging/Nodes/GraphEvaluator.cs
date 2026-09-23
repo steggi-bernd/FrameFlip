@@ -335,8 +335,10 @@ public static class GraphEvaluator
             foreach (var node in units[u])
                 unitOf[node.Id] = u;
 
+        var display = DisplaySide(graph, order);
+
         // Die Schluessel - nur mit Zwischenspeicher. Ohne ihn waeren sie Arbeit fuer nichts.
-        var shapes = cache is null ? null : Shapes(graph, units, unitOf, inputs, context, sixteen);
+        var shapes = cache is null ? null : Shapes(graph, units, unitOf, inputs, context, sixteen, display);
 
         string Shape(int unit, string output) => shapes![unit] + "|" + output;
         string Key(int unit, string output) => step + "|" + Shape(unit, output);
@@ -417,7 +419,7 @@ public static class GraphEvaluator
                 consumed.Add((link.From, link.Output));
             }
 
-            var run = new NodeRun(context, inputsOf);
+            var run = new NodeRun(context, inputsOf) { Display = display.Contains(first.Id) };
 
             if (unit.Count > 1)
             {
@@ -430,12 +432,20 @@ public static class GraphEvaluator
             }
             else if (first.Muted)
             {
-                // Stumm: das erste Bild unveraendert durch, alle anderen Ausgaenge leer.
-                string? through = first.Through;
-                var passed = through is null ? null : run.Image(through);
+                // Stumm: der durchgereichte Eingang unveraendert an jeden Ausgang seiner
+                // Art - ein Bild an die Bildausgaenge, eine Maske an die Maskenausgaenge -,
+                // alle anderen Ausgaenge leer.
+                var through = first.Through is { } name ? first.Input(name) : null;
+
+                object? passed = through?.Type switch
+                {
+                    SocketType.Image => run.Image(through.Value.Name),
+                    SocketType.Value => run.Value(through.Value.Name),
+                    _ => null,
+                };
 
                 foreach (var socket in first.Outputs)
-                    run.Set(socket.Name, socket.Type == SocketType.Image ? passed : null);
+                    run.Set(socket.Name, through is { } t && socket.Type == t.Type ? passed : null);
             }
             else
             {
@@ -552,7 +562,7 @@ public static class GraphEvaluator
     /// Objekt und bekommt eine andere Nummer, auch unter demselben Namen.
     /// </summary>
     private static string[] Shapes(NodeGraph graph, List<List<Node>> units, Dictionary<string, int> unitOf,
-                                   GraphInputs inputs, NodeContext context, bool sixteen)
+                                   GraphInputs inputs, NodeContext context, bool sixteen, HashSet<string> display)
     {
         var world = new StringBuilder();
 
@@ -578,6 +588,10 @@ public static class GraphEvaluator
 
             var first = units[u][0];
 
+            // Ein Farbverlauf rechnet vor der Anzeige anders als dahinter - und auf welcher
+            // Seite er steht, haengt an dem, der ihn liest, nicht an dem, was in ihn fliesst.
+            if (display.Contains(first.Id)) text.Append("\nAnzeige");
+
             foreach (var socket in first.Inputs)
             {
                 if (graph.Into(first.Id, socket.Name) is { } link && unitOf.TryGetValue(link.From, out int from))
@@ -588,6 +602,44 @@ public static class GraphEvaluator
         }
 
         return shapes;
+    }
+
+    /// <summary>
+    /// Welche Knoten ihr Bild auf der Anzeigeseite abgeben - hinter der Sichtumwandlung.
+    ///
+    /// Vorwaerts: Wer sein Bild von der Anzeigeseite bekommt, gibt es dort ab. Rueckwaerts
+    /// fuer das, was keinen Bildweg hat - ein Farbverlauf macht sein Bild aus einer
+    /// Maske -: Er steht auf der Seite dessen, der sein Bild liest. Ein Verlauf, der in
+    /// ein Mischen hinter der Anzeige geht, rechnet in Anzeigewerten.
+    /// </summary>
+    internal static HashSet<string> DisplaySide(NodeGraph graph, IReadOnlyList<Node> order)
+    {
+        var display = new HashSet<string>(StringComparer.Ordinal);
+
+        foreach (var node in order)
+        {
+            if (node is ViewNode)
+            {
+                display.Add(node.Id);
+                continue;
+            }
+
+            var (input, _) = NodeEdits.Through(node);
+
+            if (input is not null && graph.Into(node.Id, input) is { } link && display.Contains(link.From))
+                display.Add(node.Id);
+        }
+
+        for (int i = order.Count - 1; i >= 0; i--)
+        {
+            var node = order[i];
+
+            if (node is not ColorRampNode || display.Contains(node.Id)) continue;
+
+            if (graph.Links.Any(l => l.From == node.Id && display.Contains(l.To))) display.Add(node.Id);
+        }
+
+        return display;
     }
 
     private static readonly ConditionalWeakTable<object, object> Identities = new();

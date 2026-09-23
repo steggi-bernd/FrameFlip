@@ -68,6 +68,10 @@ public sealed class NodeLink
 [JsonDerivedType(typeof(OverlayNode), OverlayNode.KindName)]
 [JsonDerivedType(typeof(FramePassNode), FramePassNode.KindName)]
 [JsonDerivedType(typeof(OutputNode), OutputNode.KindName)]
+[JsonDerivedType(typeof(MaskMathNode), MaskMathNode.KindName)]
+[JsonDerivedType(typeof(MapRangeNode), MapRangeNode.KindName)]
+[JsonDerivedType(typeof(ColorRampNode), ColorRampNode.KindName)]
+[JsonDerivedType(typeof(MaskShapeNode), MaskShapeNode.KindName)]
 public abstract class Node
 {
     /// <summary>Eindeutig im Graphen. Die Verbindungen nennen den Knoten ueber sie.</summary>
@@ -93,7 +97,10 @@ public abstract class Node
     /// <summary>Rechnet den Knoten - siehe <see cref="NodeRun"/>.</summary>
     internal abstract void Run(NodeRun run);
 
-    /// <summary>Der Eingang, der bei einem stummen Knoten durchgereicht wird.</summary>
+    /// <summary>
+    /// Der Eingang, der bei einem stummen Knoten durchgereicht wird - an jeden Ausgang
+    /// derselben Art. Ein Bildknoten reicht sein Bild durch, ein Maskenknoten seine Maske.
+    /// </summary>
     internal virtual string? Through => Inputs.FirstOrDefault(s => s.Type == SocketType.Image).Name;
 
     public Socket? Input(string name)
@@ -224,12 +231,15 @@ public sealed class NodeGraph
 
     /// <summary>
     /// Welche Anschlussarten zusammenpassen. Ein Bild darf in eine Maske (seine
-    /// Helligkeit) und in einen Datenanschluss (ein Pass ist ein Bild); eine Maske darf
-    /// nicht zum Bild werden - das waere eine Umwandlung, die niemand gemeint hat.
+    /// Helligkeit) und in einen Datenanschluss (ein Pass ist ein Bild); ein Pass darf in
+    /// einen Wert - die Tiefe in Metern wird so zur Zahl, die ein Wertebereich abbildet.
+    /// Eine Maske darf nicht zum Bild werden - das waere eine Umwandlung, die niemand
+    /// gemeint hat. Dafuer gibt es den Farbverlauf.
     /// </summary>
     public static bool Fits(SocketType output, SocketType input)
         => output == input ||
-           (output == SocketType.Image && input is SocketType.Value or SocketType.Data);
+           (output == SocketType.Image && input is SocketType.Value or SocketType.Data) ||
+           (output == SocketType.Data && input == SocketType.Value);
 
     /// <summary>
     /// Die Knoten, die zur Ausgabe beitragen, in einer Reihenfolge, in der jeder nach

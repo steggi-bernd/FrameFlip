@@ -222,6 +222,12 @@ internal sealed class NodeRun
 
     public NodeContext Context { get; }
 
+    /// <summary>
+    /// Ob der Knoten sein Bild hinter der Sichtumwandlung abgibt - auf Anzeigewerten statt
+    /// in Licht. Siehe <see cref="GraphEvaluator"/>.
+    /// </summary>
+    public bool Display { get; init; }
+
     public IReadOnlyDictionary<string, object?> Outputs => _outputs;
 
     public object? Raw(string input) => _inputs.TryGetValue(input, out var value) ? value : null;

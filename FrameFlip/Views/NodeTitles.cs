@@ -76,6 +76,10 @@ public static class NodeTitles
         ViewNode => Strings.T("S_NodeView"),
         ToneNode => Strings.T("S_NodeTone"),
         OverlayNode => Strings.T("S_NodeOverlay"),
+        MaskMathNode math => Strings.T("S_NodeMaskMath") + ": " + Strings.T(OperationKey(math.Operation)),
+        MapRangeNode => Strings.T("S_NodeMapRange"),
+        ColorRampNode => Strings.T("S_NodeColorRamp"),
+        MaskShapeNode => Strings.T("S_NodeMaskShape"),
         OutputNode => Strings.T("S_NodeOutput"),
         _ when ToolKind(node) is { } kind && Tools.TryGetValue(kind, out var entry) => Strings.T(entry.Key),
         _ => node.GetType().Name,
@@ -98,6 +102,16 @@ public static class NodeTitles
         int dot = name.LastIndexOf('.');
         return dot >= 0 && dot < name.Length - 1 ? name[(dot + 1)..] : name;
     }
+
+    private static string OperationKey(MaskOperation operation) => operation switch
+    {
+        MaskOperation.Add => "S_MaskOpAdd",
+        MaskOperation.Subtract => "S_MaskOpSubtract",
+        MaskOperation.Minimum => "S_MaskOpMinimum",
+        MaskOperation.Maximum => "S_MaskOpMaximum",
+        MaskOperation.Difference => "S_MaskOpDifference",
+        _ => "S_MaskOpMultiply",
+    };
 
     private static string MaskKey(MaskKind kind) => kind switch
     {

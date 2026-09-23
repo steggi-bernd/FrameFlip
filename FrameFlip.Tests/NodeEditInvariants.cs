@@ -524,6 +524,36 @@ public static class NodeEditInvariants
             page.StepNodes(back: true);
 
             Check.That(page.Graph!.Nodes.OfType<LightNode>().Count() == 1, "und Rueckgaengig nimmt sie wieder weg");
+
+            // Die neuen Knoten zeigen ihre Felder - ein Stil mit falschem Ziel fiele erst hier auf.
+            var colourFields = (StackPanel)colour.FindName("NodeFields");
+            var ramp = new ColorRampNode();
+
+            foreach (var node in new Node[] { new MaskMathNode(), new MapRangeNode { Auto = false }, ramp, new MaskShapeNode() })
+            {
+                Call(page, "Place", node, new Point(40, 400));
+
+                Check.That(ReferenceEquals(editor.Selected, node) && colourFields.Children.Count > 1,
+                           $"{node.GetType().Name}: der Knoten steht da, und seine Felder auch");
+
+                if (node is MapRangeNode)
+                    Check.That(colourFields.Children.OfType<StackPanel>().Any(p => p.Children.OfType<TextBox>().Any()),
+                               "ohne eigene Spanne laesst sich Von und Bis eintippen");
+            }
+
+            editor.Select(ramp);
+            var rampEditor = colourFields.Children.OfType<RampEditor>().SingleOrDefault();
+
+            Check.That(rampEditor is not null, "der Farbverlauf zeigt seinen Verlauf");
+
+            if (rampEditor is not null)
+            {
+                rampEditor.AddAt(0.5);
+                bool added = ramp.Stops.Count == 3 && ReferenceEquals(rampEditor.Selected, ramp.Stops[^1]);
+                rampEditor.Remove();
+
+                Check.That(added && ramp.Stops.Count == 2, "ein Klick setzt einen Stopp, Entfernen nimmt ihn wieder heraus");
+            }
         }
         finally
         {

@@ -29,6 +29,13 @@ public sealed record ChoiceField(string LabelKey, IReadOnlyList<(string Key, int
 public sealed record SwitchField(string LabelKey, Func<bool> Get, Action<bool> Set, string? Text = null)
     : NodeField(LabelKey);
 
+/// <summary>Eine Zahl zum Eintippen - fuer Werte ohne feste Grenzen, etwa eine Tiefe in Metern.</summary>
+public sealed record NumberField(string LabelKey, Func<double> Get, Action<double> Set, string Format = "0.###")
+    : NodeField(LabelKey);
+
+/// <summary>Der Verlauf eines Farbverlauf-Knotens, siehe <see cref="RampEditor"/>.</summary>
+public sealed record RampField(ColorRampNode Node) : NodeField("");
+
 /// <summary>Ein Knopf - fuer etwas, das man tut, statt es einzustellen.</summary>
 public sealed record ButtonField(string LabelKey, Action Click) : NodeField(LabelKey);
 
@@ -64,6 +71,33 @@ public static class NodeFields
     {
         MixNode mix => Mix(mix),
         MaskNode mask => Mask(mask, context),
+        MaskMathNode math => new NodeField[]
+        {
+            new ChoiceField("S_NodeMaskOperation", Operations(), () => (int)math.Operation, v => math.Operation = (MaskOperation)v),
+            new InfoField(Strings.T("S_NodeMaskMathHint")),
+            new SliderField("S_NodeValueA", 0, 1, () => math.ValueA, v => math.ValueA = (float)v, 1),
+            new SliderField("S_NodeValueB", 0, 1, () => math.ValueB, v => math.ValueB = (float)v, 1),
+            new SwitchField("S_NodeClampMask", () => math.Clamp, v => math.Clamp = v),
+            new SwitchField("S_MaskInvert", () => math.Invert, v => math.Invert = v),
+        },
+        MapRangeNode range => MapRange(range, context),
+        ColorRampNode ramp => new NodeField[]
+        {
+            new InfoField(Strings.T("S_NodeRampHint")),
+            new RampField(ramp),
+            new ChoiceField("S_NodeRampBlend", new (string, int)[]
+            {
+                ("S_RampLinear", (int)RampBlend.Linear),
+                ("S_RampSmooth", (int)RampBlend.Smooth),
+                ("S_RampConstant", (int)RampBlend.Constant),
+            }, () => (int)ramp.Blend, v => ramp.Blend = (RampBlend)v),
+            new SliderField("S_NodeRampFactor", 0, 1, () => ramp.Factor, v => ramp.Factor = (float)v, 0.5),
+        },
+        MaskShapeNode shape => new NodeField[]
+        {
+            new SliderField("S_NodeGrow", -50, 50, () => shape.Grow, v => shape.Grow = (float)Math.Round(v), 0, "+0;-0;0"),
+            new SliderField("S_NodeSoften", 0, 50, () => shape.Soften, v => shape.Soften = (float)Math.Round(v, 1), 0, "0.0"),
+        },
         PlaceNode place => Place(place.Place),
         ExposureTintNode tint => new NodeField[]
         {
@@ -122,6 +156,51 @@ public static class NodeFields
                                        on => context.Change(() => NodeEdits.ShowPass(context.Graph, render, name, on)),
                                        label) { Structural = true });
         }
+
+        return fields.ToArray();
+    }
+
+    private static IReadOnlyList<(string, int)> Operations() => new (string, int)[]
+    {
+        ("S_MaskOpMultiply", (int)MaskOperation.Multiply),
+        ("S_MaskOpAdd", (int)MaskOperation.Add),
+        ("S_MaskOpSubtract", (int)MaskOperation.Subtract),
+        ("S_MaskOpMinimum", (int)MaskOperation.Minimum),
+        ("S_MaskOpMaximum", (int)MaskOperation.Maximum),
+        ("S_MaskOpDifference", (int)MaskOperation.Difference),
+    };
+
+    /// <summary>
+    /// Der Wertebereich. Ob "Von" und "Bis" Anteile der eigenen Spanne sind oder Werte in
+    /// den Einheiten des Eingangs, aendert die Felder - der Schalter baut sie neu.
+    /// </summary>
+    private static NodeField[] MapRange(MapRangeNode range, NodeFieldContext? context)
+    {
+        var fields = new List<NodeField>
+        {
+            new SwitchField("S_NodeAuto", () => range.Auto, v =>
+            {
+                if (context is null) range.Auto = v;
+                else context.Change(() => range.Auto = v);
+            }) { Structural = context is not null },
+            new InfoField(Strings.T(range.Auto ? "S_NodeAutoHint" : "S_NodeAbsoluteHint")),
+        };
+
+        if (range.Auto)
+        {
+            fields.Add(new SliderField("S_NodeFromLow", 0, 1, () => range.FromLow, v => range.FromLow = (float)v, 0));
+            fields.Add(new SliderField("S_NodeFromHigh", 0, 1, () => range.FromHigh, v => range.FromHigh = (float)v, 1));
+        }
+        else
+        {
+            fields.Add(new NumberField("S_NodeFromLow", () => range.FromLow, v => range.FromLow = (float)v));
+            fields.Add(new NumberField("S_NodeFromHigh", () => range.FromHigh, v => range.FromHigh = (float)v));
+        }
+
+        fields.Add(new SliderField("S_NodeToLow", 0, 1, () => range.ToLow, v => range.ToLow = (float)v, 0));
+        fields.Add(new SliderField("S_NodeToHigh", 0, 1, () => range.ToHigh, v => range.ToHigh = (float)v, 1));
+        fields.Add(new SwitchField("S_NodeClampRange", () => range.Clamp, v => range.Clamp = v));
+        fields.Add(new SwitchField("S_NodeSmooth", () => range.Smooth, v => range.Smooth = v));
 
         return fields.ToArray();
     }
