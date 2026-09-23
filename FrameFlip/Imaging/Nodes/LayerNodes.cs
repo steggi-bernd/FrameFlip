@@ -1,0 +1,611 @@
+using FrameFlip.Imaging.Grading;
+
+namespace FrameFlip.Imaging.Nodes;
+
+/// <summary>
+/// Die gerenderte Datei: das Bild, die Renderdaten und jeder Pass, den der Graph braucht.
+///
+/// Wie der Render-Layers-Knoten in Blender. Die Renderdaten heissen nach dem, was sie
+/// bedeuten - Tiefe, Vektor, Normale - und werden je Datei aufgeloest, genau wie die
+/// Werkzeuge es heute tun: Eine Datei nennt ihren Tiefenpass "Depth", eine andere "Z".
+/// </summary>
+public sealed class RenderNode : Node
+{
+    public const string KindName = "render";
+
+    public const string Picture = "Bild";
+    public const string Depth = "Tiefe";
+    public const string Motion = "Vektor";
+    public const string Normal = "Normale";
+
+    /// <summary>Die Passe, die als eigene Ausgaenge gebraucht werden - nach ihrem Namen in der Datei.</summary>
+    public List<string> Passes { get; set; } = new();
+
+    public override IReadOnlyList<Socket> Inputs => Array.Empty<Socket>();
+
+    public override IReadOnlyList<Socket> Outputs
+    {
+        get
+        {
+            var outputs = new List<Socket>
+            {
+                new(Picture, SocketType.Image, Source: true),
+                new(Depth, SocketType.Data, Source: true),
+                new(Motion, SocketType.Data, Source: true),
+                new(Normal, SocketType.Data, Source: true),
+            };
+
+            foreach (string pass in Passes) outputs.Add(new Socket(pass, SocketType.Image, Source: true));
+
+            return outputs;
+        }
+    }
+
+    /// <summary>Welche Renderdaten hinter welchem Ausgang stehen.</summary>
+    public static PassNeed? NeedFor(string output) => output switch
+    {
+        Depth => PassNeed.Depth,
+        Motion => PassNeed.Motion,
+        Normal => PassNeed.Normal,
+        _ => null,
+    };
+
+    internal override void Run(NodeRun run)
+    {
+        var context = run.Context;
+
+        run.Set(Picture, Read(context, ""));
+
+        foreach (string pass in Passes) run.Set(pass, Read(context, pass));
+
+        foreach (var name in new[] { Depth, Motion, Normal })
+        {
+            var need = NeedFor(name)!.Value;
+            run.Set(name, context.Data.TryGetValue(need, out var frame) && frame is not null
+                ? new SourceImage(frame, Matte: false)
+                : null);
+        }
+    }
+
+    /// <summary>
+    /// Ein Pass dieser Datei. Freigestellt ist er, wenn er nicht aus einer EXR kommt -
+    /// eine als Bild geoeffnete PNG traegt eine Maske, ein Pass traegt Licht.
+    /// </summary>
+    private static SourceImage? Read(NodeContext context, string key)
+        => context.Sources.TryGetValue(key, out var frame)
+            ? new SourceImage(frame, Matte: !frame.IsSceneReferred)
+            : null;
+}
+
+/// <summary>Ein anderes Bild von der Platte - ein Logo, eine zweite Aufnahme, ein Raster.</summary>
+public sealed class PictureNode : Node
+{
+    public const string KindName = "picture";
+
+    public string Path { get; set; } = "";
+
+    /// <summary>Ob es mit der Bildnummer mitlaeuft: bei Bild 47 auch dort Bild 47.</summary>
+    public bool FollowSequence { get; set; } = true;
+
+    public override IReadOnlyList<Socket> Inputs => Array.Empty<Socket>();
+
+    public override IReadOnlyList<Socket> Outputs { get; } = new[] { new Socket("Bild", SocketType.Image, Source: true) };
+
+    internal override void Run(NodeRun run)
+        => run.Set("Bild", run.Context.Sources.TryGetValue(Path, out var frame)
+            ? new SourceImage(frame, Matte: true)
+            : null);
+}
+
+/// <summary>
+/// Die leere Leinwand: schwarz und ohne Deckung. Worauf der Stapel sich aufbaut.
+/// </summary>
+public sealed class BlackNode : Node
+{
+    public const string KindName = "black";
+
+    public override IReadOnlyList<Socket> Inputs => Array.Empty<Socket>();
+
+    public override IReadOnlyList<Socket> Outputs { get; } = new[] { new Socket("Bild", SocketType.Image) };
+
+    internal override void Run(NodeRun run)
+    {
+        int count = run.Context.Count;
+
+        run.Set("Bild", new GridImage { Rgb = new float[count * 3], A = new float[count] });
+    }
+}
+
+/// <summary>
+/// Setzt ein gelesenes Bild auf die Leinwand - verschoben, skaliert, gedreht,
+/// beschnitten.
+///
+/// Mit nichts zu platzieren und in Leinwandgroesse ist es ein Nachschlagen am Index,
+/// genau wie im Composer. Sonst wird abgetastet, und ausserhalb der Flaeche ist die
+/// Ebene nicht da - nicht schwarz, sondern abwesend.
+/// </summary>
+public sealed class PlaceNode : Node
+{
+    public const string KindName = "place";
+
+    public LayerTransform Place { get; set; } = new();
+
+    public override IReadOnlyList<Socket> Inputs { get; } = new[] { new Socket("Bild", SocketType.Image, Source: true) };
+
+    public override IReadOnlyList<Socket> Outputs { get; } = new[] { new Socket("Bild", SocketType.Image) };
+
+    internal override void Run(NodeRun run)
+    {
+        var source = run.Source("Bild");
+        var context = run.Context;
+
+        if (source is null)
+        {
+            run.Set("Bild", null);
+            return;
+        }
+
+        var frame = source.Frame;
+
+        bool placed = !Place.IsNeutral || frame.Width != context.Width || frame.Height != context.Height;
+
+        if (!placed)
+        {
+            run.Set("Bild", NodeRun.Sample(source, context));
+            return;
+        }
+
+        var placement = LayerPlacement.Prepare(Place, frame.Width, frame.Height, context.Width, context.Height);
+
+        int count = context.Count;
+        var rgb = new float[count * 3];
+        var a = new float[count];
+
+        var columns = context.Columns;
+        var rows = context.Rows;
+        int gridWidth = context.GridWidth;
+
+        Parallel.For(0, rows.Length, NodeContext.Parallel, gy =>
+        {
+            int y = rows[gy];
+            int row = gy * gridWidth;
+
+            for (int gx = 0; gx < gridWidth; gx++)
+            {
+                int at = row + gx;
+                float covered = placement.Coverage(columns[gx], y, out float u, out float v);
+
+                if (covered <= 0f)
+                {
+                    a[at] = GridImage.Absent;
+                    continue;
+                }
+
+                placement.Sample(frame, u, v, out float r, out float g, out float b, out float own);
+
+                rgb[at * 3] = r;
+                rgb[at * 3 + 1] = g;
+                rgb[at * 3 + 2] = b;
+
+                // Die eigene Deckung und die weiche Kante der Flaeche - beides zusammen
+                // ist die Freistellung dieser Ebene.
+                a[at] = own * covered;
+            }
+        });
+
+        run.Set("Bild", new GridImage { Rgb = rgb, A = a, Matte = true, Contributed = true });
+    }
+}
+
+/// <summary>Belichtung und Toenung einer Ebene - Multiplikationen am Licht.</summary>
+public sealed class ExposureTintNode : Node
+{
+    public const string KindName = "exposure-tint";
+
+    public float Exposure { get; set; }
+
+    public ColourTriplet Tint { get; set; } = new(1, 1, 1);
+
+    public override IReadOnlyList<Socket> Inputs { get; } = new[] { new Socket("Bild", SocketType.Image) };
+
+    public override IReadOnlyList<Socket> Outputs { get; } = new[] { new Socket("Bild", SocketType.Image) };
+
+    internal override void Run(NodeRun run)
+    {
+        var image = run.Image("Bild");
+
+        if (image is null)
+        {
+            run.Set("Bild", null);
+            return;
+        }
+
+        // Derselbe Weg wie im Composer: einmal in Gleitkomma die Potenz, dann je Kanal
+        // das Produkt mit der Toenung.
+        float gain = MathF.Pow(2f, Exposure);
+        float sr = gain * Tint.R, sg = gain * Tint.G, sb = gain * Tint.B;
+
+        var input = image.Rgb;
+        var alpha = image.A;
+        var rgb = new float[input.Length];
+
+        Parallel.For(0, run.Context.GridHeight, NodeContext.Parallel, gy =>
+        {
+            int from = gy * run.Context.GridWidth;
+            int to = from + run.Context.GridWidth;
+
+            for (int at = from; at < to; at++)
+            {
+                if (alpha[at] < 0f) continue;
+
+                rgb[at * 3] = input[at * 3] * sr;
+                rgb[at * 3 + 1] = input[at * 3 + 1] * sg;
+                rgb[at * 3 + 2] = input[at * 3 + 2] * sb;
+            }
+        });
+
+        run.Set("Bild", new GridImage { Rgb = rgb, A = alpha, Matte = image.Matte, Contributed = image.Contributed });
+    }
+}
+
+/// <summary>
+/// Eine Maske - dieselben Arten wie im Stapel, dieselbe Rechnung (<see cref="MaskSampler"/>).
+///
+/// "Ebene" ist das, was eine Helligkeitsmaske ansieht; "Untergrund" das, was die
+/// Farbbereichsmaske und die Maske "darunter" ansehen. Welcher Eingang gebraucht wird,
+/// haengt von der Art ab - ein unverbundener zaehlt als Schwarz.
+/// </summary>
+public sealed class MaskNode : Node
+{
+    public const string KindName = "mask";
+
+    public LayerMask Mask { get; set; } = new();
+
+    public override IReadOnlyList<Socket> Inputs { get; } = new[]
+    {
+        new Socket("Ebene", SocketType.Image),
+        new Socket("Untergrund", SocketType.Image),
+    };
+
+    public override IReadOnlyList<Socket> Outputs { get; } = new[] { new Socket("Maske", SocketType.Value) };
+
+    internal override string? Through => null;
+
+    internal override void Run(NodeRun run)
+    {
+        var context = run.Context;
+        var sampler = MaskSampler.Prepare(Mask, context.Sources, context.Width, context.Height, context.Number);
+
+        // Eine Maske, deren Pass fehlt, faellt weg - die Ebene bleibt ganz, wie im Stapel.
+        if (sampler.Kind == MaskKind.None)
+        {
+            run.Set("Maske", null);
+            return;
+        }
+
+        var layer = run.Image("Ebene");
+        var under = run.Image("Untergrund");
+
+        var values = new float[context.Count];
+
+        var columns = context.Columns;
+        var rows = context.Rows;
+        int gridWidth = context.GridWidth;
+        int width = context.Width, height = context.Height;
+
+        Parallel.For(0, rows.Length, NodeContext.Parallel, gy =>
+        {
+            int y = rows[gy];
+            int row = gy * gridWidth;
+
+            for (int gx = 0; gx < gridWidth; gx++)
+            {
+                int at = row + gx;
+                int x = columns[gx];
+
+                float lr = 0f, lg = 0f, lb = 0f, ur = 0f, ug = 0f, ub = 0f;
+
+                if (layer is not null)
+                {
+                    lr = layer.Rgb[at * 3];
+                    lg = layer.Rgb[at * 3 + 1];
+                    lb = layer.Rgb[at * 3 + 2];
+                }
+
+                if (under is not null)
+                {
+                    ur = under.Rgb[at * 3];
+                    ug = under.Rgb[at * 3 + 1];
+                    ub = under.Rgb[at * 3 + 2];
+                }
+
+                values[at] = sampler.Factor(x, y, width, height, y * width + x, lr, lg, lb, ur, ug, ub);
+            }
+        });
+
+        run.Set("Maske", new GridValue { V = values });
+    }
+}
+
+/// <summary>
+/// Die Korrektur einer Ebene - Grundkorrektur und Werkzeuge, mit der geliehenen
+/// Anzeigeseite (<see cref="LayerGrade"/>).
+///
+/// Als Einstellungsebene gerechnet (<see cref="Adjustment"/>) bringt das Ergebnis keine
+/// eigene Freistellung mit: Es ist eine Korrektur dessen, was darunter liegt, und keine
+/// Ebene mit eigenem Umriss.
+/// </summary>
+public sealed class LayerGradeNode : Node
+{
+    public const string KindName = "layer-grade";
+
+    public ImageAdjustments? Adjustments { get; set; }
+
+    public GradingStack? Tools { get; set; }
+
+    /// <summary>Ob das Ergebnis als Einstellungsebene gilt - ohne eigene Freistellung.</summary>
+    public bool Adjustment { get; set; }
+
+    public override IReadOnlyList<Socket> Inputs { get; } = new[] { new Socket("Bild", SocketType.Image) };
+
+    public override IReadOnlyList<Socket> Outputs { get; } = new[] { new Socket("Bild", SocketType.Image) };
+
+    internal override void Run(NodeRun run)
+    {
+        var image = run.Image("Bild");
+
+        if (image is null)
+        {
+            run.Set("Bild", null);
+            return;
+        }
+
+        var grade = LayerGrade.Prepare(Adjustments, Tools);
+
+        if (grade.IsNeutral)
+        {
+            run.Set("Bild", Adjustment
+                ? new GridImage { Rgb = image.Rgb, A = image.A, Matte = false, Contributed = true }
+                : image);
+            return;
+        }
+
+        var input = image.Rgb;
+        var alpha = image.A;
+        var rgb = new float[input.Length];
+
+        Parallel.For(0, run.Context.GridHeight, NodeContext.Parallel, gy =>
+        {
+            int from = gy * run.Context.GridWidth;
+            int to = from + run.Context.GridWidth;
+
+            for (int at = from; at < to; at++)
+            {
+                if (alpha[at] < 0f) continue;
+
+                float r = input[at * 3], g = input[at * 3 + 1], b = input[at * 3 + 2];
+
+                grade.Apply(ref r, ref g, ref b);
+
+                rgb[at * 3] = r;
+                rgb[at * 3 + 1] = g;
+                rgb[at * 3 + 2] = b;
+            }
+        });
+
+        run.Set("Bild", new GridImage
+        {
+            Rgb = rgb,
+            A = alpha,
+            Matte = !Adjustment && image.Matte,
+            Contributed = Adjustment || image.Contributed,
+        });
+    }
+}
+
+/// <summary>
+/// Blendet von "Vorher" nach "Nachher", so weit die Maske reicht - die Korrektur gilt
+/// nur dort. Das ist der Umfang "die Maske begrenzt die Farbe" aus dem Stapel, als
+/// eigener Knoten: innen die Korrektur, aussen das Bild, dazwischen weich.
+/// </summary>
+public sealed class RestrictNode : Node
+{
+    public const string KindName = "restrict";
+
+    public override IReadOnlyList<Socket> Inputs { get; } = new[]
+    {
+        new Socket("Vorher", SocketType.Image),
+        new Socket("Nachher", SocketType.Image),
+        new Socket("Maske", SocketType.Value),
+    };
+
+    public override IReadOnlyList<Socket> Outputs { get; } = new[] { new Socket("Bild", SocketType.Image) };
+
+    internal override void Run(NodeRun run)
+    {
+        var before = run.Image("Vorher");
+        var after = run.Image("Nachher");
+        var mask = run.Value("Maske");
+
+        if (before is null || after is null)
+        {
+            run.Set("Bild", before ?? after);
+            return;
+        }
+
+        var rgb = new float[before.Rgb.Length];
+        var from = before.Rgb;
+        var to = after.Rgb;
+        var alpha = before.A;
+
+        Parallel.For(0, run.Context.GridHeight, NodeContext.Parallel, gy =>
+        {
+            int start = gy * run.Context.GridWidth;
+            int end = start + run.Context.GridWidth;
+
+            for (int at = start; at < end; at++)
+            {
+                // Ohne Maske ist der Anteil eins - und gerechnet wird trotzdem ueber
+                // dieselbe Formel, wie im Composer. Das Ergebnis ist dann nicht
+                // bitgenau "Nachher", sondern Vorher plus der Unterschied.
+                float factor = mask is null ? 1f : mask.V[at];
+
+                float lr = from[at * 3], lg = from[at * 3 + 1], lb = from[at * 3 + 2];
+
+                if (alpha[at] >= 0f)
+                {
+                    lr += (to[at * 3] - lr) * factor;
+                    lg += (to[at * 3 + 1] - lg) * factor;
+                    lb += (to[at * 3 + 2] - lb) * factor;
+                }
+
+                rgb[at * 3] = lr;
+                rgb[at * 3 + 1] = lg;
+                rgb[at * 3 + 2] = lb;
+            }
+        });
+
+        run.Set("Bild", new GridImage { Rgb = rgb, A = alpha, Matte = before.Matte, Contributed = before.Contributed });
+    }
+}
+
+/// <summary>
+/// Mischt "Oben" auf "Unten" - mit Modus, Deckkraft, Faktor und der Freistellung des
+/// oberen Bildes. Siehe docs/Atelier-Nodes.md, Abschnitt 2.
+///
+/// Mit <see cref="Clip"/> ist es eine Schnittmaske: Das Ergebnis behaelt Deckung und
+/// Freistellung von "Unten". Die angeschnittene Ebene liegt IN ihrem Traeger, und wo
+/// der nicht ist, ist auch sie nicht.
+/// </summary>
+public sealed class MixNode : Node
+{
+    public const string KindName = "mix";
+
+    public BlendMode Mode { get; set; } = BlendMode.Normal;
+
+    public float Opacity { get; set; } = 1f;
+
+    /// <summary>Im Anzeigeraum mischen statt in linearem Licht - siehe ImageLayer.</summary>
+    public bool InDisplay { get; set; }
+
+    /// <summary>Ab welcher Deckung das obere Bild als vorhanden gilt.</summary>
+    public float MatteFloor { get; set; }
+
+    /// <summary>Wieviel von dem gezeigt wird, was unter der Freistellung steht.</summary>
+    public float Reveal { get; set; }
+
+    /// <summary>An "Unten" anschneiden - eine Schnittmaske.</summary>
+    public bool Clip { get; set; }
+
+    public override IReadOnlyList<Socket> Inputs { get; } = new[]
+    {
+        new Socket("Unten", SocketType.Image),
+        new Socket("Oben", SocketType.Image),
+        new Socket("Faktor", SocketType.Value),
+    };
+
+    public override IReadOnlyList<Socket> Outputs { get; } = new[] { new Socket("Bild", SocketType.Image) };
+
+    internal override void Run(NodeRun run)
+    {
+        var under = run.Image("Unten");
+        var over = run.Image("Oben");
+        var factor = run.Value("Faktor");
+
+        if (under is null || over is null)
+        {
+            // An nichts angeschnitten ist nichts: Fehlt der Traeger, fehlt auch, was an
+            // ihm haengt. Ohne oberes Bild bleibt das untere.
+            run.Set("Bild", Clip && under is null ? null : under ?? over);
+            return;
+        }
+
+        float opacity = Math.Clamp(Opacity, 0f, 1f);
+
+        var rgb = new float[under.Rgb.Length];
+        var a = Clip ? under.A : new float[under.A.Length];
+
+        var ur = under.Rgb;
+        var ua = under.A;
+        var or_ = over.Rgb;
+        var oa = over.A;
+        bool matte = over.Matte;
+
+        Parallel.For(0, run.Context.GridHeight, NodeContext.Parallel, gy =>
+        {
+            int start = gy * run.Context.GridWidth;
+            int end = start + run.Context.GridWidth;
+
+            for (int at = start; at < end; at++)
+            {
+                float r0 = ur[at * 3], g0 = ur[at * 3 + 1], b0 = ur[at * 3 + 2];
+
+                // Wo das obere Bild nicht ist, bleibt das untere - samt Deckung.
+                if (oa[at] < 0f)
+                {
+                    rgb[at * 3] = r0;
+                    rgb[at * 3 + 1] = g0;
+                    rgb[at * 3 + 2] = b0;
+
+                    if (!Clip) a[at] = ua[at];
+                    continue;
+                }
+
+                // Dieselbe Rechnung und dieselbe Reihenfolge wie im Composer: die
+                // Deckkraft, mal dem Faktor, mal der aufbereiteten Freistellung.
+                float f = opacity * (factor is null ? 1f : factor.V[at]);
+
+                if (matte)
+                    f *= Math.Clamp(ImageLayer.Lift(ImageLayer.CleanMatte(oa[at], MatteFloor), Reveal), 0f, 1f);
+
+                LayerComposer.Blend(Mode, InDisplay, f, r0, g0, b0,
+                                    or_[at * 3], or_[at * 3 + 1], or_[at * 3 + 2],
+                                    out rgb[at * 3], out rgb[at * 3 + 1], out rgb[at * 3 + 2]);
+
+                if (!Clip)
+                {
+                    // Wo irgendeine Ebene deckt, deckt das Ergebnis. Eine Freistellung
+                    // steckt schon im Anteil; sonst zaehlt die Deckung des Bildes mal
+                    // dem Anteil.
+                    float covers = matte ? f : oa[at] * f;
+                    a[at] = MathF.Max(ua[at], covers);
+                }
+            }
+        });
+
+        run.Set("Bild", new GridImage
+        {
+            Rgb = rgb,
+            A = a,
+            Matte = Clip && under.Matte,
+            Contributed = under.Contributed || over.Contributed,
+        });
+    }
+}
+
+/// <summary>
+/// Der Stapel - oder, wenn keine Ebene zu ihm beigetragen hat, das Bild der Datei.
+///
+/// Dieselbe Antwort wie im Composer: Ein Rezept von einer Datei mit anderen Passen
+/// ergibt das Bild selbst statt einer schwarzen Flaeche. Man sieht, dass die Datei in
+/// Ordnung ist, und sucht den Fehler dort, wo er liegt.
+/// </summary>
+public sealed class FallbackNode : Node
+{
+    public const string KindName = "fallback";
+
+    public override IReadOnlyList<Socket> Inputs { get; } = new[]
+    {
+        new Socket("Stapel", SocketType.Image),
+        new Socket("Bild", SocketType.Image),
+    };
+
+    public override IReadOnlyList<Socket> Outputs { get; } = new[] { new Socket("Bild", SocketType.Image) };
+
+    internal override void Run(NodeRun run)
+    {
+        var stack = run.Image("Stapel");
+
+        run.Set("Bild", stack is { Contributed: true } ? stack : run.Image("Bild"));
+    }
+}

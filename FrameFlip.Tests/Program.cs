@@ -2,11 +2,36 @@ using FrameFlip.Tests;
 
 // WPF-Typen (WriteableBitmap, Image, RenderTargetBitmap) verlangen einen STA-Thread.
 int exit = 1;
-var thread = new Thread(() => exit = RunAll()) { Name = "FrameFlipTests" };
+
+// Mit Namen nur diese Pruefungen, etwa "NodeParityInvariants" - fuer die Runde zwischen
+// zwei Aenderungen, in der die ganze Reihe zu lange dauert. Ohne Namen alles.
+var only = args;
+var thread = new Thread(() => exit = only.Length > 0 ? RunOnly(only) : RunAll()) { Name = "FrameFlipTests" };
 thread.SetApartmentState(ApartmentState.STA);
 thread.Start();
 thread.Join();
 return exit;
+
+static int RunOnly(string[] names)
+{
+    LoadDictionaries();
+
+    foreach (string name in names)
+    {
+        var type = typeof(Check).Assembly.GetType("FrameFlip.Tests." + name);
+        var run = type?.GetMethod("Run", System.Type.EmptyTypes);
+
+        if (run is null)
+        {
+            Console.WriteLine($"Keine Pruefung namens {name}.");
+            return 2;
+        }
+
+        run.Invoke(null, null);
+    }
+
+    return Check.Report();
+}
 
 static int RunAll()
 {
@@ -39,6 +64,7 @@ static int RunAll()
     AdjustmentInvariants.Run();
     ImageAndGroupInvariants.Run();
     ClipAndCoverageInvariants.Run();
+    NodeParityInvariants.Run();
     LayerPlacementInvariants.Run();
     PlacementDragInvariants.Run();
     LocalToolInvariants.Run();
