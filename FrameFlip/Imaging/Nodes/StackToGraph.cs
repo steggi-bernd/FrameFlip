@@ -34,7 +34,7 @@ public static class StackToGraph
         var output = graph.Add(new OutputNode());
         graph.Connect(image.Node, image.Output, output, "Bild");
 
-        Layout(graph);
+        NodeLayout.Arrange(graph);
 
         return graph;
     }
@@ -296,6 +296,11 @@ public static class StackToGraph
     /// <summary>
     /// Die Kette am fertigen Bild - in der Reihenfolge, die der Stapel festlegt. Ein
     /// ausgeschaltetes Werkzeug wird ein stummer Knoten: Seine Einstellung bleibt.
+    ///
+    /// Werkzeuge in Grundstellung werden KEINE Knoten. Der Farbstreifen haelt jedes
+    /// Werkzeug einmal vor, auch die unbenutzten - als Knoten waeren das zwei Dutzend
+    /// Kaesten, die nichts tun, und zwischen ihnen die paar, die etwas tun. Der Stapel
+    /// ueberspringt sie beim Rechnen ohnehin.
     /// </summary>
     private static (Node, string) Picture(NodeGraph graph, RenderNode render, (Node Node, string Output) image,
                                           ImageAdjustments adjustments, GradingStack stack, LayerStack? layers)
@@ -312,18 +317,18 @@ public static class StackToGraph
 
         Then(new LightNode { Exposure = adjustments.Exposure, Saturation = adjustments.Saturation });
 
-        foreach (var tool in stack.Tools.Where(t => t.Stage == GradingStage.SceneLinear))
+        foreach (var tool in stack.Tools.Where(t => t.Stage == GradingStage.SceneLinear && !t.IsNeutral))
             Then(new PointToolNode { Tool = tool }, stack.IsBypassed(tool.Kind));
 
         var optics = stack.Optics.OrderBy(t => t.Stage).ToList();
 
-        foreach (var tool in optics.Where(t => t.Stage == OpticsStage.Lens))
+        foreach (var tool in optics.Where(t => t.Stage == OpticsStage.Lens && !t.IsNeutral))
             Then(new OpticsNode { Tool = tool }, stack.IsBypassed(tool.Kind));
 
-        foreach (var tool in stack.Geometry)
+        foreach (var tool in stack.Geometry.Where(t => !t.IsNeutral))
             Then(new GeometryNode { Tool = tool }, stack.IsBypassed(tool.Kind));
 
-        foreach (var tool in stack.Data.OrderBy(t => t.Stage))
+        foreach (var tool in stack.Data.Where(t => !t.IsNeutral).OrderBy(t => t.Stage))
         {
             var node = new DataNode { Tool = tool };
             Then(node, stack.IsBypassed(tool.Kind));
@@ -341,10 +346,10 @@ public static class StackToGraph
 
         var local = stack.Local.OrderBy(t => t.Stage).ToList();
 
-        foreach (var tool in local.Where(t => t.Stage <= LocalStage.Light))
+        foreach (var tool in local.Where(t => t.Stage <= LocalStage.Light && !t.IsNeutral))
             Then(new LocalNode { Tool = tool }, stack.IsBypassed(tool.Kind));
 
-        foreach (var tool in optics.Where(t => t.Stage == OpticsStage.Film))
+        foreach (var tool in optics.Where(t => t.Stage == OpticsStage.Film && !t.IsNeutral))
             Then(new OpticsNode { Tool = tool }, stack.IsBypassed(tool.Kind));
 
         Then(new ViewNode());
@@ -357,10 +362,10 @@ public static class StackToGraph
             Contrast = adjustments.Contrast,
         });
 
-        foreach (var tool in stack.Tools.Where(t => t.Stage == GradingStage.Display))
+        foreach (var tool in stack.Tools.Where(t => t.Stage == GradingStage.Display && !t.IsNeutral))
             Then(new PointToolNode { Tool = tool }, stack.IsBypassed(tool.Kind));
 
-        foreach (var tool in local.Where(t => t.Stage > LocalStage.Light))
+        foreach (var tool in local.Where(t => t.Stage > LocalStage.Light && !t.IsNeutral))
             Then(new LocalNode { Tool = tool }, stack.IsBypassed(tool.Kind));
 
         if (layers is not null)
@@ -388,43 +393,9 @@ public static class StackToGraph
             }
         }
 
-        foreach (var pass in stack.Frame)
+        foreach (var pass in stack.Frame.Where(p => !p.IsNeutral))
             Then(new FramePassNode { Pass = pass }, stack.IsBypassed(pass.Kind));
 
         return current;
-    }
-
-    /// <summary>
-    /// Eine erste Anordnung fuer den Editor: von links nach rechts in Rechenreihenfolge,
-    /// Seitenzweige darunter. Keine schoene, aber eine, in der sich nichts ueberdeckt.
-    /// </summary>
-    private static void Layout(NodeGraph graph)
-    {
-        var order = graph.Order();
-        if (order is null) return;
-
-        var column = new Dictionary<string, int>(StringComparer.Ordinal);
-
-        foreach (var node in order)
-        {
-            int at = 0;
-
-            foreach (var link in graph.Links.Where(l => l.To == node.Id))
-                if (column.TryGetValue(link.From, out int from)) at = Math.Max(at, from + 1);
-
-            column[node.Id] = at;
-        }
-
-        var rows = new Dictionary<int, int>();
-
-        foreach (var node in order)
-        {
-            int at = column[node.Id];
-            int row = rows.GetValueOrDefault(at);
-
-            node.X = at * 220;
-            node.Y = row * 140;
-            rows[at] = row + 1;
-        }
     }
 }

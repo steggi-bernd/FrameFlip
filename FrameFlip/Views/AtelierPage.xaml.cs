@@ -144,6 +144,15 @@ public sealed partial class AtelierPage : UserControl
 
         Bind(null);
 
+        NodeView.SocketTitle = NodeTitles.Socket;
+        NodeView.SelectionChanged += _ => OnNodeSelected();
+        NodeView.LayoutChanged += SaveNodes;
+        NodeView.GraphChanged += OnGraphChanged;
+
+        // Der Knotenmodus kommt zurueck, wenn er beim letzten Mal an war - vor dem
+        // ersten Bild, damit dieses gleich mit dem Graphen gerechnet wird.
+        RestoreNodes();
+
         // Die Sitzung kommt zurueck, sobald jemand das Atelier zum ersten Mal
         // ansieht - und nicht beim Start des Programms. Wer FrameFlip oeffnet, um
         // eine Sequenz durchzusehen, soll nicht auf eine 4K-Datei warten, die er
@@ -171,6 +180,11 @@ public sealed partial class AtelierPage : UserControl
             Recompose();
             Render();
             Measure();
+
+            // Ein Zug ist zu Ende - jetzt gehoert der Stand des Graphen in die
+            // Einstellungen. Waehrend des Zuges waere das bei jedem Bild ein Durchgang
+            // durch den ganzen Graphen.
+            if (InNodes) KeepNodes();
         };
     }
 
@@ -302,8 +316,12 @@ public sealed partial class AtelierPage : UserControl
         Measure();
 
         // Braucht der Stapel Passe, die noch nicht gelesen sind, kommen sie
-        // nachtraeglich - das Bild steht schon, waehrend sie eintreffen.
-        if (!Layers.Stack.IsPassThrough) OnLayersChanged(interim: false);
+        // nachtraeglich - das Bild steht schon, waehrend sie eintreffen. Im
+        // Knotenmodus fragt der Graph, was er braucht.
+        if (InNodes) FetchNodeSources();
+        else if (!Layers.Stack.IsPassThrough) OnLayersChanged(interim: false);
+
+        ShowNodeMode();
     }
 
     private (FloatFrame? Frame, IReadOnlyList<ExrPass> Passes,
@@ -350,6 +368,17 @@ public sealed partial class AtelierPage : UserControl
     /// </summary>
     private void Bind(ImageLayer? layer)
     {
+        // Im Knotenmodus gehoert der Streifen dem gewaehlten Knoten - auch dann, wenn
+        // der Ebenenstreifen beim Oeffnen einer Datei eine Ebene waehlt.
+        if (InNodes)
+        {
+            _editing = null;
+            ShowNodeSettings();
+            return;
+        }
+
+        Tools.LeaveNodes();
+
         _editing = layer;
         ShowPlacement();
 
@@ -424,6 +453,12 @@ public sealed partial class AtelierPage : UserControl
 
     private void OnToolsChanged(bool interim)
     {
+        if (InNodes)
+        {
+            OnNodeSettingsChanged(interim);
+            return;
+        }
+
         bool layer = _editing is not null;
 
         if (layer)
@@ -591,6 +626,15 @@ public sealed partial class AtelierPage : UserControl
         {
             var (adjustments, grading) = Current();
 
+            // Im Knotenmodus rechnet der Graph - ausser beim Vergleich mit dem
+            // Original, das ist in beiden Modi das Bild der Datei ohne alles.
+            if (InNodes && !_showingOriginal &&
+                RenderNodes(_surface.BackBuffer, _surface.BackBufferStride))
+            {
+                _surface.AddDirtyRect(new Int32Rect(0, 0, frame.Width, frame.Height));
+                return;
+            }
+
             FloatFrameProcessor.Apply(frame, adjustments, ViewFor(frame), grading,
                                       _surface.BackBuffer, _surface.BackBufferStride,
                                       _coarse ? CoarseStep : 1,
@@ -609,6 +653,12 @@ public sealed partial class AtelierPage : UserControl
     {
         var frame = _frame;
         if (frame is null) return;
+
+        if (InNodes)
+        {
+            MeasureNodes();
+            return;
+        }
 
         var histogram = new Histogram();
 

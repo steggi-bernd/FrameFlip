@@ -83,6 +83,7 @@ public partial class GradingPanel
         public required Border Host { get; init; }
         public required TextBlock Chevron { get; init; }
         public required ToggleButton Power { get; init; }
+        public required Button Remove { get; init; }
         public required TextBlock Title { get; init; }
     }
 
@@ -403,6 +404,7 @@ public partial class GradingPanel
                 Host = host,
                 Chevron = chevron,
                 Power = power,
+                Remove = remove,
                 Title = title,
             };
 
@@ -594,7 +596,15 @@ public partial class GradingPanel
 
             if (!_cards.TryGetValue(prefix, out var card)) continue;
 
-            card.Frame.Visibility = inStack ? Visibility.Visible : Visibility.Collapsed;
+            // Im Knotenmodus entscheidet der Knoten, welche Karten zu sehen sind - und
+            // Ausschalten und Entfernen gibt es dort am Knoten, nicht an der Karte.
+            bool shown = _focus is null ? inStack : _focus.Contains(prefix);
+
+            card.Frame.Visibility = shown ? Visibility.Visible : Visibility.Collapsed;
+
+            var buttons = _focus is null && prefix != "Basic" ? Visibility.Visible : Visibility.Collapsed;
+            card.Power.Visibility = buttons;
+            card.Remove.Visibility = buttons;
 
             bool open = !_folded.Contains(prefix);
 

@@ -130,6 +130,48 @@
                                 </Grid>
                             </ScrollViewer>
 
+                            <!--
+                                Der Graph ueber dem Bild - sichtbar, solange das Werkzeug
+                                "Knoten" gilt. Das Bild dahinter bleibt gedaempft zu sehen
+                                und rechnet mit, wie der Hintergrund im Compositor von
+                                Blender.
+                            -->
+                            <local:NodeEditor x:Name="NodeView" Visibility="Collapsed" />
+
+                            <!--
+                                Das Angebot umzuschalten. Ein eigenes Feld und keine
+                                Meldung: Der Schritt geht nur in eine Richtung, und das muss
+                                dastehen, bevor jemand klickt - nicht danach.
+                            -->
+                            <Border x:Name="NodeOffer" Visibility="Collapsed"
+                                    HorizontalAlignment="Center" VerticalAlignment="Center" MaxWidth="460"
+                                    Background="{StaticResource PanelBackground}"
+                                    BorderBrush="{StaticResource PanelBorder}" BorderThickness="1"
+                                    CornerRadius="6" Padding="22,18">
+                                <StackPanel>
+                                    <TextBlock Text="{DynamicResource S_NodeOfferTitle}" FontSize="15"
+                                               FontWeight="SemiBold" Foreground="{StaticResource ForegroundBrush}" />
+
+                                    <TextBlock Text="{DynamicResource S_NodeOfferText}" TextWrapping="Wrap"
+                                               Margin="0,10,0,6" FontSize="12"
+                                               Foreground="{StaticResource MutedBrush}" />
+
+                                    <TextBlock Text="{DynamicResource S_NodeOfferOneWay}" TextWrapping="Wrap"
+                                               Margin="0,0,0,16" FontSize="12"
+                                               Foreground="{StaticResource ForegroundBrush}" />
+
+                                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+                                        <Button Style="{StaticResource OverlayButton}" Margin="0,0,8,0"
+                                                Content="{DynamicResource S_NodeOfferCancel}"
+                                                Click="OnConvertCancelled" />
+
+                                        <Button x:Name="ConvertButton" Style="{StaticResource OverlayButton}"
+                                                Content="{DynamicResource S_NodeOfferConvert}"
+                                                Click="OnConvertClicked" />
+                                    </StackPanel>
+                                </StackPanel>
+                            </Border>
+
                             <TextBlock x:Name="EmptyHint" HorizontalAlignment="Center" VerticalAlignment="Center"
                                        Style="{StaticResource DashLabel}" TextWrapping="Wrap" MaxWidth="360"
                                        TextAlignment="Center"

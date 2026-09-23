@@ -80,6 +80,7 @@ public partial class PropertiesPanel : UserControl
             AtelierTool.Hand => "S_ToolHand",
             AtelierTool.Pick => "S_ToolPick",
             AtelierTool.Brush => "S_ToolBrush",
+            AtelierTool.Nodes => "S_ToolNodes",
             _ => "S_ToolMove",
         });
 
@@ -90,6 +91,7 @@ public partial class PropertiesPanel : UserControl
             AtelierTool.Hand => "S_ToolHandShort",
             AtelierTool.Pick => "S_ToolPickShort",
             AtelierTool.Brush => "S_ToolBrushShort",
+            AtelierTool.Nodes => "S_ToolNodesShort",
             _ => "S_ToolMoveShort",
         });
 

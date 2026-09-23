@@ -21,7 +21,9 @@ public partial class AtelierPage
 
         // Ohne Bild gibt es keine Ebene. Das Feld bleibt, wo es steht, und sagt dann,
         // warum es leer ist - statt einer Flaeche, die nichts zeigt und nichts erklaert.
-        Dock.SetAvailable("layers", visible, Localization.Strings.T("S_LayersUnavailable"));
+        // Im Knotenmodus stehen die Ebenen als Knoten im Graphen.
+        Dock.SetAvailable("layers", visible && !InNodes,
+                          Localization.Strings.T(InNodes ? "S_LayersInNodes" : "S_LayersUnavailable"));
 
         ShowLayerCount();
     }
@@ -34,7 +36,8 @@ public partial class AtelierPage
     /// </summary>
     private void ShowLayerCount()
     {
-        int count = _layersShown ? Layers.Stack.Layers.Count : 0;
+        // Im Knotenmodus gibt es keinen Stapel mehr zu zaehlen - die Ebenen sind Knoten.
+        int count = _layersShown && !InNodes ? Layers.Stack.Layers.Count : 0;
 
         Dock.SetBadge("layers", count > 1 ? count.ToString() : "");
     }
@@ -130,6 +133,49 @@ public partial class AtelierPage
             return;
         }
 
+        Fetch(path, missing, dataMissing, read =>
+        {
+            // Was angefordert war und nicht kam, wird vermerkt - und was diesmal
+            // kam, wird vergessen. Ein Lesefehler ist nicht endgueltig.
+            bool changed = false;
+
+            foreach (var want in missing)
+            {
+                if (want.Key.Length == 0) continue;
+
+                changed |= read.ContainsKey(want.Key)
+                    ? _unreadable.Remove(want.Key)
+                    : _unreadable.Add(want.Key);
+            }
+
+            Layers.Unreadable = _unreadable;
+
+            DropStale(NeededPasses());
+
+            // Jetzt erst gibt es Miniaturen: Die Zeilen standen schon, als die
+            // Dateien noch gelesen wurden, und haben damals nichts bekommen.
+            //
+            // Und auch dann, wenn NICHTS ankam: Dann hat sich der Vermerk
+            // geaendert, und die Zeile muss ihn zeigen. Ein fehlgeschlagener
+            // Leseversuch, nach dem die Oberflaeche unveraendert dasteht, ist
+            // genau der Fall, den niemand als Fehler erkennt.
+            if (read.Count > 0 || changed) Layers.ShowThumbnails();
+
+            Refresh(interim: false, recompose: true);
+        });
+    }
+
+    /// <summary>
+    /// Liest im Hintergrund, was fehlt, legt es in den Vorrat und meldet sich danach
+    /// auf dem Oberflaechenfaden - der Weg fuer den Stapel und fuer den Graphen.
+    ///
+    /// Waehrend gelesen wird, kann eine andere Datei geoeffnet worden sein. Die Passe
+    /// gehoeren dann zu einem Bild, das nicht mehr auf dem Schirm steht, und werden
+    /// verworfen.
+    /// </summary>
+    private void Fetch(string path, IReadOnlyList<LayerRead> missing, IReadOnlyList<string> dataMissing,
+                       Action<Dictionary<string, FloatFrame>> arrived)
+    {
         BusyBadge.Visibility = Visibility.Visible;
 
         Task.Run(() =>
@@ -167,33 +213,7 @@ public partial class AtelierPage
 
                 foreach (var (name, frame) in read) _sources[name] = frame;
 
-                // Was angefordert war und nicht kam, wird vermerkt - und was diesmal
-                // kam, wird vergessen. Ein Lesefehler ist nicht endgueltig.
-                bool changed = false;
-
-                foreach (var want in missing)
-                {
-                    if (want.Key.Length == 0) continue;
-
-                    changed |= read.ContainsKey(want.Key)
-                        ? _unreadable.Remove(want.Key)
-                        : _unreadable.Add(want.Key);
-                }
-
-                Layers.Unreadable = _unreadable;
-
-                DropStale(NeededPasses());
-
-                // Jetzt erst gibt es Miniaturen: Die Zeilen standen schon, als die
-                // Dateien noch gelesen wurden, und haben damals nichts bekommen.
-                //
-                // Und auch dann, wenn NICHTS ankam: Dann hat sich der Vermerk
-                // geaendert, und die Zeile muss ihn zeigen. Ein fehlgeschlagener
-                // Leseversuch, nach dem die Oberflaeche unveraendert dasteht, ist
-                // genau der Fall, den niemand als Fehler erkennt.
-                if (read.Count > 0 || changed) Layers.ShowThumbnails();
-
-                Refresh(interim: false, recompose: true);
+                arrived(read);
             });
         });
     }
@@ -257,6 +277,15 @@ public partial class AtelierPage
         if (_base is null)
         {
             _frame = null;
+            return;
+        }
+
+        // Im Knotenmodus setzt der Graph zusammen, beim Zeichnen. Hier bleibt das
+        // Bild der Datei - es gibt die Leinwand vor.
+        if (InNodes)
+        {
+            _frame = _base;
+            _overlays = Overlays.None;
             return;
         }
 

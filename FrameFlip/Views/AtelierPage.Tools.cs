@@ -45,7 +45,9 @@ public partial class AtelierPage
             // "Auswaehlen" IST der Auswahlmodus des Maskenbereichs. Wer das
             // Werkzeug wechselt, verlaesst ihn damit auch dort - sonst bliebe im
             // Streifen ein Haken stehen fuer eine Betriebsart, die nicht mehr gilt.
-            _picking = tool == AtelierTool.Select;
+            // Im Knotenmodus gibt es keine Ebene, an der eine Kryptomatte entstehen
+            // koennte - das Auswaehlen im Bild kommt dort mit den Maskenknoten.
+            _picking = tool == AtelierTool.Select && !InNodes;
 
             if (!_picking) Layers.StopPicking();
 
@@ -72,6 +74,11 @@ public partial class AtelierPage
         // Ausserhalb der Sperre: Der Rahmen gehoert dem Verschieben-Werkzeug, und
         // ihn zu zeigen oder zu verstecken ist die sichtbarste Folge des Wechsels.
         ShowPlacement();
+
+        // Und die Knoten: Sie liegen nur ueber dem Bild, solange ihr Werkzeug gilt.
+        ShowNodeMode();
+
+        if (tool == AtelierTool.Nodes && InNodes) NodeView.Focus();
     }
 
     /// <summary>
@@ -91,6 +98,7 @@ public partial class AtelierPage
             Key.H => AtelierTool.Hand,
             Key.B => AtelierTool.Brush,
             Key.I => AtelierTool.Pick,
+            Key.N => AtelierTool.Nodes,
             _ => (AtelierTool?)null,
         };
 

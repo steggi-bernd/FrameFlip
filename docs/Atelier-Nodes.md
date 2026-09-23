@@ -132,6 +132,29 @@ Only the alpha channel of exports changes, and only in those cases.
 2. **Overlay.** The node button in the tool column shows the graph over the dimmed picture.
    You can show, move, zoom and select nodes. The selected node's settings appear in the
    colour panel. The first thing to try in the app.
+
+   *Done (2026-09-23).*
+   - **Node button (N).** Opens an offer that says the switch is one-way; converting
+     keeps the picture byte-identical. The graph is stored as text in the settings
+     (`AtelierNodes`), so a graph this version cannot read does not break the settings
+     file.
+   - **Preview, histogram and export.** All computed from the graph. The histogram is
+     measured on the finished picture; the export gives each worker thread its own copy
+     of the graph. A test checks that the export writes the same files as the stack.
+   - **Editor.** Drawn, not built from elements. Click selects, drag moves, dragging on
+     empty space or with the middle button pans, the wheel zooms around the pointer, Home
+     shows everything, M mutes, right-click or Escape cancels a drag.
+   - **Colour panel.** A tool node shows its card, which edits the node's own tool. A
+     layer correction shows the cards a layer can have. Mix, Mask, Place, the basic
+     correction and On top show simple fields with the layers panel's ranges.
+   - **Picture tools.** Another tool hides the graph. Move then grabs the selected Place
+     or On top node, and the brush paints the selected painted mask node.
+   - **Layout.** Columns follow the distance to the output, so each layer's branch sits
+     right before its Mix. Long graphs wrap into rows. Tools left at their defaults no
+     longer become nodes.
+
+   Not yet in node mode: picking a Cryptomatte in the picture, and the channel view (R,
+   G, B, A) of the header. Wiring, adding and deleting nodes are phase 3.
 3. **Wiring.** Drag nodes in from the palette, connect, disconnect, delete, with cycle and
    type checks.
 4. **Masks, passes and layers as wires, and branching.**

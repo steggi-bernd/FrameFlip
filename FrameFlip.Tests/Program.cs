@@ -65,6 +65,8 @@ static int RunAll()
     ImageAndGroupInvariants.Run();
     ClipAndCoverageInvariants.Run();
     NodeParityInvariants.Run();
+    NodeExportInvariants.Run();
+    NodeModeInvariants.Run();
     LayerPlacementInvariants.Run();
     PlacementDragInvariants.Run();
     LocalToolInvariants.Run();

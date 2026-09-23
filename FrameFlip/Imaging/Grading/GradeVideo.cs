@@ -43,6 +43,9 @@ public sealed record GradeVideoRequest
 
     /// <summary>Threadzahl fuer den Encoder. 0 ueberlaesst ffmpeg die Wahl.</summary>
     public int EncoderThreads { get; init; }
+
+    /// <summary>Der Graph, wenn das Atelier im Knotenmodus ist - dann gilt er allein.</summary>
+    public Nodes.NodeGraph? Graph { get; init; }
 }
 
 /// <summary>
@@ -75,7 +78,8 @@ public static class GradeVideo
 
         // Die Masse des ersten Bildes bestimmen den Datenstrom - ffmpeg muss sie
         // vorher wissen, weil Rohdaten keinen Kopf haben.
-        var first = LayeredFrameLoader.Load(request.Frames[0], request.Layers);
+        // Im Knotenmodus ist die Leinwand das Bild der Datei selbst.
+        var first = LayeredFrameLoader.Load(request.Frames[0], request.Graph is null ? request.Layers : null);
         if (first is null)
             return new GradeBatchResult(0, new[] { $"{Path.GetFileName(request.Frames[0])}: nicht lesbar" },
                                         false, watch.Elapsed);
@@ -242,6 +246,8 @@ public static class GradeVideo
     private static byte[]? Render(string path, GradeVideoRequest request, PreparedGrading grading,
                                   int width, int height)
     {
+        if (request.Graph is not null) return RenderGraph(path, request, width, height);
+
         var (frame, overlays) = LayeredFrameLoader.LoadAll(path, request.Layers);
         if (frame is null) return null;
 
@@ -261,6 +267,26 @@ public static class GradeVideo
                                           (IntPtr)target, stride, step: 1, overlays,
                                           SequenceLink.NumberOf(path) ?? 0, Renderdata(grading, path));
         }
+
+        return pixels;
+    }
+
+    /// <summary>
+    /// Ein Bild im Knotenmodus. Vorausgerechnet wird auf mehreren Faeden zugleich -
+    /// deshalb rechnet jedes Bild mit einer eigenen Kopie des Graphen.
+    /// </summary>
+    private static unsafe byte[]? RenderGraph(string path, GradeVideoRequest request, int width, int height)
+    {
+        var graph = request.Graph!.Clone();
+        var inputs = Nodes.GraphFrames.Read(graph, path, request.View);
+
+        if (inputs is null || Nodes.GraphFrames.Size(inputs) != (width, height)) return null;
+
+        int stride = width * 4;
+        var pixels = new byte[stride * height];
+
+        fixed (byte* target = pixels)
+            if (!Nodes.GraphEvaluator.Render(graph, inputs, (IntPtr)target, stride)) return null;
 
         return pixels;
     }

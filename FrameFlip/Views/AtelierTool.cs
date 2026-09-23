@@ -55,4 +55,10 @@ public enum AtelierTool
     /// das, was scharf sein soll.
     /// </summary>
     Pick,
+
+    /// <summary>
+    /// Knoten: Der Graph liegt ueber dem Bild. Ein anderes Werkzeug blendet ihn aus,
+    /// und das Bild ist wieder frei - dieses holt ihn zurueck.
+    /// </summary>
+    Nodes,
 }

@@ -221,6 +221,10 @@ public partial class AtelierPage
             // der Weg, den das Atelier meint - ein Bild einrichten, alle rechnen.
             Layers = Layers.Stack.Clone(),
 
+            // Im Knotenmodus gilt der Graph allein - kopiert, aus demselben Grund
+            // wie oben.
+            Graph = _graph?.Clone(),
+
             View = _frame is not null ? ViewFor(_frame) : new StandardViewTransform(),
             MaxWorkers = Workers?.Invoke() ?? Math.Clamp(Environment.ProcessorCount / 2, 1, 8),
         };
@@ -241,6 +245,7 @@ public partial class AtelierPage
             Adjustments = _finalAdjustments,
             Grading = FinalGrading(),
             Layers = Layers.Stack.Clone(),
+            Graph = _graph?.Clone(),
             View = _frame is not null ? ViewFor(_frame) : new StandardViewTransform(),
 
             // Dieselbe Zurueckhaltung wie beim Rechnen: der Encoder darf einen

@@ -60,6 +60,13 @@ public sealed record GradeBatchRequest
     /// rendert, soll der Durchlauf langsamer werden statt zu kaempfen.
     /// </summary>
     public int MaxWorkers { get; init; } = Math.Clamp(Environment.ProcessorCount / 2, 1, 8);
+
+    /// <summary>
+    /// Der Graph, wenn das Atelier im Knotenmodus ist. Dann gilt er allein - Stapel,
+    /// Grundkorrektur und Werkzeuge oben sind in ihm aufgegangen und werden nicht
+    /// ein zweites Mal gerechnet.
+    /// </summary>
+    public Nodes.NodeGraph? Graph { get; init; }
 }
 
 /// <summary>Wie weit der Durchlauf ist.</summary>
@@ -113,7 +120,17 @@ public static class GradeBatch
 
         try
         {
-            Parallel.ForEach(request.Frames, options, path =>
+            // Je Faden eine eigene Kopie des Graphen: Seine Knoten halten beim Rechnen
+            // vorbereitete Tabellen, und zwei Bilder zugleich im selben Knoten
+            // schrieben sich gegenseitig hinein.
+            Parallel.ForEach(request.Frames, options, () => request.Graph?.Clone(), (path, _, graph) =>
+            {
+                One(path, graph);
+                return graph;
+            },
+            _ => { });
+
+            void One(string path, Nodes.NodeGraph? graph)
             {
                 token.ThrowIfCancellationRequested();
 
@@ -130,6 +147,20 @@ public static class GradeBatch
                         lock (failures)
                             failures.Add($"{Path.GetFileName(path)}: Ziel ist die Quelle");
 
+                        return;
+                    }
+
+                    if (graph is not null)
+                    {
+                        var inputs = Nodes.GraphFrames.Read(graph, path, request.View);
+
+                        if (inputs is null || !WriteGraph(graph, inputs, request, target))
+                        {
+                            lock (failures) failures.Add($"{Path.GetFileName(path)}: nicht lesbar");
+                            return;
+                        }
+
+                        Interlocked.Increment(ref written);
                         return;
                     }
 
@@ -163,7 +194,7 @@ public static class GradeBatch
                     int at = Interlocked.Increment(ref done);
                     progress?.Report(new GradeProgress(at, request.Frames.Count, Path.GetFileName(path)));
                 }
-            });
+            }
         }
         catch (OperationCanceledException)
         {
@@ -208,6 +239,45 @@ public static class GradeBatch
             ? Render8(frame, request, view, grading, overlays, number, data)
             : Render16(frame, request, view, grading, overlays, number, data);
 
+        Save(image, request, target);
+    }
+
+    /// <summary>
+    /// Ein Bild im Knotenmodus: der Graph rechnet, in acht oder sechzehn Bit, und
+    /// geschrieben wird auf demselben Weg wie sonst.
+    /// </summary>
+    private static unsafe bool WriteGraph(Nodes.NodeGraph graph, Nodes.GraphInputs inputs,
+                                          GradeBatchRequest request, string target)
+    {
+        if (Nodes.GraphFrames.Size(inputs) is not var (width, height)) return false;
+
+        bool eight = request.Format == GradeOutputFormat.Png8 || request.Format == GradeOutputFormat.Jpeg;
+        int stride = width * (eight ? 4 : 8);
+        var pixels = new byte[stride * height];
+        bool done;
+
+        fixed (byte* start = pixels)
+        {
+            done = eight
+                ? Nodes.GraphEvaluator.Render(graph, inputs, (IntPtr)start, stride)
+                : Nodes.GraphEvaluator.Render16(graph, inputs, (IntPtr)start, stride);
+        }
+
+        if (!done) return false;
+
+        var format = eight
+            ? request.Format == GradeOutputFormat.Jpeg ? PixelFormats.Bgr32 : PixelFormats.Bgra32
+            : PixelFormats.Rgba64;
+
+        var image = BitmapSource.Create(width, height, 96, 96, format, null, pixels, stride);
+        image.Freeze();
+
+        Save(image, request, target);
+        return true;
+    }
+
+    private static void Save(BitmapSource image, GradeBatchRequest request, string target)
+    {
         BitmapEncoder encoder = request.Format switch
         {
             GradeOutputFormat.Tiff16 => new TiffBitmapEncoder { Compression = TiffCompressOption.Zip },

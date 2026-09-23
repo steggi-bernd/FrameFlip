@@ -1,6 +1,7 @@
 using System.Windows.Media;
 using FrameFlip.Imaging;
 using FrameFlip.Imaging.Grading;
+using FrameFlip.Imaging.Nodes;
 
 namespace FrameFlip.Views;
 
@@ -54,6 +55,12 @@ public partial class AtelierPage
 
         Placement.Paint(null, 0, 0, false);
 
+        if (InNodes)
+        {
+            ShowNodePlacement();
+            return;
+        }
+
         if (_frame is null || _showingOriginal ||
             _tool is not (AtelierTool.Move or AtelierTool.Crop) ||
             layer is null || !_layersShown ||
@@ -94,6 +101,15 @@ public partial class AtelierPage
     /// </summary>
     private void ShowBrush()
     {
+        if (InNodes)
+        {
+            ShowNodeBrush();
+            return;
+        }
+
+        // Im Stapel legt der erste Strich eine Maskenebene an, wenn es noch keine gibt.
+        Placement.MaskWanted = MakeMaskLayer;
+
         var layer = Layers.Selection;
 
         if (_frame is null)
@@ -168,6 +184,15 @@ public partial class AtelierPage
     {
         if (_frame is null) return null;
 
+        // Im Knotenmodus wird keine Ebene angelegt - gemalt wird auf die Maske des
+        // gewaehlten Knotens oder gar nicht.
+        if (InNodes)
+        {
+            return NodeView.Selected is MaskNode { Mask.Kind: MaskKind.Painted } node
+                ? node.Mask.PaintOn(_number, _frame.Width, _frame.Height)
+                : null;
+        }
+
         var layer = Layers.Selection;
 
         if (layer is not null && layer.Mask.Kind == MaskKind.Painted)
@@ -193,6 +218,12 @@ public partial class AtelierPage
     /// </summary>
     private void OnPainted(bool interim)
     {
+        if (InNodes)
+        {
+            OnNodePainted(interim);
+            return;
+        }
+
         var layer = Layers.Selection;
         if (layer is null) return;
 
@@ -263,6 +294,12 @@ public partial class AtelierPage
     /// </summary>
     private void OnPlacementDragged(LayerTransform place, bool interim)
     {
+        if (InNodes)
+        {
+            OnNodePlacementDragged(place, interim);
+            return;
+        }
+
         // Die Ebene, fuer die der Rahmen gebaut wurde - siehe ShowPlacement. Die
         // AKTUELLE Auswahl zu nehmen war der Fehler: Sie kann sich waehrend des
         // Zuges verschoben haben, und dann bewegt sich etwas anderes als das, was
@@ -297,7 +334,10 @@ public partial class AtelierPage
         _pendingPlace = null;
         _pendingPaint = false;
 
-        Layers.PlaceMovedOutside(true);
+        // Im Knotenmodus gibt es keinen Stapel, dem man es melden muesste - der Graph
+        // rechnet gleich selbst.
+        if (InNodes) Refresh(interim: true, recompose: false);
+        else Layers.PlaceMovedOutside(true);
     }
 
     /// <summary>

@@ -411,6 +411,16 @@ public sealed class AppSettings
     /// </summary>
     public FrameFlip.Views.DockLayout? AtelierDock { get; set; }
 
+    /// <summary>
+    /// Der Graph des Knotenmodus, als Text - oder null, solange das Atelier mit dem
+    /// Stapel rechnet. Siehe docs/Atelier-Nodes.md.
+    ///
+    /// Als Text und nicht als Objekt: Ein Graph, den diese Fassung nicht lesen kann -
+    /// etwa aus einer neueren -, soll nicht die ganze Einstellungsdatei unlesbar machen.
+    /// Er bleibt dann stehen, und das Atelier rechnet mit dem Stapel.
+    /// </summary>
+    public string? AtelierNodes { get; set; }
+
     /// <summary>Gespeicherte Korrektureinstellungen, im Panel auswaehlbar.</summary>
     public List<AdjustmentPreset> AdjustmentPresets { get; set; } = new();
 

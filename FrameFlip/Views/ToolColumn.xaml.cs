@@ -28,7 +28,7 @@ public partial class ToolColumn : UserControl
     /// Maskenbereich, der um eine Kryptomatte bittet. Ohne die Sperre riefen sie sich
     /// gegenseitig auf, bis der Stapel voll ist.
     /// </summary>
-    public void Select(AtelierTool tool)
+    public void Select(AtelierTool tool, bool notify = false)
     {
         if (Tool == tool) return;
 
@@ -43,6 +43,10 @@ public partial class ToolColumn : UserControl
         {
             _quiet = false;
         }
+
+        // Wer von aussen waehlt und will, dass die Seite es erfaehrt - etwa der
+        // Abbrechen-Knopf des Knotenangebots, der zurueck zum Verschieben fuehrt.
+        if (notify) ToolChanged?.Invoke(tool);
     }
 
     private bool _quiet;
@@ -54,6 +58,7 @@ public partial class ToolColumn : UserControl
         AtelierTool.Hand => HandTool,
         AtelierTool.Brush => BrushTool,
         AtelierTool.Pick => PickTool,
+        AtelierTool.Nodes => NodesTool,
         _ => MoveTool,
     };
 
