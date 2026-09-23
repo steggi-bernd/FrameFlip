@@ -23,6 +23,62 @@ public static class NodeValueInvariants
         ColorRamp();
         MaskShape();
         InTheGraph();
+        Previews();
+    }
+
+    // ------------------------------------------------------------ Vorschauen
+
+    private static void Previews()
+    {
+        Check.Group("Vorschauen: ein kleines Bild dessen, was ein Knoten ausgibt");
+
+        var graph = new NodeGraph();
+        var render = graph.Add(new RenderNode());
+        var light = graph.Add(new LightNode { Exposure = 1 });
+        var tone = graph.Add(new ToneNode { Gamma = 2 });
+        var mask = graph.Add(new MaskNode { Mask = new LayerMask { Kind = MaskKind.Gradient, Angle = 0, Width = 1f } });
+        var output = graph.Add(new OutputNode());
+
+        graph.Connect(render, RenderNode.Picture, light, "Bild");
+        graph.Connect(light, "Bild", tone, "Bild");
+        graph.Connect(tone, "Bild", output, "Bild");
+
+        var sources = new Dictionary<string, FloatFrame> { [""] = Frame(32, 18) };
+        var without = Render(graph, sources);
+
+        var previews = new NodePreviews();
+        previews.Wanted.Add(light.Id);
+        previews.Wanted.Add(tone.Id);
+
+        var with = Render(graph, sources, previews);
+
+        Check.That(with.AsSpan().SequenceEqual(without), "Vorschauen aendern das Bild nicht - auch nicht, wo sie eine Kette teilen");
+
+        var atLight = previews.For(light.Id);
+        var atTone = previews.For(tone.Id);
+
+        Check.That(atLight is not null && atTone is not null && (atLight.Width, atLight.Height) == NodePreviews.Fit(32, 18),
+                   "jeder gewuenschte Knoten bekommt eine Vorschau im Seitenverhaeltnis des Bildes");
+        Check.That(atLight is not null && atTone is not null && !atLight.Bgra.AsSpan().SequenceEqual(atTone.Bgra),
+                   "mitten in einer Punktkette zeigt ein Knoten seinen eigenen Stand, nicht den am Ende");
+        Check.That(previews.For(render.Id) is null, "wer keine will, bekommt keine");
+
+        // Eine Maske, die nirgends steckt, wird nicht gerechnet - und hat deshalb keine Vorschau.
+        previews.Wanted.Add(mask.Id);
+        Render(graph, sources, previews);
+        Check.That(previews.For(mask.Id) is null, "ein Knoten, der nicht zur Ausgabe beitraegt, hat keine");
+
+        graph.Connect(mask, "Maske", graph.Add(new MixNode()), "Faktor");
+
+        // Ein Tiefenpass als Miniatur: auf seine Spanne bezogen, nicht einfach weiss.
+        var metres = Enumerable.Range(0, 144).Select(i => 2f + 10f * (i % 16) / 15f).ToArray();
+        var depth = new FloatFrame { Width = 16, Height = 9, R = metres, G = metres, B = metres, IsSceneReferred = true };
+
+        var thumb = NodePreviews.Draw(depth, new StandardViewTransform());
+        int last = (thumb.Width - 1) * 4;
+
+        Check.That(thumb.Bgra[0] < 40 && thumb.Bgra[last] > 215,
+                   "ein Tiefenpass wird als Verlauf von nah nach fern gezeigt", $"{thumb.Bgra[0]} .. {thumb.Bgra[last]}");
     }
 
     // ------------------------------------------------------------ Masken verrechnen
@@ -324,7 +380,7 @@ public static class NodeValueInvariants
         IsSceneReferred = true,
     };
 
-    private static byte[] Render(NodeGraph graph, Dictionary<string, FloatFrame> sources)
+    private static byte[] Render(NodeGraph graph, Dictionary<string, FloatFrame> sources, NodePreviews? previews = null)
     {
         var frame = sources[""];
         var pixels = new byte[frame.Width * frame.Height * 4];
@@ -332,7 +388,7 @@ public static class NodeValueInvariants
 
         try
         {
-            GraphEvaluator.Render(graph, new GraphInputs { Sources = sources, View = new StandardViewTransform() },
+            GraphEvaluator.Render(graph, new GraphInputs { Sources = sources, View = new StandardViewTransform(), Previews = previews },
                                   buffer, frame.Width * 4);
             Marshal.Copy(buffer, pixels, 0, pixels.Length);
         }

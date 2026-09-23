@@ -40,7 +40,18 @@ public static class NodeLayout
     {
         int rows = Math.Max(1, Math.Max(node.Inputs.Count, node.Outputs.Count));
 
-        return Header + Pad + rows * Row + Pad;
+        return Header + Pad + rows * Row + Pad + (node.Preview ? PreviewHeight + Pad : 0);
+    }
+
+    /// <summary>Wie viel Platz eine Vorschau unter den Anschluessen braucht.</summary>
+    public const double PreviewHeight = NodePreviews.Height;
+
+    /// <summary>Wo die Vorschau eines Knotens steht - unter den Anschluessen, damit diese bleiben, wo sie sind.</summary>
+    public static double PreviewTop(Node node)
+    {
+        int rows = Math.Max(1, Math.Max(node.Inputs.Count, node.Outputs.Count));
+
+        return node.Y + Header + Pad + rows * Row + Pad;
     }
 
     public static void Arrange(NodeGraph graph)

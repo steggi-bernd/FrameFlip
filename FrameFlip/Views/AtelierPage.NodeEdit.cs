@@ -32,6 +32,7 @@ public partial class AtelierPage
         NodeView.Editing += RememberNodes;
         NodeView.MenuWanted += ShowNodeMenu;
         NodeView.SectionDropped += DropFromPalette;
+        SetUpNodePreviews();
         NodeView.UndoWanted += () => StepNodes(back: true);
         NodeView.RedoWanted += () => StepNodes(back: false);
 
@@ -81,6 +82,7 @@ public partial class AtelierPage
         KeepNodes();
         ShowNodeWarning();
         ShowNodeSettings();
+        ShowNodeLayers();
         FetchNodeSources();
     }
 
@@ -183,6 +185,9 @@ public partial class AtelierPage
     {
         if (_graph is null) return;
 
+        // Die Passe im Menue bekommen Miniaturen - beim ersten Oeffnen entstehen sie.
+        MakePassThumbs();
+
         var menu = new ContextMenu();
 
         foreach (var group in NodeCatalog.All.GroupBy(k => k.Group))
@@ -265,6 +270,10 @@ public partial class AtelierPage
             };
             menu.Items.Add(mute);
 
+            var preview = new MenuItem { Header = Strings.T(node.Preview ? "S_NodeMenuPreviewOff" : "S_NodeMenuPreviewOn") };
+            preview.Click += (_, _) => NodeView.TogglePreview(node);
+            menu.Items.Add(preview);
+
             if (node is not RenderNode)
             {
                 var duplicate = new MenuItem { Header = Strings.T("S_NodeMenuDuplicate") };
@@ -278,6 +287,10 @@ public partial class AtelierPage
 
             menu.Items.Add(new Separator());
         }
+
+        var previews = new MenuItem { Header = Strings.T("S_NodeMenuPreviewAll") };
+        previews.Click += (_, _) => PreviewAllLayers();
+        menu.Items.Add(previews);
 
         var arrange = new MenuItem { Header = Strings.T("S_NodeMenuArrange") };
         arrange.Click += (_, _) =>
@@ -309,6 +322,10 @@ public partial class AtelierPage
         {
             // Unterstriche waeren sonst Zugriffstasten - "Diff_Col" verloere seinen Strich.
             var entry = new MenuItem { Header = label.Replace("_", "__") };
+
+            if (PassThumb(name) is { } thumb)
+                entry.Icon = new System.Windows.Controls.Image { Source = thumb, Width = 48, Height = 27, Stretch = System.Windows.Media.Stretch.Uniform };
+
             entry.Click += (_, _) => chosen(name);
             menu.Items.Add(entry);
         }

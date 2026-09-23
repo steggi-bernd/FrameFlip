@@ -40,6 +40,9 @@ public sealed class GraphInputs
     /// der Zwischenspeicher fuer die naechste Rechnung.
     /// </summary>
     public string? Focus { get; init; }
+
+    /// <summary>Wohin die Vorschauen der Knoten gehen - und von welchen eine gewuenscht ist.</summary>
+    public NodePreviews? Previews { get; init; }
 }
 
 /// <summary>
@@ -328,7 +331,8 @@ public static class GraphEvaluator
         };
 
         var cache = inputs.Cache;
-        var units = Units(graph, order, cache is null ? null : inputs.Focus);
+        var previews = inputs.Previews;
+        var units = Units(graph, order, cache is null ? null : inputs.Focus, previews?.Wanted);
 
         var unitOf = new Dictionary<string, int>(StringComparer.Ordinal);
         for (int u = 0; u < units.Count; u++)
@@ -453,6 +457,10 @@ public static class GraphEvaluator
             }
 
             Ran?.Invoke(first);
+
+            // Die Vorschau liest ab, was ohnehin dasteht - den ersten Ausgang.
+            if (previews is not null && previews.Wanted.Contains(last.Id) && last.Outputs.Count > 0)
+                previews.Capture(last.Id, run.Outputs.GetValueOrDefault(last.Outputs[0].Name), context, display.Contains(last.Id));
 
             if (last is OutputNode)
             {
@@ -656,10 +664,12 @@ public static class GraphEvaluator
     /// Kette, wenn sein Bild vom vorigen Glied kommt und niemand sonst dieses Bild liest.
     ///
     /// Eine Punktkette reisst am gewaehlten Knoten: Was vor ihm liegt, soll als eigenes
-    /// Ergebnis im Zwischenspeicher liegen koennen. Eine oertliche oder geometrische
-    /// Kette reisst nicht - sie getrennt zu rechnen gaebe ein anderes Bild.
+    /// Ergebnis im Zwischenspeicher liegen koennen. Und hinter einem Knoten mit Vorschau,
+    /// dessen Bild sonst mitten in der Kette verschwaende. Eine oertliche oder
+    /// geometrische Kette reisst nicht - sie getrennt zu rechnen gaebe ein anderes Bild.
     /// </summary>
-    private static List<List<Node>> Units(NodeGraph graph, IReadOnlyList<Node> order, string? focus)
+    private static List<List<Node>> Units(NodeGraph graph, IReadOnlyList<Node> order, string? focus,
+                                          IReadOnlySet<string>? previews)
     {
         var units = new List<List<Node>>();
         var unitOf = new Dictionary<string, List<Node>>(StringComparer.Ordinal);
@@ -668,6 +678,8 @@ public static class GraphEvaluator
         {
             if (node is LocalNode or GeometryNode or PointNode &&
                 !(node is PointNode && node.Id == focus) &&
+                !(node is PointNode && previews is not null && unitOf.TryGetValue(graph.Into(node.Id, "Bild")?.From ?? "", out var before) &&
+                  previews.Contains(before[^1].Id)) &&
                 graph.Into(node.Id, "Bild") is { } link &&
                 unitOf.TryGetValue(link.From, out var unit) &&
                 ReferenceEquals(unit[^1], graph.Find(link.From)) &&

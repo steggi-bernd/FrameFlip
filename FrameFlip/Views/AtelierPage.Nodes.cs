@@ -64,9 +64,11 @@ public partial class AtelierPage
     /// <summary>Was sich im Knotenmodus an der Seite aendert.</summary>
     private void EnterNodes()
     {
-        // Die Ebenen stehen jetzt als Knoten im Graphen. Das Feld bleibt, wo es ist,
-        // und sagt, wo sie hin sind.
-        Dock.SetAvailable("layers", false, Strings.T("S_LayersInNodes"));
+        // Die Ebenen stehen jetzt als Knoten im Graphen. Im Reiter steht statt des
+        // Streifens eine Liste der Ebenen, die ihre Knoten findet.
+        Layers.Visibility = Visibility.Collapsed;
+        NodeLayers.Visibility = Visibility.Visible;
+        Dock.SetAvailable("layers", _layersShown, Strings.T("S_LayersUnavailable"));
         ShowLayerCount();
 
         NodeView.Graph = _graph;
@@ -76,6 +78,7 @@ public partial class AtelierPage
         ShowNodeSettings();
         ShowNodeWarning();
         ShowPlacement();
+        ShowNodeLayers();
     }
 
     /// <summary>Schreibt den Graphen in die Einstellungen.</summary>
@@ -171,9 +174,14 @@ public partial class AtelierPage
             Pool = _pool,
             Cache = _cache,
             Focus = NodeView.Selected?.Id,
+            Previews = _previews,
         };
 
-        return GraphEvaluator.Render(_graph, inputs, target, stride);
+        WantPreviews();
+        bool done = GraphEvaluator.Render(_graph, inputs, target, stride);
+
+        ShowPreviews();
+        return done;
     }
 
     /// <summary>

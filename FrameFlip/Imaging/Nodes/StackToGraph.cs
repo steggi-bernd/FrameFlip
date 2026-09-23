@@ -167,7 +167,8 @@ public static class StackToGraph
             {
                 var source = Source(layer);
 
-                var place = _graph.Add(new PlaceNode { Place = layer.Place.Clone() });
+                // Die Vorschau zeigt, welche Ebene dieser Zweig ist.
+                var place = _graph.Add(new PlaceNode { Place = layer.Place.Clone(), Preview = true });
                 _graph.Connect(source.Node, source.Output, place, "Bild");
 
                 image = Scaled(layer, (place, "Bild"));
@@ -284,7 +285,7 @@ public static class StackToGraph
         {
             if (mask.Kind == MaskKind.None) return null;
 
-            var node = _graph.Add(new MaskNode { Mask = mask.Clone() });
+            var node = _graph.Add(new MaskNode { Mask = mask.Clone(), Preview = true });
 
             _graph.Connect(layer.Node, layer.Output, node, "Ebene");
             _graph.Connect(under.Node, under.Output, node, "Untergrund");

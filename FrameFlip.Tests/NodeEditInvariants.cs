@@ -397,6 +397,39 @@ public static class NodeEditInvariants
                        "Pass als Ebene legt einen Ausgang, Platzieren und Mischen auf Addieren an");
             Check.That(!Pixels(page).AsSpan().SequenceEqual(plain), "und das Bild wird heller");
 
+            // Die Ebenenliste: oben die neue Ebene, darunter das Bild der Datei - mit Miniaturen.
+            var list = (NodeLayerList)page.FindName("NodeLayers");
+            var shownPreviews = (NodePreviews)Field(page, "_previews")!;
+
+            Check.That(list.Shown.Count == 2 && list.Shown[0].Name == "DiffCol" && list.Shown[1].Name == Localization.Strings.T("S_NodeRender"),
+                       "die Ebenenliste zeigt die neue Ebene oben, benannt nach ihrem Pass",
+                       string.Join(" | ", list.Shown.Select(l => l.Name)));
+            Check.That(list.Shown.All(l => l.Source is not null && shownPreviews.For(l.Source.Id) is not null),
+                       "und zu jeder Ebene eine Miniatur");
+
+            var top = list.Shown[0];
+            Call(page, "OnLayerChosen", top.Target!);
+
+            Check.That(ReferenceEquals(editor.Selected, top.Mix), "ein Klick in der Liste waehlt das Mischen der Ebene");
+
+            var ground = list.Shown[1];
+            Call(page, "OnLayerChosen", ground.Target!);
+
+            Check.That(ground.Mix is null && ground.Source is RenderNode && ReferenceEquals(editor.Selected, ground.Source),
+                       "die Grundlage darunter ist die Datei selbst - ein Klick waehlt sie");
+
+            byte[] withLayer = Pixels(page);
+            Call(page, "OnLayerMuted", top.Mix!);
+            Pump(TimeSpan.FromSeconds(3), () => !Pixels(page).AsSpan().SequenceEqual(withLayer));
+
+            Check.That(page.Graph!.Nodes.OfType<MixNode>().Any(m => m.Muted) && Pixels(page).AsSpan().SequenceEqual(plain),
+                       "das Auge schaltet die Ebene stumm - das Bild ist wieder das ohne sie");
+
+            page.StepNodes(back: true);
+            Pump(TimeSpan.FromSeconds(3), () => Pixels(page).AsSpan().SequenceEqual(withLayer));
+
+            Check.That(!page.Graph!.Nodes.OfType<MixNode>().Any(m => m.Muted), "und Rueckgaengig zeigt sie wieder");
+
             page.StepNodes(back: true);
             Pump(TimeSpan.FromSeconds(3), () => Pixels(page).AsSpan().SequenceEqual(plain));
 
@@ -408,10 +441,26 @@ public static class NodeEditInvariants
             editor.Select(page.Graph.Nodes.OfType<RenderNode>().Single());
 
             var fields = (StackPanel)colour.FindName("NodeFields");
-            var mist = fields.Children.OfType<System.Windows.Controls.Primitives.ToggleButton>()
-                             .FirstOrDefault(t => (string)t.Content == "Mist");
 
-            Check.That(mist is { IsChecked: false }, "die Datei zeigt ihre Passe als Schalter");
+            System.Windows.Controls.Primitives.ToggleButton? Tile(string label)
+                => fields.Children.OfType<System.Windows.Controls.Primitives.UniformGrid>()
+                         .SelectMany(g => g.Children.OfType<System.Windows.Controls.Primitives.ToggleButton>())
+                         .FirstOrDefault(t => (string)t.Tag == label);
+
+            var mist = Tile("Mist");
+
+            Check.That(mist is { IsChecked: false }, "die Datei zeigt ihre Passe als Kacheln");
+
+            // Die Miniaturen entstehen im Hintergrund - danach stehen sie auf den Kacheln.
+            var thumbs = (System.Collections.IDictionary)Field(page, "_passThumbs")!;
+            Pump(TimeSpan.FromSeconds(5), () => thumbs.Count > 0);
+            Settle();
+
+            Check.That(thumbs.Count >= passes.Count - 1 &&
+                       Tile("Mist")?.Content is StackPanel { Children: [Border { Child: System.Windows.Controls.Image { Source: not null } }, ..] },
+                       "und jede Kachel bekommt eine Miniatur ihres Passes", $"{thumbs.Count} von {passes.Count}");
+
+            mist = Tile("Mist");
 
             if (mist is not null)
             {

@@ -62,6 +62,16 @@ later, with the editor.
   display values), *frame passes* (dither diffusion, pixel sorting).
 - *Ausgabe*.
 
+**Added after phase 5** (see section 6)
+- *Masken verrechnen*: A and B added, intersected (multiplied), subtracted, minimum,
+  maximum, difference. An input without a wire counts as a fixed value.
+- *Maske formen*: grow or shrink, then soften, in image pixels.
+- *Wertebereich* (Map Range): by default related to the input's own range, exactly like
+  the pass mask. Otherwise it works in the input's units, for example metres of depth.
+- *Farbverlauf* (Color Ramp): a value turned into colour through stops. The colours are
+  meant as seen: behind the view transform they go out as they are, before it they are
+  converted to light. Which side counts is decided by whoever reads the ramp.
+
 ## 3. How the graph is computed
 
 - **Sources and grid images.** Inputs are full-resolution frames. Everything computed from
@@ -244,3 +254,36 @@ Only the alpha channel of exports changes, and only in those cases.
    the coarse grid and after switching grids. The layers before the node demonstrably do
    not run again, a moved node triggers no work, a newly read frame recomputes everything,
    and a stroke in progress is seen. Counter-checks (one bug each) turn these tests red.
+
+6. **Opening up** (feedback after phase 5).
+
+   *Done (2026-09-24).*
+   - **Dropping onto wires.** A free node now falls into a wire that runs under its
+     *body*. Before, the middle of its title bar had to lie on the wire, which almost
+     never happened. The wire lights up while dragging; with several, the one nearest
+     the pointer wins, and only if it fits at both ends. "Free" means the image path is
+     free, so a depth-of-field node with its depth wire falls in too. Nodes to the right
+     move only as far as needed.
+   - **From the palette.** In node mode a palette tile can be dragged into the editor,
+     dropped freely or onto a wire, with a ghost node under the pointer.
+   - **New nodes** as listed in section 2. A data pass fits into a value input, so
+     depth can feed a map range. A muted mask node passes its mask through.
+   - **Previews.** A node can show a small picture of its output below its sockets. The
+     eye in its header or V toggles it; converting sets it on Place and mask nodes.
+     Previews are read from results that exist anyway. A preview in the middle of a
+     point chain splits the chain so it shows its own state; the picture stays the same.
+   - **Layer list.** The layers tab no longer goes dark in node mode. It lists every Mix
+     as a layer, with a thumbnail of what flows into "Oben" and a name taken from its
+     source (pass, image file, adjustment, group). The base sits at the bottom. A click
+     selects the node and brings it into view, and the dot mutes the layer (with undo).
+   - **Passes with thumbnails.** *Datei* shows its passes as tiles with thumbnails, as do
+     the "pass as layer/mask" menus. Thumbnails are read once per file in the background.
+     Each pass is read downscaled and only its own channels; depth is shown against its
+     own range.
+
+   Tests:
+   - Map range on depth has the same bytes as the pass mask, full and coarse.
+   - Every new node is checked against its formula.
+   - Previews change no output.
+   - The drop test places the wire under the body, far from the title bar.
+   - Counter-checks turn these tests red.

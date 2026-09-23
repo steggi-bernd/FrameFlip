@@ -1,4 +1,5 @@
 using System.IO;
+using System.Windows.Media;
 using FrameFlip.Imaging.Grading;
 using FrameFlip.Imaging.Nodes;
 using FrameFlip.Localization;
@@ -36,6 +37,12 @@ public sealed record NumberField(string LabelKey, Func<double> Get, Action<doubl
 /// <summary>Der Verlauf eines Farbverlauf-Knotens, siehe <see cref="RampEditor"/>.</summary>
 public sealed record RampField(ColorRampNode Node) : NodeField("");
 
+/// <summary>Ein Pass der Datei als Kachel - mit Miniatur, zum Ein- und Ausschalten als Ausgang.</summary>
+public sealed record PassTile(string Name, string Label, ImageSource? Thumb, Func<bool> Get, Action<bool> Set);
+
+/// <summary>Die Passe der Datei, als Kacheln nebeneinander.</summary>
+public sealed record PassesField(IReadOnlyList<PassTile> Tiles) : NodeField("");
+
 /// <summary>Ein Knopf - fuer etwas, das man tut, statt es einzustellen.</summary>
 public sealed record ButtonField(string LabelKey, Action Click) : NodeField(LabelKey);
 
@@ -48,8 +55,9 @@ public sealed record InfoField(string Text) : NodeField("");
 /// </summary>
 /// <param name="Passes">Die Passe, die ein Ausgang der Datei werden koennen - wie sie in der Datei heissen, und wie in der Liste.</param>
 /// <param name="Change">Fuehrt eine Aenderung am Aufbau aus - mit Rueckgaengig, Nachlesen und Neurechnen.</param>
+/// <param name="Thumb">Die Miniatur eines Passes - oder keine, solange sie noch entsteht.</param>
 public sealed record NodeFieldContext(NodeGraph Graph, IReadOnlyList<(string Name, string Label)> Passes,
-                                      Action<Action> Change);
+                                      Action<Action> Change, Func<string, ImageSource?>? Thumb = null);
 
 /// <summary>
 /// Was sich an einem Knoten einstellen laesst, der keine eigene Karte im Farbstreifen
@@ -150,12 +158,13 @@ public static class NodeFields
 
         fields.Add(new InfoField(Strings.T("S_NodeRenderPasses")));
 
-        foreach (var (name, label) in context.Passes)
-        {
-            fields.Add(new SwitchField("", () => render.Passes.Contains(name),
-                                       on => context.Change(() => NodeEdits.ShowPass(context.Graph, render, name, on)),
-                                       label) { Structural = true });
-        }
+        var tiles = context.Passes
+            .Select(pass => new PassTile(pass.Name, pass.Label, context.Thumb?.Invoke(pass.Name),
+                                         () => render.Passes.Contains(pass.Name),
+                                         on => context.Change(() => NodeEdits.ShowPass(context.Graph, render, pass.Name, on))))
+            .ToList();
+
+        fields.Add(new PassesField(tiles) { Structural = true });
 
         return fields.ToArray();
     }

@@ -108,6 +108,7 @@ public partial class GradingPanel
         SwitchField toggle => SwitchRow(toggle),
         ButtonField button => ButtonRow(button),
         NumberField number => NumberRow(number),
+        PassesField passes => PassesRow(passes),
         RampField ramp => new RampEditor(ramp.Node, interim => Raise(interim), key => FindResource(key)),
         InfoField info => new TextBlock
         {
@@ -284,6 +285,59 @@ public partial class GradingPanel
         panel.Children.Add(box);
 
         return panel;
+    }
+
+    /// <summary>
+    /// Die Passe der Datei als Kacheln, zwei nebeneinander: die Miniatur, darunter der
+    /// Name. Eine eingeschaltete Kachel ist ein Ausgang der Datei.
+    /// </summary>
+    private UIElement PassesRow(PassesField field)
+    {
+        var grid = new UniformGrid { Columns = 2 };
+
+        foreach (var tile in field.Tiles)
+        {
+            var face = new StackPanel();
+
+            face.Children.Add(new Border
+            {
+                Height = 46,
+                Background = new System.Windows.Media.SolidColorBrush(System.Windows.Media.Color.FromRgb(0x18, 0x18, 0x1E)),
+                Child = tile.Thumb is null
+                    ? null
+                    : new System.Windows.Controls.Image { Source = tile.Thumb, Stretch = System.Windows.Media.Stretch.Uniform },
+            });
+
+            face.Children.Add(new TextBlock
+            {
+                Text = tile.Label,
+                FontSize = 10.5,
+                TextTrimming = TextTrimming.CharacterEllipsis,
+                HorizontalAlignment = HorizontalAlignment.Center,
+                Margin = new Thickness(0, 3, 0, 0),
+            });
+
+            var toggle = new ToggleButton
+            {
+                Style = (Style)FindResource("OverlayToggle"),
+                Content = face,
+                IsChecked = tile.Get(),
+                Tag = tile.Label,
+                ToolTip = tile.Name,
+                Margin = new Thickness(0, 0, 4, 4),
+                Padding = new Thickness(4),
+                HorizontalContentAlignment = HorizontalAlignment.Stretch,
+
+                // Der Stil der Schalter ist eine Zeile hoch - eine Kachel traegt Bild und Namen.
+                Height = double.NaN,
+            };
+
+            toggle.Click += (_, _) => tile.Set(toggle.IsChecked == true);
+
+            grid.Children.Add(toggle);
+        }
+
+        return grid;
     }
 
     private UIElement ButtonRow(ButtonField field)

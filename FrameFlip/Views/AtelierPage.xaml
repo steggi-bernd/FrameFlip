@@ -191,9 +191,14 @@
                                 local:DockHost.PanelId="colour"
                                 local:DockHost.TitleKey="S_SectionColour" />
 
-            <local:LayerPanel x:Name="Layers"
-                              local:DockHost.PanelId="layers"
-                              local:DockHost.TitleKey="S_SectionLayers" />
+            <!-- Der Reiter der Ebenen: der Streifen des Stapels - oder im Knotenmodus die
+                 Liste der Ebenen im Graphen. -->
+            <Grid x:Name="LayersSlot"
+                  local:DockHost.PanelId="layers"
+                  local:DockHost.TitleKey="S_SectionLayers">
+                <local:LayerPanel x:Name="Layers" />
+                <local:NodeLayerList x:Name="NodeLayers" Visibility="Collapsed" />
+            </Grid>
 
             <!-- Die Verteilung - der Code haengt sie aus der Farbspalte hierher. -->
             <ContentControl x:Name="HistogramSlot"

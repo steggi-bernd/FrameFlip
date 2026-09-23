@@ -29,6 +29,7 @@ public partial class AtelierPage
     {
         ShowNodeSettings();
         ShowPlacement();
+        ShowNodeLayers();
 
         // Gewaehlt wird im Bild, und das geht, bevor die Maske irgendwo steckt - ihre
         // Stufen muessen also schon da sein, wenn sie nur gewaehlt ist.
@@ -60,7 +61,7 @@ public partial class AtelierPage
         change();
         NodeView.InvalidateVisual();
         AfterNodeEdit();
-    });
+    }, PassThumb);
 
     /// <summary>Die Werkzeuge, die eine Ebene haben kann - die Karten einer Ebenenkorrektur.</summary>
     private static readonly string[] LayerSections = { "Basic", "Curve", "WhiteBalance", "Zones", "Bands", "Lut" };
@@ -105,6 +106,9 @@ public partial class AtelierPage
                 Tools.ShowNode(null, new[] { section }, Array.Empty<NodeField>());
                 return;
         }
+
+        // Die Datei zeigt ihre Passe mit Miniaturen - die entstehen beim ersten Mal.
+        if (node is RenderNode) MakePassThumbs();
 
         Tools.Load(ImageAdjustments.Neutral, new GradingStack());
         Tools.ShowNode(null, Array.Empty<string>(), NodeFields.For(node, FieldContext()));

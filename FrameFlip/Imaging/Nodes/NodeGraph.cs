@@ -88,6 +88,12 @@ public abstract class Node
     /// </summary>
     public bool Muted { get; set; }
 
+    /// <summary>
+    /// Ob der Knoten ein kleines Bild dessen zeigt, was er ausgibt - wie die Vorschau im
+    /// Compositor von Blender. Fuer das Rechnen ohne Bedeutung.
+    /// </summary>
+    public bool Preview { get; set; }
+
     [JsonIgnore]
     public abstract IReadOnlyList<Socket> Inputs { get; }
 
@@ -301,7 +307,7 @@ public sealed class NodeGraph
 
     /// <summary>
     /// Wie ein Knoten fuer den Zwischenspeicher geschrieben wird: wie beim Speichern, ohne
-    /// Lage und Kennung - einen Knoten zu verschieben aendert kein Bild, und zwei gleiche
+    /// Lage, Kennung und Vorschau - einen Knoten zu verschieben aendert kein Bild, und zwei gleiche
     /// Knoten an gleichen Eingaengen rechnen dasselbe. Ohne die gemalten Masken aller
     /// Bilder; die eine, die fuer dieses Bild gilt, haengt <see cref="Print"/> an.
     /// </summary>
@@ -314,7 +320,8 @@ public sealed class NodeGraph
     {
         if (info.Kind != JsonTypeInfoKind.Object) return;
 
-        string[] names = typeof(Node).IsAssignableFrom(info.Type) ? new[] { nameof(Node.Id), nameof(Node.X), nameof(Node.Y) }
+        string[] names = typeof(Node).IsAssignableFrom(info.Type)
+                           ? new[] { nameof(Node.Id), nameof(Node.X), nameof(Node.Y), nameof(Node.Preview) }
                        : info.Type == typeof(LayerMask) ? new[] { nameof(LayerMask.Paint), nameof(LayerMask.PaintFrames) }
                        : Array.Empty<string>();
 

@@ -21,9 +21,8 @@ public partial class AtelierPage
 
         // Ohne Bild gibt es keine Ebene. Das Feld bleibt, wo es steht, und sagt dann,
         // warum es leer ist - statt einer Flaeche, die nichts zeigt und nichts erklaert.
-        // Im Knotenmodus stehen die Ebenen als Knoten im Graphen.
-        Dock.SetAvailable("layers", visible && !InNodes,
-                          Localization.Strings.T(InNodes ? "S_LayersInNodes" : "S_LayersUnavailable"));
+        // Im Knotenmodus steht dort die Liste der Ebenen im Graphen.
+        Dock.SetAvailable("layers", visible, Localization.Strings.T("S_LayersUnavailable"));
 
         ShowLayerCount();
     }
@@ -36,8 +35,8 @@ public partial class AtelierPage
     /// </summary>
     private void ShowLayerCount()
     {
-        // Im Knotenmodus gibt es keinen Stapel mehr zu zaehlen - die Ebenen sind Knoten.
-        int count = _layersShown && !InNodes ? Layers.Stack.Layers.Count : 0;
+        // Im Knotenmodus zaehlen die Ebenen des Graphen - jedes Mischen.
+        int count = !_layersShown ? 0 : InNodes ? NodeLayers.Shown.Count : Layers.Stack.Layers.Count;
 
         Dock.SetBadge("layers", count > 1 ? count.ToString() : "");
     }

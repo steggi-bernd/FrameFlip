@@ -115,7 +115,11 @@ public static class NodeModeInvariants
             Check.That(settings.AtelierNodes is { Length: > 0 }, "und der Graph steht in den Einstellungen");
             Check.That(nodes.Visibility == Visibility.Visible && offer.Visibility != Visibility.Visible,
                        "der Graph liegt ueber dem Bild");
-            Check.That(!dock.IsAvailable("layers"), "das Ebenenfeld sagt, wo die Ebenen hin sind");
+            var layerList = (NodeLayerList)page.FindName("NodeLayers");
+
+            Check.That(dock.IsAvailable("layers") && layerList.Visibility == Visibility.Visible &&
+                       ((LayerPanel)page.FindName("Layers")).Visibility != Visibility.Visible && layerList.Shown.Count > 0,
+                       "das Ebenenfeld zeigt jetzt die Ebenen des Graphen");
 
             byte[] converted = Pixels(page);
 

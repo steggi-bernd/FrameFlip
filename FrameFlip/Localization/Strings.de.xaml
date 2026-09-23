@@ -1016,6 +1016,16 @@
     <sys:String x:Key="S_NodeGrow">Ausdehnen / schrumpfen (Bildpunkte)</sys:String>
     <sys:String x:Key="S_NodeSoften">Weichzeichnen (Bildpunkte)</sys:String>
     <sys:String x:Key="S_SocketWert">Wert</sys:String>
+    <sys:String x:Key="S_NodeLayersHint">Jede Ebene ist ein „Mischen“ im Graphen. Ein Klick wählt den Knoten und rückt ihn ins Bild, der Punkt links schaltet die Ebene stumm.</sys:String>
+    <sys:String x:Key="S_NodeLayersEmpty">Im Graphen wird nichts gemischt – es gibt keine Ebenen.</sys:String>
+    <sys:String x:Key="S_NodeLayerMute">Ebene stumm schalten oder wieder zeigen</sys:String>
+    <sys:String x:Key="S_NodeLayerNothing">(nichts angesteckt)</sys:String>
+    <sys:String x:Key="S_NodeLayerClipped">angeschnitten</sys:String>
+    <sys:String x:Key="S_NodeLayerGroup">Gruppe</sys:String>
+    <sys:String x:Key="S_NodeLayerBase">Grundlage</sys:String>
+    <sys:String x:Key="S_NodeMenuPreviewOn">Vorschau zeigen (V)</sys:String>
+    <sys:String x:Key="S_NodeMenuPreviewOff">Vorschau ausblenden (V)</sys:String>
+    <sys:String x:Key="S_NodeMenuPreviewAll">Vorschau an allen Ebenen und Masken</sys:String>
     <sys:String x:Key="S_NodeDiffusion">Rasterdiffusion</sys:String>
     <sys:String x:Key="S_SectionColour">Farbe</sys:String>
     <sys:String x:Key="S_SectionProperties">Eigenschaften</sys:String>

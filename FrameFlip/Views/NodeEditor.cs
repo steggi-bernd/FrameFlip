@@ -85,6 +85,12 @@ public sealed class NodeEditor : FrameworkElement
     /// <summary>Wie ein Anschluss heisst.</summary>
     public Func<string, string>? SocketTitle { get; set; }
 
+    /// <summary>Das kleine Bild eines Knotens mit Vorschau - oder keines, solange noch nichts gerechnet ist.</summary>
+    public Func<Node, ImageSource?>? PreviewOf { get; set; }
+
+    /// <summary>Am Knopf im Kopf eines Knotens wurde die Vorschau ein- oder ausgeschaltet.</summary>
+    public event Action<Node>? PreviewToggled;
+
     /// <summary>Der gewaehlte Knoten - oder keiner.</summary>
     public Node? Selected { get; private set; }
 
@@ -204,6 +210,24 @@ public sealed class NodeEditor : FrameworkElement
             Pan = new Vector(ActualWidth / 2 - (all.X + all.Width / 2) * Zoom,
                              ActualHeight / 2 - (all.Y + all.Height / 2) * Zoom);
         }
+
+        _texts.Clear();
+        InvalidateVisual();
+    }
+
+    /// <summary>
+    /// Rueckt einen Knoten in die Mitte der Ansicht - lesbar gross, falls die Ansicht
+    /// gerade weit herausgezoomt ist.
+    /// </summary>
+    public void Reveal(Node node)
+    {
+        if (ActualWidth <= 0 || ActualHeight <= 0) return;
+
+        Zoom = Math.Max(Zoom, 0.8);
+
+        var bounds = Bounds(node);
+        Pan = new Vector(ActualWidth / 2 - (bounds.X + bounds.Width / 2) * Zoom,
+                         ActualHeight / 2 - (bounds.Y + bounds.Height / 2) * Zoom);
 
         _texts.Clear();
         InvalidateVisual();
@@ -378,6 +402,13 @@ public sealed class NodeEditor : FrameworkElement
         if (SocketAt(at) is { } socket)
         {
             StartWire(socket, at);
+            e.Handled = true;
+            return;
+        }
+
+        if (EyeAt(at) is { } eyed)
+        {
+            TogglePreview(eyed);
             e.Handled = true;
             return;
         }
@@ -860,6 +891,11 @@ public sealed class NodeEditor : FrameworkElement
                 e.Handled = true;
                 break;
 
+            case Key.V when !control && !shift && Selected is not null and not OutputNode:
+                TogglePreview(Selected);
+                e.Handled = true;
+                break;
+
             // Umschalt+D wie in Blender, Strg+D wie fast ueberall sonst.
             case Key.D when (shift || control) && Selected is not null:
                 Duplicate(Selected);
@@ -887,6 +923,39 @@ public sealed class NodeEditor : FrameworkElement
                 e.Handled = true;
                 break;
         }
+    }
+
+    /// <summary>Schaltet die Vorschau eines Knotens um - am Knopf im Kopf, oder aus dem Menue.</summary>
+    public void TogglePreview(Node node)
+    {
+        if (node is OutputNode) return;
+
+        node.Preview = !node.Preview;
+        InvalidateVisual();
+        PreviewToggled?.Invoke(node);
+    }
+
+    /// <summary>Wo der Vorschauknopf eines Knotens liegt - in Graphkoordinaten, rechts im Kopf.</summary>
+    private static Rect Eye(Node node) => new(node.X + NodeWidth - 22, node.Y + 5, 16, Header - 10);
+
+    /// <summary>Der Knoten, dessen Vorschauknopf unter einem Punkt auf dem Schirm liegt.</summary>
+    internal Node? EyeAt(Point screen)
+    {
+        if (_graph is null || Zoom < 0.45) return null;
+
+        var at = ToGraph(screen);
+
+        foreach (var node in _graph.Nodes)
+        {
+            if (node is OutputNode) continue;
+
+            var eye = Eye(node);
+            eye.Inflate(3, 3);
+
+            if (eye.Contains(at)) return node;
+        }
+
+        return null;
     }
 
     /// <summary>Nimmt einen Knoten heraus und schliesst die Luecke - Entf, oder aus dem Menue.</summary>
@@ -1165,7 +1234,7 @@ public sealed class NodeEditor : FrameworkElement
             if (node.Muted) title += " ⊘";
 
             var text = Label(title, 12 * Zoom, Text);
-            text.MaxTextWidth = Math.Max(1, box.Width - 14 * Zoom);
+            text.MaxTextWidth = Math.Max(1, box.Width - 34 * Zoom);
             text.MaxLineCount = 1;
             text.Trimming = TextTrimming.CharacterEllipsis;
 
@@ -1196,6 +1265,47 @@ public sealed class NodeEditor : FrameworkElement
             dc.DrawText(text, new Point(at.X - 9 * Zoom - text.Width, at.Y - text.Height / 2));
         }
 
+        if (labels && node is not OutputNode) DrawEye(dc, node);
+
+        if (node.Preview) DrawPreview(dc, node);
+
         dc.Pop();
+    }
+
+    private static readonly Pen EyeOn = Frozen(new Pen(new SolidColorBrush(Color.FromRgb(0xEE, 0xEE, 0xF2)), 1.2));
+    private static readonly Pen EyeOff = Frozen(new Pen(new SolidColorBrush(Color.FromArgb(0x70, 0xEE, 0xEE, 0xF2)), 1.2));
+    private static readonly Brush PreviewGround = Frozen(new SolidColorBrush(Color.FromRgb(0x18, 0x18, 0x1E)));
+
+    /// <summary>Der Knopf fuer die Vorschau: ein Auge, offen, wenn sie gezeigt wird.</summary>
+    private void DrawEye(DrawingContext dc, Node node)
+    {
+        var eye = Eye(node);
+        var centre = ToScreen(new Point(eye.X + eye.Width / 2, eye.Y + eye.Height / 2));
+        double rx = eye.Width / 2 * Zoom, ry = eye.Height / 2.6 * Zoom;
+
+        var pen = node.Preview ? EyeOn : EyeOff;
+        dc.DrawEllipse(null, pen, centre, rx, ry);
+
+        if (node.Preview) dc.DrawEllipse(pen.Brush, null, centre, ry * 0.7, ry * 0.7);
+        else dc.DrawLine(pen, new Point(centre.X - rx, centre.Y + ry), new Point(centre.X + rx, centre.Y - ry));
+    }
+
+    /// <summary>Das kleine Bild unter den Anschluessen - im Seitenverhaeltnis des Bildes, mittig.</summary>
+    private void DrawPreview(DrawingContext dc, Node node)
+    {
+        var area = new Rect(node.X + (NodeWidth - NodePreviews.Width) / 2, NodeLayout.PreviewTop(node),
+                            NodePreviews.Width, NodePreviews.Height);
+
+        var topLeft = ToScreen(area.TopLeft);
+        var box = new Rect(topLeft, new Size(area.Width * Zoom, area.Height * Zoom));
+
+        dc.DrawRectangle(PreviewGround, null, box);
+
+        if (PreviewOf?.Invoke(node) is not { } image || image.Width <= 0 || image.Height <= 0) return;
+
+        double scale = Math.Min(box.Width / image.Width, box.Height / image.Height);
+        double w = image.Width * scale, h = image.Height * scale;
+
+        dc.DrawImage(image, new Rect(box.X + (box.Width - w) / 2, box.Y + (box.Height - h) / 2, w, h));
     }
 }
