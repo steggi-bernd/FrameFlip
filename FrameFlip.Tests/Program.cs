@@ -43,6 +43,7 @@ static int RunAll()
     LocalToolInvariants.Run();
     OpticsInvariants.Run();
     RenderDataInvariants.Run();
+    ExportParityInvariants.Run();
     PngLayerInvariants.Run();
     StackReproInvariants.Run();
     BlendSpaceInvariants.Run();

@@ -383,6 +383,18 @@ public readonly struct PreparedGrading
     /// </summary>
     public IDataTool[] Data { get; } = Array.Empty<IDataTool>();
 
+    /// <summary>
+    /// Ob der erste Durchgang VOR der Sichtumwandlung enden muss - weil dazwischen
+    /// etwas laeuft, das lineares Licht oder das ganze Bild braucht: Glanz und
+    /// Halation, Geometrie, Renderdaten.
+    ///
+    /// An EINER Stelle, weil zwei Wege es fragen: die Vorschau und die
+    /// Sechzehn-Bit-Ausgabe. Als jeder es selbst beantwortete, fehlten im zweiten
+    /// Geometrie und Renderdaten - die Ausgabe hatte dann weder Tiefenschaerfe noch
+    /// Verzeichnung, waehrend die Vorschau beides zeigte.
+    /// </summary>
+    public bool SplitsAtView => LocalLight.Length > 0 || Geometry.Length > 0 || Data.Length > 0;
+
     /// <summary>True, wenn der Bildweg den Puffer und den zweiten Durchgang braucht.</summary>
     public bool HasLocal => Local.Length > 0 || LocalLight.Length > 0 ||
                             Geometry.Length > 0 || Data.Length > 0;

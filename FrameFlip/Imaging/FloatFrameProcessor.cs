@@ -429,8 +429,7 @@ public static class FloatFrameProcessor
         // die Punkte verschoben sind. Ohne beides bleibt alles in einem Zug - ein
         // zusaetzlicher Lauf ueber den Puffer kostet bei 4K rund dreihundert
         // Megabyte hin und zurueck.
-        bool split = grading.LocalLight.Length > 0 || grading.Geometry.Length > 0 ||
-                     grading.Data.Length > 0;
+        bool split = grading.SplitsAtView;
 
         // --- erster Durchgang: die Kette bis hinter die Anzeigewerkzeuge ---
         Parallel.For(0, rows.Length, new ParallelOptions
@@ -743,7 +742,10 @@ public static class FloatFrameProcessor
 
         if (grading.HasLocal)
         {
-            bool split = grading.LocalLight.Length > 0;
+            // Dieselbe Frage wie in der Vorschau, von derselben Stelle beantwortet.
+            // Hier stand frueher nur der Glanz - und ohne ihn liefen Geometrie und
+            // Renderdaten in der Ausgabe gar nicht, siehe SplitsAtView.
+            bool split = grading.SplitsAtView;
 
             scratch = new LocalPass.Scratch();
             scratch.Hold(width * height);
