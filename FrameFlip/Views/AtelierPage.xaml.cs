@@ -123,7 +123,7 @@ public sealed partial class AtelierPage : UserControl
 
         InitializeComponent();
 
-        RestoreColumns();
+        SetUpDock();
 
         Tools.Changed += OnToolsChanged;
         Tools.ToolsEnabled = false;

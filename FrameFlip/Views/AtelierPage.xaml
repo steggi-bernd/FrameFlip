@@ -11,9 +11,7 @@
         </Grid.RowDefinitions>
         <Grid.ColumnDefinitions>
             <ColumnDefinition Width="Auto" />
-            <ColumnDefinition Width="*" MinWidth="240" />
-            <ColumnDefinition Width="Auto" />
-            <ColumnDefinition x:Name="RightColumn" Width="300" MinWidth="220" />
+            <ColumnDefinition Width="*" />
         </Grid.ColumnDefinitions>
 
         <!-- Kopfzeile: was offen ist, und womit gerechnet wird -->
@@ -80,130 +78,89 @@
 
         <!-- Das Bild -->
         <!--
-            Das Bild, und darueber die Leiste des gewaehlten Werkzeugs.
+            Die Andockflaeche: das Bild in der Mitte, und links, rechts und darunter
+            Zonen, in die sich die Felder ziehen lassen. Was wo steht, merkt sich die
+            Anordnung in den Einstellungen - siehe DockHost und DockLayout.
 
-            Oben und nicht in der rechten Spalte, wie in jedem Bildprogramm: Wer malt,
-            sieht die Pinselgroesse dort, wo er malt, und die rechte Spalte bleibt
-            Farbe und Ebenen. Vorher stand hier ein eigener Abschnitt mit dauerhaft
-            hundert Punkten Beschreibungstext, der den beiden anderen die Hoehe nahm.
+            Die Felder stehen hier nur als Liste. Wohin sie kommen, entscheidet die
+            Anordnung beim Laden; ihre Namen und Handler bleiben dieselben, gleich wo
+            sie gerade haengen.
         -->
-        <Grid Grid.Row="1" Grid.Column="1">
-            <Grid.RowDefinitions>
-                <RowDefinition Height="Auto" />
-                <RowDefinition Height="*" />
-            </Grid.RowDefinitions>
+        <local:DockHost x:Name="Dock" Grid.Row="1" Grid.Column="1">
+            <local:DockHost.Center>
+                <!--
+                    Das Bild, und darueber die Leiste des gewaehlten Werkzeugs.
 
-            <local:PropertiesPanel x:Name="Properties" Grid.Row="0" Margin="0,0,0,8" />
-
-            <Border Grid.Row="1" Background="#FF101010" CornerRadius="4"
-                    ClipToBounds="True"
-                    AllowDrop="True" Drop="OnImageFilesDropped" DragOver="OnImageFilesDragOver">
+                    Oben und nicht in der rechten Spalte, wie in jedem Bildprogramm: Wer malt,
+                    sieht die Pinselgroesse dort, wo er malt, und die rechte Spalte bleibt
+                    Farbe und Ebenen. Vorher stand hier ein eigener Abschnitt mit dauerhaft
+                    hundert Punkten Beschreibungstext, der den beiden anderen die Hoehe nahm.
+                -->
                 <Grid>
-                    <ScrollViewer x:Name="ImageScroll"
-                                  HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Auto"
-                                  PanningMode="Both"
-                                  PreviewMouseDown="OnViewportDown"
-                                  PreviewMouseMove="OnViewportMove"
-                                  PreviewMouseUp="OnViewportUp">
-                        <!--
-                            Bild und Greifrahmen im selben Feld: Sie bekommen damit
-                            dieselben Masse, und der Rahmen muss die Lage des Bildes
-                            nicht nachrechnen. Ein Rahmen, der einen Bildpunkt daneben
-                            liegt, laesst einen an einer Ecke ziehen, die nicht dort ist,
-                            wo sie aussieht.
-                        -->
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="*" />
+                    </Grid.RowDefinitions>
+
+                    <local:PropertiesPanel x:Name="Properties" Grid.Row="0" Margin="0,0,0,8" />
+
+                    <Border Grid.Row="1" Background="#FF101010" CornerRadius="4"
+                            ClipToBounds="True"
+                            AllowDrop="True" Drop="OnImageFilesDropped" DragOver="OnImageFilesDragOver">
                         <Grid>
-                            <Image x:Name="Display" Stretch="Uniform"
-                                   RenderOptions.BitmapScalingMode="HighQuality"
-                                   MouseLeftButtonDown="OnImageClicked" />
+                            <ScrollViewer x:Name="ImageScroll"
+                                          HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Auto"
+                                          PanningMode="Both"
+                                          PreviewMouseDown="OnViewportDown"
+                                          PreviewMouseMove="OnViewportMove"
+                                          PreviewMouseUp="OnViewportUp">
+                                <!--
+                                    Bild und Greifrahmen im selben Feld: Sie bekommen damit
+                                    dieselben Masse, und der Rahmen muss die Lage des Bildes
+                                    nicht nachrechnen. Ein Rahmen, der einen Bildpunkt daneben
+                                    liegt, laesst einen an einer Ecke ziehen, die nicht dort ist,
+                                    wo sie aussieht.
+                                -->
+                                <Grid>
+                                    <Image x:Name="Display" Stretch="Uniform"
+                                           RenderOptions.BitmapScalingMode="HighQuality"
+                                           MouseLeftButtonDown="OnImageClicked" />
 
-                            <local:PlacementAdorner x:Name="Placement" />
+                                    <local:PlacementAdorner x:Name="Placement" />
+                                </Grid>
+                            </ScrollViewer>
+
+                            <TextBlock x:Name="EmptyHint" HorizontalAlignment="Center" VerticalAlignment="Center"
+                                       Style="{StaticResource DashLabel}" TextWrapping="Wrap" MaxWidth="360"
+                                       TextAlignment="Center"
+                                       Text="{DynamicResource S_AtelierEmpty}" />
+
+                            <Border x:Name="BusyBadge" Visibility="Collapsed"
+                                    HorizontalAlignment="Center" VerticalAlignment="Center"
+                                    Background="{StaticResource BadgeBackground}" CornerRadius="4" Padding="12,7">
+                                <TextBlock Style="{StaticResource DashLabel}" Text="{DynamicResource S_Loading}" />
+                            </Border>
                         </Grid>
-                    </ScrollViewer>
-
-                    <TextBlock x:Name="EmptyHint" HorizontalAlignment="Center" VerticalAlignment="Center"
-                               Style="{StaticResource DashLabel}" TextWrapping="Wrap" MaxWidth="360"
-                               TextAlignment="Center"
-                               Text="{DynamicResource S_AtelierEmpty}" />
-
-                    <Border x:Name="BusyBadge" Visibility="Collapsed"
-                            HorizontalAlignment="Center" VerticalAlignment="Center"
-                            Background="{StaticResource BadgeBackground}" CornerRadius="4" Padding="12,7">
-                        <TextBlock Style="{StaticResource DashLabel}" Text="{DynamicResource S_Loading}" />
                     </Border>
                 </Grid>
-            </Border>
-        </Grid>
+            </local:DockHost.Center>
 
-        <!--
-            Die Werkzeuge. Oben der Stapel, darunter die Farbe.
+            <local:GradingPanel x:Name="Tools"
+                                local:DockHost.PanelId="colour"
+                                local:DockHost.TitleKey="S_SectionColour" />
 
-            Die Reihenfolge ist die des Rechenwegs: Erst entsteht aus den Passen ein
-            Bild, dann wird dieses Bild korrigiert. Wer von oben nach unten liest,
-            liest damit dieselbe Kette, die auch gerechnet wird - und die Frage
-            "worauf wirkt der Regler?" beantwortet sich, ohne dass sie gestellt
-            werden muss: auf das, was oben herauskommt.
-        -->
-        <!--
-            Der Griff zwischen Bild und Spalte.
+            <local:LayerPanel x:Name="Layers"
+                              local:DockHost.PanelId="layers"
+                              local:DockHost.TitleKey="S_SectionLayers" />
 
-            Eine feste Breite ist eine Behauptung darueber, wie breit der Schirm des
-            Benutzers ist. Auf einem breiten will man die Ebenennamen lesen, auf
-            einem engen will man das Bild - und beides ist richtig.
-        -->
-        <GridSplitter Grid.Row="1" Grid.Column="2" Width="12"
-                      Style="{StaticResource DashboardSplitter}"
-                      HorizontalAlignment="Center" VerticalAlignment="Stretch"
-                      ResizeBehavior="PreviousAndNext"
-                      ResizeDirection="Columns" Focusable="False"
-                      DragCompleted="OnColumnResized" />
-
-        <Border Grid.Row="1" Grid.Column="3"
-                Background="{StaticResource PanelBackground}"
-                BorderBrush="{StaticResource PanelBorder}" BorderThickness="1" CornerRadius="4">
-            <Grid>
-                <Grid.RowDefinitions>
-                    <RowDefinition Height="Auto" />
-                    <RowDefinition Height="*" />
-                </Grid.RowDefinitions>
-
-                <!--
-                    Zwei Reiter, und jeder bekommt die ganze Hoehe.
-
-                    Vorher standen Eigenschaften, Farbe und Ebenen uebereinander und
-                    kaempften um dieselbe Spalte: Bekamen die Ebenen Platz, schrumpfte
-                    die Farbe auf ihre Reiterzeile, und wer darin ein Werkzeug waehlte,
-                    sah dessen Regler nicht mehr. Welche Ebene die Farbe gerade meint,
-                    sagt der Schalter oben im Farbreiter - dafuer muss die Liste nicht
-                    daneben stehen.
-                -->
-                <Border Grid.Row="0" BorderBrush="{StaticResource PanelBorder}" BorderThickness="0,0,0,1">
-                    <UniformGrid Rows="1">
-                        <RadioButton x:Name="ColourTab" Style="{StaticResource PanelTab}"
-                                     GroupName="RightPanel" IsChecked="True"
-                                     Content="{DynamicResource S_SectionColour}"
-                                     Checked="OnPanelTabChanged" />
-                        <RadioButton x:Name="LayersTab" Style="{StaticResource PanelTab}"
-                                     GroupName="RightPanel" IsEnabled="False"
-                                     ToolTip="{DynamicResource S_LayersTabHint}"
-                                     Checked="OnPanelTabChanged">
-                            <StackPanel Orientation="Horizontal">
-                                <TextBlock Text="{DynamicResource S_SectionLayers}" />
-                                <TextBlock x:Name="LayerCount" Margin="6,0,0,0"
-                                           Foreground="{StaticResource FaintBrush}" />
-                            </StackPanel>
-                        </RadioButton>
-                    </UniformGrid>
-                </Border>
-
-                <local:GradingPanel x:Name="Tools" Grid.Row="1" />
-
-                <local:LayerPanel x:Name="Layers" Grid.Row="1" Visibility="Collapsed" />
-            </Grid>
-        </Border>
+            <!-- Die Verteilung - der Code haengt sie aus der Farbspalte hierher. -->
+            <ContentControl x:Name="HistogramSlot"
+                            local:DockHost.PanelId="histogram"
+                            local:DockHost.TitleKey="S_Distribution" />
+        </local:DockHost>
 
         <!-- Die Sequenz ausgeben -->
-        <Border x:Name="ExportBar" Grid.Row="2" Grid.ColumnSpan="4" Margin="0,12,0,0"
+        <Border x:Name="ExportBar" Grid.Row="2" Grid.ColumnSpan="2" Margin="0,12,0,0"
                 Background="{StaticResource PanelBackground}"
                 BorderBrush="{StaticResource PanelBorder}" BorderThickness="1" CornerRadius="4"
                 Padding="12,10" Visibility="Collapsed">

@@ -19,10 +19,11 @@ public partial class AtelierPage
     {
         _layersShown = visible;
 
-        LayersTab.IsEnabled = visible;
-        ShowLayerCount();
+        // Ohne Bild gibt es keine Ebene. Das Feld bleibt, wo es steht, und sagt dann,
+        // warum es leer ist - statt einer Flaeche, die nichts zeigt und nichts erklaert.
+        Dock.SetAvailable("layers", visible, Localization.Strings.T("S_LayersUnavailable"));
 
-        ApplyPanelTab();
+        ShowLayerCount();
     }
 
     /// <summary>
@@ -35,7 +36,7 @@ public partial class AtelierPage
     {
         int count = _layersShown ? Layers.Stack.Layers.Count : 0;
 
-        LayerCount.Text = count > 1 ? count.ToString() : "";
+        Dock.SetBadge("layers", count > 1 ? count.ToString() : "");
     }
 
     /// <summary>

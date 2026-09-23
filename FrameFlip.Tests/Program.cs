@@ -21,8 +21,6 @@ static int RunAll()
     ExportInvariants.Run();
     ExportInvariants.RequestMath();
     PlacementInvariants.Run();
-    ImageHitInvariants.Run();
-    SortInvariants.Run();
     GovernorInvariants.Run();
     ImagingInvariants.Run();
     ViewTransformInvariants.Run();
@@ -53,6 +51,7 @@ static int RunAll()
     CryptomatteInvariants.Run();
     ImageHitInvariants.Run();
     SortInvariants.Run();
+    DockLayoutInvariants.Run();
     AtelierLayerInvariants.Run();
     GradeBatchInvariants.Run();
     GradeVideoInvariants.Run();

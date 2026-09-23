@@ -405,6 +405,12 @@ public sealed class AppSettings
     /// <summary>Hoehe des Ebenenstreifens unten in der rechten Spalte.</summary>
     public double AtelierLayersHeight { get; set; } = 240;
 
+    /// <summary>
+    /// Wo die Felder des Ateliers angedockt sind. Null heisst: noch nie verschoben -
+    /// dann gilt die Grundanordnung, mit der gemerkten Breite der rechten Spalte.
+    /// </summary>
+    public FrameFlip.Views.DockLayout? AtelierDock { get; set; }
+
     /// <summary>Gespeicherte Korrektureinstellungen, im Panel auswaehlbar.</summary>
     public List<AdjustmentPreset> AdjustmentPresets { get; set; } = new();
 

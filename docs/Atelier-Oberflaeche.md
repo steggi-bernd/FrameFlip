@@ -327,6 +327,36 @@ left. Pick a tool in the colour section and its sliders sat below the edge.
 - Found on the way: the *vibrance* slider sat outside every section and appeared under
   every tab. It is with saturation now.
 
+### Third pass: an effect stack, and panels that dock
+
+Two complaints: the tile grid was still cluttered and impractical, and the layout was
+fixed. Both are built:
+
+- **Palette and stack instead of tiles.** A slim palette of symbol tiles, one row per
+  category, adds an effect. What is in use appears below as a stack of cards. Each card
+  can fold, has an on/off switch that keeps its values (`GradingStack.Bypassed`), and can
+  be reset or removed. The basic correction is always there and can't be removed or
+  switched off. The palette shows what *can* be added; the stack shows what *is* there.
+- **Docking zones.** Colour, Layers and the histogram are panels. Drag a tab by its
+  header into a zone: left, right, or below the picture. The target decides what happens:
+  - Dropped on another group's tab bar or its middle, the panel becomes a tab there.
+  - Dropped on a group's top or bottom edge (left or right edge for groups below the
+    picture), it becomes its own group before or after that one. Dragging a tab to the
+    edge of its own group therefore splits the group.
+  - A zone that is empty appears as a strip at the picture's edge. While dragging, the
+    highlight shows the area the panel would take up.
+  - Right-click or Escape cancels, and a right-click cancel doesn't open the context menu
+    afterwards.
+
+  There are no floating windows. The layout is saved in `AtelierDock` and is back on the
+  next start. The first layout carries over the width of the old right column. The tab
+  bar's context menu resets the layout.
+- **The model is separate from the drawing.** `DockLayout` holds zones, groups and
+  panels, and guarantees that every known panel appears exactly once. That is tested over
+  400 random moves and against a hand-broken settings file. `DockHost` only draws what
+  the model says. Clicking a tab rebuilds only that one group, not the picture and the
+  other panels.
+
 Steps 5 and 6 are the only ones that add something the program cannot do at all today, and
 the gallery
 is deliberately last — not because it matters least, but because a gallery of

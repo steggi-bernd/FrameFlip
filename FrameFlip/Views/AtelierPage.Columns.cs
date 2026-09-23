@@ -1,78 +1,68 @@
 using System.Windows;
-using System.Windows.Controls.Primitives;
+using System.Windows.Controls;
+using FrameFlip.Localization;
 
 namespace FrameFlip.Views;
 
 /// <summary>
-/// Die rechte Spalte: zwei Reiter, und dass sie sich merkt, wie breit sie stand.
+/// Die Andockflaeche des Ateliers - und dass sie sich merkt, wie sie stand.
 ///
-/// "Alles sehr starr" war die Klage, und sie traf zu: Die Spalte war dreihundert
-/// Punkte breit, der Ebenenstreifen so hoch, wie er eben wurde, und daran liess sich
-/// nichts aendern. Beides ist jetzt zu ziehen.
-///
-/// Gemerkt wird es, weil eine Aufteilung, die man bei jedem Start neu herstellt,
-/// beim dritten Mal nicht mehr hergestellt wird. Das ist der ganze Unterschied
-/// zwischen "verstellbar" und "eingerichtet".
-///
-/// Was hier NICHT passiert, steht ebenso ausdruecklich im Entwurf: Es gibt kein
-/// Andocken, kein Abreissen, keine schwebenden Fenster. Das waere ein Andockrahmen,
-/// und den in WPF ohne Fremdpakete zu bauen sind Wochen und eine dauerhafte Quelle
-/// merkwuerdiger Fehler. Zwei Griffe und ein Gedaechtnis decken das ab, was "weniger
-/// starr" tatsaechlich heisst.
+/// Die Felder lassen sich in Zonen links, rechts und unter dem Bild ziehen, dort als
+/// Reiter oder uebereinander. Was wo steht, haelt <see cref="DockLayout"/> fest, und
+/// die Einstellungen merken es sich: Eine Anordnung, die man bei jedem Start neu
+/// herstellt, wird beim dritten Mal nicht mehr hergestellt.
 /// </summary>
 public partial class AtelierPage
 {
-    /// <summary>Ein Reiter der rechten Spalte wurde gewaehlt.</summary>
-    private void OnPanelTabChanged(object sender, RoutedEventArgs e) => ApplyPanelTab();
-
     /// <summary>
-    /// Zeigt den Inhalt des gewaehlten Reiters - und nur ihn, in voller Hoehe.
-    ///
-    /// Der Ebenenreiter ist nur waehlbar, wenn ein Bild offen ist: Ohne Bild gibt
-    /// es keine Ebene, und ein Reiter, der auf eine leere Flaeche fuehrt, waere ein
-    /// Klick, der nichts beantwortet.
-    /// </summary>
-    private void ApplyPanelTab()
-    {
-        // Waehrend die Oberflaeche aufgebaut wird, meldet der erste Reiter sein
-        // Haekchen bereits - bevor die Flaechen darunter existieren. Ein Wert, der
-        // beim Aufbau gesetzt wird, loest eben auch beim Aufbau aus.
-        if (Layers is null || Tools is null || LayersTab is null || ColourTab is null) return;
-
-        bool layers = LayersTab.IsChecked == true && _layersShown;
-
-        Layers.Visibility = layers ? Visibility.Visible : Visibility.Collapsed;
-        Tools.Visibility = layers ? Visibility.Collapsed : Visibility.Visible;
-
-        if (!layers && ColourTab.IsChecked != true) ColourTab.IsChecked = true;
-    }
-
-    /// <summary>
-    /// Ob ein Bild mit Ebenen offen ist - unabhaengig davon, welcher Reiter vorn
-    /// liegt.
+    /// Ob ein Bild mit Ebenen offen ist - unabhaengig davon, wo die Ebenen gerade
+    /// stehen und ob sie vorn liegen.
     ///
     /// Frueher hiess das "der Ebenenstreifen ist sichtbar", und der Greifrahmen im
-    /// Bild haengte daran. Mit Reitern ist der Streifen unsichtbar, sobald man auf
-    /// die Farbe schaut - und der Rahmen waere mit ihm verschwunden.
+    /// Bild haengte daran. Mit Reitern ist der Streifen unsichtbar, sobald etwas
+    /// anderes vorn liegt - und der Rahmen waere mit ihm verschwunden.
     /// </summary>
     private bool _layersShown;
 
-    /// <summary>Stellt die Aufteilung der letzten Sitzung wieder her.</summary>
-    private void RestoreColumns()
-        => RightColumn.Width = new GridLength(Math.Clamp(_settings.AtelierColumnWidth, 220, 900));
-
     /// <summary>
-    /// Gemerkt wird beim LOSLASSEN und nicht waehrend des Ziehens.
-    ///
-    /// Waehrend des Ziehens kommen dreissig Meldungen je Sekunde, und jede davon
-    /// schriebe die Einstellungsdatei. Das ist nicht nur Verschwendung, sondern die
-    /// Art Verschwendung, die auffaellt: Eine Datei, die waehrend eines Zuges
-    /// dauernd geschrieben wird, laesst den Zug haken.
+    /// Richtet die Andockflaeche ein: die Verteilung in ihr eigenes Feld, die
+    /// gemerkte Anordnung, und das Merken selbst.
     /// </summary>
-    private void OnColumnResized(object sender, DragCompletedEventArgs e)
+    private void SetUpDock()
     {
-        _settings.AtelierColumnWidth = RightColumn.ActualWidth;
-        _persist(_settings);
+        // Die Verteilung steht im Farbfeld, rechnet dort und wird von dort gefuellt.
+        // Zu sehen ist sie aber als eigenes Feld - herausgehaengt und in ihren Platz
+        // gesetzt. Alle Namen und Handler bleiben, wo sie waren.
+        if (Tools.HistogramBlock.Parent is Panel parent) parent.Children.Remove(Tools.HistogramBlock);
+
+        HistogramSlot.Content = Tools.HistogramBlock;
+
+        // Der Name steht jetzt auf dem Reiter - ein zweites Mal darunter waere Laerm.
+        Tools.HistogramLabel.Visibility = Visibility.Hidden;
+
+        Dock.Load(_settings.AtelierDock ?? FirstLayout());
+
+        Dock.LayoutChanged += layout =>
+        {
+            _settings.AtelierDock = layout.Clone();
+            _persist(_settings);
+        };
+
+        Dock.SetAvailable("layers", false, Strings.T("S_LayersUnavailable"));
     }
 
+    /// <summary>
+    /// Die erste Anordnung - mit der Breite, die die rechte Spalte schon hatte.
+    ///
+    /// Wer die Spalte vorher breiter gezogen hat, soll das nach dem Umstieg nicht noch
+    /// einmal tun muessen.
+    /// </summary>
+    private DockLayout FirstLayout()
+    {
+        var layout = DockLayout.Default();
+
+        layout.RightWidth = Math.Clamp(_settings.AtelierColumnWidth, 220, 900);
+
+        return layout;
+    }
 }

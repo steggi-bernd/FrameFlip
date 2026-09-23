@@ -37,7 +37,7 @@ public static class AtelierLayerInvariants
             EachLayerKeepsItsOwnTools(path);
             TheFrameOnlyGrabsWhenItShould(path);
             TheToolDecidesWhatTheMouseDoes(path);
-            TheColumnRemembersHowItStood(path);
+            TheDockRemembersHowItStood(path);
             ShowingALayerShowsItAtOnce(folder);
             TheReportedSessionComesBack(folder);
             RasterReachesTheAtelier(folder);
@@ -82,27 +82,25 @@ public static class AtelierLayerInvariants
             page.UpdateLayout();
 
             var strip = (LayerPanel)page.FindName("Layers");
-            Check.That(strip is not null, "der Streifen ist Teil der Seite");
-            if (strip is null) return;
+            var dock = (DockHost)page.FindName("Dock");
+            Check.That(strip is not null && dock is not null, "der Streifen ist Teil der Seite");
+            if (strip is null || dock is null) return;
 
-            Check.That(strip.Visibility != Visibility.Visible,
-                       "ohne Bild bleibt er aus dem Weg");
+            Check.That(!dock.IsShown("layers"), "ohne Bild bleibt er aus dem Weg");
 
             page.Open(path);
 
-            // Die Ebenen stehen in einem eigenen Reiter. Nach dem Oeffnen wird der
-            // waehlbar - und wer ihn waehlt, sieht den Streifen.
-            var layersTab = (System.Windows.Controls.RadioButton)page.FindName("LayersTab");
+            // Die Ebenen stehen in einem eigenen Feld. Nach dem Oeffnen hat es etwas
+            // zu zeigen - und wer es nach vorn holt, sieht den Streifen.
+            bool arrived = Pump(TimeSpan.FromSeconds(10), () => dock.IsAvailable("layers"));
 
-            bool arrived = Pump(TimeSpan.FromSeconds(10), () => layersTab.IsEnabled);
-
-            Check.That(arrived, "nach dem Oeffnen wird der Ebenenreiter waehlbar");
+            Check.That(arrived, "nach dem Oeffnen sind die Ebenen verfuegbar");
             if (!arrived) return;
 
-            layersTab.IsChecked = true;
+            dock.Activate("layers");
             page.UpdateLayout();
 
-            Check.That(strip.Visibility == Visibility.Visible, "und zeigt den Streifen");
+            Check.That(dock.IsShown("layers") && strip.ActualHeight > 0, "und zeigen den Streifen");
 
             Check.That(strip.HasChoice, "und weiss, dass es Passe zu waehlen gibt");
 
@@ -231,26 +229,24 @@ public static class AtelierLayerInvariants
             Check.That(loaded, "das Bild wird geladen");
             if (!loaded) return;
 
-            var layersTab = (System.Windows.Controls.RadioButton)page.FindName("LayersTab");
-            var colour = (GradingPanel)page.FindName("Tools");
+            var dock = (DockHost)page.FindName("Dock");
 
-            Check.That(layersTab.IsEnabled, "der Ebenenreiter ist auch hier waehlbar");
+            Check.That(dock.IsAvailable("layers"), "die Ebenen sind auch hier verfuegbar");
             Check.That(!strip.HasChoice, "aber es gibt keine Passe zu waehlen");
 
             // Frueher begann der Streifen eingeklappt, um der Farbe keinen Platz zu
-            // nehmen. Jetzt steht er in einem eigenen Reiter und nimmt niemandem
-            // etwas: Solange die Farbe vorn liegt, ist er gar nicht da.
-            Check.That(colour.Visibility == Visibility.Visible &&
-                       strip.Visibility != Visibility.Visible,
+            // nehmen. Jetzt teilt er sich mit ihr eine Gruppe als Reiter und nimmt
+            // niemandem etwas: Solange die Farbe vorn liegt, ist er gar nicht da.
+            Check.That(dock.IsShown("colour") && !dock.IsShown("layers"),
                        "solange die Farbe vorn liegt, nimmt er ihr keinen Platz");
 
-            layersTab.IsChecked = true;
+            dock.Activate("layers");
             page.UpdateLayout();
 
             var body = (FrameworkElement)strip.FindName("Body");
 
-            Check.That(strip.Visibility == Visibility.Visible && body.Visibility == Visibility.Visible,
-                       "und im eigenen Reiter steht er offen - zugeklappt liesse er ihn leer");
+            Check.That(dock.IsShown("layers") && body.Visibility == Visibility.Visible,
+                       "und vorn geholt steht er offen - zugeklappt liesse er das Feld leer");
         }
         finally
         {
@@ -518,7 +514,7 @@ public static class AtelierLayerInvariants
                 return;
             }
 
-            Pump(TimeSpan.FromSeconds(3), () => false);
+            Pump(TimeSpan.FromSeconds(1.2), () => false);
 
             var display = (System.Windows.Controls.Image)page.FindName("Display");
             var tools = (GradingPanel)page.FindName("Tools");
@@ -550,7 +546,11 @@ public static class AtelierLayerInvariants
                 // nur dort. Wer auf den Unterschied wartet, hat einen Test, der bei
                 // Erfolg schnell und bei Misserfolg langsam ist - und der bestanden
                 // gilt, sobald die Maschine gerade schnell genug war.
-                Pump(TimeSpan.FromSeconds(2), () => false);
+                //
+                // Die feste Zeit ist das Siebenfache des Zeitgebers (180 ms) - Rand
+                // genug fuer ein kleines Bild. Frueher waren es fuenf Sekunden an
+                // zwoelf Stellen, und die Reihe lief ueber eine Minute.
+                Pump(TimeSpan.FromSeconds(1.2), () => false);
 
                 Check.That(tools.Prepared.Frame.Length == (pick >= 3 ? 1 : 0),
                            $"Eintrag {pick}: der vorbereitete Stapel fuehrt den Rahmendurchgang",
@@ -587,7 +587,7 @@ public static class AtelierLayerInvariants
         // Atkinson - eine Fehlerdiffusion, also ein Rahmendurchgang.
         box.SelectedIndex = 4;
 
-        Pump(TimeSpan.FromSeconds(2), () => false);
+        Pump(TimeSpan.FromSeconds(1.2), () => false);
 
         Check.That(tools.Prepared.Frame.Length == 1, "gesetzt ist der Durchgang da",
                    $"{tools.Prepared.Frame.Length}");
@@ -597,13 +597,13 @@ public static class AtelierLayerInvariants
 
         strip.AddAdjustment();
 
-        Pump(TimeSpan.FromSeconds(1), () => false);
+        Pump(TimeSpan.FromSeconds(1.2), () => false);
 
         var pass = strip.Stack.Layers.First(l => l.Content == LayerContent.Pass);
 
         Select(strip, pass);
 
-        Pump(TimeSpan.FromSeconds(2), () => false);
+        Pump(TimeSpan.FromSeconds(1.2), () => false);
 
         Check.That(tools.Prepared.Frame.Length == 1,
                    "nach einem Wechsel der Auswahl ist er immer noch da",
@@ -615,7 +615,7 @@ public static class AtelierLayerInvariants
         // Und dieselbe Frage fuer die Optik, die an derselben Luecke haengt.
         box.SelectedIndex = 0;
 
-        Pump(TimeSpan.FromSeconds(2), () => false);
+        Pump(TimeSpan.FromSeconds(1.2), () => false);
 
         Check.That(tools.Prepared.Optics.Length > 0,
                    "auch das geordnete Raster ueberlebt", $"{tools.Prepared.Optics.Length}");
@@ -703,7 +703,7 @@ public static class AtelierLayerInvariants
                 return;
             }
 
-            Pump(TimeSpan.FromSeconds(6), () => false);
+            Pump(TimeSpan.FromSeconds(2), () => false);
 
             var strip = (LayerPanel)page.FindName("Layers");
             var display = (System.Windows.Controls.Image)page.FindName("Display");
@@ -874,7 +874,7 @@ public static class AtelierLayerInvariants
 
             foreach (var layer in new[] { first, glowA, glowB }) strip.SetVisible(layer, false);
 
-            Pump(TimeSpan.FromSeconds(5), () => false);
+            Pump(TimeSpan.FromSeconds(1.2), () => false);
 
             byte[] hidden = Shot(display);
 
@@ -882,7 +882,7 @@ public static class AtelierLayerInvariants
             strip.SetVisible(glowA, true);
             strip.SetVisible(glowB, true);
 
-            Pump(TimeSpan.FromSeconds(5), () => false);
+            Pump(TimeSpan.FromSeconds(1.2), () => false);
 
             byte[] withGlow = Shot(display);
 
@@ -894,7 +894,7 @@ public static class AtelierLayerInvariants
             // auftauchen.
             strip.SetVisible(first, true);
 
-            Pump(TimeSpan.FromSeconds(5), () => false);
+            Pump(TimeSpan.FromSeconds(1.2), () => false);
 
             byte[] all = Shot(display);
 
@@ -921,7 +921,7 @@ public static class AtelierLayerInvariants
                 return;
             }
 
-            Pump(TimeSpan.FromSeconds(5), () => false);
+            Pump(TimeSpan.FromSeconds(2), () => false);
 
             // Nach dem Oeffnen kann der Stapel neu aufgebaut worden sein - dann
             // zeigen die alten Verweise auf Ebenen, die niemand mehr ansieht.
@@ -973,7 +973,7 @@ public static class AtelierLayerInvariants
             strip.SetVisible(first, true);
             strip.SetVisible(picture, false);
 
-            Pump(TimeSpan.FromSeconds(5), () => false);
+            Pump(TimeSpan.FromSeconds(2), () => false);
 
             byte[] noPicture = Shot(display);
 
@@ -1072,14 +1072,16 @@ public static class AtelierLayerInvariants
     /// Bildschirmkoordinaten: Zeilennummern stimmen auch dann, wenn das Fenster im
     /// Test nie wirklich gezeichnet wird.
     /// </summary>
-    private static void TheColumnRemembersHowItStood(string path)
+    private static void TheDockRemembersHowItStood(string path)
     {
-        Check.Group("Die rechte Spalte: zwei Reiter, jeder in voller Hoehe");
+        Check.Group("Die Andockflaeche: Reiter, Zonen, und sie merkt sich, wie sie stand");
 
         // Eine Breite, die NICHT die Voreinstellung ist - sonst prueft der Test nur,
-        // dass eine Voreinstellung eine Voreinstellung ist.
+        // dass eine Voreinstellung eine Voreinstellung ist. Und noch keine Anordnung:
+        // Wer von der alten Spalte kommt, soll seine Breite mitnehmen.
         var settings = new AppSettings { AtelierColumnWidth = 380 };
-        var page = new AtelierPage(FrameDecoderRegistry.CreateDefault(() => null), settings, _ => { });
+        int saved = 0;
+        var page = new AtelierPage(FrameDecoderRegistry.CreateDefault(() => null), settings, _ => saved++);
 
         var window = new Window
         {
@@ -1098,32 +1100,35 @@ public static class AtelierLayerInvariants
             window.Show();
             page.UpdateLayout();
 
-            var column = (System.Windows.Controls.ColumnDefinition)page.FindName("RightColumn");
+            var dock = (DockHost)page.FindName("Dock");
             var strip = (LayerPanel)page.FindName("Layers");
             var colour = (GradingPanel)page.FindName("Tools");
-            var colourTab = (System.Windows.Controls.RadioButton)page.FindName("ColourTab");
-            var layersTab = (System.Windows.Controls.RadioButton)page.FindName("LayersTab");
+            var slot = (System.Windows.Controls.ContentControl)page.FindName("HistogramSlot");
 
-            Check.That(column is not null && strip is not null && colour is not null &&
-                       colourTab is not null && layersTab is not null,
-                       "die Spalte hat zwei Reiter: Farbe und Ebenen");
+            Check.That(dock is not null && strip is not null && colour is not null && slot is not null,
+                       "die Seite hat eine Andockflaeche mit Farbe, Ebenen und Verteilung");
 
-            if (column is null || strip is null || colour is null || colourTab is null || layersTab is null)
-                return;
+            if (dock is null || strip is null || colour is null || slot is null) return;
 
-            Check.Near(column.ActualWidth, 380, 1, "die gemerkte Breite steht wieder da");
+            Check.That(ReferenceEquals(slot.Content, colour.HistogramBlock),
+                       "die Verteilung steht in ihrem eigenen Feld, nicht mehr im Farbfeld");
 
-            // Das war der Kern der Klage: Drei Abschnitte uebereinander kaempften um
-            // dieselbe Hoehe. Jetzt steht immer genau EINER da - und der hat alles.
-            Check.That(colourTab.IsChecked == true && colour.Visibility == Visibility.Visible,
-                       "zu Beginn liegt die Farbe vorn");
+            Check.Near(dock.Layout.RightWidth, 380, 1e-9, "die gemerkte Breite der alten Spalte gilt weiter");
+            Check.That(colour.ActualWidth is > 330 and < 381, "und so breit ist die Farbe auch",
+                       $"{colour.ActualWidth:0}");
 
-            Check.That(!layersTab.IsEnabled, "ohne Bild ist der Ebenenreiter nicht waehlbar");
-            Check.That(strip.Visibility != Visibility.Visible, "und der Streifen nicht da");
+            // Das war der Kern der ersten Klage: Drei Abschnitte uebereinander
+            // kaempften um dieselbe Hoehe. In einer Gruppe steht immer genau EIN Feld
+            // da - und das hat alles.
+            Check.That(dock.IsShown("colour") && dock.IsShown("histogram"),
+                       "zu Beginn liegen die Farbe und die Verteilung vorn");
+
+            Check.That(!dock.IsAvailable("layers") && !dock.IsShown("layers"),
+                       "ohne Bild haben die Ebenen nichts zu zeigen");
 
             page.Open(path);
 
-            if (!Pump(TimeSpan.FromSeconds(10), () => layersTab.IsEnabled))
+            if (!Pump(TimeSpan.FromSeconds(10), () => dock.IsAvailable("layers")))
             {
                 Check.That(false, "das Bild wird geladen");
                 return;
@@ -1133,26 +1138,113 @@ public static class AtelierLayerInvariants
 
             double colourHeight = colour.ActualHeight;
 
-            layersTab.IsChecked = true;
+            dock.Activate("layers");
             page.UpdateLayout();
 
-            Check.That(strip.Visibility == Visibility.Visible && colour.Visibility != Visibility.Visible,
+            Check.That(dock.IsShown("layers") && !dock.IsShown("colour"),
                        "der Ebenenreiter zeigt die Ebenen - und nur sie");
 
             // Beide bekommen dieselbe volle Hoehe. Das ist die Zusage des Reiters:
-            // Kein Bereich schrumpft, weil ein anderer Platz braucht.
+            // Kein Feld schrumpft, weil ein anderes Platz braucht.
             Check.Near(strip.ActualHeight, colourHeight, 1,
                        "und zwar in derselben vollen Hoehe wie vorher die Farbe");
 
             Check.That(colourHeight > 500,
-                       "und die ist die ganze Spalte, nicht ein Drittel davon",
+                       "und die ist fast die ganze Spalte, nicht ein Drittel davon",
                        $"{colourHeight:0}");
 
-            colourTab.IsChecked = true;
+            // Und nun der Grund fuer das Andocken: die Ebenen nach links, als eigenes
+            // Feld. Danach stehen Farbe UND Ebenen gleichzeitig da.
+            int before = saved;
+
+            dock.MovePanel("layers", DockZone.Left, 0, asTab: false);
             page.UpdateLayout();
 
-            Check.That(colour.Visibility == Visibility.Visible && strip.Visibility != Visibility.Visible,
-                       "und zurueck die Farbe");
+            Check.That(dock.IsShown("layers") && dock.IsShown("colour"),
+                       "nach links gezogen stehen Ebenen und Farbe nebeneinander");
+
+            Check.That(strip.ActualWidth > 200 && colour.ActualWidth > 200,
+                       "und beide haben Platz",
+                       $"Ebenen {strip.ActualWidth:0}, Farbe {colour.ActualWidth:0}");
+
+            Check.That(saved > before && settings.AtelierDock?.Find("layers") is { Zone: DockZone.Left },
+                       "die Anordnung wird sofort gemerkt");
+
+            // Eine neue Seite mit denselben Einstellungen - wie beim naechsten Start.
+            var again = new AtelierPage(FrameDecoderRegistry.CreateDefault(() => null), settings, _ => { });
+            var againDock = (DockHost)again.FindName("Dock");
+
+            Check.That(againDock.Layout.Find("layers") is { Zone: DockZone.Left } &&
+                       againDock.Layout.Find("colour") is { Zone: DockZone.Right },
+                       "und beim naechsten Start steht alles wieder, wo es stand");
+
+            dock.MovePanel("histogram", DockZone.Bottom, 0, asTab: false);
+            page.UpdateLayout();
+
+            Check.That(settings.AtelierDock?.Find("histogram") is { Zone: DockZone.Bottom } &&
+                       ReferenceEquals(slot.Content, colour.HistogramBlock) && slot.ActualHeight > 60,
+                       "auch unter das Bild - und die Verteilung zieht mit");
+
+            dock.ResetLayout();
+            page.UpdateLayout();
+
+            Check.That(dock.Layout.Find("layers") is { Zone: DockZone.Right, Group: 1 } &&
+                       dock.Layout.Find("histogram") is { Zone: DockZone.Right, Group: 0 },
+                       "und wer sich verzogen hat, kommt zur Grundanordnung zurueck");
+
+            // Nun dieselben Wege mit der Zielsuche, die auch die Maus nimmt - an
+            // Punkten, die aus den Feldern selbst gerechnet sind. Die Geometrie der
+            // Ziele ist, was beim Ziehen schiefgehen kann.
+            System.Windows.Point In(FrameworkElement element, double x, double y)
+                => element.TranslatePoint(new System.Windows.Point(element.ActualWidth * x, y < 0 ? y : element.ActualHeight * y), dock);
+
+            // Den Ebenenreiter an den unteren Rand seiner eigenen Gruppe: Die Gruppe
+            // teilt sich, Farbe oben, Ebenen darunter.
+            Check.That(dock.DropAt("layers", In(colour, 0.5, 0.97)), "am unteren Rand der Farbe ist ein Ziel");
+            page.UpdateLayout();
+
+            Check.That(dock.Layout.Right.Count == 3 &&
+                       dock.Layout.Right[1].Panels.SequenceEqual(new[] { "colour" }) &&
+                       dock.Layout.Right[2].Panels.SequenceEqual(new[] { "layers" }),
+                       "ein Reiter an den eigenen Rand gezogen teilt die Gruppe",
+                       string.Join(" | ", dock.Layout.Right.Select(g => string.Join(",", g.Panels))));
+
+            Check.That(dock.IsShown("colour") && dock.IsShown("layers"), "und beide stehen da");
+
+            // Die Verteilung auf die Reiterleiste der Ebenen: dort als Reiter, und
+            // ihre alte Gruppe verschwindet.
+            Check.That(dock.DropAt("histogram", In(strip, 0.5, -12)), "die Reiterleiste ist ein Ziel");
+            page.UpdateLayout();
+
+            Check.That(dock.Layout.Right.Count == 2 &&
+                       dock.Layout.Right[1].Panels.SequenceEqual(new[] { "layers", "histogram" }) &&
+                       dock.Layout.Right[1].Active == "histogram",
+                       "auf die Reiterleiste gezogen wird es ein Reiter - und liegt vorn",
+                       string.Join(" | ", dock.Layout.Right.Select(g => string.Join(",", g.Panels))));
+
+            // Die Farbe an den linken Bildrand: Dort entsteht die linke Zone.
+            var centre = dock.Center!;
+
+            Check.That(dock.DropAt("colour", In(centre, 0, 0.5) + new System.Windows.Vector(20, 0)),
+                       "der linke Bildrand ist ein Ziel, solange links nichts steht");
+            page.UpdateLayout();
+
+            Check.That(dock.Layout.Find("colour") is { Zone: DockZone.Left } && dock.IsShown("colour"),
+                       "und dort steht die Farbe dann");
+
+            // Die Bildmitte ist kein Ziel - dort loslassen heisst: doch nicht.
+            string before2 = System.Text.Json.JsonSerializer.Serialize(dock.Layout);
+
+            Check.That(!dock.DropAt("layers", In(centre, 0.5, 0.5)), "die Bildmitte ist kein Ziel");
+
+            // Und ein Feld allein in seiner Gruppe hat dort keinen anderen Ort.
+            Check.That(!dock.DropAt("colour", In(colour, 0.5, 0.5)),
+                       "allein in der eigenen Gruppe ist jeder Ort derselbe");
+
+            Check.That(System.Text.Json.JsonSerializer.Serialize(dock.Layout) == before2,
+                       "wo kein Ziel ist, aendert sich nichts");
+
+            dock.ResetLayout();
         }
         finally
         {
