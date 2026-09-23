@@ -1,6 +1,8 @@
 using System.IO;
 using System.Windows;
 using System.Windows.Controls;
+using FrameFlip.Decoding.Exr;
+using FrameFlip.Imaging.Grading;
 using FrameFlip.Imaging.Nodes;
 using FrameFlip.Localization;
 using Point = System.Windows.Point;
@@ -177,12 +179,48 @@ public partial class AtelierPage
                 layer.Click += (_, _) => AddImageLayer();
                 item.Items.Add(layer);
 
+                if (PassMenu("S_NodeMenuPassLayer", AddPassLayer) is { } passLayer) item.Items.Add(passLayer);
+
                 var file = new MenuItem { Header = Strings.T("S_NodeMenuPictureFile") };
                 file.Click += (_, _) =>
                 {
                     if (ChoosePicture() is { } path) Place(new PictureNode { Path = path, FollowSequence = false }, at);
                 };
                 item.Items.Add(file);
+            }
+
+            if (group.Key == NodeCatalog.Masks)
+            {
+                var extra = new List<object>();
+
+                if (PassMenu("S_NodeMenuPassMask", pass => Place(new MaskNode
+                    {
+                        Mask = new LayerMask { Kind = MaskKind.Pass, Source = pass },
+                    }, at)) is { } passMask)
+                {
+                    extra.Add(passMask);
+                }
+
+                foreach (var set in _cryptomattes)
+                {
+                    var crypto = new MenuItem { Header = Strings.T("S_NodeMenuCrypto", set.ShortName) };
+                    crypto.Click += (_, _) => Place(new MaskNode
+                    {
+                        Mask = new LayerMask
+                        {
+                            Kind = MaskKind.Cryptomatte,
+                            Source = set.Prefix,
+                            Levels = Cryptomatte.Levels(_passes, set.Prefix).ToList(),
+                        },
+                    }, at);
+                    extra.Add(crypto);
+                }
+
+                if (extra.Count > 0)
+                {
+                    item.Items.Add(new Separator());
+                    foreach (var entry in extra) item.Items.Add(entry);
+                }
             }
 
             menu.Items.Add(item);
@@ -201,6 +239,13 @@ public partial class AtelierPage
                 OnGraphChanged();
             };
             menu.Items.Add(mute);
+
+            if (node is not RenderNode)
+            {
+                var duplicate = new MenuItem { Header = Strings.T("S_NodeMenuDuplicate") };
+                duplicate.Click += (_, _) => NodeView.Duplicate(node);
+                menu.Items.Add(duplicate);
+            }
 
             var delete = new MenuItem { Header = Strings.T("S_NodeMenuDelete") };
             delete.Click += (_, _) => NodeView.Remove(node);
@@ -227,6 +272,39 @@ public partial class AtelierPage
         menu.IsOpen = true;
     }
 
+    /// <summary>Ein Untermenue mit den Passen der Datei - oder null, wenn sie keine hat.</summary>
+    private MenuItem? PassMenu(string titleKey, Action<string> chosen)
+    {
+        var passes = NodePasses();
+        if (passes.Count == 0) return null;
+
+        var menu = new MenuItem { Header = Strings.T(titleKey) };
+
+        foreach (var (name, label) in passes)
+        {
+            // Unterstriche waeren sonst Zugriffstasten - "Diff_Col" verloere seinen Strich.
+            var entry = new MenuItem { Header = label.Replace("_", "__") };
+            entry.Click += (_, _) => chosen(name);
+            menu.Items.Add(entry);
+        }
+
+        return menu;
+    }
+
+    /// <summary>
+    /// Worauf eine neue Ebene kommt: auf den gewaehlten Knoten, wenn er ein Bild liefert -
+    /// sonst oben auf die Ebenen, vor die Werkzeuge am Bild, wo sie im Stapel auch laege.
+    /// </summary>
+    private Node? LayerTarget()
+    {
+        if (_graph is null) return null;
+
+        if (NodeView.Selected is { } chosen && chosen is not OutputNode && NodeEdits.Through(chosen).Output is not null)
+            return chosen;
+
+        return NodeEdits.LayerTop(_graph);
+    }
+
     /// <summary>
     /// Ein Bild als Ebene: Bilddatei, Platzieren und Mischen, hinter den gewaehlten
     /// Knoten gesetzt. Drei Knoten und vier Kabel in einem Griff - so haeufig, wie ein
@@ -234,40 +312,64 @@ public partial class AtelierPage
     /// </summary>
     private void AddImageLayer()
     {
-        if (_graph is null || ChoosePicture() is not { } path) return;
-
-        var after = NodeView.Selected is { } chosen && chosen is not OutputNode &&
-                    NodeEdits.Through(chosen).Output is not null
-            ? chosen
-            : _graph.Output is { } output && _graph.Into(output.Id, "Bild") is { } last
-                ? _graph.Find(last.From)
-                : null;
-
-        if (after is null) return;
+        if (_graph is null || ChoosePicture() is not { } path || LayerTarget() is not { } after) return;
 
         RememberNodes();
 
-        var mix = _graph.Add(new MixNode());
-        var place = _graph.Add(new PlaceNode());
         var picture = _graph.Add(new PictureNode { Path = path, FollowSequence = false });
 
-        mix.X = after.X + NodeLayout.ColumnStep;
-        mix.Y = after.Y;
-        place.X = after.X;
-        place.Y = after.Y - NodeLayout.Height(place) - NodeLayout.Gap;
+        if (NodeEdits.AddLayer(_graph, after, picture, "Bild", BlendMode.Normal) is not var (place, mix)) return;
+
+        ArrangeLayer(after, picture, place, mix);
         picture.X = place.X - NodeLayout.ColumnStep;
         picture.Y = place.Y;
-
-        NodeEdits.InsertAfter(_graph, after, mix);
-        NodeEdits.MakeRoom(_graph, mix, NodeLayout.ColumnStep);
-
-        _graph.Connect(picture, "Bild", place, "Bild");
-        _graph.Connect(place, "Bild", mix, "Oben");
 
         NodeView.Select(mix);
         NodeView.InvalidateVisual();
 
         AfterNodeEdit();
+    }
+
+    /// <summary>
+    /// Ein Pass als Ebene - wie im Ebenenstreifen auf Addieren: Die Passe einer Datei
+    /// setzen das Bild zusammen, und das Licht eines Passes kommt zum Bisherigen dazu.
+    /// </summary>
+    private void AddPassLayer(string pass)
+    {
+        if (_graph?.Nodes.OfType<RenderNode>().FirstOrDefault() is not { } file || LayerTarget() is not { } after) return;
+
+        RememberNodes();
+
+        if (!NodeEdits.ShowPass(_graph, file, pass, on: true) ||
+            NodeEdits.AddLayer(_graph, after, file, pass, BlendMode.Add) is not var (place, mix))
+        {
+            return;
+        }
+
+        ArrangeLayer(after, file, place, mix);
+
+        NodeView.Select(mix);
+        NodeView.InvalidateVisual();
+
+        AfterNodeEdit();
+    }
+
+    /// <summary>
+    /// Mischen rechts neben den Knoten, auf den es kommt; Platzieren eine Spalte davor und
+    /// darueber. Kommt die Ebene aus demselben Knoten - ein Pass auf die Datei selbst -,
+    /// steht Platzieren eine Spalte weiter rechts, sonst liefe sein Kabel rueckwaerts.
+    /// </summary>
+    private void ArrangeLayer(Node after, Node source, PlaceNode place, MixNode mix)
+    {
+        int columns = source.X >= after.X - 1 ? 2 : 1;
+
+        mix.X = after.X + NodeLayout.ColumnStep;
+        mix.Y = after.Y;
+        NodeEdits.MakeRoom(_graph!, mix, columns * NodeLayout.ColumnStep);
+
+        mix.X = after.X + columns * NodeLayout.ColumnStep;
+        place.X = mix.X - NodeLayout.ColumnStep;
+        place.Y = after.Y - NodeLayout.Height(place) - NodeLayout.Gap;
     }
 
     /// <summary>Fragt nach einer Bilddatei. Null, wenn niemand eine waehlt.</summary>

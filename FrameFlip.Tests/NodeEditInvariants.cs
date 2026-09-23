@@ -38,7 +38,9 @@ public static class NodeEditInvariants
         RemovingClosesTheGap(sources);
         InsertingMatchesTheStack(sources);
         TheEditorWires(sources);
+        DuplicatingKeepsTheInputs(sources);
         ThePageBuildsAndUndoes();
+        ThePageWiresPassesAndPicks();
     }
 
     // ------------------------------------------------------------ Modell
@@ -217,7 +219,211 @@ public static class NodeEditInvariants
         }
     }
 
+    private static void DuplicatingKeepsTheInputs(Dictionary<string, FloatFrame> sources)
+    {
+        Check.Group("Knoten bauen: verdoppeln");
+
+        var graph = StackToGraph.Convert(Stack(), Adjust(), Vignette());
+        var before = Render(graph, sources);
+
+        var vignette = graph.Nodes.OfType<OpticsNode>().Single();
+        var copy = NodeEdits.Duplicate(graph, vignette);
+
+        Check.That(copy is OpticsNode { Tool: VignetteTool { Amount: -0.6f } } c && !ReferenceEquals(c.Tool, vignette.Tool),
+                   "die Kopie hat dieselbe Einstellung - in einem eigenen Werkzeug");
+        Check.That(copy!.Id != vignette.Id && graph.Problems().Count == 0, "und eine eigene Kennung",
+                   string.Join("; ", graph.Problems()));
+
+        var inputs = graph.Links.Where(l => l.To == vignette.Id).Select(l => (l.From, l.Output, l.Input)).ToList();
+        var copied = graph.Links.Where(l => l.To == copy.Id).Select(l => (l.From, l.Output, l.Input)).ToList();
+
+        Check.That(inputs.Count > 0 && inputs.SequenceEqual(copied), "sie liest dasselbe wie das Original");
+        Check.That(!graph.Links.Any(l => l.From == copy.Id), "aber niemand liest sie");
+        Check.That(Render(graph, sources).AsSpan().SequenceEqual(before), "und das Bild bleibt, wie es war");
+
+        ((VignetteTool)vignette.Tool!).Amount = 0.3f;
+        Check.That(copy is OpticsNode { Tool: VignetteTool { Amount: -0.6f } }, "das Original zu aendern laesst die Kopie in Ruhe");
+
+        Check.That(NodeEdits.Duplicate(graph, graph.Output!) is null &&
+                   NodeEdits.Duplicate(graph, graph.Nodes.OfType<RenderNode>().Single()) is null,
+                   "Ausgabe und Datei gibt es nur einmal");
+    }
+
     // ------------------------------------------------------------ Seite
+
+    /// <summary>
+    /// Passe und Kryptomatten auf der Seite - an der kleinen Kryptomattendatei der
+    /// Probe, nicht an einem echten Projekt.
+    /// </summary>
+    private static void ThePageWiresPassesAndPicks()
+    {
+        Check.Group("Knoten bauen: Passe, Kryptomatte und Verdoppeln auf der Seite");
+
+        string folder = Path.Combine(Path.GetTempPath(), "frameflip-knotenpass-" + Guid.NewGuid().ToString("N")[..8]);
+        Directory.CreateDirectory(folder);
+
+        string path = Path.Combine(folder, "render_0001.exr");
+        File.WriteAllBytes(path, CryptoSample.Bytes());
+
+        var settings = new AppSettings();
+        var page = new AtelierPage(FrameDecoderRegistry.CreateDefault(() => null), settings, _ => { });
+        var window = Window(page);
+
+        try
+        {
+            page.Open(path);
+
+            var size = (TextBlock)page.FindName("SourceText");
+            if (!Pump(TimeSpan.FromSeconds(10), () => size.Text.Length > 0))
+            {
+                Check.That(false, "die Datei wird geladen");
+                return;
+            }
+
+            Settle();
+
+            page.ConvertToNodes();
+            ((ToolColumn)page.FindName("MouseTools")).Select(AtelierTool.Nodes, notify: true);
+            Settle();
+
+            var editor = (NodeEditor)page.FindName("NodeView");
+            var colour = (GradingPanel)page.FindName("Tools");
+            byte[] plain = Pixels(page);
+
+            var passes = (IReadOnlyList<(string Name, string Label)>)Call(page, "NodePasses")!;
+
+            Check.That(passes.Any(p => p.Label == "DiffCol") && passes.Any(p => p.Label == "Mist"),
+                       "die Passe der Datei stehen zur Wahl", string.Join(", ", passes.Select(p => p.Label)));
+            Check.That(!passes.Any(p => p.Label.StartsWith("Crypto", StringComparison.Ordinal)),
+                       "die Stufen der Kryptomatten nicht - sie sind Kennungen, kein Licht");
+
+            // Ein Pass als Ebene: Datei, Platzieren, Mischen in einem Griff.
+            string diffuse = passes.First(p => p.Label == "DiffCol").Name;
+
+            editor.Select(null);
+            Call(page, "AddPassLayer", diffuse);
+            Pump(TimeSpan.FromSeconds(3), () => !Pixels(page).AsSpan().SequenceEqual(plain));
+
+            var file = page.Graph!.Nodes.OfType<RenderNode>().Single();
+
+            Check.That(file.Passes.Contains(diffuse) && editor.Selected is MixNode { Mode: BlendMode.Add } mix &&
+                       page.Graph.Into(mix.Id, "Oben") is { } over && page.Graph.Find(over.From) is PlaceNode,
+                       "Pass als Ebene legt einen Ausgang, Platzieren und Mischen auf Addieren an");
+            Check.That(!Pixels(page).AsSpan().SequenceEqual(plain), "und das Bild wird heller");
+
+            page.StepNodes(back: true);
+            Pump(TimeSpan.FromSeconds(3), () => Pixels(page).AsSpan().SequenceEqual(plain));
+
+            Check.That(!page.Graph!.Nodes.OfType<RenderNode>().Single().Passes.Contains(diffuse) &&
+                       Pixels(page).AsSpan().SequenceEqual(plain),
+                       "Rueckgaengig nimmt alles wieder heraus");
+
+            // Ein Pass als Ausgang, am Schalter der Datei.
+            editor.Select(page.Graph.Nodes.OfType<RenderNode>().Single());
+
+            var fields = (StackPanel)colour.FindName("NodeFields");
+            var mist = fields.Children.OfType<System.Windows.Controls.Primitives.ToggleButton>()
+                             .FirstOrDefault(t => (string)t.Content == "Mist");
+
+            Check.That(mist is { IsChecked: false }, "die Datei zeigt ihre Passe als Schalter");
+
+            if (mist is not null)
+            {
+                mist.IsChecked = true;
+                mist.RaiseEvent(new RoutedEventArgs(System.Windows.Controls.Primitives.ButtonBase.ClickEvent));
+                Settle();
+            }
+
+            string mistName = passes.First(p => p.Label == "Mist").Name;
+
+            Check.That(page.Graph!.Nodes.OfType<RenderNode>().Single().Output(mistName) is not null,
+                       "eingeschaltet wird der Pass ein Ausgang");
+            Check.That(Pixels(page).AsSpan().SequenceEqual(plain), "der nichts aendert, solange kein Kabel steckt");
+
+            page.StepNodes(back: true);
+
+            Check.That(page.Graph!.Nodes.OfType<RenderNode>().Single().Output(mistName) is null,
+                       "und auch das laesst sich zuruecknehmen");
+
+            // Kryptomatte: waehlen durch Klicken, mit Rueckgaengig.
+            var sets = (IReadOnlyList<Decoding.Exr.CryptomatteSet>)Field(page, "_cryptomattes")!;
+            var all = (IReadOnlyList<Decoding.Exr.ExrPass>)Field(page, "_passes")!;
+            var set = sets.First(s => s.ShortName == "CryptoObject");
+
+            var crypto = new MaskNode
+            {
+                Mask = new LayerMask
+                {
+                    Kind = MaskKind.Cryptomatte,
+                    Source = set.Prefix,
+                    Levels = Decoding.Exr.Cryptomatte.Levels(all, set.Prefix).ToList(),
+                },
+            };
+
+            Call(page, "Place", crypto, new Point(0, 0));
+
+            // Die Stufen kommen nach - gewaehlt werden kann, sobald die unterste da ist.
+            var loaded = (System.Collections.IDictionary)Field(page, "_sources")!;
+            Pump(TimeSpan.FromSeconds(3), () => loaded.Contains(crypto.Mask.Levels[0]));
+
+            Check.That(ReferenceEquals(editor.Selected, crypto), "der Kryptomatte-Knoten steht da und ist gewaehlt");
+
+            int px = -1, py = -1;
+
+            for (int y = 0; y < CryptoSample.Height && px < 0; y++)
+                for (int x = 0; x < CryptoSample.Width && px < 0; x++)
+                    if (page.PickAt(x, y)) (px, py) = (x, y);
+
+            var picked = page.Graph!.Nodes.OfType<MaskNode>().Single(m => m.Mask.Kind == MaskKind.Cryptomatte);
+
+            Check.That(px >= 0 && picked.Mask.Picks is [{ Name.Length: > 0 }],
+                       "ein Klick ins Bild nimmt das Objekt dort auf - mit Namen",
+                       string.Join(", ", picked.Mask.Picks.Select(p => p.Name)));
+
+            var info = fields.Children.OfType<TextBlock>().Select(t => t.Text).ToList();
+            Check.That(info.Any(t => t.Contains(picked.Mask.Picks.FirstOrDefault()?.Name ?? "\u0000")),
+                       "und der Streifen nennt es", string.Join(" | ", info));
+
+            if (px >= 0) page.PickAt(px, py);
+
+            Check.That(picked.Mask.Picks.Count == 0, "ein zweiter Klick auf dasselbe nimmt es wieder heraus");
+
+            page.StepNodes(back: true);
+
+            // Ohne Wahl davor naehme Rueckgaengig den Knoten selbst weg - deshalb kein Single.
+            Check.That(page.Graph!.Nodes.OfType<MaskNode>().FirstOrDefault(m => m.Mask.Kind == MaskKind.Cryptomatte)?.Mask.Picks.Count == 1,
+                       "Rueckgaengig holt die Wahl zurueck");
+
+            // Verdoppeln auf der Seite: Umschalt+D gibt es im Editor, hier der Weg dahinter.
+            // Dass das Bild dabei bleibt, prueft das Modell oben.
+            var light = page.Graph!.Nodes.OfType<LightNode>().Single();
+
+            editor.Duplicate(light);
+
+            Check.That(page.Graph.Nodes.OfType<LightNode>().Count() == 2 && editor.Selected is LightNode chosen &&
+                       !ReferenceEquals(chosen, light),
+                       "verdoppelt, und die Kopie ist gewaehlt");
+
+            page.StepNodes(back: true);
+
+            Check.That(page.Graph!.Nodes.OfType<LightNode>().Count() == 1, "und Rueckgaengig nimmt sie wieder weg");
+        }
+        finally
+        {
+            window.Close();
+            try { Directory.Delete(folder, recursive: true); } catch (Exception) { }
+        }
+    }
+
+    private static object? Call(object target, string method, params object[] arguments)
+        => target.GetType()
+                 .GetMethod(method, System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic)!
+                 .Invoke(target, arguments);
+
+    private static object? Field(object target, string name)
+        => target.GetType()
+                 .GetField(name, System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic)!
+                 .GetValue(target);
 
     private static void ThePageBuildsAndUndoes()
     {

@@ -660,6 +660,12 @@ public sealed class NodeEditor : FrameworkElement
                 e.Handled = true;
                 break;
 
+            // Umschalt+D wie in Blender, Strg+D wie fast ueberall sonst.
+            case Key.D when (shift || control) && Selected is not null:
+                Duplicate(Selected);
+                e.Handled = true;
+                break;
+
             case Key.Z when control && !shift:
                 UndoWanted?.Invoke();
                 e.Handled = true;
@@ -692,6 +698,21 @@ public sealed class NodeEditor : FrameworkElement
         NodeEdits.Remove(_graph, node, reconnect: true);
 
         Select(null);
+        GraphChanged?.Invoke();
+    }
+
+    /// <summary>
+    /// Verdoppelt einen Knoten - er liest dasselbe, rechnet gleich und wird gewaehlt.
+    /// Wohin sein Bild geht, zieht man danach: der Anfang einer Verzweigung.
+    /// </summary>
+    public void Duplicate(Node node)
+    {
+        if (_graph is null || node is OutputNode or RenderNode) return;
+
+        Editing?.Invoke();
+        var copy = NodeEdits.Duplicate(_graph, node);
+
+        Select(copy);
         GraphChanged?.Invoke();
     }
 

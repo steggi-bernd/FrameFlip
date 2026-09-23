@@ -943,7 +943,7 @@
     <sys:String x:Key="S_NodeCropTop">Anschnitt oben</sys:String>
     <sys:String x:Key="S_NodeCropRight">Anschnitt rechts</sys:String>
     <sys:String x:Key="S_NodeCropBottom">Anschnitt unten</sys:String>
-    <sys:String x:Key="S_NodeRenderHint">Die gerenderte Datei: das Bild, die Renderdaten Tiefe, Vektor und Normale, und jeder Pass, den eine Ebene nutzt.</sys:String>
+    <sys:String x:Key="S_NodeRenderHint">Die gerenderte Datei: das Bild, die Renderdaten Tiefe, Vektor und Normale, und jeder Pass, der unten eingeschaltet ist.</sys:String>
     <sys:String x:Key="S_NodeViewHint">Die Sichtumwandlung, etwa AgX. Links davon rechnet alles in Licht, rechts davon auf Anzeigewerten.</sys:String>
     <sys:String x:Key="S_NodeRestrictHint">Blendet vom unkorrigierten zum korrigierten Bild, soweit die Maske reicht – die Korrektur gilt nur dort.</sys:String>
     <sys:String x:Key="S_NodeFallbackHint">Zeigt den Stapel – oder das Bild der Datei, wenn keine Ebene etwas beiträgt.</sys:String>
@@ -966,6 +966,17 @@
     <sys:String x:Key="S_NodeMenuDelete">Löschen (Entf)</sys:String>
     <sys:String x:Key="S_NodeMenuArrange">Neu anordnen</sys:String>
     <sys:String x:Key="S_NodeMenuFrame">Alles zeigen (Pos1)</sys:String>
+    <sys:String x:Key="S_NodeRenderPasses">Pässe als eigene Ausgänge – einschalten, dann ein Kabel ziehen:</sys:String>
+    <sys:String x:Key="S_NodeMaskPassWired">Liest den Pass „{0}“ über das Kabel an „Pass“.</sys:String>
+    <sys:String x:Key="S_NodeMaskPassNamed">Liest den Pass „{0}“ beim Namen. Ein Kabel an „Pass“ geht vor.</sys:String>
+    <sys:String x:Key="S_NodeMaskPassNone">Kein Pass angesteckt – einen Ausgang der Datei an „Pass“ ziehen.</sys:String>
+    <sys:String x:Key="S_NodeCryptoHint">Mit „Auswählen“ (W) Objekte im Bild anklicken, solange dieser Knoten gewählt ist – ein zweiter Klick nimmt sie wieder heraus. Die Maske wirkt, sobald „Maske“ an einem Faktor steckt.</sys:String>
+    <sys:String x:Key="S_NodeCryptoPicked">Gewählt: {0}</sys:String>
+    <sys:String x:Key="S_NodeCryptoClear">Auswahl leeren</sys:String>
+    <sys:String x:Key="S_NodeMenuPassLayer">Pass als Ebene</sys:String>
+    <sys:String x:Key="S_NodeMenuPassMask">Pass als Maske</sys:String>
+    <sys:String x:Key="S_NodeMenuCrypto">Kryptomatte: {0}</sys:String>
+    <sys:String x:Key="S_NodeMenuDuplicate">Duplizieren (Umschalt+D)</sys:String>
     <sys:String x:Key="S_NodeDiffusion">Rasterdiffusion</sys:String>
     <sys:String x:Key="S_SectionColour">Farbe</sys:String>
     <sys:String x:Key="S_SectionProperties">Eigenschaften</sys:String>
@@ -976,6 +987,7 @@
     <sys:String x:Key="S_ToolPick">Pipette</sys:String>
     <sys:String x:Key="S_ToolMoveShort">Zieht die gewählte Ebene im Bild. An den Ecken größer und kleiner, am Griff darüber gedreht. Doppelklick stellt sie wieder mittig.</sys:String>
     <sys:String x:Key="S_ToolSelectShort">Ein Klick auf ein Objekt legt eine Kryptomatte an. Die Einstellungen dazu stehen beim Maskenbereich der Ebene.</sys:String>
+    <sys:String x:Key="S_ToolSelectNodesShort">Ein Klick auf ein Objekt nimmt es in den gewählten Kryptomatte-Knoten auf – ein zweiter nimmt es wieder heraus.</sys:String>
     <sys:String x:Key="S_ToolCropShort">Zieht die Schnittkanten der gewählten Ebene. Der gedämpfte Rahmen zeigt, wovon abgeschnitten wird. Doppelklick nimmt den Schnitt zurück.</sys:String>
     <sys:String x:Key="S_ToolHandShort">Schiebt den Ausschnitt. Die mittlere Maustaste tut überall dasselbe, ohne das Werkzeug zu wechseln.</sys:String>
     <sys:String x:Key="S_ToolPickShort">Liest den Wert unter dem Zeiger ab — und die Entfernung, wenn die Datei einen Tiefenpass führt.</sys:String>

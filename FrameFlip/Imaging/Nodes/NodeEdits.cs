@@ -1,3 +1,5 @@
+using FrameFlip.Imaging.Grading;
+
 namespace FrameFlip.Imaging.Nodes;
 
 /// <summary>
@@ -157,6 +159,100 @@ public static class NodeEdits
 
         graph.Connect(node, output, to, target);
         return true;
+    }
+
+    /// <summary>
+    /// Verdoppelt einen Knoten - mit denselben Eingaengen, aber ohne Leser.
+    ///
+    /// Das ist der schnellste Weg zu einer Verzweigung: Die Kopie liest dasselbe wie das
+    /// Original und rechnet mit denselben Einstellungen weiter; wohin ihr Bild geht,
+    /// entscheidet man danach. Die Ausgabe und die Datei gibt es nur einmal.
+    /// </summary>
+    public static Node? Duplicate(NodeGraph graph, Node node, double offset = 40)
+    {
+        if (node is OutputNode or RenderNode) return null;
+
+        var copy = graph.Add(NodeGraph.CopyOf(node));
+        copy.X = node.X + offset;
+        copy.Y = node.Y + offset;
+
+        foreach (var link in graph.Links.Where(l => l.To == node.Id).ToList())
+            if (graph.Find(link.From) is { } source) graph.Connect(source, link.Output, copy, link.Input);
+
+        return copy;
+    }
+
+    /// <summary>
+    /// Macht einen Pass der Datei zu einem eigenen Ausgang - oder nimmt ihn wieder weg,
+    /// samt den Kabeln, die an ihm hingen. Ein Pass, der so heisst wie ein fester Ausgang,
+    /// laesst sich nicht zeigen: Zwei Ausgaenge mit einem Namen waeren nicht zu trennen.
+    /// </summary>
+    public static bool ShowPass(NodeGraph graph, RenderNode render, string pass, bool on)
+    {
+        if (pass.Length == 0 || pass is RenderNode.Picture or RenderNode.Depth or RenderNode.Motion or RenderNode.Normal)
+            return false;
+
+        if (on)
+        {
+            if (!render.Passes.Contains(pass)) render.Passes.Add(pass);
+            return true;
+        }
+
+        render.Passes.Remove(pass);
+        graph.Links.RemoveAll(l => l.From == render.Id && l.Output == pass);
+
+        return true;
+    }
+
+    /// <summary>
+    /// Eine neue Ebene: Das Bild aus <paramref name="source"/> wird platziert und auf das
+    /// gemischt, was <paramref name="after"/> liefert - so, wie eine neue Ebene im Stapel
+    /// oben auf den bisherigen liegt. Mit denselben Grundwerten wie dort, damit "als
+    /// Ebene" im Graphen dasselbe ergibt wie im Stapel.
+    /// </summary>
+    public static (PlaceNode Place, MixNode Mix)? AddLayer(NodeGraph graph, Node after, Node source, string output,
+                                                          BlendMode mode)
+    {
+        if (Through(after).Output is null || source.Output(output) is null) return null;
+
+        var mix = graph.Add(new MixNode { Mode = mode });
+        var place = graph.Add(new PlaceNode());
+
+        InsertAfter(graph, after, mix);
+
+        graph.Connect(source, output, place, "Bild");
+        graph.Connect(place, "Bild", mix, "Oben");
+
+        return (place, mix);
+    }
+
+    /// <summary>
+    /// Wohin eine neue Ebene gehoert, wenn niemand etwas gewaehlt hat: oben auf die
+    /// Ebenen - VOR die Werkzeuge am Bild und die Sichtumwandlung, nicht dahinter. Im
+    /// Stapel liegt eine neue Ebene auch unter den Werkzeugen am fertigen Bild.
+    ///
+    /// Gesucht wird von der Ausgabe zurueck, den Weg des Bildes entlang: bis zu dem, was
+    /// in den Rueckfall fuehrt, oder bis zum ersten Mischen. Gibt es beides nicht, ist
+    /// es das Erste, was ein Bild liefert, ohne eines zu lesen - die Datei.
+    /// </summary>
+    public static Node? LayerTop(NodeGraph graph)
+    {
+        Node? node = graph.Output;
+
+        for (int guard = 0; node is not null && guard <= graph.Nodes.Count; guard++)
+        {
+            var (input, _) = Through(node);
+            if (input is null || graph.Into(node.Id, input) is not { } link) return node is OutputNode ? null : node;
+
+            var from = graph.Find(link.From);
+            if (from is null) return null;
+
+            if (node is FallbackNode || from is MixNode) return from;
+
+            node = from;
+        }
+
+        return null;
     }
 
     /// <summary>

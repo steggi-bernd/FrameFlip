@@ -106,6 +106,7 @@ public partial class GradingPanel
         SliderField slider => SliderRow(slider),
         ChoiceField choice => ChoiceRow(choice),
         SwitchField toggle => SwitchRow(toggle),
+        ButtonField button => ButtonRow(button),
         InfoField info => new TextBlock
         {
             Text = info.Text,
@@ -203,7 +204,7 @@ public partial class GradingPanel
             if (_filling || box.SelectedItem is not ComboBoxItem { Tag: int v }) return;
 
             field.Set(v);
-            Raise(interim: false);
+            if (!field.Structural) Raise(interim: false);
         };
 
         panel.Children.Add(box);
@@ -216,7 +217,7 @@ public partial class GradingPanel
         var toggle = new ToggleButton
         {
             Style = (Style)FindResource("OverlayToggle"),
-            Content = Strings.T(field.LabelKey),
+            Content = field.Text ?? Strings.T(field.LabelKey),
             IsChecked = field.Get(),
             HorizontalAlignment = HorizontalAlignment.Stretch,
             FontSize = 11,
@@ -225,9 +226,28 @@ public partial class GradingPanel
         toggle.Click += (_, _) =>
         {
             field.Set(toggle.IsChecked == true);
-            Raise(interim: false);
+            if (!field.Structural) Raise(interim: false);
         };
 
         return toggle;
+    }
+
+    private UIElement ButtonRow(ButtonField field)
+    {
+        var button = new Button
+        {
+            Style = (Style)FindResource("OverlayButton"),
+            Content = Strings.T(field.LabelKey),
+            HorizontalAlignment = HorizontalAlignment.Stretch,
+            FontSize = 11,
+        };
+
+        button.Click += (_, _) =>
+        {
+            field.Click();
+            if (!field.Structural) Raise(interim: false);
+        };
+
+        return button;
     }
 }

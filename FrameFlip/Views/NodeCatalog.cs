@@ -82,6 +82,15 @@ public static class NodeCatalog
     /// </summary>
     public static void WireData(NodeGraph graph, Node node)
     {
+        // Eine Passmaske bekommt ihren Pass als Kabel - man sieht, woher sie liest.
+        if (node is MaskNode { Mask: { Kind: MaskKind.Pass, Source.Length: > 0 } mask } &&
+            graph.Nodes.OfType<RenderNode>().FirstOrDefault() is { } file &&
+            NodeEdits.ShowPass(graph, file, mask.Source, on: true))
+        {
+            graph.Connect(file, mask.Source, node, "Pass");
+            return;
+        }
+
         if (node is not DataNode { Tool: { } tool }) return;
 
         string? output = tool.Needs switch

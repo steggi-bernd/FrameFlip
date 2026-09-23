@@ -1,6 +1,8 @@
 using System.Windows.Input;
 using System.Windows.Media;
 using FrameFlip.Decoding.Exr;
+using FrameFlip.Imaging.Grading;
+using FrameFlip.Imaging.Nodes;
 
 // WinForms ist mit im Haus, und dort gibt es Point noch einmal. Der Alias sagt,
 // welcher gemeint ist, statt es dem naechsten Leser zu ueberlassen.
@@ -57,23 +59,46 @@ public partial class AtelierPage
         }
 
         if (_tool != AtelierTool.Select) return;
-
-        string? level = Layers.PickLevel;
-        if (level is null) return;
-
-        if (!_sources.TryGetValue(level, out var frame)) return;
         if (!PixelAt(e.GetPosition(Display), out int x, out int y)) return;
+
+        if (PickAt(x, y)) e.Handled = true;
+    }
+
+    /// <summary>
+    /// Nimmt das Objekt an einem Bildpunkt in die Kryptomatte auf, an der gerade gewaehlt
+    /// wird - oder wieder heraus. Im Stapel ist das die Maske der gewaehlten Ebene, im
+    /// Knotenmodus der gewaehlte Maskenknoten. False, wenn es dort nichts zu waehlen gibt.
+    /// </summary>
+    internal bool PickAt(int x, int y)
+    {
+        var node = InNodes ? NodeView.Selected as MaskNode : null;
+
+        string? level = InNodes
+            ? node?.Mask is { Kind: MaskKind.Cryptomatte, Levels.Count: > 0 } mask ? mask.Levels[0] : null
+            : Layers.PickLevel;
+
+        if (level is null || !_sources.TryGetValue(level, out var frame)) return false;
+        if (x < 0 || y < 0 || x >= frame.Width || y >= frame.Height) return false;
 
         float id = frame.R[y * frame.Width + x];
 
         // Null heisst: hier steht nichts. Der Hintergrund traegt keine Kennung, und
         // ihn auszuwaehlen ergaebe eine Maske, die nirgends greift.
-        if (id == 0f) return;
-
-        e.Handled = true;
+        if (id == 0f) return false;
 
         string name = NameOf(id) ?? "";
-        Layers.AddPick(name, id);
+
+        if (node is null)
+        {
+            Layers.AddPick(name, id);
+            return true;
+        }
+
+        RememberNodes();
+        node.Mask.TogglePick(name, id);
+        AfterNodeEdit();
+
+        return true;
     }
 
     /// <summary>Der Name zu einer Kennung, aus dem Manifest der Datei.</summary>

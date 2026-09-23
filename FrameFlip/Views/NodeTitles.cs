@@ -91,7 +91,12 @@ public static class NodeTitles
         string key = "S_Socket" + name;
         string text = Strings.T(key);
 
-        return text == key ? name : text;
+        if (text != key) return text;
+
+        // Ein Pass der Datei: ohne den Vorsatz der Ansichtsebene, wie in den Listen -
+        // "ViewLayer.DiffCol" passt sonst kaum an einen Knoten.
+        int dot = name.LastIndexOf('.');
+        return dot >= 0 && dot < name.Length - 1 ? name[(dot + 1)..] : name;
     }
 
     private static string MaskKey(MaskKind kind) => kind switch

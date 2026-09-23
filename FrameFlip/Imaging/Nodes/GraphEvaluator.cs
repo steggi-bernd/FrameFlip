@@ -70,6 +70,10 @@ public static class GraphEvaluator
                     break;
 
                 case MaskNode mask when !mask.Muted:
+                    // Eine Passmaske mit Kabel liest, was am Kabel ankommt - den Pass,
+                    // den sie beim Namen nennt, braucht sie dann nicht.
+                    if (mask.Mask.Kind == MaskKind.Pass && graph.Into(mask.Id, "Pass") is not null) break;
+
                     foreach (string source in mask.Mask.Sources()) Add(new LayerRead(source, LayerContent.Pass, false));
                     break;
             }

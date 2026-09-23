@@ -34,6 +34,7 @@ public static class NodeParityInvariants
         NamedCases(world);
         RandomCases(world);
         TheGraphSurvivesSaving(world);
+        WiredCases(world);
     }
 
     /// <summary>
@@ -267,6 +268,127 @@ public static class NodeParityInvariants
 
         Check.That(problems == 0, "jeder umgewandelte Graph ist rechenbar", first);
         Check.That(broken == 0, "und rechnet nach Speichern und Lesen dasselbe", first);
+    }
+
+    // ------------------------------------------------------------ Kabel
+
+    /// <summary>
+    /// Was man im Graphen selbst baut, rechnet wie das, was man im Stapel gebaut haette:
+    /// ein Pass als Ebene, eine Passmaske an einem anderen Pass. Ein Griff, der im Graphen
+    /// etwas anderes ergibt als die Ebene, die er nachbildet, waere ein Griff, dem man
+    /// nicht trauen kann.
+    /// </summary>
+    private static void WiredCases(World world)
+    {
+        Check.Group("Knoten: Passe als Kabel rechnen wie im Stapel");
+
+        var adjust = Adjust(0.2, 1.1, 0, 1, 1.05);
+        var picture = new GradingStack { Optics = { new VignetteTool { Amount = -0.5f } } };
+
+        // Ein Pass als Ebene - obenauf, vor den Werkzeugen am Bild.
+        foreach (var (name, below) in new[]
+        {
+            ("auf das Bild", Base()),
+            ("auf eine Ebene mit Maske", Base(Masked(Image("bild.png"), new LayerMask { Kind = MaskKind.Gradient, Angle = 20, Width = 0.7f }))),
+        })
+        {
+            var withLayer = below.Clone();
+            withLayer.Layers.Add(Pass("P.a", BlendMode.Add));
+
+            var graph = StackToGraph.Convert(below, adjust, picture);
+            var render = graph.Nodes.OfType<RenderNode>().Single();
+            var top = NodeEdits.LayerTop(graph);
+
+            bool built = top is not null &&
+                         NodeEdits.ShowPass(graph, render, "P.a", on: true) &&
+                         NodeEdits.AddLayer(graph, top, render, "P.a", BlendMode.Add) is not null;
+
+            Check.That(built && graph.Problems().Count == 0, $"Pass als Ebene {name}: der Graph ist rechenbar",
+                       string.Join("; ", graph.Problems()));
+
+            foreach (int step in new[] { 1, 3 })
+            {
+                var (differ, worst) = Diff(RenderStack(world, withLayer, adjust, picture, step, 5, sixteen: false),
+                                           RenderGraph(world, graph, step, 5, sixteen: false), 1);
+
+                Check.That(differ == 0, $"Pass als Ebene {name}{(step > 1 ? " (grob)" : "")} gleicht der Ebene im Stapel",
+                           $"{differ} Bytes anders, bis {worst} Stufen");
+            }
+
+            var (differ16, _) = Diff(RenderStack(world, withLayer, adjust, picture, 1, 5, sixteen: true),
+                                     RenderGraph(world, graph, 1, 5, sixteen: true), 2);
+
+            Check.That(differ16 == 0, $"Pass als Ebene {name} (16 Bit)", $"{differ16} Werte anders");
+        }
+
+        // Eine Passmaske haengt am Kabel - und ein anderer Pass am Kabel ist eine andere Maske.
+        var mist = Base(Masked(Image("bild.png"), new LayerMask { Kind = MaskKind.Pass, Source = "mist", Low = 0.1f, High = 0.8f }));
+        var depth = Base(Masked(Image("bild.png"), new LayerMask { Kind = MaskKind.Pass, Source = "depth", Low = 0.1f, High = 0.8f }));
+
+        var wired = StackToGraph.Convert(mist, ImageAdjustments.Neutral, new GradingStack());
+        var mask = wired.Nodes.OfType<MaskNode>().Single();
+        var file = wired.Nodes.OfType<RenderNode>().Single();
+
+        Check.That(wired.Into(mask.Id, "Pass") is { Output: "mist" } link && link.From == file.Id,
+                   "die umgewandelte Passmaske liest ihren Pass ueber ein Kabel von der Datei");
+
+        Check.That(GraphEvaluator.Reads(wired).Count(r => r.Key == "mist") == 1,
+                   "und der Pass wird einmal gelesen, nicht zweimal");
+
+        var expectedMist = RenderStack(world, mist, ImageAdjustments.Neutral, new GradingStack(), 1, 0, sixteen: false);
+        var expectedDepth = RenderStack(world, depth, ImageAdjustments.Neutral, new GradingStack(), 1, 0, sixteen: false);
+
+        Check.That(Diff(expectedMist, expectedDepth, 1).Differ > 50, "Nebel und Tiefe ergeben verschiedene Masken",
+                   "sonst prueft das Umstecken nichts");
+
+        NodeEdits.ShowPass(wired, file, "depth", on: true);
+        Check.That(NodeEdits.Connect(wired, file, "depth", mask, "Pass"), "ein anderer Pass laesst sich anstecken");
+
+        var (differDepth, worstDepth) = Diff(expectedDepth, RenderGraph(world, wired, 1, 0, sixteen: false), 1);
+
+        Check.That(differDepth == 0, "umgesteckt rechnet die Maske mit dem neuen Pass",
+                   $"{differDepth} Bytes anders, bis {worstDepth} Stufen");
+
+        NodeEdits.ShowPass(wired, file, "depth", on: false);
+
+        Check.That(wired.Into(mask.Id, "Pass") is null && wired.Problems().Count == 0,
+                   "ein abgeschalteter Ausgang nimmt sein Kabel mit, und der Graph bleibt heil",
+                   string.Join("; ", wired.Problems()));
+
+        Check.That(Diff(expectedMist, RenderGraph(world, wired, 1, 0, sixteen: false), 1).Differ == 0,
+                   "ohne Kabel liest die Maske wieder den Pass, den sie beim Namen nennt");
+
+        Check.That(!NodeEdits.ShowPass(wired, file, RenderNode.Depth, on: true) &&
+                   !file.Passes.Contains(RenderNode.Depth),
+                   "ein Pass mit dem Namen eines festen Ausgangs wird kein zweiter Ausgang");
+
+        // Eine Verzweigung: dieselbe Ebene zweimal, einmal als Kopie mit eigener Mischung.
+        var branch = StackToGraph.Convert(Base(Pass("P.a", BlendMode.Add)), ImageAdjustments.Neutral, new GradingStack());
+        var before = RenderGraph(world, branch, 1, 0, sixteen: false);
+        var place = branch.Nodes.OfType<PlaceNode>().Last();
+        var copy = NodeEdits.Duplicate(branch, place);
+
+        Check.That(copy is PlaceNode && Diff(before, RenderGraph(world, branch, 1, 0, sixteen: false), 1).Differ == 0,
+                   "eine Kopie ohne Leser aendert das Bild nicht");
+
+        var twice = Base(Pass("P.a", BlendMode.Add), Pass("P.a", BlendMode.Add));
+        var mix = branch.Nodes.OfType<MixNode>().Last();
+
+        bool branched = copy is not null && NodeEdits.AddLayer(branch, mix, copy, "Bild", BlendMode.Add) is { } added &&
+                        NodeEdits.Remove(branch, added.Place, reconnect: false) &&
+                        NodeEdits.Connect(branch, copy, "Bild", added.Mix, "Oben");
+
+        var (differTwice, worstTwice) = Diff(RenderStack(world, twice, ImageAdjustments.Neutral, new GradingStack(), 1, 0, sixteen: false),
+                                             RenderGraph(world, branch, 1, 0, sixteen: false), 1);
+
+        Check.That(branched && differTwice == 0, "die Kopie als zweite Ebene gleicht derselben Ebene zweimal im Stapel",
+                   $"{differTwice} Bytes anders, bis {worstTwice} Stufen");
+    }
+
+    private static ImageLayer Masked(ImageLayer layer, LayerMask mask)
+    {
+        layer.Mask = mask;
+        return layer;
     }
 
     // ------------------------------------------------------------ Rechnen

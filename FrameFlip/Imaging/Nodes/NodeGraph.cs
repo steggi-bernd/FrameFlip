@@ -286,4 +286,17 @@ public sealed class NodeGraph
 
     /// <summary>Eine eigene Kopie - Knoten und Werkzeuge sind danach andere Objekte.</summary>
     public NodeGraph Clone() => Load(Save())!;
+
+    /// <summary>
+    /// Eine Kopie eines Knotens, mit allem, was er einstellt - noch nicht im Graphen und
+    /// noch ohne Kennung. Ueber denselben Weg wie das Speichern, damit keine Einstellung
+    /// vergessen wird, die das Speichern kennt.
+    /// </summary>
+    public static Node CopyOf(Node node)
+    {
+        var copy = JsonSerializer.Deserialize<Node>(JsonSerializer.Serialize(node, Options), Options)!;
+        copy.Id = "";
+
+        return copy;
+    }
 }

@@ -289,6 +289,15 @@ public static class StackToGraph
             _graph.Connect(layer.Node, layer.Output, node, "Ebene");
             _graph.Connect(under.Node, under.Output, node, "Untergrund");
 
+            // Eine Passmaske nennt ihren Pass im Stapel beim Namen. Im Graphen wird
+            // daraus ein Kabel von der Datei - man sieht, woher die Maske kommt, und
+            // kann ihr einen anderen Pass anstecken.
+            if (mask.Kind == MaskKind.Pass && mask.Source.Length > 0)
+            {
+                if (!_render.Passes.Contains(mask.Source)) _render.Passes.Add(mask.Source);
+                _graph.Connect(_render, mask.Source, node, "Pass");
+            }
+
             return (node, "Maske");
         }
     }

@@ -227,6 +227,19 @@ public sealed class LayerMask
     /// </summary>
     public List<CryptoPick> Picks { get; set; } = new();
 
+    /// <summary>
+    /// Nimmt ein gewaehltes Objekt auf - oder, wenn es schon darin ist, wieder heraus.
+    /// Noch einmal auf dasselbe Objekt zu klicken ist der Griff, den man ohnehin
+    /// versucht, und er erspart das Zielen auf ein Kreuzchen in einer schmalen Liste.
+    /// </summary>
+    public void TogglePick(string name, float id)
+    {
+        var already = Picks.FirstOrDefault(p => p.Id.Equals(id));
+
+        if (already is not null) Picks.Remove(already);
+        else Picks.Add(new CryptoPick { Name = name, Id = id });
+    }
+
     [JsonIgnore]
     public bool IsNeutral => Kind == MaskKind.None;
 

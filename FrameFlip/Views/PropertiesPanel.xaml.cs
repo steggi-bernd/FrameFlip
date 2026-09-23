@@ -71,7 +71,8 @@ public partial class PropertiesPanel : UserControl
     private float? _depth;
 
     /// <summary>Welches Werkzeug gilt - danach richtet sich, was hier steht.</summary>
-    public void Show(AtelierTool tool)
+    /// <param name="nodes">Im Knotenmodus waehlt "Auswaehlen" fuer einen Knoten und legt keine Ebene an.</param>
+    public void Show(AtelierTool tool, bool nodes = false)
     {
         ToolName.Text = Strings.T(tool switch
         {
@@ -86,7 +87,7 @@ public partial class PropertiesPanel : UserControl
 
         ToolHint.Text = Strings.T(tool switch
         {
-            AtelierTool.Select => "S_ToolSelectShort",
+            AtelierTool.Select => nodes ? "S_ToolSelectNodesShort" : "S_ToolSelectShort",
             AtelierTool.Crop => "S_ToolCropShort",
             AtelierTool.Hand => "S_ToolHandShort",
             AtelierTool.Pick => "S_ToolPickShort",

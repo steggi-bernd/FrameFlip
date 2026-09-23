@@ -943,7 +943,7 @@
     <sys:String x:Key="S_NodeCropTop">Crop top</sys:String>
     <sys:String x:Key="S_NodeCropRight">Crop right</sys:String>
     <sys:String x:Key="S_NodeCropBottom">Crop bottom</sys:String>
-    <sys:String x:Key="S_NodeRenderHint">The rendered file: the picture, the render data depth, vector and normal, and every pass a layer uses.</sys:String>
+    <sys:String x:Key="S_NodeRenderHint">The rendered file: the picture, the render data depth, vector and normal, and every pass switched on below.</sys:String>
     <sys:String x:Key="S_NodeViewHint">The view transform, such as AgX. Left of it everything is light; right of it, display values.</sys:String>
     <sys:String x:Key="S_NodeRestrictHint">Blends from the uncorrected to the corrected picture as far as the mask reaches – the correction applies only there.</sys:String>
     <sys:String x:Key="S_NodeFallbackHint">Shows the stack – or the file’s picture if no layer contributes.</sys:String>
@@ -966,6 +966,17 @@
     <sys:String x:Key="S_NodeMenuDelete">Delete (Del)</sys:String>
     <sys:String x:Key="S_NodeMenuArrange">Arrange</sys:String>
     <sys:String x:Key="S_NodeMenuFrame">Show all (Home)</sys:String>
+    <sys:String x:Key="S_NodeRenderPasses">Passes as outputs of their own – switch on, then drag a wire:</sys:String>
+    <sys:String x:Key="S_NodeMaskPassWired">Reads the pass “{0}” through the wire into “Pass”.</sys:String>
+    <sys:String x:Key="S_NodeMaskPassNamed">Reads the pass “{0}” by name. A wire into “Pass” takes precedence.</sys:String>
+    <sys:String x:Key="S_NodeMaskPassNone">No pass plugged in – drag an output of the file into “Pass”.</sys:String>
+    <sys:String x:Key="S_NodeCryptoHint">Click objects in the picture with “Select” (W) while this node is selected – a second click removes them again. The mask takes effect once “Mask” is plugged into a factor.</sys:String>
+    <sys:String x:Key="S_NodeCryptoPicked">Selected: {0}</sys:String>
+    <sys:String x:Key="S_NodeCryptoClear">Clear selection</sys:String>
+    <sys:String x:Key="S_NodeMenuPassLayer">Pass as layer</sys:String>
+    <sys:String x:Key="S_NodeMenuPassMask">Pass as mask</sys:String>
+    <sys:String x:Key="S_NodeMenuCrypto">Cryptomatte: {0}</sys:String>
+    <sys:String x:Key="S_NodeMenuDuplicate">Duplicate (Shift+D)</sys:String>
     <sys:String x:Key="S_NodeDiffusion">Error diffusion</sys:String>
     <sys:String x:Key="S_SectionColour">Colour</sys:String>
     <sys:String x:Key="S_SectionProperties">Properties</sys:String>
@@ -976,6 +987,7 @@
     <sys:String x:Key="S_ToolPick">Pick</sys:String>
     <sys:String x:Key="S_ToolMoveShort">Drags the selected layer in the picture. Corners resize, the grip above rotates. Double-click centres it again.</sys:String>
     <sys:String x:Key="S_ToolSelectShort">Clicking an object creates a cryptomatte. Its settings live with the layer's mask section.</sys:String>
+    <sys:String x:Key="S_ToolSelectNodesShort">Clicking an object adds it to the selected cryptomatte node – a second click removes it again.</sys:String>
     <sys:String x:Key="S_ToolCropShort">Drags the crop edges of the selected layer. The faint frame shows what is being cut away. Double-click undoes the crop.</sys:String>
     <sys:String x:Key="S_ToolHandShort">Pans the view. The middle mouse button does the same anywhere, without switching tools.</sys:String>
     <sys:String x:Key="S_ToolPickShort">Reads the value under the pointer - and the distance, if the file carries a depth pass.</sys:String>

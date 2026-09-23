@@ -32,7 +32,8 @@ later, with the editor.
 
 **Inputs**
 - *Datei* (the rendered file): `Bild`, the semantic passes `Tiefe`, `Vektor` and `Normale`
-  (resolved per file, as the tools do today), and any named pass a layer uses.
+  (resolved per file, as the tools do today), and any named pass a layer or pass mask uses.
+  More passes can be switched on as outputs of their own (phase 4).
 - *Bilddatei*: another picture on disk, optionally following the sequence number.
 
 **Layers**
@@ -41,6 +42,8 @@ later, with the editor.
 - *Belichtung & Tönung*: exposure and tint of one layer.
 - *Masks* (produce a Value): brightness of the layer, brightness underneath, colour range,
   pass, Cryptomatte, painted, gradient. Each has black point, white point, softness and invert.
+  A pass mask reads its pass through the `Pass` input. Without a wire it falls back to the
+  pass it names, as graphs saved before phase 4 expect.
 - *Ebenenkorrektur*: the correction a layer or adjustment layer carries today (`LayerGrade`,
   including its borrowed display transform).
 - *Begrenzen*: blends the uncorrected and corrected layer by a mask. This is today's
@@ -83,6 +86,7 @@ The converter walks the stack from the bottom, as the composer does:
 
 - **Plain layer:** source → Platzieren → Belichtung & Tönung → (Ebenenkorrektur, or
   Begrenzen for colour scope) → Mischen onto what lies below. The mask goes into the factor.
+  A pass mask gets its pass as a wire from *Datei*.
 - **Adjustment layer:** below → Ebenenkorrektur → Mischen onto below.
 - **Clipping group:** the carrier's colour is the bottom input of the clipped layers'
   Mischen (clip on). The result is mixed onto what lies below using the carrier's mode,
@@ -153,8 +157,8 @@ Only the alpha channel of exports changes, and only in those cases.
      right before its Mix. Long graphs wrap into rows. Tools left at their defaults no
      longer become nodes.
 
-   Not yet in node mode: picking a Cryptomatte in the picture, and the channel view (R,
-   G, B, A) of the header. Wiring, adding and deleting nodes are phase 3.
+   Not yet in node mode: picking a Cryptomatte in the picture (phase 4). Wiring, adding
+   and deleting nodes are phase 3.
 3. **Wiring.** Drag nodes in from the palette, connect, disconnect, delete, with cycle and
    type checks.
 
@@ -178,4 +182,25 @@ Only the alpha channel of exports changes, and only in those cases.
    - **Disconnected output.** An empty picture and a notice, not the old stack.
    - **Arrange.** "Arrange" in the menu lays the graph out again.
 4. **Masks, passes and layers as wires, and branching.**
+
+   *Done (2026-09-23).*
+   - **Passes as outputs.** Selecting *Datei* lists the file's passes as switches (not the
+     Cryptomatte levels, which are IDs, not light). A pass switched on becomes an output of
+     its own. Switched off, it takes its wires with it. Undo covers both.
+   - **Pass as layer.** In the Layers menu: the pass, a Place node and a Mix on Add, just as
+     the layers panel adds a pass. With nothing selected it goes on top of the layers,
+     before the picture tools, where the stack would put it. The result has the same bytes
+     as the stack with that layer, at full grid, coarse grid and 16-bit.
+   - **Pass masks as wires.** The converter wires a pass mask to its pass on *Datei*. Plug
+     in another pass and the mask equals the stack's mask on that pass. "Pass as mask"
+     in the Masks menu creates one already wired. The colour panel says where the mask
+     reads from.
+   - **Cryptomatte.** "Cryptomatte: <set>" in the Masks menu creates a mask node. With the
+     node selected, Select (W) picks objects in the picture into it. A second click
+     removes one, and the colour panel lists the picks with a Clear button. Picking works
+     before the node is wired anywhere, because its levels load when it is selected.
+   - **Branching.** Shift+D or Ctrl+D (or the menu) duplicates the selected node with the
+     same inputs and no readers. The copy reads what the original reads. Where its picture
+     goes is up to you. A copy mixed in as a second layer gives the same bytes as the same
+     layer twice in the stack. *Datei* and *Ausgabe* cannot be duplicated.
 5. **Speed.** Cache per node, and fuse point-wise chains.

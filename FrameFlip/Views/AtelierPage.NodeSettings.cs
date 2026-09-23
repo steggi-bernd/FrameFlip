@@ -1,5 +1,6 @@
 using System.Windows.Input;
 using System.Windows.Media;
+using FrameFlip.Decoding.Exr;
 using FrameFlip.Imaging;
 using FrameFlip.Imaging.Grading;
 using FrameFlip.Imaging.Nodes;
@@ -28,7 +29,38 @@ public partial class AtelierPage
     {
         ShowNodeSettings();
         ShowPlacement();
+
+        // Gewaehlt wird im Bild, und das geht, bevor die Maske irgendwo steckt - ihre
+        // Stufen muessen also schon da sein, wenn sie nur gewaehlt ist.
+        if (NodeView.Selected is MaskNode { Mask: { Kind: MaskKind.Cryptomatte } mask } &&
+            mask.Levels.Any(level => !_sources.ContainsKey(level)))
+        {
+            FetchNodeSources();
+        }
     }
+
+    /// <summary>
+    /// Die Passe, die ein Ausgang der Datei werden koennen: alle ausser dem Bild selbst
+    /// und den Stufen einer Kryptomatte - die sind Kennungen und kein Licht. Heissen zwei
+    /// in verschiedenen Ansichtsebenen gleich, steht der ganze Name da.
+    /// </summary>
+    private IReadOnlyList<(string Name, string Label)> NodePasses()
+    {
+        var passes = _passes.Where(p => p.Name.Length > 0 && !Cryptomatte.IsLevel(p.ShortName)).ToList();
+
+        return passes
+            .Select(p => (p.Name, passes.Count(q => q.ShortName == p.ShortName) > 1 ? p.Name : p.ShortName))
+            .ToList();
+    }
+
+    /// <summary>Was die Felder im Streifen von der Seite brauchen.</summary>
+    private NodeFieldContext FieldContext() => new(_graph!, NodePasses(), change =>
+    {
+        RememberNodes();
+        change();
+        NodeView.InvalidateVisual();
+        AfterNodeEdit();
+    });
 
     /// <summary>Die Werkzeuge, die eine Ebene haben kann - die Karten einer Ebenenkorrektur.</summary>
     private static readonly string[] LayerSections = { "Basic", "Curve", "WhiteBalance", "Zones", "Bands", "Lut" };
@@ -75,7 +107,7 @@ public partial class AtelierPage
         }
 
         Tools.Load(ImageAdjustments.Neutral, new GradingStack());
-        Tools.ShowNode(null, Array.Empty<string>(), NodeFields.For(node));
+        Tools.ShowNode(null, Array.Empty<string>(), NodeFields.For(node, FieldContext()));
     }
 
     /// <summary>Ein Stapel mit genau dem Werkzeug dieses Knotens - demselben Objekt, keine Kopie.</summary>

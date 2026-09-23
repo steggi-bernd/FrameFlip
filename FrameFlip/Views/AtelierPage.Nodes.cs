@@ -103,6 +103,17 @@ public partial class AtelierPage
             .Where(r => r.Key.Length > 0 && !_sources.ContainsKey(r.Key))
             .ToList();
 
+        // Eine Kryptomatte, an der gewaehlt wird, braucht ihre Stufen, auch wenn sie
+        // noch nirgends steckt - gewaehlt wird im Bild, nicht im Graphen.
+        if (NodeView.Selected is MaskNode { Mask: { Kind: MaskKind.Cryptomatte } picking })
+        {
+            foreach (string level in picking.Levels)
+            {
+                if (!_sources.ContainsKey(level) && missing.All(r => r.Key != level))
+                    missing.Add(new LayerRead(level, LayerContent.Pass, false));
+            }
+        }
+
         var dataMissing = GraphEvaluator.Needs(_graph)
             .Select(need => FramePasses.NameFor(need, _passes))
             .OfType<string>()

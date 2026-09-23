@@ -254,6 +254,11 @@ public sealed class ExposureTintNode : Node
 /// "Ebene" ist das, was eine Helligkeitsmaske ansieht; "Untergrund" das, was die
 /// Farbbereichsmaske und die Maske "darunter" ansehen. Welcher Eingang gebraucht wird,
 /// haengt von der Art ab - ein unverbundener zaehlt als Schwarz.
+///
+/// "Pass" ist die Quelle einer Passmaske als Kabel - etwa der Tiefenpass der Datei fuer
+/// einen Nebel nach Entfernung. Kommt dort etwas an, gilt es vor dem Namen, den der
+/// Knoten sonst liest; so wird aus einer Maske, die im Stapel einen Pass beim Namen
+/// nannte, im Graphen eine sichtbare Verbindung.
 /// </summary>
 public sealed class MaskNode : Node
 {
@@ -261,20 +266,47 @@ public sealed class MaskNode : Node
 
     public LayerMask Mask { get; set; } = new();
 
-    public override IReadOnlyList<Socket> Inputs { get; } = new[]
+    private static readonly Socket[] Looks =
     {
-        new Socket("Ebene", SocketType.Image),
-        new Socket("Untergrund", SocketType.Image),
+        new("Ebene", SocketType.Image),
+        new("Untergrund", SocketType.Image),
     };
+
+    private static readonly Socket[] LooksAndPass =
+    {
+        new("Ebene", SocketType.Image),
+        new("Untergrund", SocketType.Image),
+        new("Pass", SocketType.Data, Source: true),
+    };
+
+    /// <summary>
+    /// Den Eingang "Pass" hat nur eine Passmaske - an jeder anderen waere er ein
+    /// Anschluss, der nichts tut. Die Art aendert sich am Knoten nicht mehr; ein Kabel,
+    /// das an "Pass" steckt, verliert seinen Eingang also nie.
+    /// </summary>
+    public override IReadOnlyList<Socket> Inputs => Mask.Kind == MaskKind.Pass ? LooksAndPass : Looks;
 
     public override IReadOnlyList<Socket> Outputs { get; } = new[] { new Socket("Maske", SocketType.Value) };
 
     internal override string? Through => null;
 
+    /// <summary>Unter diesem Schluessel liegt ein Pass, der als Kabel kam - kein Pass heisst so.</summary>
+    private const string WireKey = "\u0001kabel";
+
     internal override void Run(NodeRun run)
     {
         var context = run.Context;
-        var sampler = MaskSampler.Prepare(Mask, context.Sources, context.Width, context.Height, context.Number);
+        var mask = Mask;
+        var sources = context.Sources;
+
+        if (Mask.Kind == MaskKind.Pass && run.Source("Pass") is { } wired)
+        {
+            mask = Mask.Clone();
+            mask.Source = WireKey;
+            sources = new Dictionary<string, FloatFrame>(StringComparer.Ordinal) { [WireKey] = wired.Frame };
+        }
+
+        var sampler = MaskSampler.Prepare(mask, sources, context.Width, context.Height, context.Number);
 
         // Eine Maske, deren Pass fehlt, faellt weg - die Ebene bleibt ganz, wie im Stapel.
         if (sampler.Kind == MaskKind.None)

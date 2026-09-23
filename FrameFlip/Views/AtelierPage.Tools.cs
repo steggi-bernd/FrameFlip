@@ -46,7 +46,7 @@ public partial class AtelierPage
             // Werkzeug wechselt, verlaesst ihn damit auch dort - sonst bliebe im
             // Streifen ein Haken stehen fuer eine Betriebsart, die nicht mehr gilt.
             // Im Knotenmodus gibt es keine Ebene, an der eine Kryptomatte entstehen
-            // koennte - das Auswaehlen im Bild kommt dort mit den Maskenknoten.
+            // koennte - dort waehlt der Klick fuer den gewaehlten Maskenknoten.
             _picking = tool == AtelierTool.Select && !InNodes;
 
             if (!_picking) Layers.StopPicking();
@@ -64,7 +64,7 @@ public partial class AtelierPage
 
             if (tool != AtelierTool.Pick) PickText.Visibility = Visibility.Collapsed;
 
-            Properties.Show(tool);
+            Properties.Show(tool, InNodes);
         }
         finally
         {

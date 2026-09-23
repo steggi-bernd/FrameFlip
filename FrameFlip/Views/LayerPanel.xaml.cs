@@ -1461,14 +1461,7 @@ public partial class LayerPanel : UserControl
     {
         if (_selected is null || _selected.Mask.Kind != MaskKind.Cryptomatte) return;
 
-        var picks = _selected.Mask.Picks;
-        var already = picks.FirstOrDefault(p => p.Id.Equals(id));
-
-        // Noch einmal auf dasselbe Objekt zu klicken nimmt es heraus. Das ist der
-        // Griff, den man ohnehin versucht, und er erspart das Zielen auf ein
-        // Kreuzchen in einer schmalen Liste.
-        if (already is not null) picks.Remove(already);
-        else picks.Add(new CryptoPick { Name = name, Id = id });
+        _selected.Mask.TogglePick(name, id);
 
         ShowPicks();
         Rebuild();

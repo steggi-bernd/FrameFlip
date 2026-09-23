@@ -1,3 +1,4 @@
+using System.IO;
 using FrameFlip.Imaging.Grading;
 using FrameFlip.Imaging.Nodes;
 using FrameFlip.Localization;
@@ -5,7 +6,15 @@ using FrameFlip.Localization;
 namespace FrameFlip.Views;
 
 /// <summary>Eine Einstellung eines Knotens, wie der Farbstreifen sie zeigt.</summary>
-public abstract record NodeField(string LabelKey);
+public abstract record NodeField(string LabelKey)
+{
+    /// <summary>
+    /// Aendert den Aufbau des Graphen und nicht nur eine Einstellung - einen Ausgang,
+    /// ein Kabel. Das haelt die Seite selbst fest und rechnet selbst neu; der Streifen
+    /// meldet danach nichts mehr, sonst rechnete dasselbe Bild zweimal.
+    /// </summary>
+    public bool Structural { get; init; }
+}
 
 /// <summary>Ein Regler.</summary>
 public sealed record SliderField(string LabelKey, double Min, double Max, Func<double> Get, Action<double> Set,
@@ -16,10 +25,24 @@ public sealed record ChoiceField(string LabelKey, IReadOnlyList<(string Key, int
                                  Func<int> Get, Action<int> Set) : NodeField(LabelKey);
 
 /// <summary>Ein Schalter.</summary>
-public sealed record SwitchField(string LabelKey, Func<bool> Get, Action<bool> Set) : NodeField(LabelKey);
+/// <param name="Text">Steht statt der Beschriftung da, unuebersetzt - etwa der Name eines Passes.</param>
+public sealed record SwitchField(string LabelKey, Func<bool> Get, Action<bool> Set, string? Text = null)
+    : NodeField(LabelKey);
+
+/// <summary>Ein Knopf - fuer etwas, das man tut, statt es einzustellen.</summary>
+public sealed record ButtonField(string LabelKey, Action Click) : NodeField(LabelKey);
 
 /// <summary>Ein Satz, der erklaert - ohne etwas einzustellen.</summary>
 public sealed record InfoField(string Text) : NodeField("");
+
+/// <summary>
+/// Was die Felder ueber die Seite wissen muessen: den Graphen, die Passe der Datei und
+/// den Weg, auf dem eine Aenderung am Aufbau festgehalten wird.
+/// </summary>
+/// <param name="Passes">Die Passe, die ein Ausgang der Datei werden koennen - wie sie in der Datei heissen, und wie in der Liste.</param>
+/// <param name="Change">Fuehrt eine Aenderung am Aufbau aus - mit Rueckgaengig, Nachlesen und Neurechnen.</param>
+public sealed record NodeFieldContext(NodeGraph Graph, IReadOnlyList<(string Name, string Label)> Passes,
+                                      Action<Action> Change);
 
 /// <summary>
 /// Was sich an einem Knoten einstellen laesst, der keine eigene Karte im Farbstreifen
@@ -33,10 +56,14 @@ public sealed record InfoField(string Text) : NodeField("");
 /// </summary>
 public static class NodeFields
 {
-    public static IReadOnlyList<NodeField> For(Node node) => node switch
+    /// <param name="context">
+    /// Ohne ihn fehlt, was die Seite kennt: die Passe der Datei am Dateiknoten, das Kabel
+    /// an einer Passmaske und das Leeren einer Kryptomatte.
+    /// </param>
+    public static IReadOnlyList<NodeField> For(Node node, NodeFieldContext? context = null) => node switch
     {
         MixNode mix => Mix(mix),
-        MaskNode mask => Mask(mask.Mask),
+        MaskNode mask => Mask(mask, context),
         PlaceNode place => Place(place.Place),
         ExposureTintNode tint => new NodeField[]
         {
@@ -67,10 +94,7 @@ public static class NodeFields
             new InfoField(picture.Path),
             new SwitchField("S_FollowSequence", () => picture.FollowSequence, v => picture.FollowSequence = v),
         },
-        RenderNode render => new NodeField[]
-        {
-            new InfoField(Strings.T("S_NodeRenderHint")),
-        },
+        RenderNode render => Render(render, context),
         ViewNode => new NodeField[] { new InfoField(Strings.T("S_NodeViewHint")) },
         RestrictNode => new NodeField[] { new InfoField(Strings.T("S_NodeRestrictHint")) },
         FallbackNode => new NodeField[] { new InfoField(Strings.T("S_NodeFallbackHint")) },
@@ -78,6 +102,29 @@ public static class NodeFields
         OutputNode => new NodeField[] { new InfoField(Strings.T("S_NodeOutputHint")) },
         _ => Array.Empty<NodeField>(),
     };
+
+    /// <summary>
+    /// Die Datei - und jeder ihrer Passe als Schalter. Eingeschaltet wird er ein eigener
+    /// Ausgang, an den sich ein Kabel stecken laesst; ausgeschaltet nimmt er seine Kabel
+    /// mit. Zwanzig Ausgaenge, von denen keiner steckt, waeren nur ein hoher Knoten.
+    /// </summary>
+    private static NodeField[] Render(RenderNode render, NodeFieldContext? context)
+    {
+        var fields = new List<NodeField> { new InfoField(Strings.T("S_NodeRenderHint")) };
+
+        if (context is null || context.Passes.Count == 0) return fields.ToArray();
+
+        fields.Add(new InfoField(Strings.T("S_NodeRenderPasses")));
+
+        foreach (var (name, label) in context.Passes)
+        {
+            fields.Add(new SwitchField("", () => render.Passes.Contains(name),
+                                       on => context.Change(() => NodeEdits.ShowPass(context.Graph, render, name, on)),
+                                       label) { Structural = true });
+        }
+
+        return fields.ToArray();
+    }
 
     private static IReadOnlyList<(string, int)> BlendModes()
         => Blending.All.Select(entry => (entry.Key, (int)entry.Mode)).ToList();
@@ -120,8 +167,10 @@ public static class NodeFields
     }
 
     /// <summary>Die Maske - je nach Art andere Regler, wie im Ebenenstreifen.</summary>
-    private static NodeField[] Mask(LayerMask mask)
+    private static NodeField[] Mask(MaskNode node, NodeFieldContext? context)
     {
+        var mask = node.Mask;
+
         var fields = new List<NodeField>
         {
             new SwitchField("S_MaskInvert", () => mask.Invert, v => mask.Invert = v),
@@ -150,18 +199,54 @@ public static class NodeFields
                 break;
 
             case MaskKind.Pass:
-                fields.Add(new InfoField(mask.Source));
+                fields.Add(new InfoField(PassOf(node, context)));
                 fields.Add(new SliderField("S_MaskBlack", 0, 1, () => mask.Low, v => mask.Low = (float)v, 0));
                 fields.Add(new SliderField("S_MaskWhite", 0, 1, () => mask.High, v => mask.High = (float)v, 1));
                 break;
 
-            case MaskKind.Painted or MaskKind.Cryptomatte:
-                if (mask.Kind == MaskKind.Painted) fields.Add(new InfoField(Strings.T("S_NodePaintHint")));
+            case MaskKind.Painted:
+                fields.Add(new InfoField(Strings.T("S_NodePaintHint")));
+                fields.Add(new SliderField("S_MaskBlack", 0, 1, () => mask.Low, v => mask.Low = (float)v, 0));
+                fields.Add(new SliderField("S_MaskWhite", 0, 1, () => mask.High, v => mask.High = (float)v, 1));
+                break;
+
+            case MaskKind.Cryptomatte:
+                fields.Add(new InfoField(Strings.T("S_NodeCryptoHint")));
+
+                if (mask.Picks.Count > 0)
+                {
+                    fields.Add(new InfoField(Strings.T("S_NodeCryptoPicked",
+                        string.Join(", ", mask.Picks.Select(p => p.Name.Length > 0 ? p.Name : "?")))));
+
+                    if (context is not null)
+                        fields.Add(new ButtonField("S_NodeCryptoClear", () => context.Change(mask.Picks.Clear)) { Structural = true });
+                }
+
                 fields.Add(new SliderField("S_MaskBlack", 0, 1, () => mask.Low, v => mask.Low = (float)v, 0));
                 fields.Add(new SliderField("S_MaskWhite", 0, 1, () => mask.High, v => mask.High = (float)v, 1));
                 break;
         }
 
         return fields.ToArray();
+    }
+
+    /// <summary>
+    /// Woher eine Passmaske liest. Das Kabel geht vor; ohne Kabel liest sie den Pass,
+    /// den sie beim Namen nennt - so wie im Stapel, aus dem sie vielleicht kommt.
+    /// </summary>
+    private static string PassOf(MaskNode node, NodeFieldContext? context)
+    {
+        string Label(string name)
+            => context?.Passes.FirstOrDefault(p => p.Name == name).Label is { Length: > 0 } label ? label : name;
+
+        if (context?.Graph.Into(node.Id, "Pass") is { } link && context.Graph.Find(link.From) is { } from)
+        {
+            string name = from is PictureNode picture ? Path.GetFileName(picture.Path) : Label(link.Output);
+            return Strings.T("S_NodeMaskPassWired", name);
+        }
+
+        return node.Mask.Source.Length > 0
+            ? Strings.T("S_NodeMaskPassNamed", Label(node.Mask.Source))
+            : Strings.T("S_NodeMaskPassNone");
     }
 }
