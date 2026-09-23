@@ -225,6 +225,8 @@ public partial class GradingPanel
     {
         if (sender is not ToggleButton { Tag: string prefix }) return;
 
+        if (PaletteToNodes(prefix)) return;
+
         Show(prefix);
     }
 

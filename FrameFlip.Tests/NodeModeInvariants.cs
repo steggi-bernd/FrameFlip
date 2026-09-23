@@ -153,8 +153,9 @@ public static class NodeModeInvariants
             var slider = (Slider)colour.FindName("VignetteSlider");
 
             Check.That(slider.IsVisible, "ein Werkzeugknoten zeigt seine Karte");
-            Check.That(!((FrameworkElement)colour.FindName("PaletteBar")).IsVisible,
-                       "ohne Palette - hinzugefuegt wird im Graphen");
+            Check.That(((FrameworkElement)colour.FindName("PaletteBar")).IsVisible &&
+                       !((FrameworkElement)colour.FindName("TargetBar")).IsVisible,
+                       "mit Palette, aber ohne Zielschalter - das Ziel ist der Knoten");
 
             slider.Value = -1;
             Settle();

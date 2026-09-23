@@ -148,6 +148,7 @@ public sealed partial class AtelierPage : UserControl
         NodeView.SelectionChanged += _ => OnNodeSelected();
         NodeView.LayoutChanged += SaveNodes;
         NodeView.GraphChanged += OnGraphChanged;
+        SetUpNodeEditing();
 
         // Der Knotenmodus kommt zurueck, wenn er beim letzten Mal an war - vor dem
         // ersten Bild, damit dieses gleich mit dem Graphen gerechnet wird.
@@ -628,9 +629,20 @@ public sealed partial class AtelierPage : UserControl
 
             // Im Knotenmodus rechnet der Graph - ausser beim Vergleich mit dem
             // Original, das ist in beiden Modi das Bild der Datei ohne alles.
-            if (InNodes && !_showingOriginal &&
-                RenderNodes(_surface.BackBuffer, _surface.BackBufferStride))
+            if (InNodes && !_showingOriginal)
             {
+                // Ergibt der Graph kein Bild - die Ausgabe haengt an nichts -, bleibt die
+                // Flaeche leer. Auf den Stapel zurueckzufallen hiesse, ein Bild zu zeigen,
+                // das niemand mehr eingestellt hat; der Editor sagt, was fehlt.
+                if (!RenderNodes(_surface.BackBuffer, _surface.BackBufferStride))
+                {
+                    unsafe
+                    {
+                        new Span<byte>((void*)_surface.BackBuffer,
+                                       _surface.BackBufferStride * _surface.PixelHeight).Clear();
+                    }
+                }
+
                 _surface.AddDirtyRect(new Int32Rect(0, 0, frame.Width, frame.Height));
                 return;
             }

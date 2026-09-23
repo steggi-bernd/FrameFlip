@@ -118,11 +118,7 @@ public partial class AtelierPage
     }
 
     /// <summary>Am Graphen selbst hat sich etwas geaendert - ein Knoten wurde stummgeschaltet.</summary>
-    private void OnGraphChanged()
-    {
-        Refresh(interim: false, recompose: false);
-        KeepNodes();
-    }
+    private void OnGraphChanged() => AfterNodeEdit();
 
     /// <summary>
     /// Haelt den Graphen in den Einstellungen fest - ohne die Datei zu schreiben. Das

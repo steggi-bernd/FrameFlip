@@ -24,10 +24,14 @@ namespace FrameFlip.Views;
 ///
 /// Bedienung: Knoten anklicken waehlt, ziehen verschiebt. Ziehen auf freier Flaeche oder
 /// mit der mittleren Taste schiebt die Ansicht, das Mausrad zoomt um den Zeiger, Pos1
-/// zeigt alles. M schaltet den gewaehlten Knoten stumm. Rechtsklick bricht ein Ziehen ab
-/// - wie an den Reglern.
+/// zeigt alles. M schaltet den gewaehlten Knoten stumm, Entf nimmt ihn heraus und
+/// schliesst die Luecke. Rechtsklick bricht ein Ziehen ab - wie an den Reglern - und
+/// oeffnet sonst das Menue zum Hinzufuegen, wie Umschalt+A.
 ///
-/// Verbindungen werden in dieser Stufe nur gezeigt; umstecken kommt mit der naechsten.
+/// Verbinden wie in Blender: von einem Ausgang auf einen Eingang ziehen oder umgekehrt.
+/// Ein Kabel, das man an seinem Eingang packt, loest sich und laesst sich woanders
+/// anstecken oder ins Leere fallen lassen. Schon waehrend des Ziehens leuchten nur die
+/// Anschluesse auf, an die es passt.
 /// </summary>
 public sealed class NodeEditor : FrameworkElement
 {
@@ -83,6 +87,51 @@ public sealed class NodeEditor : FrameworkElement
 
     /// <summary>Am Graphen selbst hat sich etwas geaendert, das neu gerechnet werden muss.</summary>
     public event Action? GraphChanged;
+
+    /// <summary>
+    /// Gleich aendert sich der Aufbau oder die Lage - jetzt ist der Moment, den Stand
+    /// fuer "Rueckgaengig" festzuhalten.
+    /// </summary>
+    public event Action? Editing;
+
+    /// <summary>Ein Menue zum Hinzufuegen ist gewuenscht - an dieser Stelle im Graphen.</summary>
+    public event Action<Point>? MenuWanted;
+
+    public event Action? UndoWanted;
+
+    public event Action? RedoWanted;
+
+    /// <summary>Ein Satz oben links - etwa, dass die Ausgabe nicht verbunden ist. Null: keiner.</summary>
+    public string? Warning
+    {
+        get => _warning;
+        set
+        {
+            _warning = value;
+            InvalidateVisual();
+        }
+    }
+
+    private string? _warning;
+
+    /// <summary>Uebersetzt die Begruendung, warum ein Kabel nicht passt - eine Kennung aus NodeEdits.</summary>
+    public Func<string, string>? Translate { get; set; }
+
+    /// <summary>
+    /// Tauscht den Graphen aus, ohne die Ansicht zu verlassen - fuer Rueckgaengig. Der
+    /// gewaehlte Knoten bleibt gewaehlt, wenn es ihn noch gibt.
+    /// </summary>
+    public void Replace(NodeGraph graph)
+    {
+        string? chosen = Selected?.Id;
+
+        _graph = graph;
+        _texts.Clear();
+        Selected = null;
+
+        Select(chosen is null ? null : graph.Find(chosen));
+        InvalidateVisual();
+    }
 
     // ------------------------------------------------------------ Ansicht
 
@@ -196,13 +245,78 @@ public sealed class NodeEditor : FrameworkElement
 
     // ------------------------------------------------------------ Maus
 
-    private enum Drag { None, Node, Pan }
+    private enum Drag { None, Node, Pan, Wire }
 
     private Drag _drag;
     private Point _start;
     private Point _origin;
     private Vector _panOrigin;
     private bool _moved;
+
+    // Ein Kabel im Zug: sein festes Ende, das freie Ende an der Maus, und - wenn es an
+    // seinem Eingang gepackt wurde - die Verbindung, die es vorher war.
+    private Node? _wireNode;
+    private string? _wireSocket;
+    private bool _wireFromInput;
+    private NodeLink? _lifted;
+    private Point _wireEnd;
+    private Dictionary<(string, string, bool), string?>? _fits;
+    private (Node Node, Socket Socket, bool Input)? _hover;
+
+    /// <summary>
+    /// Der Anschluss unter einem Punkt auf dem Schirm - mit etwas Spielraum, denn ein
+    /// Kreis von neun Punkten trifft man nicht auf den Punkt genau.
+    /// </summary>
+    internal (Node Node, Socket Socket, bool Input)? SocketAt(Point screen)
+    {
+        if (_graph is null) return null;
+
+        double reach = Math.Max(8, 7 * Zoom);
+        (Node, Socket, bool)? best = null;
+        double nearest = reach;
+
+        foreach (var node in _graph.Nodes)
+        {
+            for (int i = 0; i < node.Inputs.Count; i++)
+            {
+                double d = (ToScreen(InputAt(node, i)) - screen).Length;
+                if (d < nearest) { nearest = d; best = (node, node.Inputs[i], true); }
+            }
+
+            for (int i = 0; i < node.Outputs.Count; i++)
+            {
+                double d = (ToScreen(OutputAt(node, i)) - screen).Length;
+                if (d < nearest) { nearest = d; best = (node, node.Outputs[i], false); }
+            }
+        }
+
+        return best;
+    }
+
+    /// <summary>Wo ein Anschluss auf dem Schirm liegt - fuer die Probe.</summary>
+    internal Point ScreenOf(Node node, string socket, bool input)
+    {
+        var list = input ? node.Inputs : node.Outputs;
+        int index = IndexOf(list, socket);
+
+        return ToScreen(input ? InputAt(node, index) : OutputAt(node, index));
+    }
+
+    /// <summary>Die Verbindung, die an einem Punkt auf dem Schirm vorbeilaeuft - oder keine.</summary>
+    internal NodeLink? LinkAt(Point screen, double reach = 10)
+    {
+        if (_graph is null) return null;
+
+        foreach (var link in _graph.Links)
+        {
+            if (Curve(link) is not var (a, b)) continue;
+
+            for (int s = 0; s <= 24; s++)
+                if ((Bezier(a, b, s / 24.0) - screen).Length < reach) return link;
+        }
+
+        return null;
+    }
 
     protected override void OnMouseDown(MouseButtonEventArgs e)
     {
@@ -211,17 +325,22 @@ public sealed class NodeEditor : FrameworkElement
 
         var at = e.GetPosition(this);
 
-        // Rechts bricht einen laufenden Zug ab - der Knoten springt zurueck.
+        // Rechts bricht einen laufenden Zug ab - der Knoten springt zurueck, das Kabel
+        // steckt wieder, wo es war. Ohne Zug oeffnet es das Menue.
         if (e.ChangedButton == MouseButton.Right)
         {
-            if (_drag == Drag.Node && Selected is not null)
+            if (_drag != Drag.None)
             {
-                Selected.X = _origin.X;
-                Selected.Y = _origin.Y;
-                _moved = false;
+                Cancel();
+            }
+            else
+            {
+                var node = NodeAt(at);
+                if (node is not null) Select(node);
+
+                MenuWanted?.Invoke(ToGraph(at));
             }
 
-            EndDrag();
             e.Handled = true;
             return;
         }
@@ -235,10 +354,17 @@ public sealed class NodeEditor : FrameworkElement
 
         if (e.ChangedButton != MouseButton.Left) return;
 
-        var node = NodeAt(at);
-        Select(node);
+        if (SocketAt(at) is { } socket)
+        {
+            StartWire(socket, at);
+            e.Handled = true;
+            return;
+        }
 
-        if (node is null)
+        var hit = NodeAt(at);
+        Select(hit);
+
+        if (hit is null)
         {
             StartPan(at);
         }
@@ -246,7 +372,7 @@ public sealed class NodeEditor : FrameworkElement
         {
             _drag = Drag.Node;
             _start = at;
-            _origin = new Point(node.X, node.Y);
+            _origin = new Point(hit.X, hit.Y);
             _moved = false;
             CaptureMouse();
         }
@@ -261,6 +387,70 @@ public sealed class NodeEditor : FrameworkElement
         _panOrigin = Pan;
         CaptureMouse();
         Cursor = Cursors.SizeAll;
+    }
+
+    /// <summary>
+    /// Beginnt ein Kabel. Am Ausgang: ein neues. Am Eingang mit Verbindung: diese
+    /// Verbindung, geloest von ihrem Eingang. Am freien Eingang: ein Kabel rueckwaerts,
+    /// das einen Ausgang sucht.
+    /// </summary>
+    private void StartWire((Node Node, Socket Socket, bool Input) socket, Point at)
+    {
+        _lifted = null;
+
+        if (socket.Input && _graph!.Into(socket.Node.Id, socket.Socket.Name) is { } link &&
+            _graph.Find(link.From) is { } source)
+        {
+            _lifted = link;
+            _wireNode = source;
+            _wireSocket = link.Output;
+            _wireFromInput = false;
+        }
+        else
+        {
+            _wireNode = socket.Node;
+            _wireSocket = socket.Socket.Name;
+            _wireFromInput = socket.Input;
+        }
+
+        _drag = Drag.Wire;
+        _wireEnd = at;
+        _fits = Fits();
+        CaptureMouse();
+        InvalidateVisual();
+    }
+
+    /// <summary>
+    /// Welche Anschluesse das Kabel nehmen wuerden - einmal zu Beginn des Zuges
+    /// gerechnet, nicht bei jeder Mausbewegung: Die Kreisprobe geht durch den Graphen.
+    /// </summary>
+    private Dictionary<(string, string, bool), string?> Fits()
+    {
+        var fits = new Dictionary<(string, string, bool), string?>();
+
+        foreach (var node in _graph!.Nodes)
+        {
+            if (_wireFromInput)
+            {
+                foreach (var output in node.Outputs)
+                    fits[(node.Id, output.Name, false)] = NodeEdits.CannotConnect(_graph, node, output.Name, _wireNode!, _wireSocket!);
+            }
+            else
+            {
+                foreach (var input in node.Inputs)
+                {
+                    // Der eigene, gerade geloeste Eingang passt immer - dorthin zurueck
+                    // heisst: nichts geaendert.
+                    bool own = _lifted is not null && _lifted.To == node.Id && _lifted.Input == input.Name;
+
+                    fits[(node.Id, input.Name, true)] = own
+                        ? null
+                        : NodeEdits.CannotConnect(_graph, _wireNode!, _wireSocket!, node, input.Name);
+                }
+            }
+        }
+
+        return fits;
     }
 
     protected override void OnMouseMove(MouseEventArgs e)
@@ -279,10 +469,20 @@ public sealed class NodeEditor : FrameworkElement
             return;
         }
 
+        if (_drag == Drag.Wire)
+        {
+            _wireEnd = at;
+            _hover = SocketAt(at) is { } s && s.Input != _wireFromInput ? s : null;
+            InvalidateVisual();
+            return;
+        }
+
         if (Selected is null) return;
 
         // Erst ab ein paar Punkten ist es ein Zug - ein Klick zum Waehlen soll nichts verschieben.
         if (!_moved && Math.Abs(delta.X) < 3 && Math.Abs(delta.Y) < 3) return;
+
+        if (!_moved) Editing?.Invoke();
 
         _moved = true;
         Selected.X = Math.Round(_origin.X + delta.X / Zoom);
@@ -297,11 +497,110 @@ public sealed class NodeEditor : FrameworkElement
 
         if (_drag == Drag.None) return;
 
+        if (_drag == Drag.Wire)
+        {
+            FinishWire(e.GetPosition(this));
+            return;
+        }
+
         bool moved = _drag == Drag.Node && _moved;
+        var node = Selected;
 
         EndDrag();
 
-        if (moved) LayoutChanged?.Invoke();
+        if (!moved || node is null) return;
+
+        // Ein freier Knoten, auf ein Kabel gelegt, faellt hinein - wie in Blender.
+        if (!_graph!.Links.Any(l => l.From == node.Id || l.To == node.Id))
+        {
+            var centre = ToScreen(new Point(node.X + NodeWidth / 2, node.Y + Header / 2));
+
+            if (LinkAt(centre, 14) is { } link && NodeEdits.InsertInto(_graph, link, node))
+            {
+                GraphChanged?.Invoke();
+                return;
+            }
+        }
+
+        LayoutChanged?.Invoke();
+    }
+
+    /// <summary>
+    /// Beginnt ein Kabel an einem Punkt auf dem Schirm - derselbe Weg wie ein Druck der
+    /// linken Taste auf einen Anschluss. Fuer die Probe, die keine Maus bewegen kann.
+    /// </summary>
+    internal bool BeginWire(Point screen)
+    {
+        if (SocketAt(screen) is not { } socket) return false;
+
+        StartWire(socket, screen);
+        return true;
+    }
+
+    /// <summary>Das Kabel wird losgelassen - angesteckt, verworfen oder zurueckgelegt.</summary>
+    internal void FinishWire(Point at)
+    {
+        var target = SocketAt(at);
+        var node = _wireNode!;
+        string socket = _wireSocket!;
+        var lifted = _lifted;
+        bool fromInput = _wireFromInput;
+
+        // Die Liste der passenden Anschluesse VOR dem Aufraeumen festhalten - EndDrag
+        // vergisst sie, und danach hiesse jeder Anschluss "passt nicht".
+        var fits = _fits;
+
+        _warning = null;
+        EndDrag();
+
+        if (target is { } t && t.Input != fromInput)
+        {
+            string? why = fits is not null && fits.TryGetValue((t.Node.Id, t.Socket.Name, t.Input), out var reason)
+                ? reason
+                : "S_NodeWhyMissing";
+
+            // An einen Anschluss, der nicht passt: nichts aendert sich, und der Grund
+            // steht oben links, bis zum naechsten Zug.
+            if (why is not null)
+            {
+                Warning = Translate?.Invoke(why) ?? why;
+                return;
+            }
+
+            // Zurueck an denselben Eingang: nichts geaendert.
+            if (lifted is not null && lifted.To == t.Node.Id && lifted.Input == t.Socket.Name) return;
+
+            Editing?.Invoke();
+
+            if (lifted is not null) _graph!.Links.Remove(lifted);
+
+            if (fromInput) _graph!.Connect(t.Node, t.Socket.Name, node, socket);
+            else _graph!.Connect(node, socket, t.Node, t.Socket.Name);
+
+            GraphChanged?.Invoke();
+            return;
+        }
+
+        // Ins Leere: Ein geloestes Kabel ist damit weg, ein neues war nie da.
+        if (lifted is not null)
+        {
+            Editing?.Invoke();
+            _graph!.Links.Remove(lifted);
+            GraphChanged?.Invoke();
+        }
+    }
+
+    /// <summary>Bricht einen Zug ab - alles steht wieder, wie es vor ihm stand.</summary>
+    private void Cancel()
+    {
+        if (_drag == Drag.Node && Selected is not null && _moved)
+        {
+            Selected.X = _origin.X;
+            Selected.Y = _origin.Y;
+        }
+
+        _moved = false;
+        EndDrag();
     }
 
     protected override void OnLostMouseCapture(MouseEventArgs e)
@@ -314,6 +613,11 @@ public sealed class NodeEditor : FrameworkElement
     private void EndDrag()
     {
         _drag = Drag.None;
+        _lifted = null;
+        _wireNode = null;
+        _wireSocket = null;
+        _fits = null;
+        _hover = null;
         Cursor = null;
 
         if (IsMouseCaptured) ReleaseMouseCapture();
@@ -333,6 +637,9 @@ public sealed class NodeEditor : FrameworkElement
     {
         base.OnKeyDown(e);
 
+        bool control = (Keyboard.Modifiers & ModifierKeys.Control) != 0;
+        bool shift = (Keyboard.Modifiers & ModifierKeys.Shift) != 0;
+
         switch (e.Key)
         {
             case Key.Home:
@@ -340,21 +647,52 @@ public sealed class NodeEditor : FrameworkElement
                 e.Handled = true;
                 break;
 
-            case Key.M when Selected is not null and not OutputNode:
+            case Key.M when !control && Selected is not null and not OutputNode:
+                Editing?.Invoke();
                 Selected.Muted = !Selected.Muted;
                 InvalidateVisual();
                 GraphChanged?.Invoke();
                 e.Handled = true;
                 break;
 
-            case Key.Escape when _drag == Drag.Node && Selected is not null:
-                Selected.X = _origin.X;
-                Selected.Y = _origin.Y;
-                _moved = false;
-                EndDrag();
+            case Key.Delete or Key.X when !control && Selected is not null and not OutputNode:
+                Remove(Selected);
+                e.Handled = true;
+                break;
+
+            case Key.Z when control && !shift:
+                UndoWanted?.Invoke();
+                e.Handled = true;
+                break;
+
+            case Key.Y when control:
+            case Key.Z when control && shift:
+                RedoWanted?.Invoke();
+                e.Handled = true;
+                break;
+
+            case Key.A when shift && !control:
+                MenuWanted?.Invoke(ToGraph(Mouse.GetPosition(this)));
+                e.Handled = true;
+                break;
+
+            case Key.Escape when _drag != Drag.None:
+                Cancel();
                 e.Handled = true;
                 break;
         }
+    }
+
+    /// <summary>Nimmt einen Knoten heraus und schliesst die Luecke - Entf, oder aus dem Menue.</summary>
+    public void Remove(Node node)
+    {
+        if (_graph is null || node is OutputNode) return;
+
+        Editing?.Invoke();
+        NodeEdits.Remove(_graph, node, reconnect: true);
+
+        Select(null);
+        GraphChanged?.Invoke();
     }
 
     // ------------------------------------------------------------ Zeichnen
@@ -424,29 +762,105 @@ public sealed class NodeEditor : FrameworkElement
 
         if (_graph is null) return;
 
-        foreach (var link in _graph.Links) DrawLink(dc, link);
+        foreach (var link in _graph.Links)
+            if (!ReferenceEquals(link, _lifted)) DrawLink(dc, link);
 
         foreach (var node in _graph.Nodes)
             if (!ReferenceEquals(node, Selected)) DrawNode(dc, node);
 
         if (Selected is not null) DrawNode(dc, Selected);
+
+        if (_drag == Drag.Wire) DrawWire(dc);
+
+        if (_warning is { Length: > 0 } warning)
+        {
+            var text = Label(warning, 12, Text);
+            text.MaxTextWidth = Math.Max(1, ActualWidth - 40);
+
+            var box = new Rect(12, 12, text.Width + 20, text.Height + 12);
+            dc.DrawRoundedRectangle(WarningBack, WarningEdge, box, 4, 4);
+            dc.DrawText(text, new Point(22, 18));
+        }
     }
 
-    private void DrawLink(DrawingContext dc, NodeLink link)
+    private static readonly Brush WarningBack = Frozen(new SolidColorBrush(Color.FromArgb(0xE6, 0x3A, 0x22, 0x22)));
+    private static readonly Pen WarningEdge = Frozen(new Pen(new SolidColorBrush(Color.FromRgb(0xC0, 0x5A, 0x4A)), 1));
+    private static readonly Pen Fitting = Frozen(new Pen(Brushes.White, 2));
+
+    /// <summary>Das Kabel im Zug - und die Anschluesse, an die es passt.</summary>
+    private void DrawWire(DrawingContext dc)
+    {
+        if (_wireNode is null || _wireSocket is null) return;
+
+        var list = _wireFromInput ? _wireNode.Inputs : _wireNode.Outputs;
+        int index = IndexOf(list, _wireSocket);
+        if (index < 0) return;
+
+        var anchor = ToScreen(_wireFromInput ? InputAt(_wireNode, index) : OutputAt(_wireNode, index));
+        var free = _hover is { } h ? ScreenOf(h.Node, h.Socket.Name, h.Input) : _wireEnd;
+
+        var (a, b) = _wireFromInput ? (free, anchor) : (anchor, free);
+
+        var pen = new Pen(SocketBrush(list[index].Type), 2) { DashStyle = DashStyles.Dash };
+        pen.Freeze();
+
+        dc.DrawGeometry(null, pen, Path(a, b));
+
+        if (_fits is null) return;
+
+        double ring = Math.Max(6, 7 * Zoom);
+
+        foreach (var ((id, name, input), why) in _fits)
+        {
+            if (why is not null || _graph!.Find(id) is not { } node) continue;
+
+            dc.DrawEllipse(null, Fitting, ScreenOf(node, name, input), ring, ring);
+        }
+
+        // Ueber einem Anschluss, der nicht passt, steht gleich dort, warum.
+        if (_hover is { } over && _fits.TryGetValue((over.Node.Id, over.Socket.Name, over.Input), out var reason) &&
+            reason is not null)
+        {
+            var text = Label(Translate?.Invoke(reason) ?? reason, 11, Text);
+            var at = new Point(_wireEnd.X + 14, _wireEnd.Y - text.Height - 6);
+
+            dc.DrawRoundedRectangle(WarningBack, WarningEdge,
+                                    new Rect(at.X - 6, at.Y - 3, text.Width + 12, text.Height + 6), 3, 3);
+            dc.DrawText(text, at);
+        }
+    }
+
+    /// <summary>Wo eine Verbindung auf dem Schirm beginnt und endet - oder nichts, wenn sie ins Leere zeigt.</summary>
+    private (Point A, Point B)? Curve(NodeLink link)
     {
         var from = _graph!.Find(link.From);
         var to = _graph.Find(link.To);
-        if (from is null || to is null) return;
+        if (from is null || to is null) return null;
 
         int output = IndexOf(from.Outputs, link.Output);
         int input = IndexOf(to.Inputs, link.Input);
-        if (output < 0 || input < 0) return;
+        if (output < 0 || input < 0) return null;
 
-        var a = ToScreen(OutputAt(from, output));
-        var b = ToScreen(InputAt(to, input));
+        return (ToScreen(OutputAt(from, output)), ToScreen(InputAt(to, input)));
+    }
 
-        double reach = Math.Max(30 * Zoom, Math.Abs(b.X - a.X) / 2);
+    private double Reach(Point a, Point b) => Math.Max(30 * Zoom, Math.Abs(b.X - a.X) / 2);
 
+    /// <summary>Ein Punkt auf der Kurve einer Verbindung - fuer die Frage, ob die Maus auf ihr liegt.</summary>
+    private Point Bezier(Point a, Point b, double s)
+    {
+        double reach = Reach(a, b);
+        var c1 = new Point(a.X + reach, a.Y);
+        var c2 = new Point(b.X - reach, b.Y);
+        double u = 1 - s;
+
+        return new Point(u * u * u * a.X + 3 * u * u * s * c1.X + 3 * u * s * s * c2.X + s * s * s * b.X,
+                         u * u * u * a.Y + 3 * u * u * s * c1.Y + 3 * u * s * s * c2.Y + s * s * s * b.Y);
+    }
+
+    private StreamGeometry Path(Point a, Point b)
+    {
+        double reach = Reach(a, b);
         var geometry = new StreamGeometry();
 
         using (var context = geometry.Open())
@@ -456,12 +870,22 @@ public sealed class NodeEditor : FrameworkElement
         }
 
         geometry.Freeze();
+        return geometry;
+    }
 
-        var pen = new Pen(SocketBrush(from.Outputs[output].Type), Math.Max(1.2, 2 * Math.Min(1, Zoom)));
+    private void DrawLink(DrawingContext dc, NodeLink link)
+    {
+        if (Curve(link) is not var (a, b)) return;
+
+        var from = _graph!.Find(link.From)!;
+        var to = _graph.Find(link.To)!;
+
+        var pen = new Pen(SocketBrush(from.Outputs[IndexOf(from.Outputs, link.Output)].Type),
+                          Math.Max(1.2, 2 * Math.Min(1, Zoom)));
         pen.Freeze();
 
         dc.PushOpacity(from.Muted || to.Muted ? 0.35 : 0.85);
-        dc.DrawGeometry(null, pen, geometry);
+        dc.DrawGeometry(null, pen, Path(a, b));
         dc.Pop();
     }
 

@@ -74,6 +74,7 @@ public partial class AtelierPage
 
         ShowNodeMode();
         ShowNodeSettings();
+        ShowNodeWarning();
         ShowPlacement();
     }
 

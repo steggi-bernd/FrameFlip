@@ -67,6 +67,7 @@ static int RunAll()
     NodeParityInvariants.Run();
     NodeExportInvariants.Run();
     NodeModeInvariants.Run();
+    NodeEditInvariants.Run();
     LayerPlacementInvariants.Run();
     PlacementDragInvariants.Run();
     LocalToolInvariants.Run();

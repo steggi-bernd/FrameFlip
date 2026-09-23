@@ -157,5 +157,25 @@ Only the alpha channel of exports changes, and only in those cases.
    G, B, A) of the header. Wiring, adding and deleting nodes are phase 3.
 3. **Wiring.** Drag nodes in from the palette, connect, disconnect, delete, with cycle and
    type checks.
+
+   *Done (2026-09-23).*
+   - **Connect.** Drag from an output to an input or the other way round. A wire grabbed
+     at its input comes loose and can be plugged in elsewhere, or dropped on empty space
+     to disconnect it. Right-click or Escape puts it back where it was.
+   - **Checks while dragging.** Only sockets the wire fits get a ring. Hovering a socket
+     that does not fit shows why: a mask is not an image, a read image is needed, or the
+     connection would make a loop. The checks live in one place (`NodeEdits`), which the
+     editor and the tests both call.
+   - **Add.** Right-click or Shift+A opens a menu with layers, masks, picture and all
+     effects, under the palette's names. "Image as layer …" creates an image file node,
+     a Place node and a Mix node in one step. In node mode the colour panel's palette
+     inserts an effect behind the selected node. A loose node dropped onto a wire falls
+     into it.
+   - **Delete.** Del or X removes the selected node and closes the gap, so the picture
+     keeps flowing. Deleting an effect gives the same bytes as the stack without it, and
+     inserting one the same bytes as the stack with it.
+   - **Undo.** Ctrl+Z / Ctrl+Y cover every structural change, mute and move.
+   - **Disconnected output.** An empty picture and a notice, not the old stack.
+   - **Arrange.** "Arrange" in the menu lays the graph out again.
 4. **Masks, passes and layers as wires, and branching.**
 5. **Speed.** Cache per node, and fuse point-wise chains.

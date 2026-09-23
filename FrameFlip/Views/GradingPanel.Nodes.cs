@@ -14,8 +14,9 @@ namespace FrameFlip.Views;
 /// Ebene haben kann. Was keine Karte hat - Mischen, Maske, Platzieren, die
 /// Grundkorrektur des Bildes -, bekommt einfache Felder mit denselben Reglern.
 ///
-/// Palette und Zielschalter verschwinden: Hinzugefuegt wird im Graphen, und das Ziel
-/// ist der Knoten.
+/// Der Zielschalter verschwindet - das Ziel ist der Knoten. Die Palette bleibt, aber ein
+/// Klick darauf setzt den Effekt als Knoten hinter den gewaehlten, statt eine Karte in
+/// den Stapel des Streifens zu legen.
 /// </summary>
 public partial class GradingPanel
 {
@@ -24,6 +25,23 @@ public partial class GradingPanel
 
     /// <summary>Ob der Streifen gerade einen Knoten zeigt.</summary>
     public bool InNodeFocus => _focus is not null;
+
+    /// <summary>
+    /// Im Knotenmodus wurde eine Kachel der Palette angeklickt - der Effekt soll als
+    /// Knoten in den Graphen, nicht in den Stapel des Streifens.
+    /// </summary>
+    public event Action<string>? NodeToolWanted;
+
+    /// <summary>Leitet einen Klick auf die Palette im Knotenmodus weiter. True, wenn er dort hingehoert.</summary>
+    private bool PaletteToNodes(string section)
+    {
+        if (_focus is null) return false;
+
+        NodeToolWanted?.Invoke(section);
+        ShowActive();
+
+        return true;
+    }
 
     /// <summary>
     /// Zeigt die Einstellungen eines Knotens.
@@ -35,8 +53,10 @@ public partial class GradingPanel
     {
         _focus = new HashSet<string>(sections, StringComparer.Ordinal);
 
+        // Die Palette bleibt: Ein Klick darauf setzt den Effekt als Knoten hinter den
+        // gewaehlten. Der Zielschalter geht - das Ziel ist der Knoten.
         TargetBar.Visibility = Visibility.Collapsed;
-        PaletteBar.Visibility = Visibility.Collapsed;
+        PaletteBar.Visibility = Visibility.Visible;
 
         NodeHint.Text = hint ?? "";
         NodeHint.Visibility = string.IsNullOrEmpty(hint) ? Visibility.Collapsed : Visibility.Visible;
