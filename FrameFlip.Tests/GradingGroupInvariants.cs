@@ -173,35 +173,30 @@ public static class GradingGroupInvariants
             window.Show();
             panel.UpdateLayout();
 
-            var tabs = (Panel)panel.FindName("Tabs");
-            var tiles = (Panel)panel.FindName("Tiles");
+            var palette = (Panel)panel.FindName("Palette");
 
-            if (tabs is null || tiles is null)
+            if (palette is null)
             {
-                Check.That(false, "Reiterleiste und Kachelfeld sind da");
+                Check.That(false, "die Palette ist da");
                 return;
             }
 
-            // Die drei Reiter, deren Werkzeuge dem ganzen Bild gelten - und die
+            // Die drei Kategorien, deren Werkzeuge dem ganzen Bild gelten - und die
             // beiden, deren Werkzeuge punktweise rechnen und deshalb auch auf einer
-            // Ebene gelten.
+            // Ebene gelten. Gegangen wird Zeile fuer Zeile durch die Palette, nicht
+            // ueber eine Liste von Namen: Ein neues Werkzeug faellt so von selbst auf.
             var forThePicture = new[] { "S_GroupLight", "S_GroupOptics", "S_GroupFilm" };
             var forBoth = new[] { "S_GroupBasics", "S_GroupTable" };
 
-            static string[] TagsOf(Panel tiles)
-                => tiles.Children.OfType<ToggleButton>()
-                        .Select(b => (string)b.Tag)
-                        .Where(tag => tag is not null)
-                        .ToArray();
+            ToggleButton[] TilesOf(string tab)
+                => palette.Children.OfType<Grid>()
+                          .Where(row => (string)row.Tag == tab)
+                          .SelectMany(row => row.Children.OfType<Panel>())
+                          .SelectMany(tiles => tiles.Children.OfType<ToggleButton>())
+                          .ToArray();
 
-            void Open(string tab)
-            {
-                var button = tabs.Children.OfType<ToggleButton>()
-                                 .First(b => (string)b.Tag == tab);
-
-                button.IsChecked = true;
-                panel.UpdateLayout();
-            }
+            Check.That(forThePicture.Concat(forBoth).All(tab => TilesOf(tab).Length > 0),
+                       "jede Kategorie hat ihre Zeile in der Palette");
 
             // Der Unterschied zwischen "ruht" und "kaputt".
             //
@@ -272,13 +267,13 @@ public static class GradingGroupInvariants
 
             foreach (string tab in forThePicture.Concat(forBoth))
             {
-                Open(tab);
-
-                foreach (string tag in TagsOf(tiles))
+                foreach (var tile in TilesOf(tab))
                 {
+                    string tag = (string)tile.Tag;
+
                     if (panel.FindName(tag + "Body") is not FrameworkElement body) continue;
 
-                    Check.That(body.IsEnabled,
+                    Check.That(body.IsEnabled && tile.IsEnabled,
                                $"ohne Ebene ist {tag} bedienbar");
                 }
             }
@@ -291,10 +286,10 @@ public static class GradingGroupInvariants
 
             foreach (string tab in forThePicture)
             {
-                Open(tab);
-
-                foreach (string tag in TagsOf(tiles))
+                foreach (var tile in TilesOf(tab))
                 {
+                    string tag = (string)tile.Tag;
+
                     if (panel.FindName(tag + "Body") is not FrameworkElement body)
                     {
                         Check.That(false, $"zu {tag} gehoert ein Abschnitt");
@@ -305,6 +300,11 @@ public static class GradingGroupInvariants
 
                     Check.That(!body.IsEnabled,
                                $"{tag} ist an einer Ebene gesperrt - es wuerde dort nie gerechnet");
+
+                    // Und das Zeichen dazu: Wer es anklickt, bekaeme sonst eine Karte,
+                    // deren Regler an der Ebene nie wirken.
+                    Check.That(!tile.IsEnabled,
+                               $"{tag}: auch das Zeichen in der Palette ist gesperrt");
                 }
             }
 
@@ -312,13 +312,13 @@ public static class GradingGroupInvariants
 
             foreach (string tab in forBoth)
             {
-                Open(tab);
-
-                foreach (string tag in TagsOf(tiles))
+                foreach (var tile in TilesOf(tab))
                 {
+                    string tag = (string)tile.Tag;
+
                     if (panel.FindName(tag + "Body") is not FrameworkElement body) continue;
 
-                    Check.That(body.IsEnabled,
+                    Check.That(body.IsEnabled && tile.IsEnabled,
                                $"{tag} bleibt bedienbar - es rechnet punktweise und gilt auch auf einer Ebene");
                 }
             }
@@ -331,7 +331,7 @@ public static class GradingGroupInvariants
 
     private static void TilesShowWhatIsThereAndWhatIsOn()
     {
-        Check.Group("Die Farbspalte: Reiter und Kacheln");
+        Check.Group("Die Farbspalte: Palette und Effektstapel");
 
         var panel = new GradingPanel();
 
@@ -352,113 +352,156 @@ public static class GradingGroupInvariants
             window.Show();
             panel.UpdateLayout();
 
-            var tabs = (Panel)panel.FindName("Tabs");
-            var tiles = (Panel)panel.FindName("Tiles");
+            var palette = (Panel)panel.FindName("Palette");
+            var cards = (Panel)panel.FindName("Cards");
 
-            Check.That(tabs is not null && tiles is not null, "Reiterleiste und Kachelfeld sind da");
-            if (tabs is null || tiles is null) return;
+            var tiles = palette.Children.OfType<Grid>()
+                               .SelectMany(row => row.Children.OfType<Panel>())
+                               .SelectMany(p => p.Children.OfType<ToggleButton>())
+                               .ToDictionary(b => (string)b.Tag);
 
-            Check.That(tabs.Children.Count == 5, "fuenf Reiter", $"{tabs.Children.Count}");
+            // --- Die Palette zeigt ALLE Effekte ----------------------------------
+            Check.That(tiles.Count >= 20, "die Palette zeigt alle Effekte auf einen Blick",
+                       $"{tiles.Count}");
 
-            // Der erste Reiter steht offen und zeigt seine Werkzeuge.
+            static Border? CardOf(Panel cards, string prefix)
+                => cards.Children.OfType<Border>().FirstOrDefault(b => (string?)b.Tag == prefix);
+
+            bool Shown(string prefix) => CardOf(cards, prefix)?.Visibility == Visibility.Visible;
+
+            // --- Der Stapel zeigt nur, was benutzt wird --------------------------
             //
-            // Geprueft wird, WELCHE dort stehen, nicht wieviele: Die Zahl aendert
-            // sich mit jedem neuen Werkzeug, und sie soll es auch. Eine feste Zahl
-            // hier bricht die Probe beim naechsten Werkzeug, ohne dass etwas kaputt
-            // waere - und das ist die Art Probe, die man irgendwann nur noch
-            // nachzieht, statt sie zu lesen.
-            Check.That(tiles.Children.Count > 0 &&
-                       tiles.Children.OfType<ToggleButton>().Any(b => (string)b.Tag == "Curve"),
-                       "die Grundkorrektur zeigt ihre Kacheln",
-                       string.Join(", ", tiles.Children.OfType<ToggleButton>()
-                                               .Select(b => (string)b.Tag)));
+            // Das ist der ganze Unterschied zu den Kacheln: Man sah zweiundzwanzig,
+            // benutzte drei, und darunter stand immer nur EINES ausgeschrieben.
+            var visible = cards.Children.OfType<Border>()
+                               .Where(b => b.Visibility == Visibility.Visible)
+                               .Select(b => (string)b.Tag).ToArray();
 
-            // Genau ein Abschnitt ist ausgeschrieben.
-            int open = 0;
+            Check.That(visible.SequenceEqual(new[] { "Basic" }),
+                       "auf einem neutralen Bild steht nur die Grundkorrektur im Stapel",
+                       string.Join(", ", visible));
 
-            foreach (string name in new[]
-                     {
-                         "BasicBody", "CurveBody", "WhiteBalanceBody", "ZonesBody", "BandsBody",
-                         "DehazeBody", "BloomBody", "VignetteBody", "DitherBody", "GrainBody",
-                     })
-            {
-                if (panel.FindName(name) is FrameworkElement shown &&
-                    shown.Visibility == Visibility.Visible)
-                {
-                    open++;
-                }
-            }
-
-            Check.That(open == 1, "und genau ein Abschnitt steht ausgeschrieben", $"{open}");
-
-            // Ein anderer Reiter zeigt andere Kacheln - und den ersten seiner eigenen.
-            var optics = tabs.Children.OfType<ToggleButton>()
-                             .First(b => (string)b.Tag == "S_GroupOptics");
-
-            optics.IsChecked = true;
+            // Ein Zeichen anklicken legt den Effekt in den Stapel.
+            tiles["Vignette"].RaiseEvent(new RoutedEventArgs(ButtonBase.ClickEvent));
             panel.UpdateLayout();
 
-            // Gezaehlt und nicht aufgezaehlt: Die Zahl aendert sich mit jedem neuen
-            // Werkzeug, und sie soll es auch - die Aussage ist "der Reiter zeigt
-            // ANDERE Kacheln als der erste", nicht "genau diese fuenf". Wer hier eine
-            // feste Zahl hinterlegt, bricht die Probe beim naechsten Werkzeug, ohne
-            // dass etwas kaputt waere.
-            Check.That(tiles.Children.Count > 0 &&
-                       tiles.Children.OfType<ToggleButton>().Any(b => (string)b.Tag == "Vignette") &&
-                       tiles.Children.OfType<ToggleButton>().All(b => (string)b.Tag != "Curve"),
-                       "die Optik zeigt ihre eigenen Kacheln und keine der ersten",
-                       string.Join(", ", tiles.Children.OfType<ToggleButton>()
-                                               .Select(b => (string)b.Tag)));
+            Check.That(Shown("Vignette"), "ein Klick auf das Zeichen legt die Karte in den Stapel");
+            Check.That(tiles["Vignette"].IsChecked == true, "und das Zeichen zeigt, dass sie drin liegt");
 
-            var basic = (FrameworkElement)panel.FindName("BasicBody");
-
-            Check.That(basic.Visibility != Visibility.Visible,
-                       "und die Grundkorrektur ist damit nicht mehr ausgeschrieben");
-
-            // Eine Kachel waehlen schreibt ihren Abschnitt aus - und nur ihren.
-            var vignette = tiles.Children.OfType<ToggleButton>()
-                                .First(b => (string)b.Tag == "Vignette");
-
-            vignette.IsChecked = true;
+            // Mehrere zugleich offen - das war an den Kacheln unmoeglich.
+            tiles["Grain"].RaiseEvent(new RoutedEventArgs(ButtonBase.ClickEvent));
             panel.UpdateLayout();
 
-            var body = (FrameworkElement)panel.FindName("VignetteBody");
-            var motion = (FrameworkElement)panel.FindName("MotionBody");
+            var vignetteBody = (FrameworkElement)panel.FindName("VignetteBody");
+            var grainBody = (FrameworkElement)panel.FindName("GrainBody");
+            var basicBody = (FrameworkElement)panel.FindName("BasicBody");
 
-            Check.That(body.Visibility == Visibility.Visible, "die gewaehlte Kachel schreibt aus");
-            Check.That(motion.Visibility != Visibility.Visible, "und die daneben nicht mehr");
+            Check.That(vignetteBody.IsVisible && grainBody.IsVisible && basicBody.IsVisible,
+                       "drei Effekte stehen gleichzeitig offen");
 
-            // Und der Gewinn, um den es ging: Eine Kachel, deren Werkzeug etwas tut,
-            // sieht anders aus als eine, deren Werkzeug nichts tut.
+            // Die Reihenfolge ist die des Rechenwegs, nicht die des Hinzufuegens:
+            // Korn wurde nach der Vignette hinzugefuegt, rechnet aber nach ihr.
+            var order = cards.Children.OfType<Border>()
+                             .Where(b => b.Visibility == Visibility.Visible)
+                             .Select(b => (string)b.Tag).ToArray();
+
+            Check.That(Array.IndexOf(order, "Basic") < Array.IndexOf(order, "Vignette") &&
+                       Array.IndexOf(order, "Vignette") < Array.IndexOf(order, "Grain"),
+                       "und stehen in der Reihenfolge des Rechenwegs", string.Join(", ", order));
+
+            // --- Was etwas tut, traegt den Strich --------------------------------
+            var vignette = panel.Stack.Optics.OfType<VignetteTool>().First();
+
             static bool Marked(ToggleButton tile)
                 => tile.Content is Grid face &&
-                   face.Children.OfType<System.Windows.Shapes.Ellipse>()
-                       .Any(dot => dot.Visibility == Visibility.Visible);
+                   face.Children.OfType<Border>().Any(bar => bar.Visibility == Visibility.Visible);
 
-            bool quiet = Marked(vignette);
+            Check.That(!Marked(tiles["Vignette"]), "solange sie nichts tut, traegt sie keinen Strich");
 
-            Check.That(!quiet, "eine Kachel, deren Werkzeug nichts tut, traegt keinen Punkt");
-
-            // Und sie ist trotzdem voll lesbar - blass sah sie aus wie gesperrt.
-            Check.Near(vignette.Opacity, 1.0, 0.001,
-                       "und ist trotzdem voll lesbar, nicht blass wie gesperrt");
-
-            panel.Stack.Optics.OfType<VignetteTool>().First().Amount = 0.5f;
-
+            vignette.Amount = 0.5f;
             panel.Load(panel.Adjustments, panel.Stack);
             panel.UpdateLayout();
 
-            var again = ((Panel)panel.FindName("Tiles")).Children.OfType<ToggleButton>()
-                        .First(b => (string)b.Tag == "Vignette");
+            Check.That(Marked(tiles["Vignette"]), "sobald sie etwas tut, schon");
+            Check.That(Shown("Vignette"), "und ihre Karte bleibt nach dem Laden im Stapel");
+            Check.That(!Shown("Grain"),
+                       "eine hinzugefuegte, aber unberuehrte Karte nicht - sie gehoerte zum alten Ziel");
 
-            Check.That(Marked(again),
-                       "eine Kachel, deren Werkzeug etwas tut, traegt den Punkt");
-            Check.That(again.FontWeight == FontWeights.SemiBold,
-                       "und ihr Name steht kraeftiger");
+            // --- Ausschalten: die Einstellung bleibt -----------------------------
+            var power = FindPower(CardOf(cards, "Vignette")!);
+
+            Check.That(power is not null, "die Karte hat einen Ein-Aus-Schalter");
+            if (power is null) return;
+
+            power.IsChecked = false;
+            power.RaiseEvent(new RoutedEventArgs(ButtonBase.ClickEvent));
+            panel.UpdateLayout();
+
+            Check.That(panel.Stack.IsBypassed(vignette.Kind), "ausgeschaltet steht sie auf der Liste");
+            Check.That(panel.Stack.Prepare().Optics.Length == 0, "und wird nicht gerechnet");
+            Check.Near(vignette.Amount, 0.5, 1e-5, "aber ihre Einstellung bleibt stehen");
+            Check.That(Shown("Vignette"), "und ihre Karte auch");
+            Check.That(!Marked(tiles["Vignette"]), "ohne den Strich - sie tut ja gerade nichts");
+
+            power.IsChecked = true;
+            power.RaiseEvent(new RoutedEventArgs(ButtonBase.ClickEvent));
+
+            Check.That(!panel.Stack.IsBypassed(vignette.Kind) && panel.Stack.Prepare().Optics.Length == 1,
+                       "wieder eingeschaltet rechnet sie wie vorher");
+
+            // --- Zuruecksetzen und Entfernen -------------------------------------
+            //
+            // Auch fuer Einstellungen, die auf keinem Regler stehen: Die
+            // Farbbereiche haben acht Baender, die Regler zeigen immer nur eines.
+            var bands = panel.Stack.Tools.OfType<HslTool>().First();
+
+            bands.Bands[5].Luminance = 40f;
+            panel.Load(panel.Adjustments, panel.Stack);
+            panel.UpdateLayout();
+
+            Check.That(Shown("Bands"), "veraenderte Farbbereiche stehen im Stapel");
+
+            ClickIn(CardOf(cards, "Bands")!, "\u21BA");
+            panel.UpdateLayout();
+
+            Check.That(panel.Stack.Tools.OfType<HslTool>().First().IsNeutral,
+                       "Zuruecksetzen erreicht auch das Band, das kein Regler gerade zeigt");
+
+            ClickIn(CardOf(cards, "Vignette")!, "\u2715");
+            panel.UpdateLayout();
+
+            Check.That(vignette.IsNeutral, "Entfernen setzt zurueck");
+            Check.That(!Shown("Vignette"), "und nimmt die Karte weg");
+            Check.That(tiles["Vignette"].IsChecked != true, "das Zeichen zeigt es");
         }
         finally
         {
             window.Close();
         }
     }
+
+    private static ToggleButton? FindPower(DependencyObject root)
+        => Descendants(root).OfType<ToggleButton>().FirstOrDefault();
+
+    private static void ClickIn(DependencyObject root, string glyph)
+    {
+        var button = Descendants(root).OfType<Button>().First(b => (string?)b.Content == glyph);
+
+        button.RaiseEvent(new RoutedEventArgs(ButtonBase.ClickEvent));
+    }
+
+    private static IEnumerable<DependencyObject> Descendants(DependencyObject root)
+    {
+        int count = System.Windows.Media.VisualTreeHelper.GetChildrenCount(root);
+
+        for (int i = 0; i < count; i++)
+        {
+            var child = System.Windows.Media.VisualTreeHelper.GetChild(root, i);
+
+            yield return child;
+
+            foreach (var deeper in Descendants(child)) yield return deeper;
+        }
+    }
+
 }

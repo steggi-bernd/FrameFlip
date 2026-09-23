@@ -65,6 +65,23 @@ public sealed class GradingStack
     /// </summary>
     public List<IDataTool> Data { get; set; } = new();
 
+    /// <summary>
+    /// Welche Werkzeuge ausgeschaltet sind - nach ihrer Kennung.
+    ///
+    /// Ausgeschaltet ist nicht zurueckgesetzt: Die Einstellung bleibt stehen und ist
+    /// mit einem Klick wieder da. Das ist der Vorher-Nachher-Vergleich EINES
+    /// Werkzeugs, und der ist beim Einstellen haeufiger gefragt als der des ganzen
+    /// Bildes.
+    ///
+    /// Hier und nicht am Werkzeug, weil es sechs Arten von Werkzeugen gibt und jede
+    /// ihre eigene Schnittstelle hat. Eine Liste an EINER Stelle, gefragt an der
+    /// einen Stelle, an der ohnehin entschieden wird, was gerechnet wird.
+    /// </summary>
+    public List<string> Bypassed { get; set; } = new();
+
+    /// <summary>Ob ein Werkzeug dieser Kennung ausgeschaltet ist.</summary>
+    public bool IsBypassed(string kind) => Bypassed.Contains(kind);
+
     /// <summary>True, wenn kein Werkzeug etwas zu tun hat.</summary>
     public bool IsNeutral
         => (Tools.Count == 0 || Tools.All(t => t.IsNeutral)) &&
@@ -91,7 +108,7 @@ public sealed class GradingStack
 
         foreach (var tool in Tools)
         {
-            if (tool.IsNeutral) continue;
+            if (tool.IsNeutral || IsBypassed(tool.Kind)) continue;
 
             tool.Prepare();
             (tool.Stage == GradingStage.SceneLinear ? linear : display).Add(tool);
@@ -103,7 +120,7 @@ public sealed class GradingStack
         // die einzige, die in beide Richtungen Sinn ergibt.
         foreach (var tool in Local.OrderBy(t => t.Stage))
         {
-            if (tool.IsNeutral) continue;
+            if (tool.IsNeutral || IsBypassed(tool.Kind)) continue;
 
             tool.Prepare();
 
@@ -117,7 +134,7 @@ public sealed class GradingStack
 
         foreach (var tool in Optics.OrderBy(t => t.Stage))
         {
-            if (tool.IsNeutral) continue;
+            if (tool.IsNeutral || IsBypassed(tool.Kind)) continue;
 
             tool.Prepare();
             optics.Add(tool);
@@ -127,7 +144,7 @@ public sealed class GradingStack
 
         foreach (var tool in Geometry)
         {
-            if (tool.IsNeutral) continue;
+            if (tool.IsNeutral || IsBypassed(tool.Kind)) continue;
 
             tool.Prepare();
             geometry.Add(tool);
@@ -139,7 +156,7 @@ public sealed class GradingStack
         // Reihenfolge, in der jemand an den Reglern war.
         foreach (var tool in Data.OrderBy(t => t.Stage))
         {
-            if (tool.IsNeutral) continue;
+            if (tool.IsNeutral || IsBypassed(tool.Kind)) continue;
 
             tool.Prepare();
             data.Add(tool);
@@ -149,7 +166,7 @@ public sealed class GradingStack
 
         foreach (var pass in Frame)
         {
-            if (pass.IsNeutral) continue;
+            if (pass.IsNeutral || IsBypassed(pass.Kind)) continue;
 
             pass.Prepare();
             frame.Add(pass);
@@ -175,6 +192,7 @@ public sealed class GradingStack
         Frame = Frame.Select(CopyFrame).ToList(),
         Geometry = Geometry.Select(CopyGeometry).ToList(),
         Data = Data.Select(CopyData).ToList(),
+        Bypassed = new List<string>(Bypassed),
     };
 
     private static IDataTool CopyData(IDataTool tool) => tool switch

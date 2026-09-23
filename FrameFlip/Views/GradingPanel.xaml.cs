@@ -270,6 +270,10 @@ public partial class GradingPanel : UserControl
         // jedem Verfahren gleichzeitig.
         DitherBody.IsEnabled = enabled;
 
+        // Und die Palette: Ein Zeichen, das an einer Ebene eine Karte anlegte, deren
+        // Regler dort nie wirken, waere dieselbe Falle ein drittes Mal.
+        LockPalette(enabled);
+
         // Pixel Sorting ist derselbe Fall: ein Durchgang ueber den fertigen Rahmen,
         // und auf einer Ebene gibt es keinen fertigen Rahmen.
         SortBody.IsEnabled = enabled;
@@ -314,6 +318,7 @@ public partial class GradingPanel : UserControl
         var geometry = stack?.Geometry.ToList();
         var data = stack?.Data.ToList();
         var frame = stack?.Frame.ToList();
+        var bypassed = stack?.Bypassed.ToList();
 
         Stack.Tools.Clear();
         if (tools is not null) Stack.Tools.AddRange(tools);
@@ -339,6 +344,16 @@ public partial class GradingPanel : UserControl
         // Stapel gefuellt und beim naechsten Start war die Einstellung weg.
         Stack.Frame.Clear();
         if (frame is not null) Stack.Frame.AddRange(frame);
+
+        // Was ausgeschaltet war, bleibt ausgeschaltet - sonst schaltete jeder Wechsel
+        // der Ebene still wieder ein, was jemand zum Vergleich abgestellt hatte.
+        Stack.Bypassed.Clear();
+        if (bypassed is not null) Stack.Bypassed.AddRange(bypassed);
+
+        // Hinzugefuegt, aber noch unberuehrt, gilt nur fuer DIESES Ziel. Eine leere
+        // Karte, die beim Wechsel zur naechsten Ebene mitwandert, waere eine Karte,
+        // die dort niemand angelegt hat.
+        _added.Clear();
 
         _curves = Take<CurvesTool>();
         _whiteBalance = Take<WhiteBalanceTool>();

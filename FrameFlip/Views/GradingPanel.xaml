@@ -80,11 +80,10 @@
     <Border Grid.Row="2" Padding="14,8,14,8"
             BorderBrush="{StaticResource PanelBorder}" BorderThickness="0,0,0,1">
         <!--
-            Eine Zeile, gleich breite Felder. Vorher brachen die Kategorien auf zwei
-            Zeilen um, weil "Licht und Zeichnung" nicht neben "Grundkorrektur" passte -
-            und eine Reiterleiste in zwei Zeilen liest niemand als Reiterleiste.
+            Die Palette: alle Effekte als kleine Zeichen, eine Zeile je Kategorie.
+            Ein Klick legt den Effekt in den Stapel darunter oder springt zu ihm.
         -->
-        <UniformGrid x:Name="Tabs" Rows="1" />
+        <StackPanel x:Name="Palette" />
     </Border>
 
     <ScrollViewer Grid.Row="3" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
@@ -95,11 +94,11 @@
                 die etwas tun, treten hervor - ein zugeklapptes Fach konnte das nie.
             -->
             <!--
-                Zwei je Zeile, gleich breit. Vorher war jede Kachel fest 128 Punkte
-                breit, und in der schmalen Spalte passte davon genau EINE - aus dem
-                Raster wurde eine Liste.
+                Der Stapel: nur die Effekte, die benutzt werden, als Karten - in der
+                Reihenfolge, in der gerechnet wird. Die Karten baut der Code; ihr
+                Inhalt sind die Abschnitte weiter unten, die er hier hineinhaengt.
             -->
-            <UniformGrid x:Name="Tiles" Columns="2" Margin="0,0,0,12" />
+            <StackPanel x:Name="Cards" />
 
 
 

@@ -885,6 +885,9 @@
     <sys:String x:Key="S_GroupOpticsShort">Optics</sys:String>
     <sys:String x:Key="S_GroupFilmShort">Film</sys:String>
     <sys:String x:Key="S_GroupTableShort">LUT</sys:String>
+    <sys:String x:Key="S_EffectPower">On and off. Switched off, the setting stays - a comparison with and without this one effect.</sys:String>
+    <sys:String x:Key="S_EffectReset">Reset: every value back to start, the card stays.</sys:String>
+    <sys:String x:Key="S_EffectRemove">Remove: reset and take the card away.</sys:String>
     <sys:String x:Key="S_SectionColour">Colour</sys:String>
     <sys:String x:Key="S_SectionProperties">Properties</sys:String>
     <sys:String x:Key="S_ToolMove">Move</sys:String>
