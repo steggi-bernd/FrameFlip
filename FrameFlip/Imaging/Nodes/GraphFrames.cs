@@ -21,7 +21,9 @@ public static class GraphFrames
     /// Liest, was der Graph fuer dieses Bild braucht. Null, wenn das Bild selbst nicht
     /// lesbar ist.
     /// </summary>
-    public static GraphInputs? Read(NodeGraph graph, string path, IViewTransform view, int step = 1)
+    /// <param name="pool">Woher die Zwischenbilder ihre Felder nehmen - je Faden einer.</param>
+    public static GraphInputs? Read(NodeGraph graph, string path, IViewTransform view, int step = 1,
+                                    GridPool? pool = null)
     {
         var sources = new Dictionary<string, FloatFrame>(StringComparer.Ordinal);
 
@@ -57,6 +59,7 @@ public static class GraphFrames
             View = picture.IsSceneReferred ? view : new StandardViewTransform(),
             Step = step,
             Number = SequenceLink.NumberOf(path) ?? 0,
+            Pool = pool,
         };
     }
 

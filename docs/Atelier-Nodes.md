@@ -69,16 +69,20 @@ later, with the editor.
   slider is dragged. Nodes that must read a source at full resolution (placing, a pass mask,
   Cryptomatte, render data) take sources only.
 - **Order.** Topological. Each buffer is released once its last reader has run, so memory
-  follows the widest point of the graph, not its length. Reusing released buffers from a
-  pool comes in phase 5.
+  follows the widest point of the graph, not its length. With a pool (the preview, and
+  each worker of the export), a released buffer goes back into the pool and the next
+  render reuses it. The engine counts how many results hold a buffer, because results
+  share buffers: coverage passes through many nodes unchanged.
 - **Merging where the stack merges.** Consecutive local tools share their blur and
   consecutive geometry tools resample once. In the stack this is how they are computed, not
   an optimisation. Two separate passes would give a different picture. The engine merges
   such chains so that a converted graph gives the same pixels.
 - **Frame passes** work on 8-bit pixels, as they do today. They are skipped while dragging
   and in 16-bit output, as today.
-- **Caching** of outputs above the edited node, and fusing point-wise chains into one pass,
-  are phase 5. Phase 1 aims to be right, not fast.
+- **Point-wise chains** (light, point tools, lens and film, view, tone) run in one pass per
+  grid point, as in the stack's processor. The same operations in the same order give
+  the same bytes, without an intermediate picture per node.
+- **Caching.** The preview remembers what flows into the selected node. See phase 5.
 
 ## 4. From stack to graph
 
@@ -204,3 +208,39 @@ Only the alpha channel of exports changes, and only in those cases.
      goes is up to you. A copy mixed in as a second layer gives the same bytes as the same
      layer twice in the stack. *Datei* and *Ausgabe* cannot be duplicated.
 5. **Speed.** Cache per node, and fuse point-wise chains.
+
+   *Done (2026-09-24).* At 1920×1080, the typical graph from phase 1:
+
+   | | before | now | stack |
+   |---|---|---|---|
+   | full render | 155 ms | 98 ms | 86 ms |
+   | while dragging | 13 ms | 9 ms | 7 ms |
+   | dragging Tone / releasing | 13 / 155 ms | 5 / 40 ms | |
+   | dragging the third layer's Mix / releasing | 13 / 155 ms | 8 / 85 ms | |
+
+   - **Point-wise chains** run in one pass (seven picture tools: 50 → 37 ms).
+   - **A pool of buffers.** Writing 18 fresh 1080p buffers takes 49 ms, reused ones 19 ms.
+     Nodes take their output buffers from the pool and must write every element; where a
+     node leaves a point out (outside a placed layer), it now writes black explicitly.
+     A buffer returns only when no result holds it any more.
+   - **Cache above the selected node.** The key of each result covers everything that
+     goes into it:
+     - each node as it would be saved, without position and ID, so moving a node costs
+       nothing;
+     - the keys of its inputs;
+     - the identity of every source frame (a newly read frame is a new object);
+     - the frame number, the canvas and the view transform.
+
+     A painted mask adds a hash of its unpacked field for the current frame, because a
+     stroke in progress changes only that field. The saved text follows only after the
+     stroke. The key alone decides whether a result is still valid. What is kept (the
+     inputs of the selected node, for the full and the coarse grid) only decides how
+     often it pays off. A point chain splits at the selected node; local and geometry
+     chains do not, because splitting them changes the picture.
+   - **Export.** Each batch export worker has its own pool. Video renders frames
+     concurrently and keeps allocating.
+
+   Tests show the cache gives the stack's bytes after changes at the selected node, on
+   the coarse grid and after switching grids. The layers before the node demonstrably do
+   not run again, a moved node triggers no work, a newly read frame recomputes everything,
+   and a stroke in progress is seen. Counter-checks (one bug each) turn these tests red.

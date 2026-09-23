@@ -1,5 +1,7 @@
 using System.IO;
 using System.IO.Compression;
+using System.Security.Cryptography;
+using System.Text;
 using System.Text.Json.Serialization;
 
 namespace FrameFlip.Imaging.Grading;
@@ -106,6 +108,17 @@ public sealed class PaintedMask
 
         return _cover;
     }
+
+    /// <summary>
+    /// Ein Abdruck dessen, was die Maske gerade deckt - fuer den Zwischenspeicher der
+    /// Knoten. Waehrend eines Pinselstrichs steht das Neue nur im entpackten Feld;
+    /// <see cref="Data"/> kommt erst mit <see cref="Keep"/> nach. Ein Abdruck aus Data
+    /// allein saehe den Strich nicht, und das Bild bliebe beim Malen stehen.
+    /// </summary>
+    internal string Print()
+        => _cover is { } cover
+            ? "c" + Convert.ToHexString(SHA256.HashData(cover))
+            : "d" + Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(Data)));
 
     /// <summary>Packt die Deckung wieder ein - nach jedem Pinselstrich.</summary>
     public void Keep()

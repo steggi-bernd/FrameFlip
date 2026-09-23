@@ -147,6 +147,12 @@ public partial class AtelierPage
         return data;
     }
 
+    /// <summary>Die Felder der Zwischenbilder - von einer Rechnung zur naechsten wiederverwendet.</summary>
+    private readonly GridPool _pool = new();
+
+    /// <summary>Was vor dem gewaehlten Knoten gerechnet wurde - beim naechsten Zug an ihm gilt es noch.</summary>
+    private readonly GraphCache _cache = new();
+
     /// <summary>
     /// Rechnet den Graphen in die Anzeigeflaeche. False, wenn er sich nicht rechnen
     /// laesst - dann bleibt das Bild, wie es war.
@@ -162,6 +168,9 @@ public partial class AtelierPage
             View = ViewFor(_base),
             Step = _coarse ? CoarseStep : 1,
             Number = _number,
+            Pool = _pool,
+            Cache = _cache,
+            Focus = NodeView.Selected?.Id,
         };
 
         return GraphEvaluator.Render(_graph, inputs, target, stride);

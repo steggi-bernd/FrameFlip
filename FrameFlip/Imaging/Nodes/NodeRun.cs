@@ -91,6 +91,114 @@ internal sealed class NodeContext
 
     public OpticsPlace Place => new(Width, Height, Number);
 
+    // ------------------------------------------------------------ Vorrat
+
+    /// <summary>Woher die Felder kommen - ohne Vorrat werden sie neu angelegt.</summary>
+    public GridPool? Pool { get; init; }
+
+    /// <summary>Felder aus dem Vorrat, die in dieser Rechnung ausgegeben wurden.</summary>
+    private readonly HashSet<float[]> _owned = new(ReferenceEqualityComparer.Instance);
+
+    /// <summary>Wie viele Ergebnisse ein Feld gerade halten.</summary>
+    private readonly Dictionary<float[], int> _holds = new(ReferenceEqualityComparer.Instance);
+
+    /// <summary>Was der laufende Knoten genommen hat.</summary>
+    private readonly List<float[]> _taken = new();
+
+    /// <summary>
+    /// Ein Feld fuer ein Ergebnis. Was darin steht, ist unbestimmt - wer es nimmt,
+    /// beschreibt jede Stelle.
+    /// </summary>
+    public float[] Take(int length)
+    {
+        if (Pool is null) return new float[length];
+
+        var array = Pool.Take(length);
+        _owned.Add(array);
+        _taken.Add(array);
+
+        return array;
+    }
+
+    /// <summary>
+    /// Der Puffer der oertlichen Wege, bereit fuer so viele Punkte, wie das Gitter hat.
+    /// Werte- und Arbeitsfeld sind frisch genommen; das Wertefeld geht mit dem Ergebnis
+    /// hinaus.
+    /// </summary>
+    internal LocalPass.Scratch Scratch()
+    {
+        if (Pool is null)
+        {
+            var own = new LocalPass.Scratch();
+            own.Hold(Count);
+            return own;
+        }
+
+        var scratch = Pool.Scratch(Count);
+        scratch.Values = Take(Count * 3);
+        scratch.Work = Take(Count * 3);
+
+        return scratch;
+    }
+
+    /// <summary>Ein Ergebnis steht jetzt da - seine Felder werden gehalten.</summary>
+    internal void Hold(object? value)
+    {
+        if (Pool is null) return;
+
+        foreach (var array in Fields(value))
+            if (_owned.Contains(array)) _holds[array] = _holds.GetValueOrDefault(array) + 1;
+    }
+
+    /// <summary>Ein Ergebnis wird nicht mehr gebraucht. Haelt niemand mehr ein Feld, geht es zurueck.</summary>
+    internal void Drop(object? value)
+    {
+        if (Pool is null) return;
+
+        foreach (var array in Fields(value))
+        {
+            if (!_holds.TryGetValue(array, out int holds)) continue;
+
+            if (holds > 1)
+            {
+                _holds[array] = holds - 1;
+                continue;
+            }
+
+            _holds.Remove(array);
+            Pool.Give(array);
+        }
+    }
+
+    /// <summary>
+    /// Ein Knoten ist fertig: Was er genommen hat und nicht in einem Ergebnis steht,
+    /// geht zurueck - Zwischenbilder, abgelesene Quellen, das Arbeitsfeld.
+    /// </summary>
+    internal void EndUnit()
+    {
+        if (Pool is null) return;
+
+        foreach (var array in _taken)
+            if (!_holds.ContainsKey(array)) Pool.Give(array);
+
+        _taken.Clear();
+    }
+
+    private static IEnumerable<float[]> Fields(object? value)
+    {
+        switch (value)
+        {
+            case GridImage image:
+                yield return image.Rgb;
+                yield return image.A;
+                break;
+
+            case GridValue mask:
+                yield return mask.V;
+                break;
+        }
+    }
+
     public static readonly ParallelOptions Parallel = new()
     {
         MaxDegreeOfParallelism = Math.Clamp(Environment.ProcessorCount, 1, 8),
@@ -145,7 +253,7 @@ internal sealed class NodeRun
                 var image = Image(input);
                 if (image is null) return null;
 
-                var v = new float[Context.Count];
+                var v = Context.Take(Context.Count);
 
                 for (int i = 0; i < v.Length; i++)
                     v[i] = 0.2126f * image.Rgb[i * 3] + 0.7152f * image.Rgb[i * 3 + 1] + 0.0722f * image.Rgb[i * 3 + 2];
@@ -170,8 +278,8 @@ internal sealed class NodeRun
         if (frame.Width != context.Width || frame.Height != context.Height) return null;
 
         int count = context.Count;
-        var rgb = new float[count * 3];
-        var a = new float[count];
+        var rgb = context.Take(count * 3);
+        var a = context.Take(count);
 
         var columns = context.Columns;
         var rows = context.Rows;

@@ -122,15 +122,18 @@ public static class GradeBatch
         {
             // Je Faden eine eigene Kopie des Graphen: Seine Knoten halten beim Rechnen
             // vorbereitete Tabellen, und zwei Bilder zugleich im selben Knoten
-            // schrieben sich gegenseitig hinein.
-            Parallel.ForEach(request.Frames, options, () => request.Graph?.Clone(), (path, _, graph) =>
+            // schrieben sich gegenseitig hinein. Und je Faden ein eigener Vorrat - er
+            // dient einer Rechnung zur Zeit, und von Bild zu Bild derselben.
+            Parallel.ForEach(request.Frames, options,
+                             () => (Graph: request.Graph?.Clone(), Pool: new Nodes.GridPool()),
+                             (path, _, worker) =>
             {
-                One(path, graph);
-                return graph;
+                One(path, worker.Graph, worker.Pool);
+                return worker;
             },
             _ => { });
 
-            void One(string path, Nodes.NodeGraph? graph)
+            void One(string path, Nodes.NodeGraph? graph, Nodes.GridPool pool)
             {
                 token.ThrowIfCancellationRequested();
 
@@ -152,7 +155,7 @@ public static class GradeBatch
 
                     if (graph is not null)
                     {
-                        var inputs = Nodes.GraphFrames.Read(graph, path, request.View);
+                        var inputs = Nodes.GraphFrames.Read(graph, path, request.View, pool: pool);
 
                         if (inputs is null || !WriteGraph(graph, inputs, request, target))
                         {

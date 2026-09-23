@@ -24,21 +24,31 @@ public abstract class PointNode : Node
     /// <summary>Ein Punkt. Muss nach <see cref="Prepare"/> von mehreren Faeden gerufen werden koennen.</summary>
     internal abstract void Shade(NodeContext context, int x, int y, ref float r, ref float g, ref float b);
 
-    internal override void Run(NodeRun run)
+    internal override void Run(NodeRun run) => RunChain(new[] { this }, run);
+
+    /// <summary>
+    /// Rechnet Punktknoten, die hintereinander haengen, in EINEM Durchgang: je Gitterpunkt
+    /// alle nacheinander, wie der Prozessor im Stapel. Das Ergebnis ist dasselbe wie
+    /// Knoten fuer Knoten - dieselben Rechnungen in derselben Reihenfolge -, nur ohne
+    /// ein Zwischenbild je Knoten. Bei sieben Werkzeugen am Bild sind das sechs Bilder
+    /// weniger, die angelegt, geschrieben und wieder gelesen werden.
+    /// </summary>
+    internal static void RunChain(IReadOnlyList<PointNode> chain, NodeRun run)
     {
         var image = run.Image("Bild");
+        var active = chain.Where(n => !n.Muted && !n.Idle).ToArray();
 
-        if (image is null || Idle)
+        if (image is null || active.Length == 0)
         {
             run.Set("Bild", image);
             return;
         }
 
         var context = run.Context;
-        Prepare(context);
+        foreach (var node in active) node.Prepare(context);
 
         var input = image.Rgb;
-        var rgb = new float[input.Length];
+        var rgb = context.Take(input.Length);
         var columns = context.Columns;
         var rows = context.Rows;
         int gridWidth = context.GridWidth;
@@ -51,9 +61,10 @@ public abstract class PointNode : Node
             for (int gx = 0; gx < gridWidth; gx++)
             {
                 int at = (row + gx) * 3;
+                int x = columns[gx];
                 float r = input[at], g = input[at + 1], b = input[at + 2];
 
-                Shade(context, columns[gx], y, ref r, ref g, ref b);
+                foreach (var node in active) node.Shade(context, x, y, ref r, ref g, ref b);
 
                 rgb[at] = r;
                 rgb[at + 1] = g;
@@ -227,8 +238,7 @@ public sealed class LocalNode : Node
 
         foreach (var tool in tools) tool.Prepare();
 
-        var scratch = new LocalPass.Scratch();
-        scratch.Hold(context.Count);
+        var scratch = context.Scratch();
         Array.Copy(image.Rgb, scratch.Values, image.Rgb.Length);
 
         LocalPass.Run(scratch, tools, context.GridWidth, context.GridHeight, context.Width, context.Step);
@@ -282,8 +292,7 @@ public sealed class GeometryNode : Node
     /// <summary>Das Bild in den Puffer der oertlichen Wege - die Deckung als Byte, wie dort.</summary>
     internal static LocalPass.Scratch Fill(GridImage image, NodeContext context)
     {
-        var scratch = new LocalPass.Scratch();
-        scratch.Hold(context.Count);
+        var scratch = context.Scratch();
 
         Array.Copy(image.Rgb, scratch.Values, image.Rgb.Length);
 
@@ -299,7 +308,7 @@ public sealed class GeometryNode : Node
     internal static GridImage Read(LocalPass.Scratch scratch, GridImage image, NodeContext context)
     {
         var alpha = scratch.Alpha;
-        var a = new float[context.Count];
+        var a = context.Take(context.Count);
 
         for (int i = 0; i < a.Length; i++) a[i] = alpha[i] / 255f;
 
@@ -408,7 +417,7 @@ public sealed class OverlayNode : Node
         };
 
         var input = image.Rgb;
-        var rgb = new float[input.Length];
+        var rgb = context.Take(input.Length);
         var columns = context.Columns;
         var rows = context.Rows;
         int gridWidth = context.GridWidth;
@@ -483,8 +492,8 @@ public sealed class FramePassNode : Node
         fixed (byte* start = pixels)
             Pass.Apply((IntPtr)start, width, height, stride, context.Number);
 
-        var back = new float[rgb.Length];
-        var alpha = new float[a.Length];
+        var back = context.Take(rgb.Length);
+        var alpha = context.Take(a.Length);
 
         for (int i = 0; i < width * height; i++)
         {

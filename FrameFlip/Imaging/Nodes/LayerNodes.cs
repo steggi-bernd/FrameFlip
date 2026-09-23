@@ -110,9 +110,14 @@ public sealed class BlackNode : Node
 
     internal override void Run(NodeRun run)
     {
-        int count = run.Context.Count;
+        var context = run.Context;
+        var rgb = context.Take(context.Count * 3);
+        var a = context.Take(context.Count);
 
-        run.Set("Bild", new GridImage { Rgb = new float[count * 3], A = new float[count] });
+        Array.Clear(rgb);
+        Array.Clear(a);
+
+        run.Set("Bild", new GridImage { Rgb = rgb, A = a });
     }
 }
 
@@ -158,8 +163,8 @@ public sealed class PlaceNode : Node
         var placement = LayerPlacement.Prepare(Place, frame.Width, frame.Height, context.Width, context.Height);
 
         int count = context.Count;
-        var rgb = new float[count * 3];
-        var a = new float[count];
+        var rgb = context.Take(count * 3);
+        var a = context.Take(count);
 
         var columns = context.Columns;
         var rows = context.Rows;
@@ -177,6 +182,11 @@ public sealed class PlaceNode : Node
 
                 if (covered <= 0f)
                 {
+                    // Die Farbe ist hier schwarz, wie in einem frischen Feld - ein
+                    // gebrauchtes aus dem Vorrat traegt sonst ein altes Bild.
+                    rgb[at * 3] = 0f;
+                    rgb[at * 3 + 1] = 0f;
+                    rgb[at * 3 + 2] = 0f;
                     a[at] = GridImage.Absent;
                     continue;
                 }
@@ -227,7 +237,7 @@ public sealed class ExposureTintNode : Node
 
         var input = image.Rgb;
         var alpha = image.A;
-        var rgb = new float[input.Length];
+        var rgb = run.Context.Take(input.Length);
 
         Parallel.For(0, run.Context.GridHeight, NodeContext.Parallel, gy =>
         {
@@ -236,7 +246,11 @@ public sealed class ExposureTintNode : Node
 
             for (int at = from; at < to; at++)
             {
-                if (alpha[at] < 0f) continue;
+                if (alpha[at] < 0f)
+                {
+                    rgb[at * 3] = rgb[at * 3 + 1] = rgb[at * 3 + 2] = 0f;
+                    continue;
+                }
 
                 rgb[at * 3] = input[at * 3] * sr;
                 rgb[at * 3 + 1] = input[at * 3 + 1] * sg;
@@ -318,7 +332,7 @@ public sealed class MaskNode : Node
         var layer = run.Image("Ebene");
         var under = run.Image("Untergrund");
 
-        var values = new float[context.Count];
+        var values = context.Take(context.Count);
 
         var columns = context.Columns;
         var rows = context.Rows;
@@ -404,7 +418,7 @@ public sealed class LayerGradeNode : Node
 
         var input = image.Rgb;
         var alpha = image.A;
-        var rgb = new float[input.Length];
+        var rgb = run.Context.Take(input.Length);
 
         Parallel.For(0, run.Context.GridHeight, NodeContext.Parallel, gy =>
         {
@@ -413,7 +427,11 @@ public sealed class LayerGradeNode : Node
 
             for (int at = from; at < to; at++)
             {
-                if (alpha[at] < 0f) continue;
+                if (alpha[at] < 0f)
+                {
+                    rgb[at * 3] = rgb[at * 3 + 1] = rgb[at * 3 + 2] = 0f;
+                    continue;
+                }
 
                 float r = input[at * 3], g = input[at * 3 + 1], b = input[at * 3 + 2];
 
@@ -465,7 +483,7 @@ public sealed class RestrictNode : Node
             return;
         }
 
-        var rgb = new float[before.Rgb.Length];
+        var rgb = run.Context.Take(before.Rgb.Length);
         var from = before.Rgb;
         var to = after.Rgb;
         var alpha = before.A;
@@ -554,8 +572,8 @@ public sealed class MixNode : Node
 
         float opacity = Math.Clamp(Opacity, 0f, 1f);
 
-        var rgb = new float[under.Rgb.Length];
-        var a = Clip ? under.A : new float[under.A.Length];
+        var rgb = run.Context.Take(under.Rgb.Length);
+        var a = Clip ? under.A : run.Context.Take(under.A.Length);
 
         var ur = under.Rgb;
         var ua = under.A;

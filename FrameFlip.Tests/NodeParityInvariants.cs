@@ -26,6 +26,13 @@ public static class NodeParityInvariants
 
     private static readonly IViewTransform View = new StandardViewTransform();
 
+    /// <summary>
+    /// Ein Vorrat fuer alle Faelle zusammen - so wie die Seite einen fuer alle Bilder hat.
+    /// Gibt der Auswerter ein Feld zu frueh zurueck, schreibt der naechste Fall hinein, und
+    /// der Vergleich mit dem Stapel merkt es.
+    /// </summary>
+    private static readonly GridPool Pool = new();
+
     public static void Run()
     {
         var world = new World();
@@ -35,6 +42,8 @@ public static class NodeParityInvariants
         RandomCases(world);
         TheGraphSurvivesSaving(world);
         WiredCases(world);
+        CachedCases(world);
+        ThePoolLeavesNoTrace(world);
     }
 
     /// <summary>
@@ -385,6 +394,196 @@ public static class NodeParityInvariants
                    $"{differTwice} Bytes anders, bis {worstTwice} Stufen");
     }
 
+    // ------------------------------------------------------------ Zwischenspeicher und Vorrat
+
+    /// <summary>
+    /// Der Zwischenspeicher liefert dasselbe Bild wie der Stapel - und laesst wirklich
+    /// aus, was vor dem gewaehlten Knoten liegt. Beides zusammen: Ein Speicher, der nie
+    /// trifft, rechnete auch richtig.
+    /// </summary>
+    private static void CachedCases(World world)
+    {
+        Check.Group("Knoten: der Zwischenspeicher rechnet nur hinter dem gewaehlten Knoten");
+
+        var stack = Base(Pass("P.a", BlendMode.Add), Image("bild.png", BlendMode.Screen));
+        var picture = new GradingStack
+        {
+            Optics = { new VignetteTool { Amount = -0.4f } },
+            Local = { new ClarityTool { Amount = 0.4f, Reach = 4 } },
+        };
+
+        var graph = StackToGraph.Convert(stack, Adjust(0.2, 1.1, 0, 1, 1.05), picture);
+        var tone = graph.Nodes.OfType<ToneNode>().Single();
+        var cache = new GraphCache();
+
+        var first = RenderGraph(world, graph, 1, 0, false, cache, tone.Id);
+
+        Check.That(Diff(RenderStack(world, stack, Adjust(0.2, 1.1, 0, 1, 1.05), picture, 1, 0, false), first, 1).Differ == 0,
+                   "beim ersten Mal rechnet alles, und das Bild stimmt");
+        Check.That(cache.Count > 0, "danach ist gemerkt, was in den Tonwert fliesst", $"{cache.Count}");
+
+        // Am Tonwert drehen: Nur er und was dahinter kommt, wird gerechnet.
+        tone.Gamma = 1.3;
+        var (again, ran) = Counted(() => RenderGraph(world, graph, 1, 0, false, cache, tone.Id));
+        var expected = RenderStack(world, stack, Adjust(0.2, 1.1, 0, 1.3, 1.05), picture, 1, 0, false);
+
+        Check.That(Diff(expected, again, 1).Differ == 0, "am Tonwert gedreht, stimmt das Bild mit dem Stapel",
+                   $"{Diff(expected, again, 1).Differ} Bytes anders");
+        Check.That(ran.OfType<ToneNode>().Any() && !ran.Any(n => n is MixNode or PlaceNode or LightNode or ViewNode),
+                   "und gerechnet wurden nur der Tonwert und was dahinter kommt",
+                   string.Join(", ", ran.Select(n => n.GetType().Name)));
+
+        // Ziehen (grob), dann Loslassen (voll): das volle Davor ist noch gemerkt.
+        tone.Gamma = 1.1;
+        var coarse = RenderGraph(world, graph, 3, 0, false, cache, tone.Id);
+
+        Check.That(Diff(RenderStack(world, stack, Adjust(0.2, 1.1, 0, 1.1, 1.05), picture, 3, 0, false), coarse, 1).Differ == 0,
+                   "grob beim Ziehen stimmt es auch");
+
+        tone.Gamma = 1.2;
+        var (released, ranReleased) = Counted(() => RenderGraph(world, graph, 1, 0, false, cache, tone.Id));
+
+        Check.That(Diff(RenderStack(world, stack, Adjust(0.2, 1.1, 0, 1.2, 1.05), picture, 1, 0, false), released, 1).Differ == 0 &&
+                   !ranReleased.Any(n => n is MixNode or PlaceNode),
+                   "und beim Loslassen rechnen die Ebenen nicht neu - das volle Davor war noch gemerkt",
+                   string.Join(", ", ranReleased.Select(n => n.GetType().Name)));
+
+        // Einen Knoten im Editor zu verschieben aendert kein Bild - und kostet keine Rechnung.
+        foreach (var node in graph.Nodes) node.X += 100;
+        tone.Gamma = 1.25;
+        var (_, ranMoved) = Counted(() => RenderGraph(world, graph, 1, 0, false, cache, tone.Id));
+
+        Check.That(!ranMoved.Any(n => n is MixNode or PlaceNode), "verschobene Knoten rechnen nicht neu",
+                   string.Join(", ", ranMoved.Select(n => n.GetType().Name)));
+
+        // Dazwischen andere Bilder durch denselben Vorrat: Was gemerkt ist, bleibt unberuehrt.
+        for (int seed = 900; seed < 906; seed++)
+            RenderGraph(world, StackToGraph.Convert(world.RandomStack(new Random(seed)), ImageAdjustments.Neutral, new GradingStack()), 1, 0, false);
+
+        tone.Gamma = 1.3;
+        Check.That(Diff(expected, RenderGraph(world, graph, 1, 0, false, cache, tone.Id), 1).Differ == 0,
+                   "auch wenn der Vorrat inzwischen andere Bilder gerechnet hat, stimmt das gemerkte Davor");
+
+        // Ein neu gelesenes Bild ist ein anderes - auch unter demselben Namen.
+        var sources = new Dictionary<string, FloatFrame>(world.Sources, StringComparer.Ordinal)
+        {
+            [""] = Darker(world.Sources[""]),
+        };
+
+        var (fresh, ranFresh) = Counted(() => RenderGraph(world, graph, 1, 0, false, cache, tone.Id, sources));
+
+        Check.That(ranFresh.Any(n => n is MixNode) &&
+                   Diff(RenderGraph(world, graph, 1, 0, false, sources: sources, pooled: false), fresh, 1).Differ == 0 &&
+                   Diff(expected, fresh, 1).Differ > 0,
+                   "ein neu gelesenes Bild rechnet alles neu");
+
+        PaintingIsSeen(world, picture);
+    }
+
+    /// <summary>
+    /// Waehrend eines Pinselstrichs aendert sich nur das entpackte Feld der Maske - was
+    /// gespeichert wuerde, kommt erst nach dem Strich. Der Speicher muss den Strich trotzdem
+    /// sehen, sonst bliebe das Bild beim Malen stehen.
+    /// </summary>
+    private static void PaintingIsSeen(World world, GradingStack picture)
+    {
+        var painted = new LayerMask { Kind = MaskKind.Painted, PaintLocked = true, Paint = PaintedMask.For(Width, Height) };
+        var stack = Base(Masked(Image("bild.png"), painted));
+        var graph = StackToGraph.Convert(stack, Adjust(0.2, 1.1, 0, 1, 1.05), picture);
+
+        var tone = graph.Nodes.OfType<ToneNode>().Single();
+        var mask = graph.Nodes.OfType<MaskNode>().Single();
+        var cache = new GraphCache();
+
+        RenderGraph(world, graph, 1, 0, false, cache, tone.Id);
+        var before = RenderGraph(world, graph, 1, 0, false, cache, tone.Id);
+
+        // Ein Strich, der noch laeuft: nur das entpackte Feld, kein Keep.
+        var cover = mask.Mask.PaintFor(0)!.Cover();
+        for (int i = 0; i < cover.Length / 2; i++) cover[i] = 255;
+
+        var during = RenderGraph(world, graph, 1, 0, false, cache, tone.Id);
+        var truth = RenderGraph(world, graph, 1, 0, false, pooled: false);
+
+        Check.That(Diff(before, during, 1).Differ > 0 && Diff(truth, during, 1).Differ == 0,
+                   "ein Pinselstrich vor dem gewaehlten Knoten wird gesehen, bevor er gespeichert ist",
+                   $"{Diff(truth, during, 1).Differ} Bytes anders als ohne Speicher");
+    }
+
+    /// <summary>
+    /// Ein Feld aus dem Vorrat traegt das Bild einer frueheren Rechnung. Wo ein Knoten
+    /// eine Stelle nicht beschreibt - ausserhalb einer platzierten Ebene -, muss trotzdem
+    /// dasselbe herauskommen wie in einem frischen Feld.
+    /// </summary>
+    private static void ThePoolLeavesNoTrace(World world)
+    {
+        Check.Group("Knoten: ein gebrauchtes Feld hinterlaesst keine Spur");
+
+        foreach (var (name, between) in new (string, Func<Node>?)[]
+        {
+            ("platziert", null),
+            ("platziert und belichtet", () => new ExposureTintNode { Exposure = 0.5f }),
+            ("platziert und korrigiert", () => new LayerGradeNode { Adjustments = new ImageAdjustments { Exposure = 0.5 } }),
+        })
+        {
+            var graph = new NodeGraph();
+            var render = graph.Add(new RenderNode());
+            var place = graph.Add(new PlaceNode { Place = new LayerTransform { Scale = 0.5f, OffsetX = 0.2f } });
+            var output = graph.Add(new OutputNode());
+
+            graph.Connect(render, RenderNode.Picture, place, "Bild");
+            Node last = place;
+
+            if (between is not null)
+            {
+                var node = graph.Add(between());
+                graph.Connect(place, "Bild", node, "Bild");
+                last = node;
+            }
+
+            graph.Connect(last, "Bild", output, "Bild");
+
+            var clean = RenderGraph(world, graph, 1, 0, false, pooled: false);
+
+            // Den Vorrat mit Bildern fuellen, die ueberall etwas tragen.
+            for (int seed = 950; seed < 954; seed++)
+                RenderGraph(world, StackToGraph.Convert(world.RandomStack(new Random(seed)), ImageAdjustments.Neutral, new GradingStack()), 1, 0, false);
+
+            var reused = RenderGraph(world, graph, 1, 0, false);
+
+            Check.That(Diff(clean, reused, 1).Differ == 0, $"{name}: aus dem Vorrat dasselbe wie frisch",
+                       $"{Diff(clean, reused, 1).Differ} Bytes anders");
+        }
+    }
+
+    /// <summary>Welche Einheiten waehrend einer Rechnung gerechnet wurden.</summary>
+    private static (byte[] Pixels, List<Node> Ran) Counted(Func<byte[]> render)
+    {
+        var ran = new List<Node>();
+        GraphEvaluator.Ran = ran.Add;
+
+        try
+        {
+            return (render(), ran);
+        }
+        finally
+        {
+            GraphEvaluator.Ran = null;
+        }
+    }
+
+    /// <summary>Dasselbe Bild noch einmal gelesen - ein anderes Objekt, etwas dunkler.</summary>
+    private static FloatFrame Darker(FloatFrame frame) => new()
+    {
+        Width = frame.Width,
+        Height = frame.Height,
+        R = frame.R.Select(v => v * 0.8f).ToArray(),
+        G = frame.G.Select(v => v * 0.8f).ToArray(),
+        B = frame.B.Select(v => v * 0.8f).ToArray(),
+        A = frame.A?.ToArray(),
+        IsSceneReferred = frame.IsSceneReferred,
+    };
+
     private static ImageLayer Masked(ImageLayer layer, LayerMask mask)
     {
         layer.Mask = mask;
@@ -479,11 +678,15 @@ public static class NodeParityInvariants
         return pixels;
     }
 
-    private static byte[] RenderGraph(World world, NodeGraph graph, int step, int number, bool sixteen)
+    private static byte[] RenderGraph(World world, NodeGraph graph, int step, int number, bool sixteen,
+                                      GraphCache? cache = null, string? focus = null,
+                                      IReadOnlyDictionary<string, FloatFrame>? sources = null, bool pooled = true)
     {
         var inputs = new GraphInputs
         {
-            Sources = world.Sources,
+            Sources = sources ?? world.Sources,
+            Cache = cache,
+            Focus = focus,
             Data = new Dictionary<PassNeed, FloatFrame?>
             {
                 [PassNeed.Depth] = world.Depth,
@@ -493,6 +696,7 @@ public static class NodeParityInvariants
             View = View,
             Step = step,
             Number = number,
+            Pool = pooled ? Pool : null,
         };
 
         int stride = Width * (sixteen ? 8 : 4);

@@ -253,6 +253,8 @@ public sealed partial class AtelierPage : UserControl
 
         _sources.Clear();
         _unreadable.Clear();
+        _pool.Clear();
+        _cache.Clear();
         _composed = null;
         _passes = passes;
 

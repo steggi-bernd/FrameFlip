@@ -1,5 +1,7 @@
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using System.Text.Json.Serialization.Metadata;
+using FrameFlip.Imaging.Grading;
 
 namespace FrameFlip.Imaging.Nodes;
 
@@ -286,6 +288,44 @@ public sealed class NodeGraph
 
     /// <summary>Eine eigene Kopie - Knoten und Werkzeuge sind danach andere Objekte.</summary>
     public NodeGraph Clone() => Load(Save())!;
+
+    /// <summary>
+    /// Wie ein Knoten fuer den Zwischenspeicher geschrieben wird: wie beim Speichern, ohne
+    /// Lage und Kennung - einen Knoten zu verschieben aendert kein Bild, und zwei gleiche
+    /// Knoten an gleichen Eingaengen rechnen dasselbe. Ohne die gemalten Masken aller
+    /// Bilder; die eine, die fuer dieses Bild gilt, haengt <see cref="Print"/> an.
+    /// </summary>
+    private static readonly JsonSerializerOptions PrintOptions = new(Options)
+    {
+        TypeInfoResolver = new DefaultJsonTypeInfoResolver { Modifiers = { LeaveOut } },
+    };
+
+    private static void LeaveOut(JsonTypeInfo info)
+    {
+        if (info.Kind != JsonTypeInfoKind.Object) return;
+
+        string[] names = typeof(Node).IsAssignableFrom(info.Type) ? new[] { nameof(Node.Id), nameof(Node.X), nameof(Node.Y) }
+                       : info.Type == typeof(LayerMask) ? new[] { nameof(LayerMask.Paint), nameof(LayerMask.PaintFrames) }
+                       : Array.Empty<string>();
+
+        for (int i = info.Properties.Count - 1; i >= 0; i--)
+            if (names.Contains(info.Properties[i].Name)) info.Properties.RemoveAt(i);
+    }
+
+    /// <summary>
+    /// Ein Abdruck dessen, was ein Knoten fuer dieses Bild rechnet - alles, was das
+    /// Speichern von ihm schreibt, und bei einer gemalten Maske der Abdruck ihres Feldes.
+    /// Dass das Speichern wirklich alles schreibt, was rechnet, prueft die Probe: Ein
+    /// gespeicherter und wieder gelesener Graph rechnet dasselbe Bild.
+    /// </summary>
+    internal static string Print(Node node, int number)
+    {
+        string json = JsonSerializer.Serialize(node, PrintOptions);
+
+        return node is MaskNode { Mask: { Kind: MaskKind.Painted } mask }
+            ? json + "|" + (mask.PaintFor(number)?.Print() ?? "-")
+            : json;
+    }
 
     /// <summary>
     /// Eine Kopie eines Knotens, mit allem, was er einstellt - noch nicht im Graphen und
