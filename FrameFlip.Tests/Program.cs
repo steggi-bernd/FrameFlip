@@ -38,6 +38,7 @@ static int RunAll()
     MaskInvariants.Run();
     AdjustmentInvariants.Run();
     ImageAndGroupInvariants.Run();
+    ClipAndCoverageInvariants.Run();
     LayerPlacementInvariants.Run();
     PlacementDragInvariants.Run();
     LocalToolInvariants.Run();

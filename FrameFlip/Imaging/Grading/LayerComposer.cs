@@ -265,9 +265,9 @@ public static class LayerComposer
             int y = rows[ry];
             int start = y * width;
 
-            // Der Stand vor jeder offenen Gruppe. Je Zeile einmal geholt, nicht je
-            // Bildpunkt - verschachtelt wird selten und flach.
-            Span<float> saved = stackalloc float[MaxDepth * 3];
+            // Der Stand vor jeder offenen Gruppe, samt Deckung. Je Zeile einmal
+            // geholt, nicht je Bildpunkt - verschachtelt wird selten und flach.
+            Span<float> saved = stackalloc float[MaxDepth * 4];
 
             for (int cx = 0; cx < columns.Length; cx++)
             {
@@ -316,9 +316,10 @@ public static class LayerComposer
                             // Schwarz vor.
                             if (depth < MaxDepth)
                             {
-                                saved[depth * 3] = vr;
-                                saved[depth * 3 + 1] = vg;
-                                saved[depth * 3 + 2] = vb;
+                                saved[depth * 4] = vr;
+                                saved[depth * 4 + 1] = vg;
+                                saved[depth * 4 + 2] = vb;
+                                saved[depth * 4 + 3] = va;
                                 depth++;
                             }
 
@@ -329,9 +330,10 @@ public static class LayerComposer
 
                         depth--;
 
-                        float br = saved[depth * 3];
-                        float bg = saved[depth * 3 + 1];
-                        float bb = saved[depth * 3 + 2];
+                        float br = saved[depth * 4];
+                        float bg = saved[depth * 4 + 1];
+                        float bb = saved[depth * 4 + 2];
+                        float ba = saved[depth * 4 + 3];
 
                         // Das Ergebnis der Gruppe auf den gesicherten Stand - mit
                         // ihrer Mischung, Deckkraft und Maske. Ohne all das ist eine
@@ -343,6 +345,13 @@ public static class LayerComposer
 
                         Blend(plan.Mode, plan.Display, groupFactor, br, bg, bb, vr, vg, vb,
                               out vr, out vg, out vb);
+
+                        // Und die Deckung ebenso. Frueher blieb sie, was die Kinder
+                        // gebracht hatten: Eine Gruppe auf halber Deckkraft ueber nichts
+                        // meldete volle Deckung, und eine PNG mit Freistellung zeigte
+                        // dort eine halbdunkle Flaeche als undurchsichtig. Die Gruppe
+                        // traegt bei, was ihre Kinder decken, mal ihrer Deckkraft.
+                        va = MathF.Max(ba, va * groupFactor);
 
                         continue;
                     }
@@ -395,7 +404,26 @@ public static class LayerComposer
                         // zwar wirklich nichts, nicht Schwarz. Ein Wasserzeichen
                         // wuerde sonst das halbe Bild ausloeschen.
                         float covered = plan.Placement.Coverage(x, y, out float u, out float v);
-                        if (covered <= 0f) continue;
+
+                        if (covered <= 0f)
+                        {
+                            // Ein Traeger, der hier nicht deckt, oeffnet trotzdem seine
+                            // Gruppe - leer und ohne Deckkraft. Sonst fanden die
+                            // angeschnittenen Ebenen darueber keine offene Gruppe vor,
+                            // wurden hier zu gewoehnlichen Ebenen und lagen ueber dem
+                            // ganzen Bild statt nur auf dem Logo, an das sie geschnitten
+                            // sind. Eine angeschnittene Ebene hier traegt ohnehin nichts bei.
+                            if (!inGroup)
+                            {
+                                gr = gg = gb = 0f;
+                                groupMode = plan.Mode;
+                                groupDisplay = plan.Display;
+                                groupOpacity = 0f;
+                                open = true;
+                            }
+
+                            continue;
+                        }
 
                         plan.Placement.Sample(frame!, u, v, out lr, out lg, out lb, out ownAlpha);
 
@@ -542,6 +570,12 @@ public static class LayerComposer
                     // schon da ist. Ihr eine Deckung zuzurechnen hiesse, ein Bild
                     // undurchsichtig zu machen, das es nicht war.
                     if (frame is null) continue;
+
+                    // Eine angeschnittene Ebene deckt nichts Eigenes ab: Sie liegt IN
+                    // ihrem Traeger, und wo der nicht deckt, ist auch sie nicht. Frueher
+                    // brachte sie ihre eigene Deckung mit und machte ein Bild dort
+                    // undurchsichtig, wo ihr Traeger durchsichtig war.
+                    if (inGroup) continue;
 
                     float la = (hasOwnAlpha ? 1f : frame.A is null ? 1f : frame.A[i]) * opacity;
                     if (la > va) va = la;
@@ -709,11 +743,22 @@ public static class LayerComposer
     /// Schliessen einer Gruppe, beim Auftragen einer Gruppe und am Ende. Vier
     /// Verzweigungen waeren vier Gelegenheiten, eine davon zu vergessen.
     /// </summary>
-    private static void Blend(BlendMode mode, bool display, float opacity,
-                              float ur, float ug, float ub,
-                              float or_, float og, float ob,
-                              out float r, out float g, out float b)
+    internal static void Blend(BlendMode mode, bool display, float opacity,
+                               float ur, float ug, float ub,
+                               float or_, float og, float ob,
+                               out float r, out float g, out float b)
     {
+        // Ohne Deckkraft bleibt, was darunter liegt - genau, und nicht beinahe. Durch
+        // die Mischung geschickt gaebe es im Anzeigeraum einen Hin- und Rueckweg durch
+        // sRGB, und bei Teilen durch null ein NaN, das mit null multipliziert NaN bleibt.
+        if (opacity <= 0f)
+        {
+            r = ur;
+            g = ug;
+            b = ub;
+            return;
+        }
+
         if (display)
             Blending.MixDisplay(mode, opacity, ur, ug, ub, or_, og, ob, out r, out g, out b);
         else
