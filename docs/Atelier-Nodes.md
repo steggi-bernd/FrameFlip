@@ -65,8 +65,9 @@ later, with the editor.
   them lives on the grid the display uses: every pixel normally, and every n-th while a
   slider is dragged. Nodes that must read a source at full resolution (placing, a pass mask,
   Cryptomatte, render data) take sources only.
-- **Order.** Topological. Each buffer goes back to a pool once its last reader has run, so
-  memory follows the widest point of the graph, not its length.
+- **Order.** Topological. Each buffer is released once its last reader has run, so memory
+  follows the widest point of the graph, not its length. Reusing released buffers from a
+  pool comes in phase 5.
 - **Merging where the stack merges.** Consecutive local tools share their blur and
   consecutive geometry tools resample once. In the stack this is how they are computed, not
   an optimisation. Two separate passes would give a different picture. The engine merges
