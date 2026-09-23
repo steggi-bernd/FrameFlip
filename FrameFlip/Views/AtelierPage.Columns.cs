@@ -4,7 +4,7 @@ using System.Windows.Controls.Primitives;
 namespace FrameFlip.Views;
 
 /// <summary>
-/// Die Aufteilung der rechten Spalte - und dass sie sich merkt, wie sie stand.
+/// Die rechte Spalte: zwei Reiter, und dass sie sich merkt, wie breit sie stand.
 ///
 /// "Alles sehr starr" war die Klage, und sie traf zu: Die Spalte war dreihundert
 /// Punkte breit, der Ebenenstreifen so hoch, wie er eben wurde, und daran liess sich
@@ -22,64 +22,40 @@ namespace FrameFlip.Views;
 /// </summary>
 public partial class AtelierPage
 {
-    /// <summary>
-    /// Die gemerkte Hoehe des Ebenenstreifens - in Grenzen, die ein Fenster ueberlebt.
-    ///
-    /// Eine Zahl aus der Einstellungsdatei ist nicht vertrauenswuerdig: Sie kann von
-    /// einem groesseren Bildschirm stammen, von einer aelteren Fassung, oder jemand
-    /// hat sie von Hand geaendert. Ungeprueft uebernommen ergaebe sie eine Spalte, in
-    /// der die Farbkorrektur nicht mehr vorkommt.
-    /// </summary>
-    private double LayerHeight() => Math.Clamp(_settings.AtelierLayersHeight, 64, 900);
-
-    /// <summary>Ein Abschnittskopf wurde angeklickt.</summary>
-    private void OnSectionToggled(object sender, RoutedEventArgs e) => ApplySections();
+    /// <summary>Ein Reiter der rechten Spalte wurde gewaehlt.</summary>
+    private void OnPanelTabChanged(object sender, RoutedEventArgs e) => ApplyPanelTab();
 
     /// <summary>
-    /// Verteilt die Hoehe nach dem, was offen ist.
+    /// Zeigt den Inhalt des gewaehlten Reiters - und nur ihn, in voller Hoehe.
     ///
-    /// Die eine Feinheit, die es braucht: Ist die Farbkorrektur zugeklappt, bekommen
-    /// die Ebenen den ganzen Platz. Sonst staende unter einem zugeklappten Kopf eine
-    /// leere Flaeche, die nichts zeigt und auch nichts zeigen kann - und "zuklappen"
-    /// haette dann nichts gespart, was sein einziger Zweck ist.
+    /// Der Ebenenreiter ist nur waehlbar, wenn ein Bild offen ist: Ohne Bild gibt
+    /// es keine Ebene, und ein Reiter, der auf eine leere Flaeche fuehrt, waere ein
+    /// Klick, der nichts beantwortet.
     /// </summary>
-    private void ApplySections()
+    private void ApplyPanelTab()
     {
-        // Waehrend die Oberflaeche aufgebaut wird, meldet der Abschnittskopf sein
-        // Haekchen bereits - und zwar in dem Augenblick, in dem der Aufbau bei ihm
-        // angekommen ist. Was weiter unten in der Datei steht, gibt es dann noch
-        // nicht. Ein Wert, der beim Aufbau gesetzt wird, loest eben auch beim Aufbau
-        // aus, und das ist die haeufigste Art, eine Oberflaeche zum Absturz zu
-        // bringen, die im Uebersetzer einwandfrei aussieht.
-        if (Layers is null || Tools is null || LayerSplitter is null || LayersRow is null ||
-            Properties is null || PropertiesHeader is null)
-        {
-            return;
-        }
+        // Waehrend die Oberflaeche aufgebaut wird, meldet der erste Reiter sein
+        // Haekchen bereits - bevor die Flaechen darunter existieren. Ein Wert, der
+        // beim Aufbau gesetzt wird, loest eben auch beim Aufbau aus.
+        if (Layers is null || Tools is null || LayersTab is null || ColourTab is null) return;
 
-        // Die Zeile der Eigenschaften ist auf "so hoch wie noetig" gestellt - sie
-        // schrumpft von selbst auf null, sobald der Abschnitt zugeklappt ist. Eine
-        // Hoehe von Hand zu rechnen waere eine Zahl, die bei jedem neuen Werkzeug
-        // wieder falsch waere.
-        Properties.Visibility = PropertiesHeader.IsChecked == true
-            ? Visibility.Visible
-            : Visibility.Collapsed;
+        bool layers = LayersTab.IsChecked == true && _layersShown;
 
-        bool colour = ColourHeader.IsChecked == true;
-        bool layers = Layers.Visibility == Visibility.Visible;
+        Layers.Visibility = layers ? Visibility.Visible : Visibility.Collapsed;
+        Tools.Visibility = layers ? Visibility.Collapsed : Visibility.Visible;
 
-        Tools.Visibility = colour ? Visibility.Visible : Visibility.Collapsed;
-        ColourRow.Height = colour ? new GridLength(1, GridUnitType.Star) : new GridLength(0);
-
-        LayersRow.Height = !layers ? new GridLength(0)
-            : colour ? new GridLength(LayerHeight())
-                     : new GridLength(1, GridUnitType.Star);
-
-        // Ein Griff zwischen zwei Flaechen, von denen eine zu ist, kann nichts
-        // aufteilen. Ihn trotzdem zu zeigen hiesse, an etwas ziehen zu lassen, das
-        // sich nicht bewegt.
-        LayerSplitter.Visibility = layers && colour ? Visibility.Visible : Visibility.Collapsed;
+        if (!layers && ColourTab.IsChecked != true) ColourTab.IsChecked = true;
     }
+
+    /// <summary>
+    /// Ob ein Bild mit Ebenen offen ist - unabhaengig davon, welcher Reiter vorn
+    /// liegt.
+    ///
+    /// Frueher hiess das "der Ebenenstreifen ist sichtbar", und der Greifrahmen im
+    /// Bild haengte daran. Mit Reitern ist der Streifen unsichtbar, sobald man auf
+    /// die Farbe schaut - und der Rahmen waere mit ihm verschwunden.
+    /// </summary>
+    private bool _layersShown;
 
     /// <summary>Stellt die Aufteilung der letzten Sitzung wieder her.</summary>
     private void RestoreColumns()
@@ -99,9 +75,4 @@ public partial class AtelierPage
         _persist(_settings);
     }
 
-    private void OnLayersResized(object sender, DragCompletedEventArgs e)
-    {
-        _settings.AtelierLayersHeight = LayersRow.ActualHeight;
-        _persist(_settings);
-    }
 }

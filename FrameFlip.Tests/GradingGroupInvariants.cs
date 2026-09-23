@@ -173,8 +173,8 @@ public static class GradingGroupInvariants
             window.Show();
             panel.UpdateLayout();
 
-            var tabs = (WrapPanel)panel.FindName("Tabs");
-            var tiles = (WrapPanel)panel.FindName("Tiles");
+            var tabs = (Panel)panel.FindName("Tabs");
+            var tiles = (Panel)panel.FindName("Tiles");
 
             if (tabs is null || tiles is null)
             {
@@ -188,7 +188,7 @@ public static class GradingGroupInvariants
             var forThePicture = new[] { "S_GroupLight", "S_GroupOptics", "S_GroupFilm" };
             var forBoth = new[] { "S_GroupBasics", "S_GroupTable" };
 
-            static string[] TagsOf(WrapPanel tiles)
+            static string[] TagsOf(Panel tiles)
                 => tiles.Children.OfType<ToggleButton>()
                         .Select(b => (string)b.Tag)
                         .Where(tag => tag is not null)
@@ -352,8 +352,8 @@ public static class GradingGroupInvariants
             window.Show();
             panel.UpdateLayout();
 
-            var tabs = (WrapPanel)panel.FindName("Tabs");
-            var tiles = (WrapPanel)panel.FindName("Tiles");
+            var tabs = (Panel)panel.FindName("Tabs");
+            var tiles = (Panel)panel.FindName("Tiles");
 
             Check.That(tabs is not null && tiles is not null, "Reiterleiste und Kachelfeld sind da");
             if (tabs is null || tiles is null) return;
@@ -430,19 +430,31 @@ public static class GradingGroupInvariants
 
             // Und der Gewinn, um den es ging: Eine Kachel, deren Werkzeug etwas tut,
             // sieht anders aus als eine, deren Werkzeug nichts tut.
-            double quiet = vignette.Opacity;
+            static bool Marked(ToggleButton tile)
+                => tile.Content is Grid face &&
+                   face.Children.OfType<System.Windows.Shapes.Ellipse>()
+                       .Any(dot => dot.Visibility == Visibility.Visible);
+
+            bool quiet = Marked(vignette);
+
+            Check.That(!quiet, "eine Kachel, deren Werkzeug nichts tut, traegt keinen Punkt");
+
+            // Und sie ist trotzdem voll lesbar - blass sah sie aus wie gesperrt.
+            Check.Near(vignette.Opacity, 1.0, 0.001,
+                       "und ist trotzdem voll lesbar, nicht blass wie gesperrt");
 
             panel.Stack.Optics.OfType<VignetteTool>().First().Amount = 0.5f;
 
             panel.Load(panel.Adjustments, panel.Stack);
             panel.UpdateLayout();
 
-            var again = ((WrapPanel)panel.FindName("Tiles")).Children.OfType<ToggleButton>()
+            var again = ((Panel)panel.FindName("Tiles")).Children.OfType<ToggleButton>()
                         .First(b => (string)b.Tag == "Vignette");
 
-            Check.That(again.Opacity > quiet,
-                       "eine Kachel, deren Werkzeug etwas tut, tritt hervor",
-                       $"{again.Opacity:0.00} gegen {quiet:0.00}");
+            Check.That(Marked(again),
+                       "eine Kachel, deren Werkzeug etwas tut, traegt den Punkt");
+            Check.That(again.FontWeight == FontWeights.SemiBold,
+                       "und ihr Name steht kraeftiger");
         }
         finally
         {

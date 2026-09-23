@@ -274,7 +274,7 @@
     <sys:String x:Key="S_MatteHint">Freigestellt heisst in einer Datei selten: Deckung genau null. Ein Entrauscher, ein Glanz im Compositing oder ein Export ueber ein Programm, das zwischendurch auf etwas legt, hinterlaesst im Hintergrund einen Schleier von wenigen Stufen - und darunter steht in den meisten Dateien Muell. Vier von 255 stehen auf Schwarz noch als Byte elf. Dieser Regler schneidet den Schleier weg.</sys:String>
     <sys:String x:Key="S_LayerTint">Farbe</sys:String>
     <sys:String x:Key="S_LayerColour">Bild</sys:String>
-    <sys:String x:Key="S_SinglePass">Dieses Format führt nur ein Bild – Passe gibt es nur in einer Multilayer-EXR. Schichten geht trotzdem: dasselbe Bild verdoppeln und auf Multiplizieren stellen.</sys:String>
+    <sys:String x:Key="S_SinglePass">Dieses Format führt nur ein Bild. Schichten geht trotzdem: dasselbe Bild verdoppeln und auf Multiplizieren stellen.</sys:String>
     <sys:String x:Key="S_PassMissing">fehlt in dieser Datei</sys:String>
     <sys:String x:Key="S_ResetLayers">zuruecksetzen</sys:String>
     <sys:String x:Key="S_BlendNormal">Normal</sys:String>
@@ -877,6 +877,14 @@
     <sys:String x:Key="S_ToolHandHint">Hand (H) - schiebt den Ausschnitt. Ziehen mit gedrückter mittlerer Maustaste tut überall dasselbe, ohne das Werkzeug zu wechseln.</sys:String>
     <sys:String x:Key="S_ToolPickHint">Pipette (I) - liest den Wert unter dem Zeiger ab.</sys:String>
     <sys:String x:Key="S_PickReadout">abgelesen</sys:String>
+    <sys:String x:Key="S_SectionLayers">Ebenen</sys:String>
+    <sys:String x:Key="S_LayersTabHint">Ebenen, Masken und Platzierung. Waehlbar, sobald ein Bild offen ist.</sys:String>
+    <sys:String x:Key="S_ResetLayersHint">Wirft alle Ebenen weg und faengt mit dem Bild allein neu an.</sys:String>
+    <sys:String x:Key="S_GroupBasicsShort">Grund</sys:String>
+    <sys:String x:Key="S_GroupLightShort">Licht</sys:String>
+    <sys:String x:Key="S_GroupOpticsShort">Optik</sys:String>
+    <sys:String x:Key="S_GroupFilmShort">Film</sys:String>
+    <sys:String x:Key="S_GroupTableShort">LUT</sys:String>
     <sys:String x:Key="S_SectionColour">Farbe</sys:String>
     <sys:String x:Key="S_SectionProperties">Eigenschaften</sys:String>
     <sys:String x:Key="S_ToolMove">Verschieben</sys:String>
@@ -929,7 +937,7 @@
     <sys:String x:Key="S_GroupTable">Tabelle</sys:String>
     <sys:String x:Key="S_ToolBrush">Pinsel</sys:String>
     <sys:String x:Key="S_ToolBrushHint">Pinsel (B) - trägt eine Maske von Hand auf. Alt hält gedrückt nimmt wieder weg. Die Ebene braucht dafür eine gemalte Maske; die Maske liegt beim Malen als farbiger Schleier über dem Bild, sonst sähe man nur ihre Wirkung.</sys:String>
-    <sys:String x:Key="S_ToolBrushShort">Trägt die Maske der gewählten Ebene auf. Alt nimmt weg. Ohne gemalte Maske an der Ebene gibt es nichts zu bemalen.</sys:String>
+    <sys:String x:Key="S_ToolBrushShort">Malt eine Maske – beim ersten Strich entsteht dafür eine Maskenebene. Rechte Maustaste oder Alt nimmt weg.</sys:String>
     <sys:String x:Key="S_MaskPainted">Gemalt</sys:String>
     <sys:String x:Key="S_MaskLock">für alle Bilder</sys:String>
     <sys:String x:Key="S_MaskLockHint">Gesperrt gilt ein Anstrich für die ganze Sequenz. Entsperrt gilt je Bild ein eigener — dann lässt sich ein einzelnes Bild retuschieren, ohne die anderen anzufassen. Beim Entsperren wandert der bisherige Anstrich auf das aktuelle Bild, statt verworfen zu werden.</sys:String>

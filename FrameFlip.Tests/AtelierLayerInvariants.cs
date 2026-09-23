@@ -90,11 +90,19 @@ public static class AtelierLayerInvariants
 
             page.Open(path);
 
-            bool arrived = Pump(TimeSpan.FromSeconds(10),
-                                () => strip.Visibility == Visibility.Visible);
+            // Die Ebenen stehen in einem eigenen Reiter. Nach dem Oeffnen wird der
+            // waehlbar - und wer ihn waehlt, sieht den Streifen.
+            var layersTab = (System.Windows.Controls.RadioButton)page.FindName("LayersTab");
 
-            Check.That(arrived, "nach dem Oeffnen zeigt er sich");
+            bool arrived = Pump(TimeSpan.FromSeconds(10), () => layersTab.IsEnabled);
+
+            Check.That(arrived, "nach dem Oeffnen wird der Ebenenreiter waehlbar");
             if (!arrived) return;
+
+            layersTab.IsChecked = true;
+            page.UpdateLayout();
+
+            Check.That(strip.Visibility == Visibility.Visible, "und zeigt den Streifen");
 
             Check.That(strip.HasChoice, "und weiss, dass es Passe zu waehlen gibt");
 
@@ -223,13 +231,26 @@ public static class AtelierLayerInvariants
             Check.That(loaded, "das Bild wird geladen");
             if (!loaded) return;
 
-            Check.That(strip.Visibility == Visibility.Visible,
-                       "der Streifen zeigt sich auch hier");
+            var layersTab = (System.Windows.Controls.RadioButton)page.FindName("LayersTab");
+            var colour = (GradingPanel)page.FindName("Tools");
+
+            Check.That(layersTab.IsEnabled, "der Ebenenreiter ist auch hier waehlbar");
             Check.That(!strip.HasChoice, "aber es gibt keine Passe zu waehlen");
 
+            // Frueher begann der Streifen eingeklappt, um der Farbe keinen Platz zu
+            // nehmen. Jetzt steht er in einem eigenen Reiter und nimmt niemandem
+            // etwas: Solange die Farbe vorn liegt, ist er gar nicht da.
+            Check.That(colour.Visibility == Visibility.Visible &&
+                       strip.Visibility != Visibility.Visible,
+                       "solange die Farbe vorn liegt, nimmt er ihr keinen Platz");
+
+            layersTab.IsChecked = true;
+            page.UpdateLayout();
+
             var body = (FrameworkElement)strip.FindName("Body");
-            Check.That(body.Visibility != Visibility.Visible,
-                       "und er beginnt eingeklappt, statt Platz zu nehmen");
+
+            Check.That(strip.Visibility == Visibility.Visible && body.Visibility == Visibility.Visible,
+                       "und im eigenen Reiter steht er offen - zugeklappt liesse er ihn leer");
         }
         finally
         {
@@ -1035,7 +1056,11 @@ public static class AtelierLayerInvariants
     }
 
     /// <summary>
-    /// Die rechte Spalte: Ebenen unten, Groessen verstellbar, Aufteilung gemerkt.
+    /// Die rechte Spalte: zwei Reiter, jeder in voller Hoehe, Breite gemerkt.
+    ///
+    /// Frueher standen hier Eigenschaften, Farbe und Ebenen uebereinander, mit einem
+    /// Griff dazwischen - und kaempften um dieselbe Hoehe. Die Geschichte davor steht
+    /// weiter unten und bleibt stehen, weil sie erklaert, warum es Reiter wurden.
     ///
     /// Drei Klagen in einer. "Alles sehr starr" - die Spalte war dreihundert Punkte
     /// breit und der Ebenenstreifen so hoch, wie er eben wurde. "Dass die Ebenen ganz
@@ -1049,11 +1074,11 @@ public static class AtelierLayerInvariants
     /// </summary>
     private static void TheColumnRemembersHowItStood(string path)
     {
-        Check.Group("Die rechte Spalte: Ebenen unten und verstellbar");
+        Check.Group("Die rechte Spalte: zwei Reiter, jeder in voller Hoehe");
 
-        // Eine Aufteilung, die NICHT die Voreinstellung ist - sonst prueft der Test
-        // nur, dass eine Voreinstellung eine Voreinstellung ist.
-        var settings = new AppSettings { AtelierColumnWidth = 380, AtelierLayersHeight = 180 };
+        // Eine Breite, die NICHT die Voreinstellung ist - sonst prueft der Test nur,
+        // dass eine Voreinstellung eine Voreinstellung ist.
+        var settings = new AppSettings { AtelierColumnWidth = 380 };
         var page = new AtelierPage(FrameDecoderRegistry.CreateDefault(() => null), settings, _ => { });
 
         var window = new Window
@@ -1074,69 +1099,60 @@ public static class AtelierLayerInvariants
             page.UpdateLayout();
 
             var column = (System.Windows.Controls.ColumnDefinition)page.FindName("RightColumn");
-            var row = (System.Windows.Controls.RowDefinition)page.FindName("LayersRow");
             var strip = (LayerPanel)page.FindName("Layers");
             var colour = (GradingPanel)page.FindName("Tools");
-            var header = (System.Windows.Controls.Primitives.ToggleButton)page.FindName("ColourHeader");
+            var colourTab = (System.Windows.Controls.RadioButton)page.FindName("ColourTab");
+            var layersTab = (System.Windows.Controls.RadioButton)page.FindName("LayersTab");
 
-            Check.That(column is not null && row is not null && strip is not null && header is not null,
-                       "die Spalte ist in Abschnitte geteilt, jeder mit einem Kopf");
+            Check.That(column is not null && strip is not null && colour is not null &&
+                       colourTab is not null && layersTab is not null,
+                       "die Spalte hat zwei Reiter: Farbe und Ebenen");
 
-            if (column is null || row is null || strip is null || colour is null || header is null)
+            if (column is null || strip is null || colour is null || colourTab is null || layersTab is null)
                 return;
 
-            Check.Near(column.ActualWidth, 380, 1,
-                       "die gemerkte Breite steht wieder da");
+            Check.Near(column.ActualWidth, 380, 1, "die gemerkte Breite steht wieder da");
 
-            // Die Ebenen liegen UNTER der Farbe. Das ist die eigentliche Umstellung.
-            Check.That(System.Windows.Controls.Grid.GetRow(strip) >
-                       System.Windows.Controls.Grid.GetRow(colour),
-                       "die Ebenen stehen unter der Farbkorrektur");
+            // Das war der Kern der Klage: Drei Abschnitte uebereinander kaempften um
+            // dieselbe Hoehe. Jetzt steht immer genau EINER da - und der hat alles.
+            Check.That(colourTab.IsChecked == true && colour.Visibility == Visibility.Visible,
+                       "zu Beginn liegt die Farbe vorn");
 
-            Check.That(System.Windows.Controls.Grid.GetRow(header) <
-                       System.Windows.Controls.Grid.GetRow(colour),
-                       "und die Farbe hat einen Kopf ueber sich");
-
-            Check.That(strip.Visibility != Visibility.Visible,
-                       "ohne Bild ist der Streifen weg");
-
-            Check.Near(row.ActualHeight, 0, 0.5,
-                       "und seine Zeile hat dann keine Hoehe - kein Loch am Rand");
+            Check.That(!layersTab.IsEnabled, "ohne Bild ist der Ebenenreiter nicht waehlbar");
+            Check.That(strip.Visibility != Visibility.Visible, "und der Streifen nicht da");
 
             page.Open(path);
 
-            var size = (System.Windows.Controls.TextBlock)page.FindName("SourceText");
-
-            if (!Pump(TimeSpan.FromSeconds(10), () => size.Text.Length > 0))
+            if (!Pump(TimeSpan.FromSeconds(10), () => layersTab.IsEnabled))
             {
                 Check.That(false, "das Bild wird geladen");
                 return;
             }
 
-            Pump(TimeSpan.FromSeconds(3), () => strip.Visibility == Visibility.Visible);
             page.UpdateLayout();
 
-            Check.That(strip.Visibility == Visibility.Visible, "mit Bild zeigt er sich");
+            double colourHeight = colour.ActualHeight;
 
-            Check.Near(row.ActualHeight, 180, 1,
-                       "und zwar so hoch, wie er zuletzt stand");
-
-            // Zuklappen muss Platz FREIGEBEN, sonst hat es keinen Zweck. Ist die
-            // Farbe zu, gehoert ihre Hoehe den Ebenen.
-            header.IsChecked = false;
+            layersTab.IsChecked = true;
             page.UpdateLayout();
 
-            Check.That(colour.Visibility != Visibility.Visible,
-                       "zugeklappt ist die Farbkorrektur weg");
+            Check.That(strip.Visibility == Visibility.Visible && colour.Visibility != Visibility.Visible,
+                       "der Ebenenreiter zeigt die Ebenen - und nur sie");
 
-            Check.That(row.ActualHeight > 200,
-                       "und die Ebenen bekommen den frei gewordenen Platz",
-                       $"{row.ActualHeight:0}");
+            // Beide bekommen dieselbe volle Hoehe. Das ist die Zusage des Reiters:
+            // Kein Bereich schrumpft, weil ein anderer Platz braucht.
+            Check.Near(strip.ActualHeight, colourHeight, 1,
+                       "und zwar in derselben vollen Hoehe wie vorher die Farbe");
 
-            header.IsChecked = true;
+            Check.That(colourHeight > 500,
+                       "und die ist die ganze Spalte, nicht ein Drittel davon",
+                       $"{colourHeight:0}");
+
+            colourTab.IsChecked = true;
             page.UpdateLayout();
 
-            Check.Near(row.ActualHeight, 180, 1, "aufgeklappt steht alles wieder wie vorher");
+            Check.That(colour.Visibility == Visibility.Visible && strip.Visibility != Visibility.Visible,
+                       "und zurueck die Farbe");
         }
         finally
         {

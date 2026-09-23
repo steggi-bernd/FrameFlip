@@ -7,6 +7,7 @@
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto" />
             <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
             <RowDefinition Height="*" />
         </Grid.RowDefinitions>
 
@@ -18,7 +19,30 @@
             Einstellungsebene gewaehlt wird, und wer das nicht sieht, stellt das ganze
             Bild ein, waehrend er eine Ebene meint.
         -->
-        <Border x:Name="TargetBar" Grid.Row="0" Padding="14,8"
+        <!--
+            Die Verteilung ganz oben, fest und nicht in der Bildlaufflaeche.
+
+            Wie in jedem Entwicklungsprogramm: Man sieht beim Ziehen eines Reglers
+            hin, was mit den Lichtern passiert - und das geht nur, wenn die Verteilung
+            stehenbleibt, waehrend man nach unten rollt. Vorher stand sie zwischen den
+            Kacheln und den Reglern und schob die Regler unter den Rand.
+        -->
+        <Border Grid.Row="0" Padding="14,10,14,8"
+                BorderBrush="{StaticResource PanelBorder}" BorderThickness="0,0,0,1">
+            <StackPanel>
+                <Grid Margin="0,0,0,4">
+                    <TextBlock Text="{DynamicResource S_Distribution}" Style="{StaticResource PanelLabel}" />
+                    <Button x:Name="HistogramModeButton" Style="{StaticResource LinkButton}"
+                            HorizontalAlignment="Right" Content="RGB" Click="OnHistogramModeClicked"
+                            ToolTip="{DynamicResource S_RgbToggle}" />
+                </Grid>
+                <local:HistogramView x:Name="Histogram" Height="72" />
+                <TextBlock x:Name="ClipText" Margin="0,4,0,0" FontSize="10"
+                           Foreground="{StaticResource MutedBrush}" TextTrimming="CharacterEllipsis" />
+            </StackPanel>
+        </Border>
+
+        <Border x:Name="TargetBar" Grid.Row="1" Padding="14,8"
                 Background="{StaticResource OverlayBackground}"
                 BorderBrush="{StaticResource PanelBorder}" BorderThickness="0,0,0,1">
             <!--
@@ -31,16 +55,17 @@
                 Maske an der Ebene lief ins Leere. Wer eine Maske malt, um DORT etwas
                 zu aendern, braucht diesen Schalter.
             -->
-            <StackPanel Orientation="Horizontal">
+            <UniformGrid Columns="2">
                 <RadioButton x:Name="TargetImageButton" Style="{StaticResource OverlayToggle}"
+                             FontSize="11" Margin="0,0,3,0" HorizontalAlignment="Stretch"
                              Content="{DynamicResource S_ToolsTargetImage}"
                              ToolTip="{DynamicResource S_ToolsTargetImageHint}"
                              Checked="OnTargetChanged" />
                 <RadioButton x:Name="TargetLayerButton" Style="{StaticResource OverlayToggle}"
-                             Margin="6,0,0,0" MaxWidth="190"
+                             FontSize="11" Margin="3,0,0,0" HorizontalAlignment="Stretch"
                              ToolTip="{DynamicResource S_ToolsTargetLayerHint}"
                              Checked="OnTargetChanged" />
-            </StackPanel>
+            </UniformGrid>
         </Border>
 
     <!--
@@ -52,32 +77,31 @@
         beantwortet die Frage "wo bin ich hier" genau dann nicht mehr, wenn sie
         aufkommt.
     -->
-    <Border Grid.Row="1" Padding="14,8,14,6"
+    <Border Grid.Row="2" Padding="14,8,14,8"
             BorderBrush="{StaticResource PanelBorder}" BorderThickness="0,0,0,1">
-        <WrapPanel x:Name="Tabs" />
+        <!--
+            Eine Zeile, gleich breite Felder. Vorher brachen die Kategorien auf zwei
+            Zeilen um, weil "Licht und Zeichnung" nicht neben "Grundkorrektur" passte -
+            und eine Reiterleiste in zwei Zeilen liest niemand als Reiterleiste.
+        -->
+        <UniformGrid x:Name="Tabs" Rows="1" />
     </Border>
 
-    <ScrollViewer Grid.Row="2" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+    <ScrollViewer Grid.Row="3" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
         <StackPanel Margin="14,12,14,14">
 
             <!--
                 Die Kacheln des gewaehlten Reiters. Alle auf einen Blick, und die,
                 die etwas tun, treten hervor - ein zugeklapptes Fach konnte das nie.
             -->
-            <WrapPanel x:Name="Tiles" Margin="0,0,0,10" />
+            <!--
+                Zwei je Zeile, gleich breit. Vorher war jede Kachel fest 128 Punkte
+                breit, und in der schmalen Spalte passte davon genau EINE - aus dem
+                Raster wurde eine Liste.
+            -->
+            <UniformGrid x:Name="Tiles" Columns="2" Margin="0,0,0,12" />
 
-            <!-- Verteilung -->
-            <Grid Margin="0,0,0,4">
-                <TextBlock Text="{DynamicResource S_Distribution}" Style="{StaticResource PanelHeading}" />
-                <Button x:Name="HistogramModeButton" Style="{StaticResource LinkButton}"
-                        HorizontalAlignment="Right" Content="RGB" Click="OnHistogramModeClicked"
-                        ToolTip="{DynamicResource S_RgbToggle}" />
-            </Grid>
 
-            <local:HistogramView x:Name="Histogram" Margin="0,0,0,4" />
-
-            <TextBlock x:Name="ClipText" Margin="0,0,0,4" FontSize="10"
-                       Foreground="{StaticResource MutedBrush}" TextWrapping="Wrap" />
 
             <ToggleButton x:Name="GroupBasic" Style="{StaticResource SectionHeader}"
                           Margin="0,18,0,2" IsChecked="True" Tag="Basic,Curve,WhiteBalance,Zones,Bands"
@@ -143,6 +167,21 @@
                 <Slider x:Name="WhiteSlider" Style="{StaticResource PanelSlider}"
                         Minimum="0.1" Maximum="2" Value="1" SmallChange="0.01" LargeChange="0.05"
                         ValueChanged="OnChanged" MouseDoubleClick="OnSliderReset" Tag="1" />
+
+                <!--
+                    Dynamik gehoert neben die Saettigung, wie in jedem
+                    Entwicklungsprogramm. Sie stand frueher ausserhalb jedes Abschnitts
+                    und erschien deshalb unter JEDEM Reiter - ueber der Verschiebung
+                    ebenso wie ueber dem Rastern.
+                -->
+                <Grid Margin="0,10,0,2">
+                    <TextBlock Text="{DynamicResource S_Vibrance}" Style="{StaticResource PanelLabel}" />
+                    <TextBlock x:Name="VibranceValue" Style="{StaticResource PanelValue}" />
+                </Grid>
+                <Slider x:Name="VibranceSlider" Style="{StaticResource PanelSliderTinted}"
+                        Background="{StaticResource TrackVibrance}"
+                        Minimum="-1" Maximum="1" Value="0" SmallChange="0.02" LargeChange="0.1"
+                        ValueChanged="OnChanged" MouseDoubleClick="OnSliderReset" Tag="0" />
             </StackPanel>
 
             <!-- Kurven -->
@@ -217,16 +256,6 @@
                         Minimum="-100" Maximum="100" Value="0" SmallChange="1" LargeChange="5"
                         ValueChanged="OnChanged" MouseDoubleClick="OnSliderReset" Tag="0" />
             </StackPanel>
-
-            <!-- Dynamik -->
-            <Grid Margin="0,16,0,2">
-                <TextBlock Text="{DynamicResource S_Vibrance}" Style="{StaticResource PanelLabel}" />
-                <TextBlock x:Name="VibranceValue" Style="{StaticResource PanelValue}" />
-            </Grid>
-            <Slider x:Name="VibranceSlider" Style="{StaticResource PanelSliderTinted}"
-                        Background="{StaticResource TrackVibrance}"
-                    Minimum="-1" Maximum="1" Value="0" SmallChange="0.02" LargeChange="0.1"
-                    ValueChanged="OnChanged" MouseDoubleClick="OnSliderReset" Tag="0" />
 
             <!-- Zonen -->
             <Grid x:Name="ZonesHead" Margin="0,16,0,0">
@@ -762,11 +791,11 @@
                     einen Riss ueber einen Startwert aus, man wuerfelt, bis er passt.
                 -->
                 <StackPanel Orientation="Horizontal" Margin="0,10,0,0">
-                    <ToggleButton x:Name="DisplaceWrapButton" Style="{StaticResource OverlayToggle}"
+                    <ToggleButton x:Name="DisplaceWrapButton" FontSize="11" Style="{StaticResource OverlayToggle}"
                                   Content="{DynamicResource S_DisplaceWrap}"
                                   ToolTip="{DynamicResource S_DisplaceWrapHint}"
                                   Checked="OnDisplaceFlagChanged" Unchecked="OnDisplaceFlagChanged" />
-                    <Button x:Name="DisplaceReseedButton" Style="{StaticResource OverlayButton}"
+                    <Button x:Name="DisplaceReseedButton" FontSize="11" Style="{StaticResource OverlayButton}"
                             Margin="6,0,0,0" Visibility="Collapsed"
                             Content="{DynamicResource S_Reseed}"
                             ToolTip="{DynamicResource S_ReseedHint}"
@@ -1178,16 +1207,16 @@
                         ToolTip="{DynamicResource S_SortSpeedHint}" />
 
                 <StackPanel Orientation="Horizontal" Margin="0,10,0,0">
-                    <ToggleButton x:Name="SortCrossButton" Style="{StaticResource OverlayToggle}"
+                    <ToggleButton x:Name="SortCrossButton" FontSize="11" Style="{StaticResource OverlayToggle}"
                                   Content="{DynamicResource S_SortCross}"
                                   ToolTip="{DynamicResource S_SortCrossHint}"
                                   Checked="OnSortFlagChanged" Unchecked="OnSortFlagChanged" />
-                    <ToggleButton x:Name="SortDescendingButton" Style="{StaticResource OverlayToggle}"
+                    <ToggleButton x:Name="SortDescendingButton" FontSize="11" Style="{StaticResource OverlayToggle}"
                                   Margin="6,0,0,0"
                                   Content="{DynamicResource S_SortDescending}"
                                   ToolTip="{DynamicResource S_SortDescendingHint}"
                                   Checked="OnSortFlagChanged" Unchecked="OnSortFlagChanged" />
-                    <Button x:Name="SortReseedButton" Style="{StaticResource OverlayButton}"
+                    <Button x:Name="SortReseedButton" FontSize="11" Style="{StaticResource OverlayButton}"
                             Margin="6,0,0,0"
                             Content="{DynamicResource S_Reseed}"
                             ToolTip="{DynamicResource S_ReseedHint}"

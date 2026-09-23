@@ -2,116 +2,134 @@
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
 
-    <StackPanel Margin="14,10,14,12">
+    <!--
+        Die Leiste des gewaehlten Werkzeugs - waagerecht, ueber dem Bild.
 
-        <!--
-            Was das gewaehlte Werkzeug tut - in einem Satz.
-
-            Der Satz steht hier und nicht nur im Hinweisfenster: Ein Hinweis, der
-            erscheint, wenn man mit der Maus stehenbleibt, erreicht nur den, der
-            ohnehin schon zweifelt. Wer das Werkzeug gerade gewaehlt hat, sieht hier,
-            was er damit bekommt.
-        -->
-        <TextBlock x:Name="ToolName" Style="{StaticResource PanelHeading}" />
-
-        <TextBlock x:Name="ToolHint" Margin="0,4,0,0" FontSize="10" TextWrapping="Wrap"
-                   Foreground="{StaticResource MutedBrush}" />
-
-        <!--
-            Der Pinsel. Vier Zahlen, und jede beantwortet eine eigene Frage: wie
-            gross, wie hart die Kante, wie schnell es aufbaut, und wie weit es
-            ueberhaupt gehen darf.
-
-            Staerke und Deckkraft sind nicht dasselbe, auch wenn sie sich aehnlich
-            anfuehlen: Die eine sagt, wieviel EIN Strich auftraegt, die andere, wo
-            auch zehn Striche aufhoeren. Ohne die zweite laeuft jede weiche Maske
-            frueher oder spaeter voll.
-        -->
-        <StackPanel x:Name="BrushBody" Visibility="Collapsed" Margin="0,10,0,0">
-
-            <Grid Margin="0,0,0,2">
-                <TextBlock Text="{DynamicResource S_BrushSize}" Style="{StaticResource PanelLabel}" />
-                <TextBlock x:Name="BrushSizeValue" Style="{StaticResource PanelValue}" />
-            </Grid>
-            <Slider x:Name="BrushSizeSlider" Style="{StaticResource PanelSlider}"
-                    Minimum="2" Maximum="400" Value="40" SmallChange="2" LargeChange="20"
-                    ValueChanged="OnBrushChanged" MouseDoubleClick="OnBrushReset" Tag="40" />
-
-            <Grid Margin="0,10,0,2">
-                <TextBlock Text="{DynamicResource S_BrushHardness}" Style="{StaticResource PanelLabel}" />
-                <TextBlock x:Name="BrushHardnessValue" Style="{StaticResource PanelValue}" />
-            </Grid>
-            <Slider x:Name="BrushHardnessSlider" Style="{StaticResource PanelSlider}"
-                    Minimum="0" Maximum="1" Value="0.5" SmallChange="0.02" LargeChange="0.1"
-                    ValueChanged="OnBrushChanged" MouseDoubleClick="OnBrushReset" Tag="0.5" />
-
-            <Grid Margin="0,10,0,2">
-                <TextBlock Text="{DynamicResource S_BrushFlow}" Style="{StaticResource PanelLabel}" />
-                <TextBlock x:Name="BrushFlowValue" Style="{StaticResource PanelValue}" />
-            </Grid>
-            <Slider x:Name="BrushFlowSlider" Style="{StaticResource PanelSlider}"
-                    Minimum="0.02" Maximum="1" Value="0.7" SmallChange="0.02" LargeChange="0.1"
-                    ValueChanged="OnBrushChanged" MouseDoubleClick="OnBrushReset" Tag="0.7" />
-
-            <Grid Margin="0,10,0,2">
-                <TextBlock Text="{DynamicResource S_BrushOpacity}" Style="{StaticResource PanelLabel}" />
-                <TextBlock x:Name="BrushOpacityValue" Style="{StaticResource PanelValue}" />
-            </Grid>
-            <Slider x:Name="BrushOpacitySlider" Style="{StaticResource PanelSlider}"
-                    Minimum="0.05" Maximum="1" Value="1" SmallChange="0.02" LargeChange="0.1"
-                    ValueChanged="OnBrushChanged" MouseDoubleClick="OnBrushReset" Tag="1" />
-
-            <TextBlock Margin="0,8,0,0" FontSize="10" TextWrapping="Wrap"
-                       Foreground="{StaticResource MutedBrush}"
-                       Text="{DynamicResource S_BrushHint}" />
-        </StackPanel>
-
-        <!-- Was die Pipette gelesen hat -->
-        <StackPanel x:Name="PickBody" Visibility="Collapsed" Margin="0,10,0,0">
-
-            <Grid Margin="0,0,0,3">
-                <TextBlock Text="{DynamicResource S_PickAt}" Style="{StaticResource PanelLabel}" />
-                <TextBlock x:Name="PickWhere" Style="{StaticResource PanelValue}" />
-            </Grid>
-
-            <Grid Margin="0,0,0,3">
-                <TextBlock Text="{DynamicResource S_PickByte}" Style="{StaticResource PanelLabel}" />
-                <TextBlock x:Name="PickByte" Style="{StaticResource PanelValue}" />
-            </Grid>
+        Wie in jedem Bildprogramm: Die Einstellungen eines Werkzeugs stehen dort, wo
+        man mit ihm arbeitet, und nicht in einer Spalte am Rand, die sie sich mit der
+        Farbe und den Ebenen teilen muss. Links steht, was das Werkzeug tut - in einer
+        Zeile, der ganze Satz im Hinweis -, rechts daneben, was sich daran einstellen
+        laesst.
+    -->
+    <Border Background="{StaticResource PanelBackground}"
+            BorderBrush="{StaticResource PanelBorder}" BorderThickness="1" CornerRadius="4"
+            Padding="12,0" MinHeight="40">
+        <DockPanel LastChildFill="True">
 
             <!--
-                Beide Zahlen, und das ist Absicht: Nur der Lichtwert beantwortet "wie
-                hell ist das wirklich", und nur der Anzeigewert laesst sich mit einer
-                Pipette in einem anderen Programm vergleichen. Eine davon wegzulassen
-                hiesse, sich auf eine der beiden Fragen festzulegen.
+                Name und Satz. Der Satz ist gekuerzt, wenn der Platz nicht reicht,
+                und steht dann ganz im Hinweis - eine Leiste, die umbricht, frisst
+                die Hoehe, die sie gerade freigeben soll.
             -->
-            <Grid Margin="0,0,0,3">
-                <TextBlock Text="{DynamicResource S_PickLight}" Style="{StaticResource PanelLabel}" />
-                <TextBlock x:Name="PickLight" Style="{StaticResource PanelValue}" />
-            </Grid>
+            <StackPanel DockPanel.Dock="Left" Orientation="Horizontal" VerticalAlignment="Center"
+                        Margin="0,0,16,0">
+                <TextBlock x:Name="ToolName" FontSize="12" FontWeight="SemiBold"
+                           Foreground="{StaticResource ForegroundBrush}" VerticalAlignment="Center" />
+            </StackPanel>
 
-            <Grid x:Name="DepthRow" Visibility="Collapsed" Margin="0,0,0,3">
-                <TextBlock Text="{DynamicResource S_PickDepth}" Style="{StaticResource PanelLabel}" />
-                <TextBlock x:Name="PickDepth" Style="{StaticResource PanelValue}" />
-            </Grid>
+            <!-- Der Pinsel: vier Regler in einer Zeile. -->
+            <StackPanel x:Name="BrushBody" DockPanel.Dock="Left" Orientation="Horizontal"
+                        VerticalAlignment="Center" Visibility="Collapsed">
+
+                <TextBlock Text="{DynamicResource S_BrushSize}" Style="{StaticResource PanelLabel}"
+                           VerticalAlignment="Center" Margin="0,0,6,0" />
+                <Slider x:Name="BrushSizeSlider" Style="{StaticResource PanelSlider}" Width="110"
+                        VerticalAlignment="Center"
+                        Minimum="2" Maximum="400" Value="40" SmallChange="2" LargeChange="20"
+                        ValueChanged="OnBrushChanged" MouseDoubleClick="OnBrushReset" Tag="40" />
+                <TextBlock x:Name="BrushSizeValue" Style="{StaticResource PanelValue}"
+                           VerticalAlignment="Center" Width="46" Margin="6,0,14,0"
+                           HorizontalAlignment="Left" />
+
+                <TextBlock Text="{DynamicResource S_BrushHardness}" Style="{StaticResource PanelLabel}"
+                           VerticalAlignment="Center" Margin="0,0,6,0" />
+                <Slider x:Name="BrushHardnessSlider" Style="{StaticResource PanelSlider}" Width="80"
+                        VerticalAlignment="Center"
+                        Minimum="0" Maximum="1" Value="0.5" SmallChange="0.02" LargeChange="0.1"
+                        ValueChanged="OnBrushChanged" MouseDoubleClick="OnBrushReset" Tag="0.5" />
+                <TextBlock x:Name="BrushHardnessValue" Style="{StaticResource PanelValue}"
+                           VerticalAlignment="Center" Width="36" Margin="6,0,14,0"
+                           HorizontalAlignment="Left" />
+
+                <TextBlock Text="{DynamicResource S_BrushFlow}" Style="{StaticResource PanelLabel}"
+                           VerticalAlignment="Center" Margin="0,0,6,0" />
+                <Slider x:Name="BrushFlowSlider" Style="{StaticResource PanelSlider}" Width="80"
+                        VerticalAlignment="Center"
+                        Minimum="0.02" Maximum="1" Value="0.7" SmallChange="0.02" LargeChange="0.1"
+                        ValueChanged="OnBrushChanged" MouseDoubleClick="OnBrushReset" Tag="0.7" />
+                <TextBlock x:Name="BrushFlowValue" Style="{StaticResource PanelValue}"
+                           VerticalAlignment="Center" Width="36" Margin="6,0,14,0"
+                           HorizontalAlignment="Left" />
+
+                <!--
+                    Staerke und Deckkraft sind nicht dasselbe, auch wenn sie sich
+                    aehnlich anfuehlen: Die eine sagt, wieviel EIN Strich auftraegt,
+                    die andere, wo auch zehn Striche aufhoeren.
+                -->
+                <TextBlock Text="{DynamicResource S_BrushOpacity}" Style="{StaticResource PanelLabel}"
+                           VerticalAlignment="Center" Margin="0,0,6,0" />
+                <Slider x:Name="BrushOpacitySlider" Style="{StaticResource PanelSlider}" Width="80"
+                        VerticalAlignment="Center"
+                        Minimum="0.05" Maximum="1" Value="1" SmallChange="0.02" LargeChange="0.1"
+                        ValueChanged="OnBrushChanged" MouseDoubleClick="OnBrushReset" Tag="1" />
+                <TextBlock x:Name="BrushOpacityValue" Style="{StaticResource PanelValue}"
+                           VerticalAlignment="Center" Width="36" Margin="6,0,0,0"
+                           HorizontalAlignment="Left" />
+            </StackPanel>
+
+            <!-- Was die Pipette gelesen hat - ebenfalls in einer Zeile. -->
+            <StackPanel x:Name="PickBody" DockPanel.Dock="Left" Orientation="Horizontal"
+                        VerticalAlignment="Center" Visibility="Collapsed">
+
+                <TextBlock Text="{DynamicResource S_PickAt}" Style="{StaticResource PanelLabel}"
+                           VerticalAlignment="Center" Margin="0,0,6,0" />
+                <TextBlock x:Name="PickWhere" Style="{StaticResource PanelValue}"
+                           VerticalAlignment="Center" Margin="0,0,16,0" />
+
+                <TextBlock Text="{DynamicResource S_PickByte}" Style="{StaticResource PanelLabel}"
+                           VerticalAlignment="Center" Margin="0,0,6,0" />
+                <TextBlock x:Name="PickByte" Style="{StaticResource PanelValue}"
+                           VerticalAlignment="Center" Margin="0,0,16,0" />
+
+                <!--
+                    Beide Zahlen, und das ist Absicht: Nur der Lichtwert beantwortet
+                    "wie hell ist das wirklich", und nur der Anzeigewert laesst sich
+                    mit einer Pipette in einem anderen Programm vergleichen.
+                -->
+                <TextBlock Text="{DynamicResource S_PickLight}" Style="{StaticResource PanelLabel}"
+                           VerticalAlignment="Center" Margin="0,0,6,0" />
+                <TextBlock x:Name="PickLight" Style="{StaticResource PanelValue}"
+                           VerticalAlignment="Center" Margin="0,0,16,0" />
+
+                <StackPanel x:Name="DepthRow" Orientation="Horizontal" Visibility="Collapsed">
+                    <TextBlock Text="{DynamicResource S_PickDepth}" Style="{StaticResource PanelLabel}"
+                               VerticalAlignment="Center" Margin="0,0,6,0" />
+                    <TextBlock x:Name="PickDepth" Style="{StaticResource PanelValue}"
+                               VerticalAlignment="Center" Margin="0,0,16,0" />
+                </StackPanel>
+
+                <!--
+                    Der Grund, warum es die Pipette ueberhaupt gibt: Die nachtraegliche
+                    Tiefenschaerfe verlangt eine Entfernung in Szeneneinheiten, und ein
+                    Klick auf das, was scharf sein soll, ist die ehrliche Antwort.
+                -->
+                <Button x:Name="FocusButton" Style="{StaticResource OverlayButton}"
+                        VerticalAlignment="Center" IsEnabled="False"
+                        Content="{DynamicResource S_UseAsFocus}" Click="OnUseAsFocus"
+                        ToolTip="{DynamicResource S_UseAsFocusHint}" />
+
+                <TextBlock x:Name="FocusNote" Margin="10,0,0,0" FontSize="10"
+                           VerticalAlignment="Center" Visibility="Collapsed"
+                           Foreground="{StaticResource MutedBrush}" />
+            </StackPanel>
 
             <!--
-                Der Grund, warum es die Pipette ueberhaupt gibt.
-
-                Die nachtraegliche Tiefenschaerfe verlangt eine Entfernung in
-                Szeneneinheiten. Ohne Pipette ist die einzige Art, sie zu beantworten,
-                ein Regler in Metern und Probieren - und man probiert an einer Zahl,
-                die man nirgends ablesen kann. Ein Klick auf das, was scharf sein
-                soll, ist die ehrliche Antwort.
+                Der Satz zum Werkzeug, am Ende: Er nimmt, was an Platz uebrig bleibt,
+                und steht beim Pinsel hinter den Reglern statt davor.
             -->
-            <Button x:Name="FocusButton" Style="{StaticResource OverlayButton}"
-                    Margin="0,8,0,0" HorizontalAlignment="Left" IsEnabled="False"
-                    Content="{DynamicResource S_UseAsFocus}" Click="OnUseAsFocus"
-                    ToolTip="{DynamicResource S_UseAsFocusHint}" />
-
-            <TextBlock x:Name="FocusNote" Margin="0,6,0,0" FontSize="10" TextWrapping="Wrap"
-                       Visibility="Collapsed"
+            <TextBlock x:Name="ToolHint" FontSize="10" VerticalAlignment="Center"
+                       Margin="16,0,0,0" TextTrimming="CharacterEllipsis"
                        Foreground="{StaticResource MutedBrush}" />
-        </StackPanel>
-    </StackPanel>
+        </DockPanel>
+    </Border>
 </UserControl>

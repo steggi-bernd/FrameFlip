@@ -93,6 +93,11 @@ public partial class PropertiesPanel : UserControl
             _ => "S_ToolMoveShort",
         });
 
+        // Die Leiste kuerzt den Satz, wenn der Platz nicht reicht - ganz steht er im
+        // Hinweis. Ein Satz, der mitten im Wort aufhoert und nirgends vollstaendig zu
+        // lesen ist, waere schlimmer als keiner.
+        ToolHint.ToolTip = ToolHint.Text;
+
         PickBody.Visibility = tool == AtelierTool.Pick ? Visibility.Visible : Visibility.Collapsed;
 
         BrushBody.Visibility = tool == AtelierTool.Brush ? Visibility.Visible : Visibility.Collapsed;

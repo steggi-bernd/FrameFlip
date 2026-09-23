@@ -300,11 +300,57 @@
         Kachel sich anfuehlt wie jeder andere Schalter im Programm.
     -->
     <Style x:Key="ToolTile" TargetType="ToggleButton" BasedOn="{StaticResource OverlayToggle}">
-        <Setter Property="Width" Value="128" />
-        <Setter Property="Height" Value="30" />
-        <Setter Property="MinWidth" Value="128" />
-        <Setter Property="FontSize" Value="10" />
-        <Setter Property="Margin" Value="0,0,5,5" />
+        <Setter Property="Height" Value="32" />
+        <Setter Property="FontSize" Value="11" />
+        <Setter Property="Margin" Value="0,0,4,4" />
+        <Setter Property="HorizontalAlignment" Value="Stretch" />
+        <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+    </Style>
+
+    <!--
+        Ein Reiter der rechten Spalte: Farbe oder Ebenen.
+
+        Ein Reiter und kein Abschnittskopf, und das ist die eigentliche Umstellung.
+        Drei Abschnitte uebereinander in einer schmalen Spalte kaempften um dieselbe
+        Hoehe: Bekamen die Ebenen Platz, schrumpfte die Farbe auf ihre Reiterzeile,
+        und wer darin ein Werkzeug waehlte, sah dessen Regler gar nicht mehr. Ein
+        Reiter gibt seinem Inhalt die GANZE Hoehe.
+
+        Unten eine Linie in der Akzentfarbe, wenn gewaehlt - die Art, wie jede
+        Anwendung ihre Reiter zeigt, und damit nichts, was man lernen muss.
+    -->
+    <Style x:Key="PanelTab" TargetType="RadioButton">
+        <Setter Property="Focusable" Value="False" />
+        <Setter Property="Foreground" Value="{StaticResource MutedBrush}" />
+        <Setter Property="FontSize" Value="12" />
+        <Setter Property="FontWeight" Value="SemiBold" />
+        <Setter Property="Height" Value="36" />
+        <Setter Property="Cursor" Value="Hand" />
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="RadioButton">
+                    <Grid x:Name="Face" Background="Transparent">
+                        <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
+                        <Border x:Name="Line" Height="2" VerticalAlignment="Bottom"
+                                Margin="10,0" CornerRadius="1"
+                                Background="{StaticResource AccentBrush}" Visibility="Hidden" />
+                    </Grid>
+                    <ControlTemplate.Triggers>
+                        <Trigger Property="IsMouseOver" Value="True">
+                            <Setter Property="Foreground" Value="{StaticResource ForegroundBrush}" />
+                        </Trigger>
+                        <Trigger Property="IsChecked" Value="True">
+                            <Setter Property="Foreground" Value="{StaticResource ForegroundBrush}" />
+                            <Setter TargetName="Line" Property="Visibility" Value="Visible" />
+                        </Trigger>
+                        <Trigger Property="IsEnabled" Value="False">
+                            <Setter Property="Foreground" Value="{StaticResource FaintBrush}" />
+                            <Setter Property="Cursor" Value="Arrow" />
+                        </Trigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
     </Style>
 
     <!--

@@ -56,7 +56,7 @@ public partial class AtelierPage
 
         if (_frame is null || _showingOriginal ||
             _tool is not (AtelierTool.Move or AtelierTool.Crop) ||
-            layer is null || Layers.Visibility != System.Windows.Visibility.Visible ||
+            layer is null || !_layersShown ||
             layer.Content is LayerContent.Adjustment or LayerContent.Group ||
             !_sources.TryGetValue(layer.Source, out var source))
         {

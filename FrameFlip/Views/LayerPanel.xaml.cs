@@ -217,7 +217,10 @@ public partial class LayerPanel : UserControl
         // PNG ist die Liste eine Zeile lang, und zweihundert Punkte Hoehe dafuer
         // waeren im schmalen Streifen der teuerste Platz, den es gibt. Die
         // Ueberschrift bleibt stehen - wer schichten will, findet sie.
-        Fold(open: HasChoice || Stack.Layers.Count > 1);
+        // Immer offen. Frueher klappte der Streifen bei einer einzigen Ebene zu, um
+        // der Farbe keinen Platz zu nehmen - jetzt steht er in einem eigenen Reiter
+        // und nimmt niemandem etwas. Zugeklappt liesse er den Reiter leer.
+        Fold(open: true);
 
         Editing?.Invoke(EditedLayer);
     }
@@ -391,8 +394,8 @@ public partial class LayerPanel : UserControl
             // unterscheiden.
             var thumb = new Border
             {
-                Width = 46,
-                Height = 28,
+                Width = 64,
+                Height = 38,
                 Background = (System.Windows.Media.Brush)FindResource("CheckerBrush"),
                 Margin = new Thickness(0, 0, 6, 0),
                 CornerRadius = new CornerRadius(2),

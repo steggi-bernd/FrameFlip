@@ -17,13 +17,25 @@ public partial class AtelierPage
 {
     private void ShowLayers(bool visible)
     {
-        Layers.Visibility = visible ? Visibility.Visible : Visibility.Collapsed;
+        _layersShown = visible;
 
-        // Die Zeile selbst muss mitgehen. Eine unsichtbare Flaeche mit Hoehe waere
-        // ein Loch am unteren Rand, fuer das es keine Erklaerung gibt.
-        LayersRow.MinHeight = visible ? 64 : 0;
+        LayersTab.IsEnabled = visible;
+        ShowLayerCount();
 
-        ApplySections();
+        ApplyPanelTab();
+    }
+
+    /// <summary>
+    /// Wieviele Ebenen es gibt - klein neben dem Reiter.
+    ///
+    /// Damit sieht man, dass im anderen Reiter etwas liegt, ohne hinzuschauen. Eine
+    /// einzige Ebene ist der Normalfall und wird nicht eigens gezaehlt.
+    /// </summary>
+    private void ShowLayerCount()
+    {
+        int count = _layersShown ? Layers.Stack.Layers.Count : 0;
+
+        LayerCount.Text = count > 1 ? count.ToString() : "";
     }
 
     /// <summary>
@@ -87,6 +99,8 @@ public partial class AtelierPage
     private void OnLayersChanged(bool interim)
     {
         _settings.Layers = Layers.Stack;
+
+        ShowLayerCount();
 
         string? path = _path;
 

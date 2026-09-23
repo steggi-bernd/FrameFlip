@@ -99,20 +99,23 @@
             der beim Rollen verschwindet, beantwortet die Frage "wo bin ich hier"
             genau dann nicht mehr, wenn sie gestellt wird.
         -->
-        <Border Grid.Row="0" Height="28"
+        <!--
+            Der alte Kopf mit Titel und Einklappknopf - jetzt verborgen.
+
+            Der Streifen steht in einem eigenen Reiter, und der Reiter IST sein Kopf:
+            Ein zweiter Titel darunter sagte dasselbe noch einmal, und Einklappen
+            haette den Reiter leer gelassen. Der Knopf bleibt im Baum, weil der Code
+            ihn anspricht; zu sehen ist er nicht.
+        -->
+        <Border x:Name="StripHeader" Grid.Row="0" Height="28" Visibility="Collapsed"
                 Background="{StaticResource OverlayBackground}"
                 BorderBrush="{StaticResource PanelBorder}" BorderThickness="0,0,0,1">
             <Grid Margin="10,0">
                 <TextBlock Text="{DynamicResource S_Layers}" Style="{StaticResource PanelHeading}"
                            VerticalAlignment="Center" />
 
-                <StackPanel Orientation="Horizontal" HorizontalAlignment="Right"
-                            VerticalAlignment="Center">
-                    <Button x:Name="ResetButton" Style="{StaticResource LinkButton}" Margin="0,0,6,0"
-                            Content="{DynamicResource S_ResetLayers}" Click="OnResetClicked" />
-                    <Button x:Name="FoldButton" Style="{StaticResource StripButton}" Content="−"
-                            Click="OnFoldClicked" />
-                </StackPanel>
+                <Button x:Name="FoldButton" Style="{StaticResource StripButton}" Content="−"
+                        HorizontalAlignment="Right" Click="OnFoldClicked" />
             </Grid>
         </Border>
 
@@ -139,7 +142,7 @@
                     eine Ebenenliste ohne Entfernen-Taste fuehlt sich kaputt an.
                 -->
                 <Grid>
-                    <ListBox x:Name="LayerList" MaxHeight="300" MinHeight="96" Background="Transparent"
+                    <ListBox x:Name="LayerList" MaxHeight="380" MinHeight="150" Background="Transparent"
                              BorderThickness="0"
                              ItemContainerStyle="{StaticResource LayerRow}"
                              ScrollViewer.HorizontalScrollBarVisibility="Disabled"
@@ -197,10 +200,15 @@
                             die eine Zeile in eine Gruppe zieht, trifft im schmalen
                             Streifen daneben, und das Ergebnis sieht man erst hinterher.
                         -->
-                        <Button x:Name="IndentButton" Style="{StaticResource StripButton}" Content="▶" Click="OnIndentClicked"
+                        <!--
+                            Einruecken und Ausruecken mit Pfeilen zu einer Kante - und
+                            nicht mit Dreiecken. Die Dreiecke standen neben den Pfeilen
+                            fuer hoch und runter und sahen aus wie "vor" und "zurueck".
+                        -->
+                        <Button x:Name="IndentButton" Style="{StaticResource StripButton}" Content="⇥" Click="OnIndentClicked"
                                 ToolTip="{DynamicResource S_MoveIntoGroup}" />
                         <Button x:Name="OutdentButton" Style="{StaticResource StripButton}"
-                                Margin="0,0,8,0" Content="◀" Click="OnOutdentClicked"
+                                Margin="0,0,8,0" Content="⇤" Click="OnOutdentClicked"
                                 ToolTip="{DynamicResource S_MoveOutOfGroup}" />
 
                         <Button x:Name="UpButton" Style="{StaticResource StripButton}" Content="▲" Click="OnUpClicked"
@@ -690,6 +698,18 @@
                            Foreground="{StaticResource MutedBrush}" TextWrapping="Wrap"
                            Text="{DynamicResource S_LayersHint}" />
             </StackPanel>
+
+            <!--
+                Zuruecksetzen am ENDE und nicht im Kopf.
+
+                Es wirft den ganzen Stapel weg. Im Kopf stand es neben dem Titel - dort,
+                wo man hinklickt, um etwas zu oeffnen. Ganz unten muss man es suchen,
+                und das ist bei einem Knopf, der alles zuruecksetzt, der richtige Ort.
+            -->
+            <Button x:Name="ResetButton" Style="{StaticResource LinkButton}"
+                    HorizontalAlignment="Left" Margin="0,18,0,0"
+                    Content="{DynamicResource S_ResetLayers}" Click="OnResetClicked"
+                    ToolTip="{DynamicResource S_ResetLayersHint}" />
         </StackPanel>
         </ScrollViewer>
     </Grid>
