@@ -94,6 +94,12 @@ public abstract class Node
     /// </summary>
     public bool Preview { get; set; }
 
+    /// <summary>
+    /// Wie der Knoten heisst, wenn er anders heissen soll als seine Art - etwa ein Mischen
+    /// nach der Ebene, die es auflegt. Fuer das Rechnen ohne Bedeutung.
+    /// </summary>
+    public string? Label { get; set; }
+
     [JsonIgnore]
     public abstract IReadOnlyList<Socket> Inputs { get; }
 
@@ -321,7 +327,7 @@ public sealed class NodeGraph
         if (info.Kind != JsonTypeInfoKind.Object) return;
 
         string[] names = typeof(Node).IsAssignableFrom(info.Type)
-                           ? new[] { nameof(Node.Id), nameof(Node.X), nameof(Node.Y), nameof(Node.Preview) }
+                           ? new[] { nameof(Node.Id), nameof(Node.X), nameof(Node.Y), nameof(Node.Preview), nameof(Node.Label) }
                        : info.Type == typeof(LayerMask) ? new[] { nameof(LayerMask.Paint), nameof(LayerMask.PaintFrames) }
                        : Array.Empty<string>();
 

@@ -81,7 +81,7 @@ public static class GraphEvaluator
             if (!reads.Any(r => r.Key.Equals(read.Key, StringComparison.Ordinal))) reads.Add(read);
         }
 
-        var order = graph.Order() ?? Array.Empty<Node>();
+        var order = Live(graph);
         var used = Used(graph, order);
 
         foreach (var node in order)
@@ -115,7 +115,7 @@ public static class GraphEvaluator
     /// <summary>Welche Renderdaten der Graph braucht - Tiefe, Bewegung, Normalen.</summary>
     public static IReadOnlyList<PassNeed> Needs(NodeGraph graph)
     {
-        var order = graph.Order() ?? Array.Empty<Node>();
+        var order = Live(graph);
         var used = Used(graph, order);
         var needs = new List<PassNeed>();
 
@@ -129,6 +129,36 @@ public static class GraphEvaluator
         }
 
         return needs;
+    }
+
+    /// <summary>
+    /// Die Knoten, die wirklich gerechnet werden - in Rechenreihenfolge. Das ist die
+    /// Reihenfolge des Graphen ohne das, was nur in einen stummen Knoten fliesst, und zwar
+    /// nicht in den Eingang, den er durchreicht: Eine ausgeblendete Ebene haengt an einem
+    /// stummen Mischen, und ihr Bild wird weder gelesen noch gerechnet.
+    /// </summary>
+    internal static IReadOnlyList<Node> Live(NodeGraph graph)
+    {
+        var order = graph.Order();
+        if (order is null || graph.Output is not { } output) return Array.Empty<Node>();
+
+        var live = new HashSet<string>(StringComparer.Ordinal) { output.Id };
+        var open = new Stack<Node>();
+        open.Push(output);
+
+        while (open.Count > 0)
+        {
+            var node = open.Pop();
+
+            foreach (var link in graph.Links.Where(l => l.To == node.Id))
+            {
+                if (node.Muted && link.Input != node.Through) continue;
+
+                if (graph.Find(link.From) is { } from && live.Add(from.Id)) open.Push(from);
+            }
+        }
+
+        return order.Where(n => live.Contains(n.Id)).ToList();
     }
 
     /// <summary>Welche Ausgaenge von Knoten gelesen werden, die selbst gerechnet werden.</summary>
@@ -307,8 +337,10 @@ public static class GraphEvaluator
     /// </summary>
     internal static (GridImage? Image, NodeContext? Context) Evaluate(NodeGraph graph, GraphInputs inputs, bool sixteen)
     {
-        var order = graph.Order();
-        if (order is null) return (null, null);
+        if (graph.Order() is null) return (null, null);
+
+        var order = Live(graph);
+        if (order.Count == 0) return (null, null);
 
         var (width, height) = Canvas(inputs.Sources);
         if (width == 0 || height == 0) return (null, null);

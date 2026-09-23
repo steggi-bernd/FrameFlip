@@ -292,6 +292,10 @@ public partial class AtelierPage
         previews.Click += (_, _) => PreviewAllLayers();
         menu.Items.Add(previews);
 
+        var rebuild = new MenuItem { Header = Strings.T("S_NodeMenuRebuild") };
+        rebuild.Click += (_, _) => RebuildFromStack();
+        menu.Items.Add(rebuild);
+
         var arrange = new MenuItem { Header = Strings.T("S_NodeMenuArrange") };
         arrange.Click += (_, _) =>
         {

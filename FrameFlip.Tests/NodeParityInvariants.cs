@@ -2,6 +2,7 @@ using System.Runtime.InteropServices;
 using FrameFlip.Imaging;
 using FrameFlip.Imaging.Grading;
 using FrameFlip.Imaging.Nodes;
+using FrameFlip.Views;
 
 namespace FrameFlip.Tests;
 
@@ -44,6 +45,105 @@ public static class NodeParityInvariants
         WiredCases(world);
         CachedCases(world);
         ThePoolLeavesNoTrace(world);
+        HiddenLayers(world);
+    }
+
+    // ------------------------------------------------------------ Ausgeblendete Ebenen
+
+    /// <summary>
+    /// Ausgeblendete Ebenen stehen stumm im Graphen: Das Bild bleibt Byte fuer Byte das
+    /// des Stapels, ihre Dateien werden nicht gelesen, und eingeschaltet tun sie, was
+    /// sie im Stapel taeten. So wie Bernds "Glare"-Ebenen, die beim Umwandeln verschwanden.
+    /// </summary>
+    private static void HiddenLayers(World world)
+    {
+        Check.Group("Knoten: ausgeblendete Ebenen stehen stumm im Graphen");
+
+        ImageLayer Hide(ImageLayer layer, string name)
+        {
+            layer.Visible = false;
+            layer.Name = name;
+            return layer;
+        }
+
+        var painted = new LayerMask { Kind = MaskKind.Painted, PaintLocked = true, Paint = PaintedMask.For(Width, Height) };
+        var cover = painted.Paint!.Cover();
+        for (int i = 0; i < cover.Length / 3; i++) cover[i] = 255;
+        painted.Paint.Keep();
+
+        var faint = Image("bild.png", BlendMode.Screen);
+        faint.Opacity = 0f;
+        faint.Name = "ohne Deckkraft";
+
+        var stack = Base(
+            Hide(Image("ohne.png", BlendMode.Add), "Glare A"),
+            Placed("logo.png", 0.5f, 0.1f, 0f, 0f),
+            Hide(Image("bild.png", BlendMode.Screen), "zwischen Traeger und Schnitt"),
+            Clip(Image("bild.png")),
+            Hide(Clip(Pass("P.a", BlendMode.Add)), "angeschnitten, aus"),
+            Hide(Masked(Adjustment(Adjust(0.5, 1, 0, 1, 1)), painted), "Mask"),
+            faint);
+
+        foreach (int step in new[] { 1, 3 })
+        {
+            var (differ, worst) = Compare8(world, stack, ImageAdjustments.Neutral, new GradingStack(), step, number: 0);
+
+            Check.That(differ == 0, $"das Bild bleibt das des Stapels{(step > 1 ? " (grob)" : "")}", $"{differ} Bytes anders, bis {worst}");
+        }
+
+        var (differ16, _) = Compare16(world, stack, ImageAdjustments.Neutral, new GradingStack(), number: 0);
+        Check.That(differ16 == 0, "auch in 16 Bit", $"{differ16} Werte anders");
+
+        var graph = StackToGraph.Convert(stack, ImageAdjustments.Neutral, new GradingStack());
+        var silent = graph.Nodes.OfType<MixNode>().Where(m => m.Muted).ToList();
+
+        Check.That(silent.Count == 5 && silent.Select(m => m.Label).OrderBy(l => l).SequenceEqual(
+                       new[] { "angeschnitten, aus", "Glare A", "Mask", "ohne Deckkraft", "zwischen Traeger und Schnitt" }.OrderBy(l => l)),
+                   "jede ausgeblendete Ebene steht als stummes Mischen da, mit ihrem Namen",
+                   string.Join(", ", silent.Select(m => m.Label)));
+
+        Check.That(!GraphEvaluator.Reads(graph).Any(r => r.Key == "ohne.png"),
+                   "was nur eine ausgeblendete Ebene braucht, wird nicht gelesen");
+
+        var (_, ran) = Counted(() => RenderGraph(world, graph, 1, 0, false));
+        Check.That(!ran.OfType<PictureNode>().Any(p => p.Path == "ohne.png") && !ran.OfType<LayerGradeNode>().Any(),
+                   "und nicht gerechnet", string.Join(", ", ran.Select(n => n.GetType().Name)));
+
+        // Die Ebenenliste: Namen der Ebenen, stumme als ausgeblendet, die Maske daneben.
+        var layers = NodeLayerList.Of(graph);
+        var mask = layers.SingleOrDefault(l => l.Name == "Mask");
+
+        Check.That(layers.Count(l => l.Mix?.Muted == true) == 5 && mask?.MaskSource is MaskNode { Mask.Kind: MaskKind.Painted },
+                   "die Ebenenliste zeigt alle ausgeblendeten Ebenen - und bei der Maskenebene ihre gemalte Maske",
+                   string.Join(" | ", layers.Select(l => l.Name)));
+        Check.That(layers.Single(l => l.Name == "Glare A").Origin is { Node: PictureNode { Path: "ohne.png" } },
+                   "eine ausgeblendete Ebene kennt ihre Quelle - fuer die Miniatur, die nicht gerechnet wird");
+
+        // Eingeschaltet tut eine Ebene, was sie im Stapel taete.
+        foreach (string name in new[] { "Glare A", "Mask", "angeschnitten, aus" })
+        {
+            var shown = StackToGraph.Convert(stack, ImageAdjustments.Neutral, new GradingStack());
+            shown.Nodes.OfType<MixNode>().Single(m => m.Label == name).Muted = false;
+
+            var visible = stack.Clone();
+            Find(visible.Layers, name)!.Visible = true;
+
+            var (differOn, worstOn) = Diff(RenderStack(world, visible, ImageAdjustments.Neutral, new GradingStack(), 1, 0, false),
+                                           RenderGraph(world, shown, 1, 0, false), 1);
+
+            Check.That(differOn == 0, $"{name}: eingeschaltet wie im Stapel sichtbar", $"{differOn} Bytes anders, bis {worstOn}");
+        }
+    }
+
+    private static ImageLayer? Find(IEnumerable<ImageLayer> layers, string name)
+    {
+        foreach (var layer in layers)
+        {
+            if (layer.Name == name) return layer;
+            if (layer.Children is { } children && Find(children, name) is { } found) return found;
+        }
+
+        return null;
     }
 
     /// <summary>

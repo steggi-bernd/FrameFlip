@@ -21,6 +21,16 @@ public sealed record NodeLayer(MixNode? Mix, Node? Source, string Name, string D
 {
     /// <summary>Welcher Knoten gewaehlt wird, wenn man die Ebene anklickt.</summary>
     public Node? Target => Mix ?? Source;
+
+    /// <summary>Was in den Faktor des Mischens fliesst - die Maske der Ebene, wenn sie eine hat.</summary>
+    public Node? MaskSource { get; init; }
+
+    /// <summary>
+    /// Woher das Bild der Ebene letztlich kommt - eine Bilddatei oder ein Ausgang der
+    /// Datei. Fuer die Miniatur einer ausgeblendeten Ebene: Ihr Zweig wird nicht
+    /// gerechnet, ihr Bild laesst sich trotzdem lesen.
+    /// </summary>
+    public (Node Node, string Output)? Origin { get; init; }
 }
 
 /// <summary>
@@ -74,24 +84,31 @@ public sealed class NodeLayerList : Border
     /// <summary>Die Zeilen, wie sie gerade dastehen - fuer die Probe.</summary>
     internal IReadOnlyList<NodeLayer> Shown { get; private set; } = Array.Empty<NodeLayer>();
 
-    /// <summary>Zeigt die Ebenen eines Graphen. <paramref name="thumb"/> liefert die Miniatur zu einem Knoten.</summary>
-    public void Show(IReadOnlyList<NodeLayer> layers, Node? selected, Func<Node, ImageSource?> thumb)
+    /// <summary>
+    /// Zeigt die Ebenen eines Graphen. <paramref name="picture"/> liefert die Miniatur einer
+    /// Ebene, <paramref name="mask"/> die ihrer Maske.
+    /// </summary>
+    public void Show(IReadOnlyList<NodeLayer> layers, Node? selected,
+                     Func<NodeLayer, ImageSource?> picture, Func<NodeLayer, ImageSource?> mask)
     {
         Shown = layers;
         _rows.Children.Clear();
         _empty.Visibility = layers.Count == 0 ? Visibility.Visible : Visibility.Collapsed;
 
-        foreach (var layer in layers) _rows.Children.Add(Row(layer, ReferenceEquals(selected, layer.Target), thumb));
+        foreach (var layer in layers)
+            _rows.Children.Add(Row(layer, ReferenceEquals(selected, layer.Target), picture(layer),
+                                   layer.MaskSource is null ? null : mask(layer)));
     }
 
     private static readonly Brush ChosenBack = new SolidColorBrush(Color.FromArgb(0x55, 0xA4, 0x7B, 0xF0));
     private static readonly Brush RowBack = new SolidColorBrush(Color.FromArgb(0x30, 0x23, 0x23, 0x2A));
 
-    private UIElement Row(NodeLayer layer, bool chosen, Func<Node, ImageSource?> thumb)
+    private UIElement Row(NodeLayer layer, bool chosen, ImageSource? thumb, ImageSource? maskThumb)
     {
         var grid = new Grid();
         grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(26) });
         grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(72) });
+        grid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
         grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
 
         bool muted = layer.Mix?.Muted == true;
@@ -128,15 +145,30 @@ public sealed class NodeLayerList : Border
             Height = 36,
             Background = new SolidColorBrush(Color.FromRgb(0x18, 0x18, 0x1E)),
             Margin = new Thickness(2, 0, 6, 0),
-            Child = new Image
-            {
-                Source = layer.Source is null ? null : thumb(layer.Source),
-                Stretch = Stretch.Uniform,
-            },
+            Child = new Image { Source = thumb, Stretch = Stretch.Uniform },
         };
 
         Grid.SetColumn(picture, 1);
         grid.Children.Add(picture);
+
+        // Die Maske daneben, wie in einem Ebenenstapel: klein und grau.
+        if (layer.MaskSource is not null)
+        {
+            var mask = new Border
+            {
+                Width = 36,
+                Height = 36,
+                Background = new SolidColorBrush(Color.FromRgb(0x18, 0x18, 0x1E)),
+                BorderBrush = new SolidColorBrush(Color.FromRgb(0x3A, 0x3A, 0x46)),
+                BorderThickness = new Thickness(1),
+                Margin = new Thickness(0, 0, 6, 0),
+                ToolTip = Strings.T("S_NodeLayerMask"),
+                Child = new Image { Source = maskThumb, Stretch = Stretch.UniformToFill },
+            };
+
+            Grid.SetColumn(mask, 2);
+            grid.Children.Add(mask);
+        }
 
         var text = new StackPanel { VerticalAlignment = VerticalAlignment.Center };
         text.Children.Add(new TextBlock
@@ -155,7 +187,7 @@ public sealed class NodeLayerList : Border
             TextTrimming = TextTrimming.CharacterEllipsis,
         });
 
-        Grid.SetColumn(text, 2);
+        Grid.SetColumn(text, 3);
         grid.Children.Add(text);
 
         var row = new Border
@@ -192,18 +224,33 @@ public sealed class NodeLayerList : Border
         {
             var link = graph.Into(mix.Id, "Oben");
             var source = link is null ? null : graph.Find(link.From);
+            var origin = source is null ? null : Origin(graph, source, link!.Output);
 
-            string name = source is null ? Strings.T("S_NodeLayerNothing") : NameOf(graph, source, link!.Output);
+            string name = mix.Label is { Length: > 0 } label ? label
+                        : source is null ? Strings.T("S_NodeLayerNothing")
+                        : NameOf(graph, source, link!.Output);
 
             string detail = Strings.T(NodeTitles.BlendKey(mix.Mode)) + " · " +
                             (mix.Opacity * 100).ToString("0", CultureInfo.CurrentCulture) + " %" +
-                            (mix.Clip ? " · " + Strings.T("S_NodeLayerClipped") : "");
+                            (mix.Clip ? " · " + Strings.T("S_NodeLayerClipped") : "") +
+                            (mix.Muted ? " · " + Strings.T("S_NodeLayerHidden") : "");
 
-            layers.Add(new NodeLayer(mix, source, name, detail));
+            var factor = graph.Into(mix.Id, "Faktor");
+
+            layers.Add(new NodeLayer(mix, source, name, detail)
+            {
+                MaskSource = factor is null ? null : graph.Find(factor.From),
+                Origin = origin,
+            });
         }
 
         if (Base(graph, order) is var (baseNode, baseOutput))
-            layers.Add(new NodeLayer(null, baseNode, NameOf(graph, baseNode, baseOutput), Strings.T("S_NodeLayerBase")));
+        {
+            layers.Add(new NodeLayer(null, baseNode, NameOf(graph, baseNode, baseOutput), Strings.T("S_NodeLayerBase"))
+            {
+                Origin = (baseNode, baseOutput),
+            });
+        }
 
         return layers;
     }
@@ -239,6 +286,25 @@ public sealed class NodeLayerList : Border
             if (next is null) return (node, NodeEdits.Through(node).Output ?? "Bild");
 
             link = next;
+        }
+
+        return null;
+    }
+
+    /// <summary>Die Quelle am Anfang des Bildwegs - eine Bilddatei oder ein Ausgang der Datei. Sonst keine.</summary>
+    internal static (Node Node, string Output)? Origin(NodeGraph graph, Node node, string output)
+    {
+        for (int guard = 0; guard < 64; guard++)
+        {
+            if (node is RenderNode or PictureNode) return (node, output);
+
+            var (input, _) = NodeEdits.Through(node);
+
+            if (input is null || graph.Into(node.Id, input) is not { } link || graph.Find(link.From) is not { } from)
+                return null;
+
+            node = from;
+            output = link.Output;
         }
 
         return null;

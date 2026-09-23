@@ -60,6 +60,9 @@ public static class NodeTitles
 
     public static string For(Node node) => node switch
     {
+        // Ein Mischen mit dem Namen seiner Ebene - und der Mischart, die man sonst nirgends sieht.
+        MixNode { Label: { Length: > 0 } label } mix => label + ": " + Strings.T(BlendKey(mix.Mode)),
+        { Label: { Length: > 0 } label } => label,
         RenderNode => Strings.T("S_NodeRender"),
         PictureNode picture => picture.Path.Length > 0
             ? System.IO.Path.GetFileName(picture.Path)

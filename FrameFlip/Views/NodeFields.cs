@@ -30,6 +30,9 @@ public sealed record ChoiceField(string LabelKey, IReadOnlyList<(string Key, int
 public sealed record SwitchField(string LabelKey, Func<bool> Get, Action<bool> Set, string? Text = null)
     : NodeField(LabelKey);
 
+/// <summary>Ein Text zum Eintippen - etwa der Name einer Ebene.</summary>
+public sealed record TextField(string LabelKey, Func<string> Get, Action<string> Set) : NodeField(LabelKey);
+
 /// <summary>Eine Zahl zum Eintippen - fuer Werte ohne feste Grenzen, etwa eine Tiefe in Metern.</summary>
 public sealed record NumberField(string LabelKey, Func<double> Get, Action<double> Set, string Format = "0.###")
     : NodeField(LabelKey);
@@ -77,7 +80,7 @@ public static class NodeFields
     /// </param>
     public static IReadOnlyList<NodeField> For(Node node, NodeFieldContext? context = null) => node switch
     {
-        MixNode mix => Mix(mix),
+        MixNode mix => Mix(mix, context),
         MaskNode mask => Mask(mask, context),
         MaskMathNode math => new NodeField[]
         {
@@ -217,8 +220,15 @@ public static class NodeFields
     private static IReadOnlyList<(string, int)> BlendModes()
         => Blending.All.Select(entry => (entry.Key, (int)entry.Mode)).ToList();
 
-    private static NodeField[] Mix(MixNode mix) => new NodeField[]
+    private static NodeField[] Mix(MixNode mix, NodeFieldContext? context) => new NodeField[]
     {
+        new TextField("S_NodeLayerName", () => mix.Label ?? "", v =>
+        {
+            string? label = v.Trim().Length > 0 ? v.Trim() : null;
+
+            if (context is null) mix.Label = label;
+            else context.Change(() => mix.Label = label);
+        }) { Structural = context is not null },
         new ChoiceField("S_BlendMode", BlendModes(), () => (int)mix.Mode, v => mix.Mode = (BlendMode)v),
         new SliderField("S_Opacity", 0, 1, () => mix.Opacity, v => mix.Opacity = (float)v, 1),
         new SwitchField("S_NodeClip", () => mix.Clip, v => mix.Clip = v),

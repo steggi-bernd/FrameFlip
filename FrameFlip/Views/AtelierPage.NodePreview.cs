@@ -2,6 +2,7 @@ using System.Windows;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
 using FrameFlip.Imaging;
+using FrameFlip.Imaging.Grading;
 using FrameFlip.Imaging.Nodes;
 
 namespace FrameFlip.Views;
@@ -23,7 +24,7 @@ public partial class AtelierPage
 
     private void SetUpNodePreviews()
     {
-        NodeView.PreviewOf = PreviewImage;
+        NodeView.PreviewOf = node => PreviewImage(node) ?? QuietPreview(node);
         NodeView.PreviewToggled += OnPreviewToggled;
 
         NodeLayers.Chosen += OnLayerChosen;
@@ -43,7 +44,10 @@ public partial class AtelierPage
             if (node.Preview) _previews.Wanted.Add(node.Id);
 
         foreach (var layer in NodeLayerList.Of(_graph))
+        {
             if (layer.Source is { } source) _previews.Wanted.Add(source.Id);
+            if (layer.MaskSource is { } mask) _previews.Wanted.Add(mask.Id);
+        }
 
         _previews.Keep(_graph.Nodes.Select(n => n.Id));
     }
@@ -63,6 +67,20 @@ public partial class AtelierPage
         return image;
     }
 
+    /// <summary>
+    /// Die Vorschau eines Knotens, der nicht gerechnet wird - im Zweig einer
+    /// ausgeblendeten Ebene. Eine Bilddatei und ein Platzieren zeigen dann ihre Quelle,
+    /// wie die Ebenenliste; alles andere bleibt leer.
+    /// </summary>
+    private ImageSource? QuietPreview(Node node)
+    {
+        if (_graph is null || node is not (PictureNode or PlaceNode)) return null;
+
+        var (_, output) = NodeEdits.Through(node);
+
+        return NodeLayerList.Origin(_graph, node, output ?? "Bild") is var (origin, from) ? SourceThumb(origin, from) : null;
+    }
+
     /// <summary>Nach einer Rechnung: Sind neue Vorschauen da, werden sie gezeigt.</summary>
     private void ShowPreviews()
     {
@@ -79,8 +97,99 @@ public partial class AtelierPage
     {
         if (_graph is null) return;
 
-        NodeLayers.Show(NodeLayerList.Of(_graph), NodeView.Selected, PreviewImage);
+        NodeLayers.Show(NodeLayerList.Of(_graph), NodeView.Selected, LayerThumb,
+                        layer => layer.MaskSource is { } mask ? PreviewImage(mask) : null);
         ShowLayerCount();
+    }
+
+    /// <summary>
+    /// Die Miniatur einer Ebene: die Vorschau dessen, was in ihr Mischen fliesst. Eine
+    /// ausgeblendete Ebene wird nicht gerechnet und hat keine - dann zeigt die Liste ihre
+    /// Quelle, die Bilddatei oder den Pass, wie er in der Datei steht.
+    /// </summary>
+    private ImageSource? LayerThumb(NodeLayer layer)
+    {
+        if (layer.Source is { } source && PreviewImage(source) is { } computed) return computed;
+
+        return layer.Origin is var (node, output) ? SourceThumb(node, output) : null;
+    }
+
+    private readonly Dictionary<string, ImageSource> _sourceThumbs = new(StringComparer.Ordinal);
+    private readonly HashSet<string> _sourceThumbsBusy = new(StringComparer.Ordinal);
+
+    /// <summary>
+    /// Die Miniatur einer Quelle, ohne dass der Graph sie rechnet: ein Pass aus den
+    /// Miniaturen der Datei, eine Bilddatei einmal im Hintergrund gelesen und verkleinert.
+    /// </summary>
+    private ImageSource? SourceThumb(Node node, string output)
+    {
+        switch (node)
+        {
+            case RenderNode when output != RenderNode.Picture:
+                MakePassThumbs();
+                return PassThumb(output);
+
+            case RenderNode when _base is not null:
+                return Thumb("datei", () => _base);
+
+            case PictureNode picture when picture.Path.Length > 0 && _path is { } framePath:
+                return Thumb("bild:" + picture.Path, () => LayeredFrameLoader.Read(
+                    new LayerRead(picture.Path, LayerContent.Image, picture.FollowSequence), framePath));
+
+            default:
+                return null;
+        }
+    }
+
+    /// <summary>Eine Miniatur, im Hintergrund gelesen - beim ersten Mal keine, danach die Liste neu.</summary>
+    private ImageSource? Thumb(string key, Func<FloatFrame?> read)
+    {
+        if (_sourceThumbs.TryGetValue(key, out var known)) return known;
+        if (!_sourceThumbsBusy.Add(key) || _base is null) return null;
+
+        string? path = _path;
+        var view = ViewFor(_base);
+
+        Task.Run(() => read() is { } frame ? NodePreviews.Draw(frame, view) : null)
+            .ContinueWith(task => Dispatcher.Invoke(() =>
+            {
+                _sourceThumbsBusy.Remove(key);
+
+                // Waehrend gelesen wurde, kann eine andere Datei geoeffnet worden sein.
+                if (!string.Equals(path, _path, StringComparison.Ordinal)) return;
+                if (!task.IsCompletedSuccessfully || task.Result is not { } thumb) return;
+
+                var image = BitmapSource.Create(thumb.Width, thumb.Height, 96, 96, PixelFormats.Bgra32, null,
+                                                thumb.Bgra, thumb.Width * 4);
+                image.Freeze();
+
+                _sourceThumbs[key] = image;
+                ShowNodeLayers();
+                NodeView.InvalidateVisual();
+            }));
+
+        return null;
+    }
+
+    /// <summary>
+    /// Baut den Graphen neu aus dem gespeicherten Stapel - fuer einen Graphen, der
+    /// umgewandelt wurde, bevor ausgeblendete Ebenen, Namen und Vorschauen mitkamen.
+    /// Was seitdem am Graphen gebaut wurde, ist danach weg; Rueckgaengig holt es zurueck.
+    /// </summary>
+    private void RebuildFromStack()
+    {
+        if (_graph is null) return;
+
+        RememberNodes();
+
+        _graph = StackToGraph.Convert(Layers.Stack, _settings.Adjustments ?? ImageAdjustments.Neutral,
+                                      _settings.Grading ?? new GradingStack());
+        _cache.Clear();
+
+        NodeView.Replace(_graph);
+        NodeView.Frame();
+
+        AfterNodeEdit();
     }
 
     /// <summary>

@@ -1023,6 +1023,10 @@
     <sys:String x:Key="S_NodeLayerClipped">clipped</sys:String>
     <sys:String x:Key="S_NodeLayerGroup">Group</sys:String>
     <sys:String x:Key="S_NodeLayerBase">Base</sys:String>
+    <sys:String x:Key="S_NodeLayerMask">The layer's mask</sys:String>
+    <sys:String x:Key="S_NodeLayerHidden">hidden</sys:String>
+    <sys:String x:Key="S_NodeLayerName">Layer name</sys:String>
+    <sys:String x:Key="S_NodeMenuRebuild">Rebuild from the stack (Ctrl+Z brings the graph back)</sys:String>
     <sys:String x:Key="S_NodeMenuPreviewOn">Show preview (V)</sys:String>
     <sys:String x:Key="S_NodeMenuPreviewOff">Hide preview (V)</sys:String>
     <sys:String x:Key="S_NodeMenuPreviewAll">Preview on all layers and masks</sys:String>

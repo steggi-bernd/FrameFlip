@@ -281,8 +281,24 @@ Only the alpha channel of exports changes, and only in those cases.
      Each pass is read downscaled and only its own channels; depth is shown against its
      own range.
 
+   - **Hidden layers.** They used to be dropped when converting (a stack with hidden
+     "Glare" layers lost them for good). Now a hidden layer, or one at zero opacity,
+     becomes its full branch plus a *muted* Mix. That Mix passes the picture below
+     unchanged, so the picture keeps the stack's bytes. It also does not close an open
+     group unless doing so is harmless. Switched on, the layer does what it would do in
+     the stack. A muted node's other inputs are neither read nor computed, so hidden
+     layers cost nothing. Their previews show the source file instead.
+   - **Names.** Every Mix carries its layer's name ("Mask", "Glare_2…"), shown in its title
+     and in the layer list, and editable in its fields. The list shows each layer's mask
+     next to its thumbnail.
+   - **Rebuild from the stack.** A graph converted before this rebuilds from the stored
+     stack via the menu. Ctrl+Z brings the old graph back.
+
    Tests:
    - Map range on depth has the same bytes as the pass mask, full and coarse.
+   - Hidden layers in every position (above the base, between carrier and clipped
+     layer, clipped, as an adjustment with a painted mask, at zero opacity) keep the
+     bytes. Switched on, each equals the stack with that layer visible.
    - Every new node is checked against its formula.
    - Previews change no output.
    - The drop test places the wire under the body, far from the title bar.

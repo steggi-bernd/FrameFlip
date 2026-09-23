@@ -108,6 +108,7 @@ public partial class GradingPanel
         SwitchField toggle => SwitchRow(toggle),
         ButtonField button => ButtonRow(button),
         NumberField number => NumberRow(number),
+        TextField text => TextRow(text),
         PassesField passes => PassesRow(passes),
         RampField ramp => new RampEditor(ramp.Node, interim => Raise(interim), key => FindResource(key)),
         InfoField info => new TextBlock
@@ -338,6 +339,42 @@ public partial class GradingPanel
         }
 
         return grid;
+    }
+
+    /// <summary>Ein Text zum Eintippen - uebernommen mit der Eingabetaste oder beim Verlassen des Feldes.</summary>
+    private UIElement TextRow(TextField field)
+    {
+        var panel = new StackPanel();
+
+        panel.Children.Add(new TextBlock
+        {
+            Text = Strings.T(field.LabelKey),
+            Style = (Style)FindResource("PanelLabel"),
+            Margin = new Thickness(0, 0, 0, 4),
+        });
+
+        var box = new TextBox { Style = (Style)FindResource("DialogTextBox"), Text = field.Get() };
+
+        void Take()
+        {
+            if (box.Text == field.Get()) return;
+
+            field.Set(box.Text);
+            if (!field.Structural) Raise(interim: false);
+        }
+
+        box.LostKeyboardFocus += (_, _) => Take();
+        box.KeyDown += (_, e) =>
+        {
+            if (e.Key != System.Windows.Input.Key.Enter) return;
+
+            Take();
+            e.Handled = true;
+        };
+
+        panel.Children.Add(box);
+
+        return panel;
     }
 
     private UIElement ButtonRow(ButtonField field)

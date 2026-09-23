@@ -430,6 +430,26 @@ public static class NodeEditInvariants
 
             Check.That(!page.Graph!.Nodes.OfType<MixNode>().Any(m => m.Muted), "und Rueckgaengig zeigt sie wieder");
 
+            // Ein Mischen umbenennen: der Name steht im Titel und in der Ebenenliste.
+            var mixNode = list.Shown[0].Mix!;
+            editor.Select(mixNode);
+
+            var context = (NodeFieldContext)Call(page, "FieldContext")!;
+            var nameField = NodeFields.For(mixNode, context).OfType<TextField>().Single();
+            nameField.Set("Glare");
+
+            var named = page.Graph!.Nodes.OfType<MixNode>().First(m => m.Id == mixNode.Id);
+            var layerList = (NodeLayerList)page.FindName("NodeLayers");
+
+            Check.That(named.Label == "Glare" && NodeTitles.For(named).StartsWith("Glare", StringComparison.Ordinal) &&
+                       layerList.Shown.Any(l => l.Name == "Glare"),
+                       "ein umbenanntes Mischen heisst im Titel und in der Ebenenliste so",
+                       string.Join(" | ", layerList.Shown.Select(l => l.Name)));
+
+            page.StepNodes(back: true);
+
+            Check.That(page.Graph!.Nodes.OfType<MixNode>().All(m => m.Label is null), "und Rueckgaengig nimmt den Namen wieder weg");
+
             page.StepNodes(back: true);
             Pump(TimeSpan.FromSeconds(3), () => Pixels(page).AsSpan().SequenceEqual(plain));
 
@@ -698,6 +718,20 @@ public static class NodeEditInvariants
 
             Check.That(editor.Warning is null && Pixels(page).AsSpan().SequenceEqual(darker),
                        "Rueckgaengig steckt sie wieder an");
+
+            // Aus dem Stapel neu aufbauen: der frische Graph - und Rueckgaengig holt den alten.
+            Call(page, "RebuildFromStack");
+            Settle();
+
+            Check.That(!page.Graph!.Nodes.OfType<OpticsNode>().Any() && Pixels(page).AsSpan().SequenceEqual(plain),
+                       "neu aus dem Stapel aufgebaut, ist der Graph der frisch umgewandelte");
+
+            page.StepNodes(back: true);
+            Settle();
+
+            Check.That(page.Graph!.Nodes.OfType<OpticsNode>().Any() && Pixels(page).AsSpan().SequenceEqual(darker),
+                       "und Rueckgaengig holt den gebauten zurueck");
+
         }
         finally
         {

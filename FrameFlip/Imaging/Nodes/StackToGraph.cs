@@ -80,12 +80,22 @@ public static class StackToGraph
 
         private void Layers(IEnumerable<ImageLayer> layers, int depth)
         {
-            foreach (var layer in layers)
+            var list = layers as IList<ImageLayer> ?? layers.ToList();
+
+            for (int i = 0; i < list.Count; i++)
             {
-                if (!layer.Visible || layer.Opacity <= 0.0005f) continue;
+                var layer = list[i];
 
                 // Was obenauf liegt, kommt erst nach der Bildwerdung - als eigener Knoten.
                 if (layer.OnTop && layer.Content == LayerContent.Image) continue;
+
+                if (Hidden(layer))
+                {
+                    // Eine ausgeblendete Gruppe bleibt draussen: Sie zu bauen hiesse, die
+                    // offene Gruppe davor zu schliessen - und das aendert das Bild.
+                    if (layer.Content != LayerContent.Group) Silent(layer, ClipAhead(list, i));
+                    continue;
+                }
 
                 if (layer.Content == LayerContent.Group)
                 {
@@ -120,6 +130,7 @@ public static class StackToGraph
 
             var mix = _graph.Add(new MixNode
             {
+                Label = group.Name.Length > 0 ? group.Name : null,
                 Mode = group.Mode,
                 Opacity = Math.Clamp(group.Opacity, 0f, 1f),
                 InDisplay = group.BlendInDisplay,
@@ -145,64 +156,7 @@ public static class StackToGraph
 
             var under = clipped ? _group!.Value : _below;
 
-            (Node Node, string Output) image;
-            (Node Node, string Output)? mask;
-
-            if (layer.Content == LayerContent.Adjustment)
-            {
-                // Eine Einstellungsebene nimmt als Eingang, worauf sie wirkt - und wird
-                // erst korrigiert, dann belichtet, wie im Composer.
-                var grade = _graph.Add(new LayerGradeNode
-                {
-                    Adjustments = layer.Adjustments,
-                    Tools = layer.Tools?.Clone(),
-                    Adjustment = true,
-                });
-
-                _graph.Connect(under.Node, under.Output, grade, "Bild");
-                image = Scaled(layer, (grade, "Bild"));
-                mask = Mask(layer.Mask, layer: image, under: under);
-            }
-            else
-            {
-                var source = Source(layer);
-
-                // Die Vorschau zeigt, welche Ebene dieser Zweig ist.
-                var place = _graph.Add(new PlaceNode { Place = layer.Place.Clone(), Preview = true });
-                _graph.Connect(source.Node, source.Output, place, "Bild");
-
-                image = Scaled(layer, (place, "Bild"));
-                mask = Mask(layer.Mask, layer: image, under: under);
-
-                if (!layer.Grade().IsNeutral)
-                {
-                    var grade = _graph.Add(new LayerGradeNode
-                    {
-                        Adjustments = layer.Adjustments,
-                        Tools = layer.Tools?.Clone(),
-                    });
-
-                    _graph.Connect(image.Node, image.Output, grade, "Bild");
-
-                    if (layer.Mask.Scope == MaskScope.Colour)
-                    {
-                        // Die Maske sagt hier, WO korrigiert wird - und nicht mehr, wo
-                        // die Ebene zu sehen ist.
-                        var restrict = _graph.Add(new RestrictNode());
-
-                        _graph.Connect(image.Node, image.Output, restrict, "Vorher");
-                        _graph.Connect(grade, "Bild", restrict, "Nachher");
-                        if (mask is { } m) _graph.Connect(m.Node, m.Output, restrict, "Maske");
-
-                        image = (restrict, "Bild");
-                        mask = null;
-                    }
-                    else
-                    {
-                        image = (grade, "Bild");
-                    }
-                }
-            }
+            var (image, mask) = Branch(layer, under);
 
             if (clipped)
             {
@@ -221,6 +175,137 @@ public static class StackToGraph
             _group = image;
             _carrier = layer;
             _carrierMask = mask;
+        }
+
+        /// <summary>
+        /// Der Zweig einer Ebene: woher ihr Bild kommt, wie es platziert, belichtet und
+        /// korrigiert wird, und ihre Maske. <paramref name="under"/> ist, worauf sie
+        /// liegt - das sieht eine Einstellungsebene, und das lesen die Masken, die den
+        /// Untergrund ansehen.
+        /// </summary>
+        private ((Node Node, string Output) Image, (Node Node, string Output)? Mask) Branch(
+            ImageLayer layer, (Node Node, string Output) under)
+        {
+                (Node Node, string Output) image;
+                (Node Node, string Output)? mask;
+
+                if (layer.Content == LayerContent.Adjustment)
+                {
+                    // Eine Einstellungsebene nimmt als Eingang, worauf sie wirkt - und wird
+                    // erst korrigiert, dann belichtet, wie im Composer.
+                    var grade = _graph.Add(new LayerGradeNode
+                    {
+                        Adjustments = layer.Adjustments,
+                        Tools = layer.Tools?.Clone(),
+                        Adjustment = true,
+                    });
+
+                    _graph.Connect(under.Node, under.Output, grade, "Bild");
+                    image = Scaled(layer, (grade, "Bild"));
+                    mask = Mask(layer.Mask, layer: image, under: under);
+                }
+                else
+                {
+                    var source = Source(layer);
+
+                    // Die Vorschau zeigt, welche Ebene dieser Zweig ist.
+                    var place = _graph.Add(new PlaceNode { Place = layer.Place.Clone(), Preview = true });
+                    _graph.Connect(source.Node, source.Output, place, "Bild");
+
+                    image = Scaled(layer, (place, "Bild"));
+                    mask = Mask(layer.Mask, layer: image, under: under);
+
+                    if (!layer.Grade().IsNeutral)
+                    {
+                        var grade = _graph.Add(new LayerGradeNode
+                        {
+                            Adjustments = layer.Adjustments,
+                            Tools = layer.Tools?.Clone(),
+                        });
+
+                        _graph.Connect(image.Node, image.Output, grade, "Bild");
+
+                        if (layer.Mask.Scope == MaskScope.Colour)
+                        {
+                            // Die Maske sagt hier, WO korrigiert wird - und nicht mehr, wo
+                            // die Ebene zu sehen ist.
+                            var restrict = _graph.Add(new RestrictNode());
+
+                            _graph.Connect(image.Node, image.Output, restrict, "Vorher");
+                            _graph.Connect(grade, "Bild", restrict, "Nachher");
+                            if (mask is { } m) _graph.Connect(m.Node, m.Output, restrict, "Maske");
+
+                            image = (restrict, "Bild");
+                            mask = null;
+                        }
+                        else
+                        {
+                            image = (grade, "Bild");
+                        }
+                    }
+                }
+
+            return (image, mask);
+        }
+
+        private static bool Hidden(ImageLayer layer) => !layer.Visible || layer.Opacity <= 0.0005f;
+
+        /// <summary>
+        /// Ob die naechste Ebene, die mitrechnet, an die offene Gruppe angeschnitten wird -
+        /// dann darf eine ausgeblendete Ebene davor sie nicht schliessen.
+        /// </summary>
+        private static bool ClipAhead(IList<ImageLayer> list, int index)
+        {
+            for (int j = index + 1; j < list.Count; j++)
+            {
+                var next = list[j];
+
+                if (next.OnTop && next.Content == LayerContent.Image) continue;
+                if (Hidden(next)) continue;
+
+                return next.Clipped && next.Content != LayerContent.Group;
+            }
+
+            return false;
+        }
+
+        /// <summary>
+        /// Eine ausgeblendete Ebene - oder eine ohne Deckkraft. Sie rechnet nicht mit, steht
+        /// aber im Graphen: derselbe Zweig wie sonst, und ihr Mischen ist stumm. So findet
+        /// man sie in der Ebenenliste und schaltet sie mit einem Klick wieder ein.
+        ///
+        /// Ein stummes Mischen reicht das Bild darunter unveraendert durch - dasselbe
+        /// Ergebnis, nicht nur dasselbe Bild. Deshalb aendert die Ebene nichts an dem, was
+        /// der Stapel rechnet. Wo sie steht, entscheidet, was sie tut, wenn man sie
+        /// einschaltet:
+        ///
+        /// - Angeschnitten, an einer offenen Gruppe: in deren Kette, als Schnittmaske - wie im Stapel.
+        /// - Sonst schliesst sie die offene Gruppe, wie es eine sichtbare Ebene taete, und
+        ///   liegt auf dem Bisherigen. Das aendert nichts: Geschlossen wuerde ohnehin.
+        /// - Nur wenn danach noch eine sichtbare Ebene an diese Gruppe angeschnitten wird,
+        ///   darf sie sie nicht schliessen (sonst verloere jene ihren Traeger) und setzt sich
+        ///   in deren Kette. Eingeschaltet laege sie dann in der Gruppe und nicht darueber.
+        /// </summary>
+        private void Silent(ImageLayer layer, bool clipAhead)
+        {
+            bool clipped = layer.Clipped && _group is not null;
+
+            if (!clipped && !clipAhead) Close();
+
+            bool inGroup = _group is not null;
+            var under = inGroup ? _group!.Value : _below;
+
+            var (image, mask) = Branch(layer, under);
+
+            var mix = Mix(layer, clip: clipped);
+            mix.Muted = true;
+
+            _graph.Connect(under.Node, under.Output, mix, "Unten");
+            _graph.Connect(image.Node, image.Output, mix, "Oben");
+            if (mask is { } m) _graph.Connect(m.Node, m.Output, mix, "Faktor");
+
+            if (inGroup) _group = (mix, "Bild");
+            else _below = (mix, "Bild");
         }
 
         /// <summary>Die offene Gruppe auf das Bisherige - mit Mischung, Deckkraft und Maske ihres Traegers.</summary>
@@ -242,6 +327,8 @@ public static class StackToGraph
 
         private MixNode Mix(ImageLayer layer, bool clip) => _graph.Add(new MixNode
         {
+            // Der Name der Ebene - damit man sie im Graphen und in der Ebenenliste wiederfindet.
+            Label = layer.Name.Length > 0 ? layer.Name : null,
             Mode = layer.Mode,
             Opacity = Math.Clamp(layer.Opacity, 0f, 1f),
             InDisplay = layer.BlendInDisplay,
