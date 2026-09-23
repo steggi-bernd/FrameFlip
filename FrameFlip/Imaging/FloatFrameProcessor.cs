@@ -270,7 +270,12 @@ public static class FloatFrameProcessor
 
                     // Der Film kommt hier und nicht im ersten Durchgang: Er sitzt
                     // hinter der Linse, und dazwischen lag die Geometrie.
-                    ShadeFilm(in plan, gx * step, gy * step, ref vr, ref vg, ref vb);
+                    //
+                    // An denselben Stellen wie im ersten Durchgang - den Gitterpunkten,
+                    // deren letzter auf dem Rand liegt. Hier stand gx * step, und das
+                    // zeigt beim groben Raster am rechten und unteren Rand ueber das
+                    // Bild hinaus: Das Korn sass dort anders als auf dem geraden Weg.
+                    ShadeFilm(in plan, columns[gx], rows[gy], ref vr, ref vg, ref vb);
 
                     // Die Deckung liegt als Byte daneben. Fuer die Kanalansicht ist
                     // das genau genug - sie zeigt ohnehin Bytes.
@@ -787,7 +792,11 @@ public static class FloatFrameProcessor
         // Hat die Geometrie Punkte verschoben, ist die Deckung mitgewandert und liegt
         // im Puffer - die der Datei zeigte dann auf die Stelle von vorher. Ohne
         // Geometrie bleibt es bei der Datei, die sie mit voller Genauigkeit fuehrt.
-        var moved = grading.Geometry.Length > 0 ? scratch?.Alpha : null;
+        //
+        // Die Renderdaten verschieben ebenso: Bewegungsunschaerfe und Verschiebung
+        // nehmen die Deckung mit. Hier stand nur die Geometrie, und eine verschobene
+        // Kante kam in sechzehn Bit mit der Deckung von vorher heraus.
+        var moved = grading.Geometry.Length > 0 || grading.Data.Length > 0 ? scratch?.Alpha : null;
 
         Parallel.For(0, height, new ParallelOptions
         {

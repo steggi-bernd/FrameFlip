@@ -103,12 +103,17 @@ public static class ExportParityInvariants
         var r = new float[count];
         var g = new float[count];
         var b = new float[count];
+        var a = new float[count];
 
         for (int y = 0; y < Height; y++)
         {
             for (int x = 0; x < Width; x++)
             {
                 int i = y * Width + x;
+
+                // Eine Deckung mit Kante, damit ein Werkzeug, das Punkte verschiebt,
+                // sie sichtbar mitnehmen muss.
+                a[i] = x < Width / 3 ? 0.25f : 1f;
 
                 r[i] = 0.05f + 0.6f * x / Width;
                 g[i] = 0.05f + 0.5f * y / Height;
@@ -118,7 +123,7 @@ public static class ExportParityInvariants
             }
         }
 
-        return new FloatFrame { Width = Width, Height = Height, R = r, G = g, B = b };
+        return new FloatFrame { Width = Width, Height = Height, R = r, G = g, B = b, A = a };
     }
 
     /// <summary>Tiefe von einem bis zehn Meter, von links nach rechts.</summary>
@@ -192,7 +197,8 @@ public static class ExportParityInvariants
 
     /// <summary>
     /// Der groesste Abstand in Achtbitstufen. Die Vorschau liegt als B, G, R, A vor,
-    /// die Ausgabe als R, G, B, A - verglichen werden nur die Farben.
+    /// die Ausgabe als R, G, B, A - verglichen wird alles, auch die Deckung: Ein
+    /// Werkzeug, das Punkte verschiebt, muss sie in beiden Wegen mitnehmen.
     /// </summary>
     private static int Worst(byte[] eight, ushort[] sixteen)
     {
@@ -200,9 +206,9 @@ public static class ExportParityInvariants
 
         for (int p = 0; p < Width * Height; p++)
         {
-            for (int c = 0; c < 3; c++)
+            for (int c = 0; c < 4; c++)
             {
-                int preview = eight[p * 4 + (2 - c)];
+                int preview = eight[p * 4 + (c == 3 ? 3 : 2 - c)];
                 int export = (int)Math.Round(sixteen[p * 4 + c] / 257.0);
 
                 worst = Math.Max(worst, Math.Abs(preview - export));
