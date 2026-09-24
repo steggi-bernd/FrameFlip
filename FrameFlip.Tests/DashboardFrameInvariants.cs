@@ -235,7 +235,8 @@ public static class DashboardFrameInvariants
             }});
         }
         internal string PathFor(int n) => Path.Combine(Render, $"frame_{n:0000}.png");
-        internal void Open(DashboardVideoSources? videoSources = null, AppSettings? settings = null)
+        internal void Open(DashboardVideoSources? videoSources = null, AppSettings? settings = null,
+            Action<AppSettings>? persist = null)
         {
             var sources = new DashboardFrameSources((path, width) =>
             {
@@ -259,7 +260,7 @@ public static class DashboardFrameInvariants
             });
             Window = new MainWindow(sources, null, () => null, () => { }, _ => { }, () => { },
                 settings ?? new AppSettings { Prebuffer = true, PrepareVideo = false, MemoryBudgetMb = 128 },
-                videoSources: videoSources);
+                persist, videoSources: videoSources);
         }
         internal Image Image => (Image)Window.FindName("StageImage");
         internal FrameworkElement Bar => (FrameworkElement)Window.FindName("PreloadBar");

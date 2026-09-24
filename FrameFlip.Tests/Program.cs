@@ -126,6 +126,7 @@ static int RunAll()
     DashboardFrameInvariants.Run();
     DashboardFrameInvariants.RetiredWork();
     DashboardMediaControllerInvariants.Run();
+    DashboardPlaybackInvariants.Run();
     PaceInvariants.Run();
     ReadinessInvariants.Run();
     MachineInvariants.Run();
