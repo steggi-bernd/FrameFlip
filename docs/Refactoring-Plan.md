@@ -47,10 +47,11 @@ Refactoring-Schritte und werden nicht als bereits umgesetzt gezählt.
 
 ## Fortschritt am 23. September 2026
 
-Die Strukturarbeit liegt separat auf `codex/refactor-watch-lifecycle`, inzwischen
+Die Strukturarbeit entstand separat auf `codex/refactor-watch-lifecycle`, aufgebaut
 auf Claudes gespeichertem Feature-Stand `7e92276`. Der gemeinsam benutzte
-Feature-Checkout bleibt bei Claude. Die folgenden Schnitte sind **im Branch
-implementiert und geprüft**, noch nicht in `feature/atelier` oder `main` gemergt:
+Feature-Checkout bleibt bei Claude. Die folgenden Schnitte sind **implementiert,
+geprüft und am 24. September in `feature/atelier` gemergt** (`2675ed2`), noch
+nicht in `main`:
 
 - **D2 abgeschlossen:** `AppWatchController` besitzt Start, Austausch,
   Einstellungsvergleich und Ende des Zuschauerdienstes. Schlüsselverwaltung,
@@ -122,10 +123,10 @@ Warnungen und **140 Zusicherungen** aus den sieben Dashboard-Testaufrufen
 (`DashboardMediaControllerInvariants`, `DashboardFrameInvariants` mit
 `RetiredWork`, `DashboardSelectionInvariants`, `DashboardLiveInvariants`,
 `DashboardSequenceControllerInvariants`, `DashboardLiveControllerInvariants`).
-Die vollständigen Prüfreihen stehen für diesen Schnitt noch aus und folgen beim
-Zusammenführen mit `feature/atelier`. Claudes weitere Atelier-Commits nach `7e92276` gehören
-nicht zu diesem geprüften Branchstand und werden beim späteren Zusammenführen
-erneut abgeglichen.
+Nach dem Merge in `feature/atelier` liefen beide Prüfreihen vollständig über den
+gemeinsamen Stand, einschließlich Claudes Atelier-Commits bis `4c60517`:
+**4.274 Zusicherungen** in `FrameFlip.Tests` (ein Gesamtlauf, 67 Sekunden) und
+**227 UI-Prüfungen**, beide erfolgreich.
 
 ## Historischer Stand der ersten Desktop-Schnitte (9. September 2026)
 
@@ -316,7 +317,7 @@ sofort koppeln, ohne zusätzliche Schritte.
 
 **Aktiv: D1, Dashboard-Sitzung.** D2, D1a (Ordnerbeobachtung/Ruhefrist),
 D1b (Auswahl/Scan-Zustand) und D1c (Decoder, Vorladen, Bildspeicher und
-Videovorbereitung) sind im separaten Branch umgesetzt. Als Nächstes folgt
+Videovorbereitung) sind umgesetzt und in `feature/atelier` gemergt. Als Nächstes folgt
 Playback als eigener Schnitt: zunächst Abspielen/Pause, Loop, Follow,
 Lücken, In-/Out-Punkte, Bildratenwechsel und den Übergang vom Vorladen
 charakterisieren. Danach die Unterschiede zum vorhandenen
