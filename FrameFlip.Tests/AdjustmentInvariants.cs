@@ -492,15 +492,15 @@ public static class AdjustmentInvariants
         Console.WriteLine($"         1080p: zwei Passe {without:0.0} ms, " +
                           $"mit Korrektur {with:0.0} ms, beim Ziehen {coarse:0.0} ms");
 
-        Check.That(with < 150, "der volle Durchgang bleibt im Rahmen", $"{with:0.0} ms");
-        Check.That(with > without, "und die Korrektur kostet messbar etwas",
+        Check.Timing(with < 150, "der volle Durchgang bleibt im Rahmen", $"{with:0.0} ms");
+        Check.Timing(with > without, "und die Korrektur kostet messbar etwas",
                    $"{with:0.0} gegen {without:0.0} ms");
 
         // Das ist die Zahl, an der die Bedienbarkeit haengt: Beim Ziehen wird nur
         // das Gitter gerechnet, und das muss deutlich unter einem Bildabstand
         // bleiben, sonst ruckelt jeder Regler.
-        Check.That(coarse < 20, "beim Ziehen bleibt es bedienbar", $"{coarse:0.0} ms");
-        Check.That(coarse < with / 4, "das Gitter spart ein Vielfaches",
+        Check.Timing(coarse < 20, "beim Ziehen bleibt es bedienbar", $"{coarse:0.0} ms");
+        Check.Timing(coarse < with / 4, "das Gitter spart ein Vielfaches",
                    $"{coarse:0.0} gegen {with:0.0} ms");
     }
 

@@ -278,14 +278,14 @@ public static class FloatImagingInvariants
                 Console.WriteLine($"  [i]    1080p, Sichtumwandlung AgX:      {agxMs:0.#} ms" +
                                   $"   (4K rund {agxMs * 4:0} ms)");
 
-                Check.That(agxMs < 1000, "ein Reglerzug auf 1080p mit AgX bleibt im Rahmen",
+                Check.Timing(agxMs < 1000, "ein Reglerzug auf 1080p mit AgX bleibt im Rahmen",
                            $"{agxMs:0.#} ms");
             }
 
             // Grosszuegig bemessen: auf einer langsamen Maschine unter Last darf es
             // laenger dauern. Die Grenze soll einen Einbruch um eine Groessenordnung
             // fangen, nicht eine Schwankung.
-            Check.That(ms < 500, "ein Reglerzug auf 1080p bleibt im Rahmen", $"{ms:0.#} ms");
+            Check.Timing(ms < 500, "ein Reglerzug auf 1080p bleibt im Rahmen", $"{ms:0.#} ms");
         }
         finally
         {
@@ -425,7 +425,7 @@ public static class FloatImagingInvariants
 
             // Ein Sechzehntel der Punkte; der Rest ist Fuellen und Speicherzugriff.
             // Ein Faktor von wenigstens drei ist die Aussage, auf die es ankommt.
-            Check.That(coarseMs * 3 < fullMs, "die grobe Vorschau ist deutlich schneller",
+            Check.Timing(coarseMs * 3 < fullMs, "die grobe Vorschau ist deutlich schneller",
                        $"{coarseMs:0.#} ms gegen {fullMs:0.#} ms");
         }
         finally

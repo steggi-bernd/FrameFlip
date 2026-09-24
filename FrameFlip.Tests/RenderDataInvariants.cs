@@ -384,9 +384,9 @@ public static class RenderDataInvariants
         Console.WriteLine($"         1080p: Bewegung ueber alles {motion:0.0} ms, " +
                           $"beim Ziehen {motionCoarse:0.0} ms");
 
-        Check.That(with < 500, "der volle Durchgang bleibt im Rahmen", $"{with:0.0} ms");
-        Check.That(coarse < 60, "beim Ziehen bleibt es bedienbar", $"{coarse:0.0} ms");
-        Check.That(motionCoarse < 80, "auch mit Bewegung ueber dem ganzen Bild",
+        Check.Timing(with < 500, "der volle Durchgang bleibt im Rahmen", $"{with:0.0} ms");
+        Check.Timing(coarse < 60, "beim Ziehen bleibt es bedienbar", $"{coarse:0.0} ms");
+        Check.Timing(motionCoarse < 80, "auch mit Bewegung ueber dem ganzen Bild",
                    $"{motionCoarse:0.0} ms");
     }
 

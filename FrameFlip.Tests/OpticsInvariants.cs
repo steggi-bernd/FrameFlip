@@ -571,7 +571,7 @@ public static class OpticsInvariants
         Console.WriteLine($"         1080p: ohne {without:0.0} ms, Vignette {withVignette:0.0} ms, " +
                           $"Korn {withGrain:0.0} ms, beide {withBoth:0.0} ms");
 
-        Check.That(withBoth < without + 60, "beide zusammen bleiben im Rahmen",
+        Check.Timing(withBoth < without + 60, "beide zusammen bleiben im Rahmen",
                    $"{withBoth:0.0} gegen {without:0.0} ms");
     }
 

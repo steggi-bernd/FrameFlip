@@ -252,8 +252,8 @@ public static class RawCacheInvariants
                               $"PNG entpacken kostet rund 31 ms)");
 
             // Der ganze Zweck ist, schneller als das Entpacken zu sein.
-            Check.That(read < 20, "lesen bleibt deutlich unter dem Entpacken", $"{read:0.0} ms");
-            Check.That(write < 40, "schreiben bleibt vertretbar", $"{write:0.0} ms");
+            Check.Timing(read < 20, "lesen bleibt deutlich unter dem Entpacken", $"{read:0.0} ms");
+            Check.Timing(write < 40, "schreiben bleibt vertretbar", $"{write:0.0} ms");
         }
         finally
         {

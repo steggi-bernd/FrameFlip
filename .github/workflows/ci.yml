@@ -11,7 +11,13 @@ permissions:
 jobs:
   test:
     runs-on: windows-latest
-    timeout-minutes: 10
+    # Die Kernreihe laeuft lokal gut eine Minute, mit Fenstertests und festen
+    # Wartezeiten. Ein geteilter Laeufer braucht ein Mehrfaches davon.
+    timeout-minutes: 20
+    env:
+      # Feste Millisekundengrenzen messen hier die Maschine, nicht den Code:
+      # Ueberschreitungen werden gemeldet, machen den Lauf aber nicht rot.
+      FRAMEFLIP_TIMING: report
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-dotnet@v4

@@ -407,8 +407,8 @@ public static class SortInvariants
 
         Console.WriteLine($"         1080p {full:0.0} ms, 4K {uhd:0.0} ms - Fenster ganz offen");
 
-        Check.That(full < 400, "1080p bleibt im Rahmen", $"{full:0.0} ms");
-        Check.That(uhd < 1600, "und 4K bleibt benutzbar", $"{uhd:0.0} ms");
+        Check.Timing(full < 400, "1080p bleibt im Rahmen", $"{full:0.0} ms");
+        Check.Timing(uhd < 1600, "und 4K bleibt benutzbar", $"{uhd:0.0} ms");
 
         // Und der uebliche Fall ist deutlich billiger: ein schmales Fenster trifft
         // wenige Punkte, und kurze Laeufe sortieren sich schneller als lange.
@@ -416,7 +416,7 @@ public static class SortInvariants
 
         Console.WriteLine($"         1080p {usual:0.0} ms - schmales Fenster, Laufgrenze 120");
 
-        Check.That(usual < full,
+        Check.Timing(usual < full,
                    "ein schmales Fenster kostet weniger als ein offenes",
                    $"{usual:0.0} gegen {full:0.0} ms");
 
@@ -426,7 +426,7 @@ public static class SortInvariants
 
         Console.WriteLine($"         4K {diagonal:0.0} ms - 30 Grad, kreuzweise, Fenster ganz offen");
 
-        Check.That(diagonal < 1600, "auch schraeg und kreuzweise bleibt 4K benutzbar",
+        Check.Timing(diagonal < 1600, "auch schraeg und kreuzweise bleibt 4K benutzbar",
                    $"{diagonal:0.0} ms");
     }
 

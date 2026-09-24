@@ -4,8 +4,17 @@ namespace FrameFlip.Tests;
 public static class Check
 {
     private static readonly List<string> Failures = new();
+    private static readonly List<string> Slow = new();
     private static int _passed;
     private static string _group = "";
+
+    /// <summary>
+    /// Mit FRAMEFLIP_TIMING=report werden Zeitgrenzen nur gemeldet. Die CI setzt das:
+    /// Auf einem geteilten Rechner misst eine feste Millisekundengrenze die Maschine,
+    /// nicht den Code. Lokal bleibt jede Zeitpruefung eine echte Zusicherung.
+    /// </summary>
+    private static readonly bool ReportTimingOnly = string.Equals(
+        Environment.GetEnvironmentVariable("FRAMEFLIP_TIMING"), "report", StringComparison.OrdinalIgnoreCase);
 
     public static void Group(string name)
     {
@@ -26,6 +35,19 @@ public static class Check
 
         Failures.Add($"{_group}: {what}" + (detail is null ? "" : $"  ({detail})"));
         Console.WriteLine($"  [FEHL] {what}" + (detail is null ? "" : $"  {detail}"));
+    }
+
+    /// <summary>Eine Zusicherung ueber gemessene Zeit. Siehe <see cref="ReportTimingOnly"/>.</summary>
+    public static void Timing(bool condition, string what, string? detail = null)
+    {
+        if (condition || !ReportTimingOnly)
+        {
+            That(condition, what, detail);
+            return;
+        }
+
+        Slow.Add($"{_group}: {what}" + (detail is null ? "" : $"  ({detail})"));
+        Console.WriteLine($"  [ZEIT] {what}" + (detail is null ? "" : $"  {detail}"));
     }
 
     public static void Near(double actual, double expected, double tolerance, string what)
@@ -52,6 +74,13 @@ public static class Check
     public static int Report()
     {
         Console.WriteLine();
+        if (Slow.Count > 0)
+        {
+            Console.WriteLine($"{Slow.Count} Zeitpruefungen ueber der Grenze, nur gemeldet (FRAMEFLIP_TIMING=report):");
+            foreach (var slow in Slow) Console.WriteLine($"  - {slow}");
+            Console.WriteLine();
+        }
+
         if (Failures.Count == 0)
         {
             Console.WriteLine($"Alle {_passed} Zusicherungen erfuellt.");

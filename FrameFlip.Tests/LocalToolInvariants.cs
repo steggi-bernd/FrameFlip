@@ -1019,9 +1019,9 @@ public static class LocalToolInvariants
                           $"alle sechs ueber beide Seiten {all:0.0} ms");
         Console.WriteLine($"         beim Ziehen: Klarheit {coarse:0.0} ms, alle sechs {coarseAll:0.0} ms");
 
-        Check.That(with < 400, "der volle Durchgang bleibt im Rahmen", $"{with:0.0} ms");
-        Check.That(coarse < 40, "beim Ziehen bleibt es bedienbar", $"{coarse:0.0} ms");
-        Check.That(coarseAll < 80, "auch mit allen sechsen", $"{coarseAll:0.0} ms");
+        Check.Timing(with < 400, "der volle Durchgang bleibt im Rahmen", $"{with:0.0} ms");
+        Check.Timing(coarse < 40, "beim Ziehen bleibt es bedienbar", $"{coarse:0.0} ms");
+        Check.Timing(coarseAll < 80, "auch mit allen sechsen", $"{coarseAll:0.0} ms");
     }
 
     // ------------------------------------------------------------------- Handwerk
