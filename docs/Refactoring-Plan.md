@@ -130,8 +130,8 @@ gemeinsamen Stand, einschließlich Claudes Atelier-Commits bis `4c60517`:
 ## Fortschritt am 24. September 2026
 
 Der Playback-Schnitt liegt auf `refactor/dashboard-playback`, aufgebaut auf dem
-gemergten Stand `b3bc6c9`. Er ist **implementiert und geprüft**, noch nicht in
-`feature/atelier` oder `main` gemergt.
+gemergten Stand `b3bc6c9`. Er ist **implementiert, geprüft und am 24. September
+in `feature/atelier` gemergt** (`d35aa36`), noch nicht in `main`.
 
 - **Testläufer nach dem Merge:** Atelier und dieser Strang hatten unabhängig je
   einen Gruppenfilter eingeführt. Nach dem textlich konfliktfreien Merge landete
@@ -170,6 +170,10 @@ Debug und Release ohne neue Warnungen. Im Gesamtlauf überschritt einmal die
 bekannte Zeitprüfung „beide zusammen bleiben im Rahmen“ in `OpticsInvariants`
 ihre Grenze (95,6 ms). Die Maschine war dabei kaum belastet; die Gruppe lief
 danach einzeln dreimal grün. Der Schnitt berührt keinen Optik-Code.
+Nach dem Merge liefen beide Prüfreihen vollständig über den gemeinsamen Stand,
+einschließlich Claudes Atelier-Commits bis `1659d67`: **4.350 Zusicherungen** in
+`FrameFlip.Tests` (ein Gesamtlauf, 70 Sekunden) und **227 UI-Prüfungen**, alle
+erfolgreich.
 
 ## Historischer Stand der ersten Desktop-Schnitte (9. September 2026)
 
@@ -358,9 +362,8 @@ sofort koppeln, ohne zusätzliche Schritte.
 
 ## Nächster Startpunkt
 
-**D1 ist mit dem Playback-Schnitt abgeschlossen.** D2 und D1a–D1c sind in
-`feature/atelier` gemergt; D1d (Playback) liegt geprüft auf
-`refactor/dashboard-playback` und wartet auf den Merge. Danach folgen die übrigen
+**D1 ist mit dem Playback-Schnitt abgeschlossen.** D2 und D1a–D1d sind in
+`feature/atelier` gemergt, noch nicht in `main`. Danach folgen die übrigen
 offenen Schritte in der oben festgelegten Reihenfolge: Android-`RemoteHub`,
 feldweise Protokolltypen, Relay/Bridge nur bei Bedarf. Die Atelier-Seite bleibt
 außerhalb dieser Schnitte.
