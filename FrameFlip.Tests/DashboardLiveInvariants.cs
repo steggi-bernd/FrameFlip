@@ -5,6 +5,7 @@ using System.Windows.Media;
 using System.Windows.Media.Imaging;
 using System.Windows.Threading;
 using FrameFlip.Configuration;
+using FrameFlip.Dashboard;
 using FrameFlip.Sequencing;
 using FrameFlip.Views;
 
@@ -35,44 +36,44 @@ public static class DashboardLiveInvariants
             window = new MainWindow(null, () => null, () => { }, _ => { }, () => { },
                 new AppSettings { Prebuffer = false });
             Check.That((bool)Call(window, "OpenPath", Frame(first, 1))!, "eine eigene Testsequenz wird geoeffnet");
-            Check.That(Sequence(window).Count == 2 && Field<int>(window, "_head") == 1,
+            Check.That(Sequence(window).Count == 2 && Playback(window).Head == 1,
                 "Oeffnen beginnt beim ersten vorhandenen Frame");
             Check.That(Field<IReadOnlyList<int>>(window, "_missing").SequenceEqual(new[] { 2 })
-                       && Field<int>(window, "_outPoint") == 3, "Luecken und Bereich folgen der Ausgangssequenz");
+                       && Playback(window).OutPoint == 3, "Luecken und Bereich folgen der Ausgangssequenz");
 
             WriteFrame(first, 4);
             PumpFor(100);
             Check.That(Sequence(window).Count == 2, "Dateimeldungen lesen den Ordner nicht sofort neu ein");
             PumpUntil(() => Sequence(window).Count == 3);
-            Check.That(Field<int>(window, "_head") == 4 && Field<int>(window, "_outPoint") == 4,
+            Check.That(Playback(window).Head == 4 && Playback(window).OutPoint == 4,
                 "Follow und ein offenes Bereichsende wachsen mit dem Render");
 
-            Set(window, "_follow", false);
+            DashboardPlaybackInvariants.Poke(window, "Follow", false);
             Call(window, "ShowFrame", 1);
-            Set(window, "_outPoint", 3);
+            DashboardPlaybackInvariants.Poke(window, "OutPoint", 3);
             WriteFrame(first, 5);
             PumpUntil(() => Sequence(window).Count == 4);
-            Check.That(Field<int>(window, "_head") == 1 && Field<int>(window, "_outPoint") == 3,
+            Check.That(Playback(window).Head == 1 && Playback(window).OutPoint == 3,
                 "ohne Follow bleiben Kopf und ein von Hand gesetztes Ende erhalten");
 
-            Set(window, "_follow", true);
-            Set(window, "_playing", true);
+            DashboardPlaybackInvariants.Poke(window, "Follow", true);
+            DashboardPlaybackInvariants.Poke(window, "IsPlaying", true);
             WriteFrame(first, 6);
             PumpUntil(() => Sequence(window).Count == 5);
-            Check.That(Field<int>(window, "_head") == 1,
+            Check.That(Playback(window).Head == 1,
                 "waehrend Playback springt auch eingeschaltetes Follow nicht ans Ende");
-            Set(window, "_playing", false);
+            DashboardPlaybackInvariants.Poke(window, "IsPlaying", false);
             WriteFrame(first, 2);
             PumpUntil(() => Sequence(window).Count == 6);
             Check.That(Field<IReadOnlyList<int>>(window, "_missing").Count == 0
-                       && Field<int>(window, "_head") == 1,
+                       && Playback(window).Head == 1,
                 "eine gefuellte Luecke aktualisiert die Folge ohne Follow-Sprung");
 
             WriteFrame(first, 7);
             Check.That((bool)Call(window, "OpenPath", Frame(second, 11))!, "eine zweite Folge ersetzt die Auswahl");
             PumpFor(750);
             Check.That(Sequence(window).Count == 2 && Sequence(window).StartNumber == 11
-                       && Field<int>(window, "_head") == 11,
+                       && Playback(window).Head == 11,
                 "Meldungen der alten Folge veraendern die neue Auswahl nicht");
 
             File.Delete(Frame(second, 11));
@@ -80,7 +81,7 @@ public static class DashboardLiveInvariants
             PumpUntil(() => Sequence(window).EndNumber == 13);
             Check.That(Sequence(window).StartNumber == 12 && Sequence(window).Count == 2,
                 "nach Entfernen des Seeds wird ein anderer Frame im gewaehlten Ordner gefunden");
-            Check.That(Field<int>(window, "_inPoint") == 12 && Field<int>(window, "_outPoint") == 13,
+            Check.That(Playback(window).InPoint == 12 && Playback(window).OutPoint == 13,
                 "Start und offenes Ende werden an die verbliebene Folge angepasst");
 
             var before = Sequence(window);
@@ -121,7 +122,7 @@ public static class DashboardLiveInvariants
     }
     private static ImageSequence Sequence(MainWindow window) => Field<ImageSequence>(window, "_sequence");
     private static T Field<T>(MainWindow window, string name) => (T)DashboardSelectionInvariants.Read(window, name)!;
-    private static void Set(MainWindow window, string name, object value) => typeof(MainWindow).GetField(name, Hidden)!.SetValue(window, value);
+    private static DashboardPlaybackController Playback(MainWindow window) => DashboardPlaybackInvariants.Playback(window);
     private static object? Call(MainWindow window, string name, params object[] args)
         => typeof(MainWindow).GetMethod(name, Hidden)!.Invoke(window, args);
     private static void PumpFor(int milliseconds)

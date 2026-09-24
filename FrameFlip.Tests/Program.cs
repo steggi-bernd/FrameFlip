@@ -3,8 +3,10 @@ using FrameFlip.Tests;
 // WPF-Typen (WriteableBitmap, Image, RenderTargetBitmap) verlangen einen STA-Thread.
 int exit = 1;
 
-// Mit Namen nur diese Pruefungen, etwa "NodeParityInvariants" - fuer die Runde zwischen
-// zwei Aenderungen, in der die ganze Reihe zu lange dauert. Ohne Namen alles.
+// Mit Namen nur diese Pruefungen - fuer die Runde zwischen zwei Aenderungen, in der die
+// ganze Reihe zu lange dauert. Ohne Namen alles. Beide Schreibweisen gelten:
+//   NodeParityInvariants WatchLifecycleInvariants
+//   --only=WatchLifecycleInvariants,ExportInvariants.RequestMath
 var only = args;
 var thread = new Thread(() => exit = only.Length > 0 ? RunOnly(only) : RunAll()) { Name = "FrameFlipTests" };
 thread.SetApartmentState(ApartmentState.STA);
@@ -12,21 +14,38 @@ thread.Start();
 thread.Join();
 return exit;
 
-static int RunOnly(string[] names)
+static int RunOnly(string[] args)
 {
     LoadDictionaries();
 
+    var names = args.SelectMany(arg =>
+        arg == "--watch-lifecycle" ? new[] { nameof(WatchLifecycleInvariants) }
+        : arg.StartsWith("--only=", StringComparison.Ordinal)
+            ? arg[7..].Split(',', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries)
+            : new[] { arg }).ToArray();
+
+    if (names.Length == 0)
+    {
+        Console.WriteLine("Keine Testgruppe angegeben.");
+        return 2;
+    }
+
     foreach (string name in names)
     {
-        var type = typeof(Check).Assembly.GetType("FrameFlip.Tests." + name);
-        var run = type?.GetMethod("Run", System.Type.EmptyTypes);
+        // "Klasse" ruft Run auf, "Klasse.Methode" eine einzelne weitere Gruppe.
+        var parts = name.Split('.');
+        var type = typeof(Check).Assembly.GetType("FrameFlip.Tests." + parts[0]);
+        var run = parts.Length <= 2 ? type?.GetMethod(parts.Length == 2 ? parts[1] : "Run",
+            System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Static,
+            System.Type.EmptyTypes) : null;
 
-        if (run is null)
+        if (run is null || run.ReturnType != typeof(void))
         {
             Console.WriteLine($"Keine Pruefung namens {name}.");
             return 2;
         }
 
+        Console.WriteLine("Testgruppe: " + name);
         run.Invoke(null, null);
     }
 
@@ -38,33 +57,6 @@ static int RunAll()
     Console.WriteLine("FrameFlip - Invarianten aus Teil 1 bis 3");
 
     LoadDictionaries();
-
-    // Einzelne Gruppen koennen ohne einen langen Gesamtlauf geprueft werden.
-    // Beispiel: --only=WatchLifecycleInvariants,ExportInvariants.RequestMath
-    var args = Environment.GetCommandLineArgs();
-    string? only = args.FirstOrDefault(arg => arg.StartsWith("--only=", StringComparison.Ordinal))?[7..];
-    if (args.Contains("--watch-lifecycle")) only = nameof(WatchLifecycleInvariants);
-    if (only is not null)
-    {
-        var selected = only.Split(',', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries);
-        if (selected.Length == 0) { Console.Error.WriteLine("Keine Testgruppe angegeben."); return 2; }
-        foreach (string name in selected)
-        {
-            var parts = name.Split('.');
-            var type = typeof(Check).Assembly.GetType("FrameFlip.Tests." + parts[0]);
-            var method = parts.Length <= 2 ? type?.GetMethod(parts.Length == 2 ? parts[1] : "Run",
-                System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Static,
-                Type.EmptyTypes) : null;
-            if (method is null || method.ReturnType != typeof(void))
-            {
-                Console.Error.WriteLine("Unbekannte Testgruppe: " + name);
-                return 2;
-            }
-            Console.WriteLine("Testgruppe: " + name);
-            method.Invoke(null, null);
-        }
-        return Check.Report();
-    }
 
     ZoomInvariants.Run();
     BufferInvariants.Run();
@@ -134,6 +126,8 @@ static int RunAll()
     DashboardFrameInvariants.Run();
     DashboardFrameInvariants.RetiredWork();
     DashboardMediaControllerInvariants.Run();
+    DashboardPlaybackInvariants.Run();
+    DashboardPlaybackControllerInvariants.Run();
     PaceInvariants.Run();
     ReadinessInvariants.Run();
     MachineInvariants.Run();
