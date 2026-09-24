@@ -60,6 +60,12 @@ about blown highlights, an A/B comparison against a kept frame, and presets you
 can save. The correction affects the display only; the files stay untouched. The
 export asks whether it should apply it.
 
+**On a held EXR it works on the file's own values.** Eight bits are right for
+playback and wrong for judging a render: a highlight at 4.0 is clipped to white
+there, and pulling the exposure down afterwards only darkens the picture. On the
+float values the same slider brings the colour back, because the numbers are still
+there. Pause, and a small **float** marker says the correction has switched over.
+
 **Export**, when a video is needed after all — through ffmpeg, with in/out points,
 scaling and the usual target formats.
 
@@ -125,9 +131,25 @@ PNG, JPEG, TIFF and BMP through the Windows Imaging Component. WebP as well, as
 long as Microsoft's *WebP Image Extension* is installed — without it, that one
 format simply drops out cleanly.
 
-**Not EXR.** The place for it is kept free: another `IFrameDecoder` implementation,
-registered in `FrameDecoderRegistry.CreateDefault()`. Cache, playback and interface
-stay as they are.
+**EXR**, through a reader of its own — no third-party package. Uncompressed, RLE and
+ZIP/ZIPS, which is what Blender writes by default; PIZ and DWA are recognised in the
+header and declined there, rather than failing somewhere in the middle of the file.
+Multilayer works: of a render with twenty-four channels, the `Combined` layer is what
+you see, and only the channels actually needed are read into memory.
+
+**And it looks like it does in Blender.** That is not a given. Blender applies its
+view transform — AgX since 4.0 — when it writes a PNG, but an EXR holds the raw scene
+values. Displayed naively it comes out washed out and dark, nothing like the viewport.
+
+So AgX is not reimplemented here: it is assembled from Blender's own colour
+management. `config.ocio` describes it as a chain of a matrix, a log2 allocation, a
+3D lookup table, an exponent and sRGB encoding — and the table, where the actual
+image formation lives, is read from the installation FrameFlip already knows how to
+find. Measured against Blender's own output across nearly 21 stops, there is no
+deviation at all; on a rendered sequence, at most one step out of 255.
+
+Without Blender installed the view transform falls back to *Standard*. The picture
+is then not wrong, only flatter in the highlights.
 
 ## ffmpeg
 
@@ -153,6 +175,7 @@ measurement behind it:
 * [Adaptive resources](docs/Technik.md#adaptive-resources)
 * [Zoom and resolution](docs/Technik.md#zoom-and-resolution)
 * [Locking discipline](docs/Technik.md#locking-discipline)
+* [On a held EXR, the correction uses the file's values](docs/Technik.md#on-a-held-exr-the-correction-uses-the-files-values)
 
 ## Tests
 
@@ -160,10 +183,15 @@ measurement behind it:
 dotnet run --project FrameFlip.Tests
 ```
 
-474 assertions, no third-party packages — a plain console project instead of a test
+1827 assertions, no third-party packages — a plain console project instead of a test
 framework with three NuGet dependencies. A non-zero exit code means failure.
 Everything runs without a visible window and in under a minute; the tests create
 their own image material.
+
+One exception, and it is deliberate: the EXR samples are real files written by
+Blender, embedded as base64. A round trip against a packer of my own would have
+confirmed itself — a swapped sign in the predictor cancels out when the same wrong
+assumption sits on both sides.
 
 What gets checked is what can be checked this way and has been wrong before: zoom
 mathematics, buffer limits, the in/out range, sequence detection including gaps,

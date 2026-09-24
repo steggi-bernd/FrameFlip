@@ -11,7 +11,13 @@ permissions:
 jobs:
   test:
     runs-on: windows-latest
-    timeout-minutes: 10
+    # Die Kernreihe laeuft lokal gut eine Minute, mit Fenstertests und festen
+    # Wartezeiten. Ein geteilter Laeufer braucht ein Mehrfaches davon.
+    timeout-minutes: 20
+    env:
+      # Feste Millisekundengrenzen messen hier die Maschine, nicht den Code:
+      # Ueberschreitungen werden gemeldet, machen den Lauf aber nicht rot.
+      FRAMEFLIP_TIMING: report
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-dotnet@v4
@@ -20,3 +26,9 @@ jobs:
       - run: dotnet restore FrameFlip.Tests/FrameFlip.Tests.csproj
       - run: dotnet build FrameFlip.Tests/FrameFlip.Tests.csproj --configuration Release --no-restore
       - run: dotnet run --project FrameFlip.Tests/FrameFlip.Tests.csproj --configuration Release --no-build
+
+      # Die Oberflaechenreihe baut echte WPF-Elemente auf und misst sie. Das geht
+      # nur auf einem Windows-Laeufer - was dieser ist.
+      - run: dotnet restore FrameFlip.UiTests/FrameFlip.UiTests.csproj
+      - run: dotnet build FrameFlip.UiTests/FrameFlip.UiTests.csproj --configuration Release --no-restore
+      - run: dotnet run --project FrameFlip.UiTests/FrameFlip.UiTests.csproj --configuration Release --no-build

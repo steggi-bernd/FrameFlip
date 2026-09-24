@@ -17,3 +17,9 @@ publish/
 # Betriebssystem
 Thumbs.db
 desktop.ini
+
+# Ausgabe der Oberflaechenreihe: gerenderte Bilder zum Nachsehen, keine Quelle.
+review/
+
+# Eigene Arbeitsbaeume fuer Strukturarbeit neben dem gemeinsamen Checkout.
+.worktrees/

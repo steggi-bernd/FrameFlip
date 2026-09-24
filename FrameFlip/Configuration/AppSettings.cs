@@ -173,6 +173,23 @@ public sealed class AppSettings
     public int BridgePort { get; set; } = 47823;
 
     /// <summary>
+    /// Wann sich das Addon zuletzt gemeldet hat - ueber Programmstarts hinweg.
+    ///
+    /// Ohne diesen Wert kann die Oberflaeche zwei voellig verschiedene Lagen nicht
+    /// auseinanderhalten: Jemand hat das Addon nie installiert, oder jemand hat es
+    /// laengst installiert und Blender gerade nicht offen. Beide sehen zur Laufzeit
+    /// gleich aus - es meldet sich nichts.
+    ///
+    /// Dem Neuling gehoert die Anleitung zum Einrichten. Dem anderen waere sie eine
+    /// Zumutung, und zwar jedes Mal, wenn er Blender schliesst. Deshalb wird der
+    /// Zeitpunkt aufgehoben und nicht nur der laufende Zustand angesehen.
+    ///
+    /// Kein personenbezogener Wert: ein Zeitstempel auf dem eigenen Rechner, der das
+    /// Geraet nie verlaesst.
+    /// </summary>
+    public DateTime? BridgeLastSeen { get; set; }
+
+    /// <summary>
     /// Die Seite zum Zusehen im Browser, ueber den Relay.
     ///
     /// Aus, solange niemand sie einschaltet. Eine Verbindung nach draussen, die man
@@ -345,6 +362,64 @@ public sealed class AppSettings
     /// Dateien bleiben unberuehrt.
     /// </summary>
     public Imaging.ImageAdjustments? Adjustments { get; set; }
+
+    /// <summary>
+    /// Die Werkzeuge der Farbkorrektur - Kurven und was noch dazukommt.
+    ///
+    /// Getrennt von <see cref="Adjustments"/>, obwohl beides zusammen das Bild
+    /// ergibt: Die Regler dort sind der schnelle Griff beim Beurteilen und sollen
+    /// auch ohne Gleitkommamaterial wirken. Der Stapel hier greift nur auf dem
+    /// angehaltenen Bild und faellt sonst nicht ins Gewicht.
+    /// </summary>
+    public Imaging.Grading.GradingStack? Grading { get; set; }
+
+    /// <summary>
+    /// Der Ebenenstapel des Ateliers.
+    ///
+    /// Er nennt Passe mit Namen, nicht mit Inhalt. Beim Oeffnen einer Datei, die
+    /// diese Passe nicht fuehrt, faellt er deshalb auf die eine Grundebene zurueck -
+    /// zwanzig ausgegraute Zeilen waeren keine Hilfe, sondern ein Raetsel.
+    /// </summary>
+    public Imaging.Grading.LayerStack? Layers { get; set; }
+
+    /// <summary>
+    /// Das Bild, das im Atelier zuletzt offen war.
+    ///
+    /// Gemerkt, weil der Stapel es ohnehin wird: Ein Rezept ohne sein Bild ist beim
+    /// naechsten Start ein Stapel, der auf die erste beste Datei faellt, die jemand
+    /// oeffnet - und dann sieht alles verschoben aus, weil es fuer eine andere
+    /// Leinwand gemacht wurde. Entweder beides oder nichts.
+    /// </summary>
+    public string? AtelierImage { get; set; }
+
+    /// <summary>
+    /// Breite der rechten Spalte im Atelier, in Punkten.
+    ///
+    /// Gemerkt, weil sie nicht Geschmack ist, sondern vom Bildschirm abhaengt: Auf
+    /// einem breiten Schirm will man die Ebenennamen lesen koennen, auf einem engen
+    /// will man das Bild. Wer das bei jedem Start neu einstellt, stellt es
+    /// irgendwann nicht mehr ein.
+    /// </summary>
+    public double AtelierColumnWidth { get; set; } = 300;
+
+    /// <summary>Hoehe des Ebenenstreifens unten in der rechten Spalte.</summary>
+    public double AtelierLayersHeight { get; set; } = 240;
+
+    /// <summary>
+    /// Wo die Felder des Ateliers angedockt sind. Null heisst: noch nie verschoben -
+    /// dann gilt die Grundanordnung, mit der gemerkten Breite der rechten Spalte.
+    /// </summary>
+    public FrameFlip.Views.DockLayout? AtelierDock { get; set; }
+
+    /// <summary>
+    /// Der Graph des Knotenmodus, als Text - oder null, solange das Atelier mit dem
+    /// Stapel rechnet. Siehe docs/Atelier-Nodes.md.
+    ///
+    /// Als Text und nicht als Objekt: Ein Graph, den diese Fassung nicht lesen kann -
+    /// etwa aus einer neueren -, soll nicht die ganze Einstellungsdatei unlesbar machen.
+    /// Er bleibt dann stehen, und das Atelier rechnet mit dem Stapel.
+    /// </summary>
+    public string? AtelierNodes { get; set; }
 
     /// <summary>Gespeicherte Korrektureinstellungen, im Panel auswaehlbar.</summary>
     public List<AdjustmentPreset> AdjustmentPresets { get; set; } = new();

@@ -1,0 +1,398 @@
+using System.Globalization;
+using System.Windows;
+using System.Windows.Controls;
+using System.Windows.Controls.Primitives;
+using FrameFlip.Localization;
+
+namespace FrameFlip.Views;
+
+/// <summary>
+/// Der Farbstreifen im Knotenmodus: Er zeigt die Einstellungen des gewaehlten Knotens.
+///
+/// Ein Werkzeugknoten zeigt seine Karte - dieselbe wie im Stapel, und sie bearbeitet
+/// das Werkzeug des Knotens selbst. Eine Ebenenkorrektur zeigt die Karten, die eine
+/// Ebene haben kann. Was keine Karte hat - Mischen, Maske, Platzieren, die
+/// Grundkorrektur des Bildes -, bekommt einfache Felder mit denselben Reglern.
+///
+/// Der Zielschalter verschwindet - das Ziel ist der Knoten. Die Palette bleibt, aber ein
+/// Klick darauf setzt den Effekt als Knoten hinter den gewaehlten, statt eine Karte in
+/// den Stapel des Streifens zu legen.
+/// </summary>
+public partial class GradingPanel
+{
+    /// <summary>Welche Karten im Knotenmodus zu sehen sind - null heisst: der gewoehnliche Stapel.</summary>
+    private HashSet<string>? _focus;
+
+    /// <summary>Ob der Streifen gerade einen Knoten zeigt.</summary>
+    public bool InNodeFocus => _focus is not null;
+
+    /// <summary>
+    /// Im Knotenmodus wurde eine Kachel der Palette angeklickt - der Effekt soll als
+    /// Knoten in den Graphen, nicht in den Stapel des Streifens.
+    /// </summary>
+    public event Action<string>? NodeToolWanted;
+
+    /// <summary>Leitet einen Klick auf die Palette im Knotenmodus weiter. True, wenn er dort hingehoert.</summary>
+    private bool PaletteToNodes(string section)
+    {
+        if (_focus is null) return false;
+
+        NodeToolWanted?.Invoke(section);
+        ShowActive();
+
+        return true;
+    }
+
+    /// <summary>
+    /// Zeigt die Einstellungen eines Knotens.
+    /// </summary>
+    /// <param name="hint">Ein Satz ueber allem - etwa "einen Knoten waehlen". Null: keiner.</param>
+    /// <param name="sections">Die Karten, die zu sehen sind.</param>
+    /// <param name="fields">Einfache Felder unter dem Hinweis, fuer Knoten ohne Karte.</param>
+    public void ShowNode(string? hint, IReadOnlyCollection<string> sections, IReadOnlyList<NodeField> fields)
+    {
+        _focus = new HashSet<string>(sections, StringComparer.Ordinal);
+
+        // Die Palette bleibt: Ein Klick darauf setzt den Effekt als Knoten hinter den
+        // gewaehlten. Der Zielschalter geht - das Ziel ist der Knoten.
+        TargetBar.Visibility = Visibility.Collapsed;
+        PaletteBar.Visibility = Visibility.Visible;
+
+        NodeHint.Text = hint ?? "";
+        NodeHint.Visibility = string.IsNullOrEmpty(hint) ? Visibility.Collapsed : Visibility.Visible;
+
+        BuildFields(fields);
+        ShowActive();
+    }
+
+    /// <summary>Zurueck zum gewoehnlichen Stapel.</summary>
+    public void LeaveNodes()
+    {
+        if (_focus is null) return;
+
+        _focus = null;
+
+        TargetBar.Visibility = Visibility.Visible;
+        PaletteBar.Visibility = Visibility.Visible;
+        NodeHint.Visibility = Visibility.Collapsed;
+        NodeFields.Children.Clear();
+        NodeFields.Visibility = Visibility.Collapsed;
+
+        ShowActive();
+    }
+
+    private void BuildFields(IReadOnlyList<NodeField> fields)
+    {
+        NodeFields.Children.Clear();
+        NodeFields.Visibility = fields.Count > 0 ? Visibility.Visible : Visibility.Collapsed;
+
+        bool first = true;
+
+        foreach (var field in fields)
+        {
+            var row = Row(field);
+            if (row is null) continue;
+
+            if (!first && row is FrameworkElement element)
+                element.Margin = new Thickness(0, 10, 0, 0);
+
+            NodeFields.Children.Add(row);
+            first = false;
+        }
+    }
+
+    private UIElement? Row(NodeField field) => field switch
+    {
+        SliderField slider => SliderRow(slider),
+        ChoiceField choice => ChoiceRow(choice),
+        SwitchField toggle => SwitchRow(toggle),
+        ButtonField button => ButtonRow(button),
+        NumberField number => NumberRow(number),
+        TextField text => TextRow(text),
+        PassesField passes => PassesRow(passes),
+        RampField ramp => new RampEditor(ramp.Node, interim => Raise(interim), key => FindResource(key)),
+        InfoField info => new TextBlock
+        {
+            Text = info.Text,
+            TextWrapping = TextWrapping.Wrap,
+            Style = (Style)FindResource("DashLabel"),
+        },
+        _ => null,
+    };
+
+    private UIElement SliderRow(SliderField field)
+    {
+        var panel = new StackPanel();
+
+        var head = new Grid { Margin = new Thickness(0, 0, 0, 2) };
+
+        head.Children.Add(new TextBlock { Text = Strings.T(field.LabelKey), Style = (Style)FindResource("PanelLabel") });
+
+        var value = new TextBlock { Style = (Style)FindResource("PanelValue") };
+        head.Children.Add(value);
+
+        var slider = new Slider
+        {
+            Style = (Style)FindResource("PanelSlider"),
+            Minimum = field.Min,
+            Maximum = field.Max,
+            SmallChange = (field.Max - field.Min) / 200,
+            LargeChange = (field.Max - field.Min) / 20,
+        };
+
+        void Show(double v) => value.Text = v.ToString(field.Format, CultureInfo.CurrentCulture);
+
+        _filling = true;
+
+        try
+        {
+            slider.Value = field.Get();
+        }
+        finally
+        {
+            _filling = false;
+        }
+
+        Show(field.Get());
+
+        slider.ValueChanged += (_, e) =>
+        {
+            if (_filling) return;
+
+            field.Set(e.NewValue);
+            Show(e.NewValue);
+
+            // Wie an jedem Regler: waehrend des Zuges grob, das Loslassen holt der
+            // Zeitgeber der Seite nach.
+            Raise(interim: true);
+        };
+
+        // Doppelklick stellt zurueck, wie an den Karten.
+        slider.MouseDoubleClick += (_, _) => slider.Value = field.Default;
+
+        panel.Children.Add(head);
+        panel.Children.Add(slider);
+
+        return panel;
+    }
+
+    private UIElement ChoiceRow(ChoiceField field)
+    {
+        var panel = new StackPanel();
+
+        panel.Children.Add(new TextBlock
+        {
+            Text = Strings.T(field.LabelKey),
+            Style = (Style)FindResource("PanelLabel"),
+            Margin = new Thickness(0, 0, 0, 4),
+        });
+
+        var box = new ComboBox { Style = (Style)FindResource("OverlayCombo"), HorizontalAlignment = HorizontalAlignment.Stretch };
+        int current = field.Get();
+
+        foreach (var (key, v) in field.Options)
+        {
+            var item = new ComboBoxItem
+            {
+                Style = (Style)FindResource("OverlayComboItem"),
+                Content = Strings.T(key),
+                Tag = v,
+            };
+
+            box.Items.Add(item);
+            if (v == current) box.SelectedItem = item;
+        }
+
+        box.SelectionChanged += (_, _) =>
+        {
+            if (_filling || box.SelectedItem is not ComboBoxItem { Tag: int v }) return;
+
+            field.Set(v);
+            if (!field.Structural) Raise(interim: false);
+        };
+
+        panel.Children.Add(box);
+
+        return panel;
+    }
+
+    private UIElement SwitchRow(SwitchField field)
+    {
+        var toggle = new ToggleButton
+        {
+            Style = (Style)FindResource("OverlayToggle"),
+            Content = field.Text ?? Strings.T(field.LabelKey),
+            IsChecked = field.Get(),
+            HorizontalAlignment = HorizontalAlignment.Stretch,
+            FontSize = 11,
+        };
+
+        toggle.Click += (_, _) =>
+        {
+            field.Set(toggle.IsChecked == true);
+            if (!field.Structural) Raise(interim: false);
+        };
+
+        return toggle;
+    }
+
+    /// <summary>
+    /// Eine Zahl zum Eintippen. Uebernommen wird sie mit der Eingabetaste oder beim
+    /// Verlassen des Feldes; was sich nicht lesen laesst, springt auf den alten Wert zurueck.
+    /// </summary>
+    private UIElement NumberRow(NumberField field)
+    {
+        var panel = new StackPanel();
+
+        panel.Children.Add(new TextBlock
+        {
+            Text = Strings.T(field.LabelKey),
+            Style = (Style)FindResource("PanelLabel"),
+            Margin = new Thickness(0, 0, 0, 4),
+        });
+
+        var box = new TextBox
+        {
+            Style = (Style)FindResource("DialogTextBox"),
+            Text = field.Get().ToString(field.Format, CultureInfo.CurrentCulture),
+        };
+
+        void Take()
+        {
+            string text = box.Text.Trim();
+
+            if (double.TryParse(text, NumberStyles.Float, CultureInfo.CurrentCulture, out double value) ||
+                double.TryParse(text, NumberStyles.Float, CultureInfo.InvariantCulture, out value))
+            {
+                if (value != field.Get())
+                {
+                    field.Set(value);
+                    Raise(interim: false);
+                }
+            }
+
+            box.Text = field.Get().ToString(field.Format, CultureInfo.CurrentCulture);
+        }
+
+        box.LostKeyboardFocus += (_, _) => Take();
+        box.KeyDown += (_, e) =>
+        {
+            if (e.Key != System.Windows.Input.Key.Enter) return;
+
+            Take();
+            e.Handled = true;
+        };
+
+        panel.Children.Add(box);
+
+        return panel;
+    }
+
+    /// <summary>
+    /// Die Passe der Datei als Kacheln, zwei nebeneinander: die Miniatur, darunter der
+    /// Name. Eine eingeschaltete Kachel ist ein Ausgang der Datei.
+    /// </summary>
+    private UIElement PassesRow(PassesField field)
+    {
+        var grid = new UniformGrid { Columns = 2 };
+
+        foreach (var tile in field.Tiles)
+        {
+            var face = new StackPanel();
+
+            face.Children.Add(new Border
+            {
+                Height = 46,
+                Background = new System.Windows.Media.SolidColorBrush(System.Windows.Media.Color.FromRgb(0x18, 0x18, 0x1E)),
+                Child = tile.Thumb is null
+                    ? null
+                    : new System.Windows.Controls.Image { Source = tile.Thumb, Stretch = System.Windows.Media.Stretch.Uniform },
+            });
+
+            face.Children.Add(new TextBlock
+            {
+                Text = tile.Label,
+                FontSize = 10.5,
+                TextTrimming = TextTrimming.CharacterEllipsis,
+                HorizontalAlignment = HorizontalAlignment.Center,
+                Margin = new Thickness(0, 3, 0, 0),
+            });
+
+            var toggle = new ToggleButton
+            {
+                Style = (Style)FindResource("OverlayToggle"),
+                Content = face,
+                IsChecked = tile.Get(),
+                Tag = tile.Label,
+                ToolTip = tile.Name,
+                Margin = new Thickness(0, 0, 4, 4),
+                Padding = new Thickness(4),
+                HorizontalContentAlignment = HorizontalAlignment.Stretch,
+
+                // Der Stil der Schalter ist eine Zeile hoch - eine Kachel traegt Bild und Namen.
+                Height = double.NaN,
+            };
+
+            toggle.Click += (_, _) => tile.Set(toggle.IsChecked == true);
+
+            grid.Children.Add(toggle);
+        }
+
+        return grid;
+    }
+
+    /// <summary>Ein Text zum Eintippen - uebernommen mit der Eingabetaste oder beim Verlassen des Feldes.</summary>
+    private UIElement TextRow(TextField field)
+    {
+        var panel = new StackPanel();
+
+        panel.Children.Add(new TextBlock
+        {
+            Text = Strings.T(field.LabelKey),
+            Style = (Style)FindResource("PanelLabel"),
+            Margin = new Thickness(0, 0, 0, 4),
+        });
+
+        var box = new TextBox { Style = (Style)FindResource("DialogTextBox"), Text = field.Get() };
+
+        void Take()
+        {
+            if (box.Text == field.Get()) return;
+
+            field.Set(box.Text);
+            if (!field.Structural) Raise(interim: false);
+        }
+
+        box.LostKeyboardFocus += (_, _) => Take();
+        box.KeyDown += (_, e) =>
+        {
+            if (e.Key != System.Windows.Input.Key.Enter) return;
+
+            Take();
+            e.Handled = true;
+        };
+
+        panel.Children.Add(box);
+
+        return panel;
+    }
+
+    private UIElement ButtonRow(ButtonField field)
+    {
+        var button = new Button
+        {
+            Style = (Style)FindResource("OverlayButton"),
+            Content = Strings.T(field.LabelKey),
+            HorizontalAlignment = HorizontalAlignment.Stretch,
+            FontSize = 11,
+        };
+
+        button.Click += (_, _) =>
+        {
+            field.Click();
+            if (!field.Structural) Raise(interim: false);
+        };
+
+        return button;
+    }
+}

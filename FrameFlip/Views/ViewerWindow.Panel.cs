@@ -292,7 +292,7 @@ public partial class ViewerWindow
         int index = _playback.ShownIndex >= 0 ? _playback.ShownIndex : _playback.Index;
         if (_showingReference) { ShowReferenceFrame(); return; }
 
-        _cache?.TryPresent(index, Blit);
+        _cache?.TryPresent(index, buffer => Blit(buffer, index));
     }
 
     // ---------------------------------------------------------------- Verteilung
@@ -323,8 +323,19 @@ public partial class ViewerWindow
 
         _cache?.TryPresent(index, frame =>
         {
-            FrameProcessor.Measure(frame.Pixels, frame.Width, frame.Height, frame.Stride,
-                                   _histogram, HistogramStep, _adjustments);
+            // Auf demselben Material messen, das auch angezeigt wird - sonst zeigte
+            // das Histogramm eine andere Verteilung als das Bild darueber. Auf dem
+            // Gleitkommaweg kommt ausserdem die Reserve oberhalb von Weiss dazu.
+            if (HasFloatFor(index, frame.Width, frame.Height))
+            {
+                FloatFrameProcessor.Measure(_floatFrame!, _adjustments, FloatView,
+                                            _histogram, HistogramStep);
+            }
+            else
+            {
+                FrameProcessor.Measure(frame.Pixels, frame.Width, frame.Height, frame.Stride,
+                                       _histogram, HistogramStep, _adjustments);
+            }
         });
 
         HistogramView.Update(_histogram);
@@ -432,7 +443,7 @@ public partial class ViewerWindow
 
         // Denselben Weg wie ein normaler Frame nehmen, damit Korrektur, Zoom und
         // Bitmapgroesse identisch behandelt werden.
-        Blit(new FrameBuffer(_referencePixels, _referenceWidth, _referenceHeight,
+        Blit(index: -1, buffer: new FrameBuffer(_referencePixels, _referenceWidth, _referenceHeight,
                              _referenceStride, _playback.ShownIndex));
     }
 

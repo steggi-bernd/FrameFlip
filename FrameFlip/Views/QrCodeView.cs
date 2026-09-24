@@ -78,7 +78,7 @@ public sealed class QrCodeView : FrameworkElement
         if (side <= 0) return;
 
         // Beide Varianten erhalten Kontrast, Ruhezone und unveränderte Module.
-        context.DrawRectangle(LightModules ? Surface : Brushes.White, null, new Rect(0, 0, side, side));
+        context.DrawRectangle(LightModules ? TryFindResource("DesktopSurface") as Brush ?? Surface : Brushes.White, null, new Rect(0, 0, side, side));
 
         if (_modules is not { Length: > 0 }) return;
 

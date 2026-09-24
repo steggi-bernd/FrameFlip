@@ -33,6 +33,19 @@ public sealed class ClickCard : Border
         Cursor = Cursors.Hand;
 
         KeyDown += OnKeyDown;
+
+        /* Die Maus gehoert hierher, nicht an jede Aufrufstelle.
+         *
+         * Sie fehlte: Die Klasse konnte Fokus, Tastatur und Bedienungshilfen, aber
+         * ein Mausklick tat nichts. Dass die Kacheln trotzdem reagierten, lag daran,
+         * dass jeder Aufrufer sich selbst ein MouseLeftButtonUp anhaengte - dreimal
+         * dieselbe Zeile.
+         *
+         * Der Rueckwegknopf im Projektpfad war der vierte Aufrufer, und er vergass
+         * es. Er liess sich mit der Tastatur ausloesen und meldete sich brav bei den
+         * Bedienungshilfen - weshalb er im Automatentest tadellos lief und unter dem
+         * Mauszeiger nichts tat. */
+        MouseLeftButtonUp += (_, _) => Activate();
     }
 
     public ClickCard(string name, Action click) : this()

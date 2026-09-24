@@ -1,4 +1,4 @@
-<Window x:Class="FrameFlip.Views.FramePreviewWindow"
+﻿<Window x:Class="FrameFlip.Views.FramePreviewWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:shell="clr-namespace:System.Windows.Shell;assembly=PresentationFramework"
@@ -27,8 +27,15 @@
             <RowDefinition Height="Auto" />
         </Grid.RowDefinitions>
 
+        <!-- Der Korrekturbereich steht NEBEN der Buehne, nicht darueber: Er ist zum
+             Beurteilen da, und dazu muss man das Bild dabei sehen. -->
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="*" />
+            <ColumnDefinition x:Name="PanelColumn" Width="0" />
+        </Grid.ColumnDefinitions>
+
         <!-- ============================================================ Titelzeile -->
-        <Border Grid.Row="0" Background="{StaticResource DesktopPanel}"
+        <Border Grid.Row="0" Grid.ColumnSpan="2" Background="{StaticResource DesktopPanel}"
                 BorderBrush="{StaticResource DesktopLine}" BorderThickness="0,0,0,1">
             <Grid>
                 <Grid.ColumnDefinitions>
@@ -59,6 +66,16 @@
                         <Border Width="11" Height="1.5" Background="{Binding Foreground,
                                 RelativeSource={RelativeSource AncestorType=Button}}" />
                     </Button>
+                    <!-- Der Knopf fehlte. Das Fenster liess sich an den Raendern
+                         ziehen, aber der kuerzeste Weg zu einer grossen Vorschau -
+                         und genau dafuer ist es da - war nicht da. -->
+                    <Button x:Name="MaximizeButton" Style="{StaticResource DashWindowButton}" Click="OnMaximize"
+                            ToolTip="{DynamicResource D_Maximize}"
+                            AutomationProperties.Name="{DynamicResource D_Maximize}">
+                        <Border x:Name="MaximizeGlyph" Width="10" Height="10" BorderThickness="1.5"
+                                BorderBrush="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}" />
+                    </Button>
+
                     <Button Style="{StaticResource DashWindowClose}" Click="OnCloseWindow"
                             ToolTip="{DynamicResource D_Close}"
                             AutomationProperties.Name="{DynamicResource D_Close}">
@@ -71,9 +88,23 @@
         </Border>
 
         <!-- ============================================================ Buehne -->
-        <Grid Grid.Row="1" Background="{StaticResource DesktopStage}" ClipToBounds="True">
+        <Grid x:Name="Stage" Grid.Row="1" Grid.Column="0" Background="{StaticResource DesktopStage}" ClipToBounds="True"
+              MouseWheel="OnWheel" MouseLeftButtonDown="OnGrab" MouseMove="OnDrag"
+              MouseLeftButtonUp="OnRelease" MouseLeave="OnRelease">
+
+            <!-- Der Zoom haengt an einer eigenen Verschiebung, nicht am Rand des
+                 Bildes: Ein Rand verschoebe auch die Buehne, und beim Hineinzoomen
+                 waere die Stelle unter dem Zeiger nicht mehr dort, wo der Zeiger ist.
+
+                 RenderTransform statt LayoutTransform, weil die Kachel beim Zoomen
+                 nicht neu vermessen werden soll - sie wird nur anders gezeichnet. -->
             <Image x:Name="Picture" Margin="24" Stretch="Uniform"
-                   RenderOptions.BitmapScalingMode="HighQuality" />
+                   RenderOptions.BitmapScalingMode="HighQuality"
+                   RenderTransformOrigin="0,0">
+                <Image.RenderTransform>
+                    <MatrixTransform x:Name="Lupe" />
+                </Image.RenderTransform>
+            </Image>
 
             <!-- EXR und halb geschriebene Dateien lassen sich nicht anzeigen.
                  Das gehört dann auch dagestanden, statt eine leere Fläche zu
@@ -101,13 +132,90 @@
         </Grid>
 
         <!-- ============================================================ Transport -->
-        <Border Grid.Row="2" Background="{StaticResource DesktopPanel}"
+        <!-- ========================================================== Korrektur
+
+             Dieselben Regler wie im Viewer, aber nicht dessen ganzer Bereich:
+             Vorlagen, Vergleichsbild und Waveform gehoeren zum Beurteilen einer
+             SEQUENZ. Hier geht es um ein Bild, das man gerade angeklickt hat.
+
+             Gerechnet wird mit demselben FrameProcessor wie ueberall sonst - eine
+             zweite Tonwertkurve waere die Art Doppelung, die irgendwann
+             auseinanderlaeuft. -->
+        <Border x:Name="AdjustPanel" Grid.Row="1" Grid.Column="1" Visibility="Collapsed"
+                Background="{StaticResource DesktopPanel}"
+                BorderBrush="{StaticResource DesktopLine}" BorderThickness="1,0,0,0">
+            <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled"
+                          Padding="18,16,14,16">
+                <StackPanel>
+                    <Grid Margin="0,0,0,14">
+                        <TextBlock views:Track.Text="{DynamicResource S_Correction}"
+                                   FontFamily="{StaticResource HeadFont}" FontWeight="Bold" FontSize="9.5"
+                                   VerticalAlignment="Center"
+                                   Foreground="{StaticResource DesktopFaint}" />
+                        <Button x:Name="AdjustReset" Style="{StaticResource LinkButton}"
+                                HorizontalAlignment="Right" Click="OnAdjustReset"
+                                Content="{DynamicResource S_Reset}" />
+                    </Grid>
+
+                    <Grid><TextBlock Text="{DynamicResource S_Exposure}" Style="{StaticResource PanelLabel}" />
+                          <TextBlock x:Name="ExposureValue" Style="{StaticResource PanelValue}" /></Grid>
+                    <Slider x:Name="ExposureSlider" Style="{StaticResource PanelSlider}"
+                            Minimum="-4" Maximum="4" Value="0" SmallChange="0.05" LargeChange="0.25"
+                            ValueChanged="OnAdjustChanged" MouseDoubleClick="OnSliderReset" Tag="0" />
+
+                    <Grid Margin="0,10,0,0"><TextBlock Text="{DynamicResource S_Gamma}" Style="{StaticResource PanelLabel}" />
+                          <TextBlock x:Name="GammaValue" Style="{StaticResource PanelValue}" /></Grid>
+                    <Slider x:Name="GammaSlider" Style="{StaticResource PanelSlider}"
+                            Minimum="0.2" Maximum="3" Value="1" SmallChange="0.02" LargeChange="0.1"
+                            ValueChanged="OnAdjustChanged" MouseDoubleClick="OnSliderReset" Tag="1" />
+
+                    <Grid Margin="0,10,0,0"><TextBlock Text="{DynamicResource S_Contrast}" Style="{StaticResource PanelLabel}" />
+                          <TextBlock x:Name="ContrastValue" Style="{StaticResource PanelValue}" /></Grid>
+                    <Slider x:Name="ContrastSlider" Style="{StaticResource PanelSlider}"
+                            Minimum="0" Maximum="3" Value="1" SmallChange="0.02" LargeChange="0.1"
+                            ValueChanged="OnAdjustChanged" MouseDoubleClick="OnSliderReset" Tag="1" />
+
+                    <Grid Margin="0,10,0,0"><TextBlock Text="{DynamicResource S_Saturation}" Style="{StaticResource PanelLabel}" />
+                          <TextBlock x:Name="SaturationValue" Style="{StaticResource PanelValue}" /></Grid>
+                    <Slider x:Name="SaturationSlider" Style="{StaticResource PanelSlider}"
+                            Minimum="0" Maximum="3" Value="1" SmallChange="0.02" LargeChange="0.1"
+                            ValueChanged="OnAdjustChanged" MouseDoubleClick="OnSliderReset" Tag="1" />
+
+                    <Grid Margin="0,10,0,0"><TextBlock Text="{DynamicResource S_BlackPoint}" Style="{StaticResource PanelLabel}" />
+                          <TextBlock x:Name="BlackValue" Style="{StaticResource PanelValue}" /></Grid>
+                    <Slider x:Name="BlackSlider" Style="{StaticResource PanelSlider}"
+                            Minimum="0" Maximum="0.9" Value="0" SmallChange="0.01" LargeChange="0.05"
+                            ValueChanged="OnAdjustChanged" MouseDoubleClick="OnSliderReset" Tag="0" />
+
+                    <Grid Margin="0,10,0,0"><TextBlock Text="{DynamicResource S_WhitePoint}" Style="{StaticResource PanelLabel}" />
+                          <TextBlock x:Name="WhiteValue" Style="{StaticResource PanelValue}" /></Grid>
+                    <Slider x:Name="WhiteSlider" Style="{StaticResource PanelSlider}"
+                            Minimum="0.1" Maximum="1.5" Value="1" SmallChange="0.01" LargeChange="0.05"
+                            ValueChanged="OnAdjustChanged" MouseDoubleClick="OnSliderReset" Tag="1" />
+
+                    <TextBlock Text="{DynamicResource S_Channel}" Style="{StaticResource PanelLabel}"
+                               Margin="0,16,0,6" />
+                    <ComboBox x:Name="ChannelBox" Style="{StaticResource DesktopCombo}"
+                              IsEditable="False" Width="Auto" HorizontalAlignment="Stretch"
+                              ToolTip="{DynamicResource S_ChannelHint}"
+                              SelectionChanged="OnAdjustChanged" />
+
+                    <TextBlock x:Name="AdjustNote" Margin="0,14,0,0" TextWrapping="Wrap"
+                               FontSize="10.5" LineHeight="16"
+                               Foreground="{StaticResource DesktopFaint}"
+                               Text="{DynamicResource S_Adjusted}" />
+                </StackPanel>
+            </ScrollViewer>
+        </Border>
+
+        <Border Grid.Row="2" Grid.ColumnSpan="2" Background="{StaticResource DesktopPanel}"
                 BorderBrush="{StaticResource DesktopLine}" BorderThickness="0,1,0,0"
                 Padding="18,12">
             <Grid>
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="Auto" />
                     <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
                     <ColumnDefinition Width="Auto" />
                 </Grid.ColumnDefinitions>
 
@@ -135,7 +243,17 @@
                            TextTrimming="CharacterEllipsis" FontSize="11"
                            Foreground="{StaticResource DesktopFaint}" />
 
-                <Button x:Name="Combine" Grid.Column="2" Style="{StaticResource DashPrimary}"
+                <!-- Der Schalter fuer die Korrektur steht links vom Uebernehmen:
+                     Erst ansehen, dann entscheiden. -->
+                <ToggleButton x:Name="AdjustToggle" Grid.Column="2" Style="{StaticResource DashFollow}"
+                              Margin="0,0,10,0" Height="36" Click="OnAdjustToggle"
+                              ToolTip="{DynamicResource S_TogglePanel}"
+                              AutomationProperties.Name="{DynamicResource S_Correction}">
+                    <TextBlock views:Track.Text="{DynamicResource S_Correction}"
+                               views:Track.Amount="1" FontSize="9.5" />
+                </ToggleButton>
+
+                <Button x:Name="Combine" Grid.Column="3" Style="{StaticResource DashPrimary}"
                         MinWidth="190" Height="36" Click="OnCombine">
                     <TextBlock x:Name="CombineText" views:Track.Text="{DynamicResource S_CombineButton}"
                                views:Track.Amount="1" FontSize="9.5" />

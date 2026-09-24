@@ -633,7 +633,7 @@ public partial class ViewerWindow : Window, IViewerOpenTarget
     {
         var cache = _cache;
         if (cache is null || index < 0 || index >= _sequence.Count) return false;
-        if (!cache.TryPresent(index, Blit)) return false;
+        if (!cache.TryPresent(index, buffer => Blit(buffer, index))) return false;
 
         _playback.MarkPresented(index);
         _presentedInWindow++;
@@ -642,7 +642,17 @@ public partial class ViewerWindow : Window, IViewerOpenTarget
         UpdateScrubber(index);
 
         // Waehrend der Wiedergabe entfaellt der Dateisystemzugriff fuer die Groesse.
-        if (!_playback.IsPlaying) UpdateMetadata(index);
+        if (!_playback.IsPlaying)
+        {
+            UpdateMetadata(index);
+
+            // Steht das Bild, lohnt der zweite Weg: die Gleitkommawerte der Datei.
+            // Die Groesse kommt aus der Bitmap, weil der Frame dieselbe haben muss -
+            // die Anzeige dekodiert je nach Vorlauf auch auf 50 oder 25 Prozent.
+            if (_surface is not null)
+                EnsureFloatFrame(index, _surface.PixelWidth, _surface.PixelHeight);
+        }
+
         return true;
     }
 
@@ -655,7 +665,13 @@ public partial class ViewerWindow : Window, IViewerOpenTarget
     /// das ist die Invariante, die uninitialisierte, also schwarze Bereiche
     /// ausschliesst.
     /// </summary>
-    private void Blit(FrameBuffer buffer)
+    /// <param name="index">
+    /// Welcher Frame der Sequenz das ist - entscheidet, ob die Gleitkommawerte der
+    /// Datei benutzt werden duerfen. -1 fuer ein Bild, das zu keinem Frame gehoert:
+    /// der gemerkte Frame des A/B-Vergleichs ist eine Kopie in acht Bit, und fuer den
+    /// gibt es keine Gleitkommafassung.
+    /// </param>
+    private void Blit(FrameBuffer buffer, int index)
     {
         // Der Puffer kommt aus einem Pool, der nach Kapazitaet vergibt: das Array darf
         // laenger sein als die Nutzlast, der Stride niemals breiter als der Frame.
@@ -688,8 +704,20 @@ public partial class ViewerWindow : Window, IViewerOpenTarget
         _surface.Lock();
         try
         {
-            FrameProcessor.Apply(buffer.Pixels, buffer.Width, buffer.Height, buffer.Stride,
-                                 _surface.BackBuffer, _surface.BackBufferStride, _adjustments);
+            // Stehen fuer dieses Bild die Gleitkommawerte der Datei bereit, wird die
+            // Korrektur auf ihnen gerechnet statt auf den acht Bit im Ringpuffer.
+            // Der Puffer bleibt trotzdem der Massstab: er bestimmt die Groesse, und
+            // solange nichts geladen ist, zeigt er das Bild.
+            if (HasFloatFor(index, buffer.Width, buffer.Height))
+            {
+                FloatFrameProcessor.Apply(_floatFrame!, _adjustments, FloatView,
+                                          _surface.BackBuffer, _surface.BackBufferStride);
+            }
+            else
+            {
+                FrameProcessor.Apply(buffer.Pixels, buffer.Width, buffer.Height, buffer.Stride,
+                                     _surface.BackBuffer, _surface.BackBufferStride, _adjustments);
+            }
 
             _surface.AddDirtyRect(new Int32Rect(0, 0, buffer.Width, buffer.Height));
         }
@@ -1040,6 +1068,10 @@ public partial class ViewerWindow : Window, IViewerOpenTarget
         HideStatus();
         Volatile.Write(ref _pendingIndex, -1);
         _refresh.Reset();
+
+        // Sie gehoeren zu einem einzelnen Bild. Bliebe der Frame stehen, zeigte
+        // jedes weitere die Werte desjenigen, bei dem zuletzt angehalten wurde.
+        DropFloatFrame();
         _cache?.SetPosition(_playback.Index, 1, _playback.Loop, urgent: false);
 
         CompositionTarget.Rendering += OnRendering;

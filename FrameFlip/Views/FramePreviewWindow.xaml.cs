@@ -1,4 +1,4 @@
-using System.Windows;
+﻿using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Media.Imaging;
@@ -27,6 +27,9 @@ public partial class FramePreviewWindow : Window
 
     private int _index;
 
+    /// <summary>Das unveraenderte Bild. Die Korrektur rechnet daraus, zeigt aber dieses, solange sie ruht.</summary>
+    private System.Windows.Media.Imaging.BitmapSource? _bild;
+
     public FramePreviewWindow(string path, IReadOnlyList<string> frames, Action<string> combine)
     {
         _combine = combine;
@@ -50,6 +53,11 @@ public partial class FramePreviewWindow : Window
 
         KeyDown += OnKey;
 
+        KanaeleFuellen();
+
+        // Ab hier sind alle Regler da; vorher waeren ihre Meldungen Unfug.
+        _bereit = true;
+
         // Auch dieses Fenster kann auf einem Bildschirm landen, den es nicht mehr
         // gibt - siehe WindowPlacer.
         SourceInitialized += (_, _) =>
@@ -65,6 +73,12 @@ public partial class FramePreviewWindow : Window
     }
 
     private void OnMinimize(object sender, RoutedEventArgs e) => SystemCommands.MinimizeWindow(this);
+
+    private void OnMaximize(object sender, RoutedEventArgs e)
+    {
+        if (WindowState == WindowState.Maximized) SystemCommands.RestoreWindow(this);
+        else SystemCommands.MaximizeWindow(this);
+    }
 
     private void OnCloseWindow(object sender, RoutedEventArgs e) => Close();
 
@@ -83,9 +97,114 @@ public partial class FramePreviewWindow : Window
         {
             case Key.Left or Key.Up: Step(-1); break;
             case Key.Right or Key.Down: Step(1); break;
+
+            // Erst der Zoom zurueck, dann schliessen. Wer hineingezoomt hat und Esc
+            // drueckt, will fast immer das eine und nicht das andere.
+            case Key.Escape when !Lupe.Matrix.IsIdentity: Anpassen(); break;
             case Key.Escape: Close(); break;
+
+            case Key.D0 or Key.NumPad0: Anpassen(); break;
+            case Key.Add or Key.OemPlus: Zoomen(1.25, Mitte()); break;
+            case Key.Subtract or Key.OemMinus: Zoomen(1 / 1.25, Mitte()); break;
+
             case Key.Enter or Key.Space when _frames.Count > 1: _combine(_frames[_index]); break;
         }
+    }
+
+    /* ------------------------------------------------------------------- Lupe
+
+       Zoom auf den Zeiger und Schieben - dasselbe, was die Zuschauerseite im
+       Browser kann. Ohne das war die Vorschau im Projektbereich eine Ansicht, in
+       der man nichts nachsehen konnte: Ein Rendersfehler ist oft zwanzig Pixel
+       gross, und die sieht man in einer eingepassten Ansicht nicht.
+
+       Gerechnet wird ueber eine Matrix und nicht ueber Skalierung plus Rand. Der
+       Unterschied ist der ganze Punkt: Beim Zoomen soll die Stelle UNTER DEM ZEIGER
+       dort bleiben, wo der Zeiger ist. Mit einer Matrix ist das eine Zeile -
+       verschieben, skalieren, zurueckverschieben. Mit getrennten Werten wird es eine
+       Rechnung, die man beim zweiten Zoomschritt falsch hat. */
+
+    private const double Kleinste = 1, Groesste = 24;
+
+    private System.Windows.Point _griff;
+    private bool _schiebt;
+
+    private System.Windows.Point Mitte() => new(Stage.ActualWidth / 2, Stage.ActualHeight / 2);
+
+    /// <summary>Zurueck auf eingepasst. Auch nach jedem Bildwechsel.</summary>
+    private void Anpassen()
+    {
+        Lupe.Matrix = System.Windows.Media.Matrix.Identity;
+        Stage.Cursor = null;
+    }
+
+    private void Zoomen(double faktor, System.Windows.Point um)
+    {
+        var m = Lupe.Matrix;
+
+        double jetzt = m.M11;
+        double ziel = Math.Clamp(jetzt * faktor, Kleinste, Groesste);
+
+        if (Math.Abs(ziel - jetzt) < 0.0001) return;
+
+        /* Ganz herausgezoomt heisst eingepasst - und zwar ohne Rest.
+         *
+         * Die Skalierung allein zurueckzudrehen genuegt nicht: Wer hineingezoomt und
+         * dann geschoben hat, traegt eine Verschiebung mit sich, und die bleibt beim
+         * Herauszoomen stehen. Das Bild sass danach bei einfacher Vergroesserung
+         * irgendwo neben der Mitte, statt wieder im Fenster zu liegen.
+         *
+         * Eine Verschiebung anteilig mit herunterzurechnen waere die aufwendigere
+         * Antwort auf dieselbe Frage. Bei einfacher Vergroesserung gibt es aber gar
+         * nichts zu verschieben - das Bild passt dann per Definition ins Fenster. */
+        if (ziel <= Kleinste) { Anpassen(); return; }
+
+        // Um den Punkt skalieren: hin, skalieren, zurueck.
+        m.ScaleAt(ziel / jetzt, ziel / jetzt, um.X, um.Y);
+
+        Lupe.Matrix = m;
+
+        Stage.Cursor = Cursors.SizeAll;
+    }
+
+    private void OnWheel(object sender, MouseWheelEventArgs e)
+    {
+        Zoomen(e.Delta > 0 ? 1.2 : 1 / 1.2, e.GetPosition(Stage));
+        e.Handled = true;
+    }
+
+    private void OnGrab(object sender, MouseButtonEventArgs e)
+    {
+        // Ein Doppelklick passt wieder ein - der kuerzeste Weg zurueck.
+        if (e.ClickCount == 2) { Anpassen(); return; }
+
+        // Bei eingepasster Ansicht gibt es nichts zu schieben.
+        if (Lupe.Matrix.M11 <= 1) return;
+
+        _griff = e.GetPosition(Stage);
+        _schiebt = true;
+        Stage.CaptureMouse();
+    }
+
+    private void OnDrag(object sender, MouseEventArgs e)
+    {
+        if (!_schiebt) return;
+
+        var jetzt = e.GetPosition(Stage);
+        var m = Lupe.Matrix;
+
+        m.Translate(jetzt.X - _griff.X, jetzt.Y - _griff.Y);
+
+        Lupe.Matrix = m;
+        _griff = jetzt;
+    }
+
+    private void OnRelease(object sender, MouseEventArgs e)
+    {
+        if (!_schiebt) return;
+
+        _schiebt = false;
+        Stage.ReleaseMouseCapture();
     }
 
     private void Step(int direction)
@@ -100,12 +219,24 @@ public partial class FramePreviewWindow : Window
     {
         string path = _frames[_index];
 
+        // Beim Bildwechsel wieder einpassen. Den Zoom mitzunehmen klingt bequem und
+        // ist es nicht: Zwei Frames derselben Sequenz sind gleich gross, aber der
+        // Ausschnitt, den man am einen pruefen wollte, ist am naechsten selten der
+        // gesuchte - und man landet blind in einer Ecke.
+        Anpassen();
+
         Caption.Text = Path.GetFileName(path);
         Trouble.Visibility = Visibility.Collapsed;
 
         var image = Decode(path);
 
+        _bild = image;
         Picture.Source = image;
+
+        // Pixel fuer die Korrektur bereitstellen und die Regler auf Ruhe setzen:
+        // Was am vorigen Bild richtig war, ist am naechsten eine Behauptung.
+        KorrekturQuelle(image);
+        Zuruecksetzen();
 
         if (image is null)
         {

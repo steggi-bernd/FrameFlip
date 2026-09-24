@@ -37,6 +37,9 @@ public sealed class RenderMonitor : IDisposable
 
     public bool IsListening => _server.IsListening;
 
+    /// <summary>Wann sich zuletzt ein echtes Addon gemeldet hat - oder null, wenn nie.</summary>
+    public DateTime? LastBridgeContact => _server.LastGreetingUtc;
+
     public bool HasRunningJob
     {
         get { lock (_gate) return Job?.IsRunning == true; }

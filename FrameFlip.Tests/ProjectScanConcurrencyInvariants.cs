@@ -60,7 +60,7 @@ public static class ProjectScanConcurrencyInvariants
             Finish(page, "_contentTask");
             PumpUntil(() => oldTask.IsCompleted);
             oldTask.GetAwaiter().GetResult();
-            var tips = Body(page).Children.OfType<WrapPanel>().SelectMany(p => p.Children.OfType<Border>())
+            var tips = Body(page).Children.OfType<FillWrap>().SelectMany(p => p.Children.OfType<Border>())
                                  .Select(b => (string)b.ToolTip).ToArray();
             Check.That(tips.SequenceEqual(new[] { Path.Combine(fresh, "child") }),
                        failOld ? "verspaeteter Fehler veraendert die neue Ansicht nicht" : "verspaeteter Inhalt ersetzt die neue Ansicht nicht");

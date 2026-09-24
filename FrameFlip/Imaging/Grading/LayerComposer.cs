@@ -1,0 +1,752 @@
+namespace FrameFlip.Imaging.Grading;
+
+/// <summary>
+/// Setzt die Ebenen zu einem Bild zusammen.
+///
+/// Das Ergebnis ist wieder ein <see cref="FloatFrame"/> in linearem Licht, und damit
+/// geht es unveraendert denselben Weg weiter wie ein einzeln gelesenes Bild:
+/// Grundkorrektur, Werkzeuge, Sichtumwandlung. Die Zusammensetzung ist ein Schritt
+/// davor und kein zweiter Weg daneben - sonst haette der Stapellauf eine Kette und
+/// die Vorschau eine andere, und irgendwann saehe der Export anders aus als das,
+/// worauf sich jemand verlassen hat.
+///
+/// Zusammengesetzt wird VOR der Sichtumwandlung. Das ist die Stelle, an der die
+/// Zerlegung entstanden ist: Blender addiert die Passe im linearen Licht zum
+/// fertigen Bild. Wer sie hinterher zusammensetzte, addierte bereits durch AgX
+/// gegangene Bilder, und die Summe waere nicht das Original, sondern heller.
+/// </summary>
+public static class LayerComposer
+{
+    /// <summary>
+    /// Baut das Bild aus den Ebenen. Null, wenn keine Ebene etwas beitraegt.
+    /// </summary>
+    /// <param name="sources">
+    /// Die gelesenen Passe, nach dem Namen der Quelle. Eine Ebene, deren Pass fehlt
+    /// oder eine andere Groesse hat, wird uebersprungen - eine halb gelesene Datei
+    /// soll ein Bild ergeben, das man ansehen kann, und keinen Abbruch.
+    /// </param>
+    /// <param name="into">
+    /// Ein Frame aus einem frueheren Durchgang, in den geschrieben werden darf.
+    ///
+    /// Bei 1080p sind das 33 Megabyte je Durchgang, bei 4K rund 130 - und
+    /// zusammengesetzt wird bei JEDEM Reglerzug. Die Felder jedes Mal neu anzulegen
+    /// heisst, sie jedes Mal neu zu nullen und dem Sammler zu ueberlassen; gemessen
+    /// war das der groessere Teil der Zeit, nicht die Rechnung.
+    ///
+    /// Der Aufrufer muss einen Frame uebergeben, der IHM gehoert - niemals einen aus
+    /// <paramref name="sources"/>. Hineinzuschreiben, waehrend daraus gelesen wird,
+    /// ergaebe ein Bild, das sich mit jedem Durchgang weiter verzieht.
+    /// </param>
+    /// <param name="step">
+    /// Nur jeder n-te Bildpunkt wird zusammengesetzt - dieselben Gitterpunkte, die
+    /// der grobe Durchgang der Anzeige anschliessend liest.
+    ///
+    /// Das ist der Grund, warum es diese Zahl hier ueberhaupt gibt: Beim Ziehen an
+    /// einem Regler rechnet die Anzeige ohnehin nur auf einem Gitter und
+    /// interpoliert dazwischen. Wer trotzdem jeden Bildpunkt zusammensetzt, rechnet
+    /// fuenfzehn Sechzehntel davon fuer nichts - gemessen sind das bei 1080p mit
+    /// einer Einstellungsebene neunzig Millisekunden je Reglerzug statt sechs.
+    ///
+    /// Die Werte ZWISCHEN den Gitterpunkten bleiben dabei stehen, wie sie waren. Das
+    /// ist in Ordnung, weil sie niemand liest - aber nur solange die Schrittweite
+    /// dieselbe ist. Beim Loslassen laeuft ein voller Durchgang und fuellt alles.
+    /// </param>
+    /// <param name="number">
+    /// Die Bildnummer. Gebraucht fuer gemalte Masken, die nicht gesperrt sind: Dort
+    /// gilt je Bild ein eigener Anstrich, und ohne die Nummer waere nicht zu sagen,
+    /// welcher.
+    /// </param>
+    public static FloatFrame? Compose(LayerStack stack, IReadOnlyDictionary<string, FloatFrame> sources,
+                                      FloatFrame? into = null, int step = 1, int number = 0)
+    {
+        step = Math.Clamp(step, 1, 16);
+
+        var used = new List<(ImageLayer Layer, FloatFrame? Frame, StepKind Kind)>();
+        int width = 0, height = 0;
+
+        Collect(stack.Layers, sources, used, ref width, ref height, depth: 0);
+
+        // Keine SICHTBARE Passebene? Dann gibt das Bild selbst die Groesse vor.
+        //
+        // Die Regel dort drueben - nur ein Pass legt die Leinwand fest - hat einen
+        // guten Grund: Sonst bestimmte ein Wasserzeichen von zweihundert Punkten die
+        // Groesse, wenn es zufaellig zuunterst liegt. Sie hatte aber eine Luecke, und
+        // die war teuer: Ist die Passebene AUSGEBLENDET, legt niemand eine Groesse
+        // fest, und dann kam ueberhaupt kein Bild zustande.
+        //
+        // Im Atelier sah das aus, als taete das Einblenden nichts. Der Rueckfall
+        // zeigte weiter die Datei, jede eingeblendete Ebene blieb wirkungslos - und
+        // in dem Augenblick, in dem jemand die unterste Ebene einblendete, erschienen
+        // alle anderen auf einmal. Nach einer wiederhergestellten Sitzung ist genau
+        // das der Normalfall, denn dort kommt der Stapel zurueck, wie er stand.
+        //
+        // Das Bild liegt immer unter dem leeren Schluessel. Es ist die richtige
+        // Antwort auf "wie gross ist die Leinwand", ganz gleich, welche Ebene gerade
+        // zu sehen ist: Die Leinwand haengt nicht daran, was jemand eingeblendet hat.
+        if (width == 0 && sources.TryGetValue("", out var canvas))
+        {
+            width = canvas.Width;
+            height = canvas.Height;
+        }
+
+        // Und wenn es auch das nicht gibt: die groesste Ebene, die etwas mitbringt.
+        // Kein gutes Mass, aber ein Bild - und ein Bild ist besser als keines.
+        if (width == 0)
+        {
+            foreach (var (_, frame, _) in used)
+            {
+                if (frame is null) continue;
+                if ((long)frame.Width * frame.Height <= (long)width * height) continue;
+
+                width = frame.Width;
+                height = frame.Height;
+            }
+        }
+
+        // Ohne einen einzigen Pass gibt es nichts, worauf eine Korrektur wirken
+        // koennte - und auch keine Bildgroesse. Ein Stapel aus lauter
+        // Einstellungsebenen ist kein Bild.
+        if (used.Count == 0 || width == 0) return null;
+
+        // Eine Einstellungsebene ohne Wirkung bleibt trotzdem stehen. Sie
+        // herauszunehmen waere die naheliegende Ersparnis und ein Fehler: Traegt sie
+        // eine angeschnittene Ebene, haengt diese danach an einer anderen - und der
+        // Stapel rechnet etwas anderes, sobald man die Korrektur auf null stellt.
+        // Der Durchlauf kostet ohnehin fast nichts; die Kette kehrt sofort zurueck.
+
+        // Eine einzelne unveraenderte Ebene ist das Bild selbst. Sie durchzureichen
+        // spart bei 4K rund hundert Megabyte und eine Kopie.
+        //
+        // Nicht aber, wenn sie freigestellt ist und nicht aus einer EXR kommt. Dann
+        // muesste ihre Deckung angewandt werden, und auf diesem Weg tut es niemand:
+        // Was hier zurueckgegeben wird, geht unveraendert an die Anzeige. Genau daran
+        // hing der lange gesuchte Fehler - eine freigestellte PNG als BILD geoeffnet
+        // zeigte den Muell unter ihrer Deckung, dieselbe Datei als EBENE nicht.
+        bool bare = used[0].Frame is null ||
+                    used[0].Frame!.IsSceneReferred ||
+                    !used[0].Frame!.HasMatte;
+
+        if (used.Count == 1 && used[0].Kind == StepKind.Layer && bare &&
+            used[0].Layer.IsNeutral && used[0].Layer.LiesOnBlack)
+        {
+            return used[0].Frame!;
+        }
+
+        int count = width * height;
+
+        // Der alte Frame taugt, wenn er die richtige Groesse hat und keiner der
+        // Quellen ist. Das zweite prueft der Aufrufer; hier wird nur die Groesse
+        // abgeglichen.
+        bool reuse = into is not null && into.Width == width && into.Height == height &&
+                     into.A is not null;
+
+        var r = reuse ? into!.R : new float[count];
+        var g = reuse ? into!.G : new float[count];
+        var b = reuse ? into!.B : new float[count];
+        var a = reuse ? into!.A! : new float[count];
+
+        // Ob in Licht gerechnet wird: wie die erste Ebene mit eigenem Bild - und gibt es
+        // keine, wie das Bild der Datei. Hier stand First(), und das warf, sobald keine
+        // sichtbare Ebene ein eigenes Bild mitbrachte: das Bild ausgeblendet, eine
+        // Einstellungsebene an. Ein gewoehnlicher Handgriff, und das Zusammensetzen
+        // stuerzte ab.
+        var carrying = used.FirstOrDefault(u => u.Frame is not null).Frame;
+        bool sceneReferred = carrying?.IsSceneReferred ??
+                             (!sources.TryGetValue("", out var file) || file.IsSceneReferred);
+
+        // Je Ebene einmal vorbereitet, damit die innere Schleife nur noch multipliziert.
+        var plans = new Plan[used.Count];
+        for (int i = 0; i < used.Count; i++)
+        {
+            var layer = used[i].Layer;
+            float gain = MathF.Pow(2f, layer.Exposure);
+
+            // Die unterste Ebene kann sich an nichts anschneiden. Eine Schnittmaske
+            // ohne Traeger als solche zu behandeln hiesse, sie verschwinden zu
+            // lassen - sie wird stattdessen zur gewoehnlichen Ebene.
+            bool clipped = layer.Clipped && i > 0;
+
+            // Die Maske, fertig zum Fragen - fehlt ihr Pass, faellt sie weg. Siehe
+            // MaskSampler; der Maskenknoten im Graphen fragt dieselbe.
+            var sampler = MaskSampler.Prepare(layer.Mask, sources, width, height, number);
+
+            // Die Kette wird EINMAL vorbereitet, nicht je Bildpunkt. Bei 4K waeren
+            // es sonst 25 Millionen Tabellenaufbauten.
+            //
+            // Fuer JEDE Ebene, nicht nur fuer Einstellungsebenen. Dass es lange nur
+            // fuer die eine Art geschah, war ein stiller Fehler: Der Streifen legte
+            // die Werkzeuge einer gewaehlten Bildebene brav in den Stapel, und der
+            // Composer sah sie nie an. Man stellte an einer Bildebene eine Kurve ein
+            // und nichts geschah - ohne Meldung, ohne gesperrten Regler.
+            var grade = layer.Grade();
+
+            // Platziert wird nur, wenn es etwas zu platzieren gibt: eine Ebene in
+            // der Groesse der Leinwand und ohne Einstellung geht den geraden Weg
+            // ueber den Index, ohne Abtasten und ohne Grenzpruefung.
+            var source = used[i].Frame;
+
+            bool placed = source is not null &&
+                          (!layer.Place.IsNeutral ||
+                           source.Width != width || source.Height != height);
+
+            var placement = placed
+                ? LayerPlacement.Prepare(layer.Place, source!.Width, source.Height, width, height)
+                : default;
+
+            plans[i] = new Plan(used[i].Frame, layer.Mode, Math.Clamp(layer.Opacity, 0f, 1f),
+                                gain * layer.Tint.R, gain * layer.Tint.G, gain * layer.Tint.B, clipped,
+                                sampler, layer.Content, grade, used[i].Kind, placed, placement,
+                                layer.MatteFloor, layer.BlendInDisplay, layer.Reveal);
+        }
+
+        // Die Gitterpunkte einmal aufschreiben, statt sie je Bildpunkt auszurechnen.
+        // Bei Schrittweite eins ist es die vollstaendige Liste; die letzte Spalte
+        // liegt in beiden Faellen auf dem Rand, weil der grobe Durchgang der Anzeige
+        // es genauso haelt - eine Abweichung um einen Bildpunkt waere ein Streifen
+        // am rechten Rand, der nie mitgerechnet wird.
+        int[] columns = Grid(width, step);
+        int[] rows = Grid(height, step);
+
+        Parallel.For(0, rows.Length, new ParallelOptions
+        {
+            MaxDegreeOfParallelism = Math.Clamp(Environment.ProcessorCount, 1, 8),
+        },
+        ry =>
+        {
+            int y = rows[ry];
+            int start = y * width;
+
+            // Der Stand vor jeder offenen Gruppe, samt Deckung. Je Zeile einmal
+            // geholt, nicht je Bildpunkt - verschachtelt wird selten und flach.
+            Span<float> saved = stackalloc float[MaxDepth * 4];
+
+            for (int cx = 0; cx < columns.Length; cx++)
+            {
+                int x = columns[cx];
+                int i = start + x;
+                int depth = 0;
+
+                // Der Untergrund ist Schwarz und nicht die unterste Ebene: Damit
+                // gilt fuer JEDE Ebene dieselbe Regel, auch fuer die unterste. Auf
+                // Add ergibt das die Summe der Passe und damit wieder das Bild, das
+                // gerendert wurde; auf Normal legt die unterste Ebene sich einfach
+                // auf das Schwarz.
+                float vr = 0f, vg = 0f, vb = 0f, va = 0f;
+
+                // Die laufende Gruppe: eine Traegerebene und alles, was sich an sie
+                // anschneidet. Sie wird erst als Ganzes auf das Ergebnis gemischt,
+                // und zwar mit der Mischung des Traegers - genau so, wie eine
+                // Schnittmaske in Photoshop wirkt.
+                float gr = 0f, gg = 0f, gb = 0f;
+                var groupMode = BlendMode.Normal;
+                bool groupDisplay = false;
+                float groupOpacity = 1f;
+                bool open = false;
+
+                for (int p = 0; p < plans.Length; p++)
+                {
+                    ref readonly var plan = ref plans[p];
+                    var frame = plan.Frame;
+
+                    // --- die Klammern einer Gruppe ---
+                    if (plan.Kind != StepKind.Layer)
+                    {
+                        // Eine Schnittgruppe darf keine Gruppengrenze ueberschreiten.
+                        if (open)
+                        {
+                            Blend(groupMode, groupDisplay, groupOpacity, vr, vg, vb, gr, gg, gb,
+                                  out vr, out vg, out vb);
+                            open = false;
+                        }
+
+                        if (plan.Kind == StepKind.Begin)
+                        {
+                            // Der Stand von jetzt wird gesichert, und die Gruppe
+                            // rechnet darauf weiter. Sie sieht also, was unter ihr
+                            // liegt - eine Gruppe aus Korrekturen faende sonst
+                            // Schwarz vor.
+                            if (depth < MaxDepth)
+                            {
+                                saved[depth * 4] = vr;
+                                saved[depth * 4 + 1] = vg;
+                                saved[depth * 4 + 2] = vb;
+                                saved[depth * 4 + 3] = va;
+                                depth++;
+                            }
+
+                            continue;
+                        }
+
+                        if (depth == 0) continue;
+
+                        depth--;
+
+                        float br = saved[depth * 4];
+                        float bg = saved[depth * 4 + 1];
+                        float bb = saved[depth * 4 + 2];
+                        float ba = saved[depth * 4 + 3];
+
+                        // Das Ergebnis der Gruppe auf den gesicherten Stand - mit
+                        // ihrer Mischung, Deckkraft und Maske. Ohne all das ist eine
+                        // Gruppe damit genau so, als waere sie nicht da.
+                        float groupFactor = plan.Sampler.Kind == MaskKind.None
+                            ? plan.Opacity
+                            : plan.Opacity * plan.Sampler.Factor(x, y, width, height, i,
+                                                                 vr, vg, vb, br, bg, bb);
+
+                        Blend(plan.Mode, plan.Display, groupFactor, br, bg, bb, vr, vg, vb,
+                              out vr, out vg, out vb);
+
+                        // Und die Deckung ebenso. Frueher blieb sie, was die Kinder
+                        // gebracht hatten: Eine Gruppe auf halber Deckkraft ueber nichts
+                        // meldete volle Deckung, und eine PNG mit Freistellung zeigte
+                        // dort eine halbdunkle Flaeche als undurchsichtig. Die Gruppe
+                        // traegt bei, was ihre Kinder decken, mal ihrer Deckkraft.
+                        va = MathF.Max(ba, va * groupFactor);
+
+                        continue;
+                    }
+
+                    bool inGroup = plan.Clipped && open;
+
+                    // Die offene Gruppe wird ZUERST eingerechnet, nicht erst nach
+                    // dem Lesen dieser Ebene.
+                    //
+                    // Das war zuerst andersherum, und es kostete die halbe Wirkung:
+                    // Eine Einstellungsebene und eine Helligkeitsmaske lesen beide,
+                    // was unter ihnen liegt - und "darunter" war dann der Stand VOR
+                    // der letzten Ebene. Eine Korrektur ueber zwei Passen rechnete
+                    // mit dem ersten und uebersah den zweiten.
+                    if (!inGroup && open)
+                    {
+                        Blend(groupMode, groupDisplay, groupOpacity, vr, vg, vb, gr, gg, gb,
+                              out vr, out vg, out vb);
+                        open = false;
+                    }
+
+                    float lr, lg, lb;
+                    // Die Deckung, die die Ebene SELBST mitbringt - aus ihrem
+                    // Alphakanal, aus der weichen Kante ihrer Flaeche oder aus
+                    // beidem. Sie wirkt wie eine Maske und wird weiter unten zur
+                    // oertlichen Deckkraft verrechnet.
+                    float ownAlpha = 1f;
+                    bool hasOwnAlpha = false;
+
+                    if (plan.Content == LayerContent.Adjustment)
+                    {
+                        // Eine Einstellungsebene nimmt als Eingang das, worauf sie
+                        // wirkt: angeschnitten die Gruppe, sonst das Ergebnis
+                        // darunter. Damit heisst "Schnittmaske" hier genau dasselbe
+                        // wie in Photoshop - die Korrektur gilt nur fuer die eine
+                        // Ebene darunter.
+                        lr = inGroup ? gr : vr;
+                        lg = inGroup ? gg : vg;
+                        lb = inGroup ? gb : vb;
+
+                        plan.Grade.Apply(ref lr, ref lg, ref lb);
+
+                        lr *= plan.ScaleR;
+                        lg *= plan.ScaleG;
+                        lb *= plan.ScaleB;
+                    }
+                    else if (plan.Placed)
+                    {
+                        // Ausserhalb ihrer Flaeche traegt die Ebene nichts bei - und
+                        // zwar wirklich nichts, nicht Schwarz. Ein Wasserzeichen
+                        // wuerde sonst das halbe Bild ausloeschen.
+                        float covered = plan.Placement.Coverage(x, y, out float u, out float v);
+
+                        if (covered <= 0f)
+                        {
+                            // Ein Traeger, der hier nicht deckt, oeffnet trotzdem seine
+                            // Gruppe - leer und ohne Deckkraft. Sonst fanden die
+                            // angeschnittenen Ebenen darueber keine offene Gruppe vor,
+                            // wurden hier zu gewoehnlichen Ebenen und lagen ueber dem
+                            // ganzen Bild statt nur auf dem Logo, an das sie geschnitten
+                            // sind. Eine angeschnittene Ebene hier traegt ohnehin nichts bei.
+                            if (!inGroup)
+                            {
+                                gr = gg = gb = 0f;
+                                groupMode = plan.Mode;
+                                groupDisplay = plan.Display;
+                                groupOpacity = 0f;
+                                open = true;
+                            }
+
+                            continue;
+                        }
+
+                        plan.Placement.Sample(frame!, u, v, out lr, out lg, out lb, out ownAlpha);
+
+                        lr *= plan.ScaleR;
+                        lg *= plan.ScaleG;
+                        lb *= plan.ScaleB;
+
+                        // Die eigene Deckung der Ebene zaehlt mit, und die weiche
+                        // Kante der Flaeche ebenso: Ein Logo mit durchsichtigem Rand
+                        // bleibt durchsichtig, und eine gedrehte Kante bleibt glatt.
+                        ownAlpha *= covered;
+                        hasOwnAlpha = true;
+                    }
+                    else
+                    {
+                        lr = frame!.R[i] * plan.ScaleR;
+                        lg = frame.G[i] * plan.ScaleG;
+                        lb = frame.B[i] * plan.ScaleB;
+
+                        // Eine Bildebene in Bildgroesse bringt ihre Deckung genauso
+                        // mit wie eine platzierte - nur dass sie nicht abgetastet
+                        // werden muss. Sie hier zu uebergehen war der Fehler, der
+                        // freigestellte PNGs mit pixeligem Nebel fuellte: Unter der
+                        // Deckung steht in den meisten Dateien, was zufaellig im
+                        // Puffer stand, und ohne Deckung wird genau das gezeigt.
+                        //
+                        // Nicht bei einem Pass aus einer EXR. Dort heisst Deckung
+                        // null "hier wurde nichts getroffen", und die Farbe daneben
+                        // ist trotzdem echt - das Umgebungslicht steht dort. Einen
+                        // solchen Pass mit seinem Alpha zu multiplizieren loeschte
+                        // den Himmel.
+                        //
+                        // Bei allem anderen SCHON - und das schliesst das Grundbild
+                        // ein. Das war der Fehler, der lange gesucht wurde: Die
+                        // unterste Ebene im Atelier ist ein Pass, und eine PNG, die
+                        // als Bild geoeffnet wird, ist damit auch einer. Ihre
+                        // Freistellung galt dann nicht, und unter der Freistellung
+                        // steht in den meisten Dateien, was zufaellig im Puffer
+                        // stand. Dieselbe Datei war als EBENE still und als BILD ein
+                        // Rauschteppich - gemessen 0,00 gegen 83,78 Stufen.
+                        //
+                        // Unterschieden wird nicht nach der Art der Ebene, sondern
+                        // nach der Herkunft des Feldes: Was aus einer EXR kommt,
+                        // traegt Licht und meint es so; was ueber Windows' Decoder
+                        // kam, ist ein Bild und hat eine Maske.
+                        bool matte = plan.Content == LayerContent.Image ||
+                                     !frame.IsSceneReferred;
+
+                        if (matte && frame.A is not null)
+                        {
+                            ownAlpha = frame.A[i];
+                            hasOwnAlpha = true;
+                        }
+                    }
+
+                    float underR = inGroup ? gr : vr;
+                    float underG = inGroup ? gg : vg;
+                    float underB = inGroup ? gb : vb;
+
+                    // Die Maske wird EINMAL gefragt. Was ihre Antwort dann bedeutet,
+                    // entscheidet die Ebene - siehe MaskScope.
+                    float factor = plan.Sampler.Kind == MaskKind.None
+                        ? 1f
+                        : plan.Sampler.Factor(x, y, width, height, i, lr, lg, lb, underR, underG, underB);
+
+                    // Die eigenen Werkzeuge einer Bild- oder Passebene. Eine
+                    // Einstellungsebene hat ihre Korrektur oben schon angewandt - sie
+                    // BESTEHT aus ihr.
+                    if (plan.Content != LayerContent.Adjustment && !plan.Grade.IsNeutral)
+                    {
+                        float qr = lr, qg = lg, qb = lb;
+
+                        plan.Grade.Apply(ref qr, ref qg, ref qb);
+
+                        if (plan.Sampler.Scope == MaskScope.Colour)
+                        {
+                            // Die Maske sagt hier, WO korrigiert wird - nicht, wo die
+                            // Ebene zu sehen ist. Gerechnet wird genau das, was eine
+                            // Kopie der Ebene taete, die nur den Bereich zeigt: innen
+                            // die Korrektur, aussen das Bild, dazwischen weich.
+                            lr += (qr - lr) * factor;
+                            lg += (qg - lg) * factor;
+                            lb += (qb - lb) * factor;
+
+                            // Und die Ebene selbst bleibt ganz da. Sie hier ebenfalls
+                            // auszublenden waere die Falle, um die es ging: ein Fleck
+                            // gemalt, und das Bild ausser dem Fleck ist weg.
+                            factor = 1f;
+                        }
+                        else
+                        {
+                            lr = qr;
+                            lg = qg;
+                            lb = qb;
+                        }
+                    }
+
+                    // Die Maske greift an genau einer Stelle an: Sie macht die
+                    // Deckkraft oertlich. Damit gilt fuer jede Mischung und jede
+                    // Schnittmaske dieselbe Regel, und es gibt keinen Fall, in dem
+                    // eine Maske etwas anderes bedeutet als sonst.
+                    float opacity = plan.Opacity * factor;
+
+                    // Die eigene Deckung wirkt wie eine Maske: Sie macht die
+                    // Deckkraft oertlich. Dieselbe Stelle, dieselbe Regel - und
+                    // dieselbe Stelle, an der ein Schleier im Alphakanal gesaeubert
+                    // wird, falls jemand das eingestellt hat.
+                    if (hasOwnAlpha)
+                    {
+                        float matte = ImageLayer.CleanMatte(ownAlpha, plan.MatteFloor);
+
+                        // Aufdecken kommt NACH dem Saeubern: Erst wird entschieden,
+                        // was als durchsichtig gilt, dann wird es aufgezogen.
+                        // Andersherum saeuberte man weg, was man gerade zeigen wollte.
+                        opacity *= Math.Clamp(ImageLayer.Lift(matte, plan.Reveal), 0f, 1f);
+                    }
+
+                    if (inGroup)
+                    {
+                        Blend(plan.Mode, plan.Display, opacity, gr, gg, gb, lr, lg, lb,
+                              out gr, out gg, out gb);
+                    }
+                    else
+                    {
+                        gr = lr;
+                        gg = lg;
+                        gb = lb;
+                        groupMode = plan.Mode;
+                        groupDisplay = plan.Display;
+
+                        // Die Gruppe fuehrt die Deckkraft ihres Traegers mit, und
+                        // damit auch dessen Maske: Erst wenn die Gruppe geschlossen
+                        // wird, mischt sie sich auf das Ergebnis, und bis dahin muss
+                        // der oertliche Wert erhalten bleiben.
+                        groupOpacity = opacity;
+                        open = true;
+                    }
+
+                    // Die Deckung ist keine Mischung, sondern eine Abdeckung: Wo
+                    // irgendeine Ebene deckt, deckt das Ergebnis. Sie durch dieselbe
+                    // Formel zu schicken wie die Farbe hiesse, Alpha auf Add zu
+                    // summieren - drei Passe ergaeben Deckung 3.
+                    // Eine Einstellungsebene deckt nichts ab - sie faerbt nur, was
+                    // schon da ist. Ihr eine Deckung zuzurechnen hiesse, ein Bild
+                    // undurchsichtig zu machen, das es nicht war.
+                    if (frame is null) continue;
+
+                    // Eine angeschnittene Ebene deckt nichts Eigenes ab: Sie liegt IN
+                    // ihrem Traeger, und wo der nicht deckt, ist auch sie nicht. Frueher
+                    // brachte sie ihre eigene Deckung mit und machte ein Bild dort
+                    // undurchsichtig, wo ihr Traeger durchsichtig war.
+                    if (inGroup) continue;
+
+                    float la = (hasOwnAlpha ? 1f : frame.A is null ? 1f : frame.A[i]) * opacity;
+                    if (la > va) va = la;
+                }
+
+                if (open)
+                    Blend(groupMode, groupDisplay, groupOpacity, vr, vg, vb, gr, gg, gb,
+                          out vr, out vg, out vb);
+
+                r[i] = vr;
+                g[i] = vg;
+                b[i] = vb;
+                a[i] = va;
+            }
+        });
+
+        // Derselbe Frame, wenn seine Felder wiederverwendet wurden - sonst haette
+        // der Aufrufer zwei Huellen um dieselben Daten und wuesste nicht, welche gilt.
+        return reuse
+            ? into!
+            : new FloatFrame
+            {
+                Width = width,
+                Height = height,
+                R = r,
+                G = g,
+                B = b,
+                A = a,
+                Layer = used.Count == 1 ? used[0].Frame?.Layer : null,
+                IsSceneReferred = sceneReferred,
+            };
+    }
+
+    /// <summary>
+    /// Die Stellen, an denen gerechnet wird. Bei Schrittweite eins alle.
+    ///
+    /// Die letzte liegt immer auf dem Rand - genau wie im groben Durchgang der
+    /// Anzeige. Rechnete das Gitter hier bis ueber den Rand hinaus oder hoerte einen
+    /// Schritt frueher auf, bliebe der letzte Streifen ungerechnet und zoege beim
+    /// Reglerzug eine sichtbare Kante nach sich.
+    /// </summary>
+    private static int[] Grid(int size, int step)
+    {
+        if (step <= 1)
+        {
+            var all = new int[size];
+            for (int i = 0; i < size; i++) all[i] = i;
+
+            return all;
+        }
+
+        int count = (size + step - 1) / step + 1;
+        var grid = new int[count];
+
+        for (int i = 0; i < count; i++) grid[i] = Math.Min(i * step, size - 1);
+
+        return grid;
+    }
+
+    /// <summary>
+    /// Wie tief Gruppen ineinander stehen duerfen.
+    ///
+    /// Acht ist keine gegriffene Zahl, sondern die Grenze, ab der der gesicherte
+    /// Stand je Bildpunkt teurer wuerde als die Gruppen wert sind. Wer tiefer
+    /// schachtelt, hat ein anderes Problem als diese Grenze.
+    /// </summary>
+    private const int MaxDepth = 8;
+
+    /// <summary>Ob ein Schritt eine Ebene ist oder die Klammer einer Gruppe.</summary>
+    private enum StepKind
+    {
+        Layer,
+        Begin,
+        End,
+    }
+
+    /// <summary>
+    /// Macht aus dem Baum eine flache Folge mit Klammern.
+    ///
+    /// Flach und nicht rekursiv, weil die innere Schleife je Bildpunkt laeuft: Eine
+    /// Rekursion dort waere bei 4K fuenfundzwanzig Millionen Aufrufe tief. Die
+    /// Schachtelung steckt stattdessen in zwei Marken und einer kleinen Halde.
+    /// </summary>
+    private static void Collect(IEnumerable<ImageLayer> layers,
+                                IReadOnlyDictionary<string, FloatFrame> sources,
+                                List<(ImageLayer Layer, FloatFrame? Frame, StepKind Kind)> into,
+                                ref int width, ref int height, int depth)
+    {
+        foreach (var layer in layers)
+        {
+            if (!layer.Visible || layer.Opacity <= 0.0005f) continue;
+
+            // Was obenauf liegt, gehoert nicht in den Stapel: Es wird erst nach der
+            // Bildwerdung aufgetragen, siehe Overlays.
+            if (layer.OnTop && layer.Content == LayerContent.Image) continue;
+
+            if (layer.Content == LayerContent.Group)
+            {
+                // Zu tief geschachtelt: die Gruppe faellt weg, ihre Kinder bleiben.
+                // Sie stillschweigend mitsamt Inhalt zu verschlucken waere die
+                // schlechtere Antwort - man saehe ein Bild, in dem etwas fehlt.
+                if (depth >= MaxDepth)
+                {
+                    Collect(layer.Children, sources, into, ref width, ref height, depth);
+                    continue;
+                }
+
+                into.Add((layer, null, StepKind.Begin));
+                Collect(layer.Children, sources, into, ref width, ref height, depth + 1);
+                into.Add((layer, null, StepKind.End));
+
+                continue;
+            }
+
+            // Eine Einstellungsebene bringt kein Bild mit - sie rechnet mit dem, was
+            // schon da ist. Sie gibt deshalb auch keine Groesse vor; die kommt von
+            // den Passen darunter.
+            if (layer.Content == LayerContent.Adjustment)
+            {
+                into.Add((layer, null, StepKind.Layer));
+                continue;
+            }
+
+            if (!sources.TryGetValue(layer.Source, out var frame)) continue;
+
+            // Die erste brauchbare Ebene gibt die Groesse vor.
+            //
+            // Frueher fiel alles Abweichende heraus - Skalieren war eine andere
+            // Aufgabe als Mischen. Jetzt gibt es die Platzierung, und damit ist eine
+            // Ebene anderer Groesse kein Sonderfall mehr, sondern ein Logo: Sie wird
+            // mittig eingepasst, und Massstab und Versatz rechnen von dort weiter.
+            //
+            // Die GROESSE gibt sie trotzdem nicht vor. Sonst bestimmte ein
+            // Wasserzeichen von 200 Punkten die Leinwand, wenn es zufaellig zuunterst
+            // liegt.
+            if (width == 0 && layer.Content == LayerContent.Pass)
+            {
+                width = frame.Width;
+                height = frame.Height;
+            }
+
+            into.Add((layer, frame, StepKind.Layer));
+        }
+    }
+
+    /// <summary>
+    /// Mischt - in linearem Licht oder im Anzeigeraum, je nachdem, was die Ebene sagt.
+    ///
+    /// An einer Stelle, weil der Composer an vier Stellen mischt: je Ebene, beim
+    /// Schliessen einer Gruppe, beim Auftragen einer Gruppe und am Ende. Vier
+    /// Verzweigungen waeren vier Gelegenheiten, eine davon zu vergessen.
+    /// </summary>
+    internal static void Blend(BlendMode mode, bool display, float opacity,
+                               float ur, float ug, float ub,
+                               float or_, float og, float ob,
+                               out float r, out float g, out float b)
+    {
+        // Ohne Deckkraft bleibt, was darunter liegt - genau, und nicht beinahe. Durch
+        // die Mischung geschickt gaebe es im Anzeigeraum einen Hin- und Rueckweg durch
+        // sRGB, und bei Teilen durch null ein NaN, das mit null multipliziert NaN bleibt.
+        if (opacity <= 0f)
+        {
+            r = ur;
+            g = ug;
+            b = ub;
+            return;
+        }
+
+        if (display)
+            Blending.MixDisplay(mode, opacity, ur, ug, ub, or_, og, ob, out r, out g, out b);
+        else
+            Blending.Mix(mode, opacity, ur, ug, ub, or_, og, ob, out r, out g, out b);
+    }
+
+    /// <summary>Was je Ebene einmal feststeht.</summary>
+    private readonly struct Plan
+    {
+        public Plan(FloatFrame? frame, BlendMode mode, float opacity,
+                    float sr, float sg, float sb, bool clipped, MaskSampler sampler,
+                    LayerContent content, LayerGrade grade, StepKind step,
+                    bool placed, LayerPlacement placement,
+                    float matteFloor, bool display, float reveal)
+        {
+            Sampler = sampler;
+            Display = display;
+            Reveal = reveal;
+            MatteFloor = matteFloor;
+            Content = content;
+            Grade = grade;
+            Kind = step;
+            Placed = placed;
+            Placement = placement;
+            Frame = frame;
+            Mode = mode;
+            Opacity = opacity;
+            ScaleR = sr;
+            ScaleG = sg;
+            ScaleB = sb;
+            Clipped = clipped;
+        }
+
+        public readonly FloatFrame? Frame;
+        public readonly StepKind Kind;
+        public readonly bool Placed;
+        public readonly LayerPlacement Placement;
+        public readonly LayerContent Content;
+        public readonly LayerGrade Grade;
+        public readonly BlendMode Mode;
+        public readonly bool Clipped;
+        public readonly float Opacity, ScaleR, ScaleG, ScaleB;
+
+        /// <summary>Die Maske der Ebene, fertig zum Fragen - samt dem, was sie begrenzt.</summary>
+        public readonly MaskSampler Sampler;
+
+        public readonly float MatteFloor;
+
+        /// <summary>Ob diese Ebene im Anzeigeraum mischt - siehe ImageLayer.</summary>
+        public readonly bool Display;
+
+        /// <summary>Wieviel von dem gezeigt wird, was unter der Deckung steht.</summary>
+        public readonly float Reveal;
+    }
+}

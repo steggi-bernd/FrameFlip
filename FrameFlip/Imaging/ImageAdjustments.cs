@@ -87,15 +87,36 @@ public sealed record ImageAdjustments
     /// "Gamma 0,9999999999995" in der Konfiguration und die Korrektur gilt als aktiv,
     /// obwohl nichts zu sehen ist.
     /// </summary>
-    public ImageAdjustments Clamped() => this with
+    /// <summary>
+    /// Kleinster Abstand zwischen Schwarz- und Weisspunkt.
+    ///
+    /// Ohne ihn liessen sich die beiden ueberkreuzen, und dann dreht sich die
+    /// Tonwertkurve um: Der Spannenwert wird negativ, das Bild kippt ins Negative,
+    /// und niemand bringt das mit dem Regler in Verbindung, den er zuletzt bewegt
+    /// hat. Beide einzeln zu begrenzen reicht dafuer nicht - sie muessen
+    /// gegeneinander begrenzt werden.
+    /// </summary>
+    public const double MinimumSpan = 0.05;
+
+    public ImageAdjustments Clamped()
     {
-        Exposure = Snap(Math.Clamp(Exposure, -6, 6), 0),
-        BlackPoint = Snap(Math.Clamp(BlackPoint, 0, 0.95), 0),
-        WhitePoint = Snap(Math.Clamp(WhitePoint, 0.05, 2.0), 1.0),
-        Gamma = Snap(Math.Clamp(Gamma, 0.1, 5.0), 1.0),
-        Contrast = Snap(Math.Clamp(Contrast, 0, 4.0), 1.0),
-        Saturation = Snap(Math.Clamp(Saturation, 0, 4.0), 1.0),
-    };
+        double white = Math.Clamp(WhitePoint, 0.05, 2.0);
+        double black = Math.Clamp(BlackPoint, 0, 0.95);
+
+        // Der Weisspunkt gewinnt: Er ist der Bezug, auf den sich alles andere
+        // bezieht, und ihn nachzugeben waere die groessere Ueberraschung.
+        if (black > white - MinimumSpan) black = Math.Max(0, white - MinimumSpan);
+
+        return this with
+        {
+            Exposure = Snap(Math.Clamp(Exposure, -6, 6), 0),
+            BlackPoint = Snap(black, 0),
+            WhitePoint = Snap(white, 1.0),
+            Gamma = Snap(Math.Clamp(Gamma, 0.1, 5.0), 1.0),
+            Contrast = Snap(Math.Clamp(Contrast, 0, 4.0), 1.0),
+            Saturation = Snap(Math.Clamp(Saturation, 0, 4.0), 1.0),
+        };
+    }
 
     private static double Snap(double value, double neutral)
         => Same(value, neutral) ? neutral : Math.Round(value, 3);

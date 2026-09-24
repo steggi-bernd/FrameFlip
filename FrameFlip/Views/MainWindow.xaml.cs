@@ -11,6 +11,7 @@ using System.Windows.Threading;
 using FrameFlip.Bridge;
 using FrameFlip.Configuration;
 using FrameFlip.Decoding;
+using FrameFlip.Dashboard;
 using FrameFlip.Export;
 using FrameFlip.Diagnostics;
 using FrameFlip.Localization;
@@ -41,10 +42,9 @@ namespace FrameFlip.Views;
 /// die Menues zeigt. Sie legen sich ueber die drei Spalten, statt sie zu ersetzen:
 /// Wer zurueckwechselt, findet dieselbe Sequenz an derselben Stelle wieder.
 ///
-/// Was hier bewusst NICHT passiert: Das Dashboard baut keinen zweiten Abspieler.
-/// Es zeigt den gewaehlten Frame als Einzelbild - ohne Ringpuffer, ohne Bildratenuhr,
-/// ohne Dekodierkette. Die liegen im Vorschaufenster, und zweimal dieselbe Mechanik
-/// waere zweimal derselbe Fehler.
+/// Auswahl, Ordnerbeobachtung, Bildspeicher, Videovorbereitung und Wiedergabe haben
+/// eigene Controller. Das Fenster verbindet deren Entscheidungen mit Zeitgebern,
+/// WPF-Eingaben und Anzeigen.
 /// </summary>
 public partial class MainWindow : Window
 {
@@ -71,41 +71,29 @@ public partial class MainWindow : Window
     private Web.WatchService? _watched;
 
     private readonly FrameDecoderRegistry _decoders = FrameDecoderRegistry.CreateDefault();
+    private readonly DashboardFrameController _frames;
+    private readonly DashboardVideoController _videos;
 
     private readonly DispatcherTimer _ticker;
     private readonly DispatcherTimer _player;
 
-    private readonly List<(ToggleButton Button, RenderEntry Entry)> _sequenceButtons = new();
+    private readonly List<(ToggleButton Button, DashboardSequenceEntry Entry)> _sequenceButtons = new();
 
-    /// <summary>Von Hand geoeffnete Ordner - leben nur, solange das Fenster offen ist.</summary>
-    private readonly List<RenderEntry> _adhoc = new();
+    private readonly DashboardSequenceController _sequences;
     private readonly List<string> _log = new();
     private readonly List<MetricTile> _tiles = new();
 
-    private ImageSequence? _sequence;
-    private RenderEntry? _current;
-
-    /// <summary>Laeuft mit jedem Neuaufbau der Liste hoch; spaete Zaehlungen verfallen.</summary>
-    private int _listGeneration;
+    private ImageSequence? _sequence => _sequences.Sequence;
+    private DashboardSequenceEntry? _current => _sequences.Current;
 
     /// <summary>Die zuletzt gesehene Auftragsnummer - daran haengt der Neuaufbau der Liste.</summary>
     private string _lastJobId = string.Empty;
     private IReadOnlyList<int> _missing = Array.Empty<int>();
 
-    private int _head;
-    private int _inPoint;
-    private int _outPoint;
-    private bool _playing;
+    /// <summary>Kopf, Bereich, Abspielzustand, Follow und Bildrate.</summary>
+    private readonly DashboardPlaybackController _playback;
+
     private bool _scrubbing;
-
-    /// <summary>Der Pfad, der als naechstes auf die Buehne soll - oder null.</summary>
-    private string? _wanted;
-
-    /// <summary>Die vorausgeladene Folge, an derselben Stelle wie ihre Bilder.</summary>
-    private BitmapSource?[] _cache = Array.Empty<BitmapSource?>();
-
-    /// <summary>Laeuft, solange vorausgeladen wird.</summary>
-    private SequencePreloader? _preloader;
 
     /// <summary>Ob Abspielen erst vorauslaedt. Wird mit den Einstellungen gemerkt.</summary>
     private bool _prebuffer = true;
@@ -113,35 +101,19 @@ public partial class MainWindow : Window
     /// <summary>Ob beim Vorausladen nebenher ein Video entsteht.</summary>
     private bool _prepareVideo;
 
-    /// <summary>Laeuft, solange im Hintergrund kodiert wird.</summary>
-    private CancellationTokenSource? _prepping;
-
-    /// <summary>Die zuletzt fertiggestellte Vorbereitung - oder null.</summary>
-    private string? _prepared;
-
-    /// <summary>Ob gerade ein Bild gelesen wird. Es laeuft immer hoechstens eines.</summary>
-    private bool _decoding;
-
     /// <summary>Format und Farbtiefe der Sequenz - einmal ermittelt, dann angezeigt.</summary>
     private string _format = string.Empty;
 
     private string _page = "dashboard";
     private string _panel = "metrics";
-    private double _fps = 24;
 
     private ToggleButton? _loopChip;
 
     /// <summary>Der Zeiger auf der Zeitleiste - wandert, statt neu zu entstehen.</summary>
     private Rectangle? _headMark;
 
-    /// <summary>Sieht dem Ausgabeordner beim Wachsen zu. Einer, und nur fuer die Auswahl.</summary>
-    private FileSystemWatcher? _watcher;
-
-    /// <summary>Sammelt Dateimeldungen ein, statt jede einzeln zu beantworten.</summary>
-    private DispatcherTimer? _settle;
-
-    /// <summary>Ob der Kopf auf dem neuesten Bild bleiben soll.</summary>
-    private bool _follow = true;
+    /// <summary>Ordnerbeobachtung und Ruhefrist der aktuell gewaehlten Folge.</summary>
+    private readonly DashboardLiveController _live;
 
     /// <summary>Der zuletzt gemeldete Ladestand - fuer den Balken beim Groessenwechsel.</summary>
     private PreloadProgress? _lastPreload;
@@ -167,12 +139,28 @@ public partial class MainWindow : Window
         Action<AppSettings>? persist = null, Func<AppSettings, string?>? applySettings = null,
         Func<AppSettings>? getSettings = null, Func<Web.WatchService?>? watch = null,
         Action? renewWatch = null, Action<string?>? setWatchCode = null)
+        : this(DashboardFrameSources.Default, monitor, remoteState, showSettings, openSequence, showPairing,
+            settings, persist, applySettings, getSettings, watch, renewWatch, setWatchCode)
     {
+    }
+
+    internal MainWindow(DashboardFrameSources frameSources, RenderMonitor? monitor, Func<RelayState?> remoteState,
+        Action showSettings, Action<string> openSequence, Action showPairing, AppSettings? settings = null,
+        Action<AppSettings>? persist = null, Func<AppSettings, string?>? applySettings = null,
+        Func<AppSettings>? getSettings = null, Func<Web.WatchService?>? watch = null,
+        Action? renewWatch = null, Action<string?>? setWatchCode = null, DashboardVideoSources? videoSources = null)
+    {
+        _frames = new DashboardFrameController(frameSources, DispatchFrame, ShowDecodedFrame,
+            ShowPreloadProgress, () => DecodeWidth(atLeast: 960), CurrentPace);
         _watch = watch ?? (() => null);
         _renewWatch = renewWatch;
         _setWatchCode = setWatchCode;
 
         _monitor = monitor;
+        _videos = new DashboardVideoController(videoSources ?? DashboardVideoSources.Default,
+            () => _monitor?.Job?.IsRunning == true
+                ? System.Diagnostics.ProcessPriorityClass.Idle
+                : System.Diagnostics.ProcessPriorityClass.BelowNormal);
         _remoteState = remoteState;
         _openSequence = openSequence;
         _persist = persist;
@@ -198,13 +186,22 @@ public partial class MainWindow : Window
              * TermsHost kann noch fehlen: Der Aufruf hier steht vor InitializeComponent. */
             if ((next.RemoteEnabled || next.WatchEnabled)
                 && !_getSettings().TermsOk
-                && TermsHost is { Visibility: not Visibility.Visible })
+                && !next.TermsOk)
             {
-                AskTerms(Wiederholung(next));
+                if (TermsHost is { Visibility: not Visibility.Visible })
+                    AskTerms(Wiederholung(next), next.RelayHost);
+                // Den angeforderten Stand erst nach Zustimmung an den Wirt geben.
+                // Auch eine Vorschau oder ein anderer Apply-Rueckruf darf vorher
+                // weder speichern noch den Entwurf durch Normalize veraendern.
+                return Strings.T("S_TermsMissing");
             }
 
             var error = applySettings?.Invoke(next);
             if (error is not null) return error;
+
+            // Ein von Hand eingetragener ffmpeg-Pfad aendert die Antwort auf die
+            // Frage, ob es gefunden wird. Die gemerkte Antwort gilt dann nicht mehr.
+            ForgetFfmpeg();
 
             current = next;
 
@@ -217,11 +214,16 @@ public partial class MainWindow : Window
             return null;
         };
 
+        _sequences = new DashboardSequenceController(DashboardSequenceSources.Default(_decoders),
+            action => Dispatcher.BeginInvoke(action), RefreshSequenceItem);
+        _playback = new DashboardPlaybackController(() => _sequences.Sequence);
+        _live = new DashboardLiveController(DashboardLiveSources.Default(Dispatcher), _decoders.IsSupported, RescanLive);
         _layout = DesktopLayout.Load();
 
         InitializeComponent();
 
         ApplyScale();
+        InitializeDashboardLayout();
 
         if (settings is not null)
         {
@@ -256,7 +258,7 @@ public partial class MainWindow : Window
         _ticker.Tick += (_, _) => Refresh();
         _ticker.Start();
 
-        _player = new DispatcherTimer { Interval = TimeSpan.FromSeconds(1.0 / Clean(_fps)) };
+        _player = new DispatcherTimer { Interval = _playback.Interval };
         _player.Tick += (_, _) => Advance();
 
         if (_monitor is not null)
@@ -274,15 +276,17 @@ public partial class MainWindow : Window
 
         Closed += (_, _) =>
         {
+            _frames.Dispose();
+            _videos.Dispose();
             Strings.Changed -= OnLanguageChanged;
             _layout.Changed -= OnLayoutChanged;
+            _settingsPage?.Dispose();
             _ticker.Stop();
             _player.Stop();
-            _settle?.Stop();
-            StopWatching();
+            _live.Dispose();
+            _sequences.Dispose();
             CancelPreload();
             DropCache();
-            _prepping?.Cancel();
         };
 
         _ready = true;
@@ -384,7 +388,7 @@ public partial class MainWindow : Window
         if (width > 0 && height > 0 && !double.IsNaN(width) && !double.IsNaN(height))
             elastic = ElasticFor(width, height);
 
-        double scale = _layout.Scale * elastic;
+        double scale = Math.Min(_layout.Scale * elastic, Math.Min(width / NeededWidth, height / NeededHeight));
 
         // Unter einem Promille sieht niemand etwas, aber jede Zuweisung stoesst ein
         // neues Layout an - und SizeChanged feuert waehrend des Ziehens dauernd.
@@ -441,6 +445,13 @@ public partial class MainWindow : Window
         ShowPage(key);
     }
 
+    /// <summary>
+    /// Die Atelierseite wird gehalten, nicht bei jedem Wechsel neu gebaut: Auf ihr
+    /// steht ein geoeffnetes Bild samt aller Reglerstellungen, und das waere nach
+    /// einem Blick in die Einstellungen sonst weg.
+    /// </summary>
+    private AtelierPage? _atelierPage;
+
     private void ShowPage(string key)
     {
         _page = key;
@@ -457,13 +468,18 @@ public partial class MainWindow : Window
         if (dashboard)
         {
             PageContent.Content = null;
+            // Die eingeklappte Dashboard-Fläche hat während der Einstellungen
+            // keine nutzbaren Maße. Erst nach dem Einblenden neu aufteilen.
+            Dispatcher.BeginInvoke(new Action(ApplyDashboardLayout), DispatcherPriority.Loaded);
             return;
         }
 
+        AnimatePageChange();
         PageContent.Content = key switch
         {
             "projects" => new ProjectsPage(OpenFromProjects),
-            _ => new SettingsPage(_getSettings, _apply, _remoteState, _layout),
+            "atelier" => _atelierPage ??= new AtelierPage(_decoders, _getSettings(), next => _persist?.Invoke(next)),
+            _ => _settingsPage ??= new SettingsPage(_getSettings, _apply, _remoteState, _layout),
         };
     }
 
@@ -505,71 +521,20 @@ public partial class MainWindow : Window
 
     // ================================================================ Sequenzen
 
-    /// <summary>
-    /// Eine Zeile in der Sequenzspalte: eine Blender-Datei, die gerendert hat.
-    ///
-    /// Nicht jeder Bildordner auf der Platte, sondern die Renders, die FrameFlip
-    /// mitbekommen hat. Ein Ordner voller Bilder sagt nicht, woraus er entstanden
-    /// ist; die Bruecke sagt es, und das ist der Unterschied zwischen einer Liste
-    /// von Ordnern und einer Liste von Arbeit.
-    /// </summary>
-    private sealed class RenderEntry
+    private void LoadSequences() => LoadSequenceList(keepSelection: false);
+
+    private void LoadSequenceList(bool keepSelection)
     {
-        public string Name { get; init; } = string.Empty;
-        public string BlendPath { get; init; } = string.Empty;
-        public string Folder { get; init; } = string.Empty;
-        public string Seed { get; init; } = string.Empty;
-        public int Width { get; set; }
-        public int Height { get; set; }
-        public DateTime SeenUtc { get; init; }
-
-        /// <summary>Von Hand geoeffnet statt protokolliert - nur fuer diese Sitzung.</summary>
-        public bool Adhoc { get; init; }
-
-        /// <summary>Nachgetragen vom Hintergrunddurchgang; null, solange ungezaehlt.</summary>
-        public int? Frames { get; set; }
-
-        public int Missing { get; set; }
-
-        public bool HasOutput => Folder.Length > 0 && Directory.Exists(Folder);
-    }
-
-    private void LoadSequences()
-    {
+        _sequences.Reload(keepSelection);
         SequenceList.Children.Clear();
         _sequenceButtons.Clear();
-
-        var entries = new List<RenderEntry>();
-
-        // Was von Hand geoeffnet wurde, bleibt oben stehen, solange das Fenster
-        // offen ist. Sonst waere ein gerade geoeffneter Ordner ausgewaehlt, ohne
-        // dass er irgendwo in der Liste steht - Auswahl ohne Zeile.
-        entries.AddRange(_adhoc);
-
-        foreach (var known in ProjectLibrary.Load().Files)
-        {
-            if (!BlendProjects.IsBlendFile(known.Path)) continue;
-
-            entries.Add(new RenderEntry
-            {
-                Name = Path.GetFileName(known.Path),
-                BlendPath = known.Path,
-                Folder = known.Output,
-                Seed = known.Seed,
-                Width = known.Width,
-                Height = known.Height,
-                SeenUtc = known.SeenUtc,
-            });
-        }
-
-        foreach (var entry in entries)
+        foreach (var entry in _sequences.Entries)
         {
             var button = BuildSequenceItem(entry);
             SequenceList.Children.Add(button);
             _sequenceButtons.Add((button, entry));
         }
-
-        if (entries.Count == 0)
+        if (_sequences.Entries.Count == 0)
         {
             SequenceList.Children.Add(new TextBlock
             {
@@ -579,72 +544,11 @@ public partial class MainWindow : Window
                 FontSize = 11.5,
                 Foreground = (Brush)FindResource("DesktopFaint"),
             });
-
-            ShowEmptyStage();
-            return;
         }
-
-        CountFramesInBackground(entries);
-
-        var first = entries.FirstOrDefault(e => e.HasOutput) ?? entries[0];
-        Select(first);
+        ApplySequenceSelection();
     }
 
-    /// <summary>
-    /// Die Bildzahl je Zeile nachtragen.
-    ///
-    /// Abseits des Oberflaechenfadens, und erst nachdem die Liste steht: Ein Dutzend
-    /// Ordner zu zaehlen dauert laenger, als das Fenster auf sich warten lassen darf,
-    /// und die Zahl ist Beiwerk - der Name ist die Auskunft.
-    /// </summary>
-    private void CountFramesInBackground(List<RenderEntry> entries)
-    {
-        var pending = entries.Where(e => e.Frames is null && e.HasOutput).ToList();
-        if (pending.Count == 0) return;
-
-        int generation = ++_listGeneration;
-
-        Task.Run(() =>
-        {
-            foreach (var entry in pending)
-            {
-                if (generation != _listGeneration) return;
-
-                try
-                {
-                    // Derselbe Leser wie bei der Auswahl. Die Zahl von Hand zu
-                    // ermitteln waere schneller, muesste aber dieselbe Namensregel
-                    // ein zweites Mal treffen - und zwei Regeln driften auseinander.
-                    string seed = entry.Seed.Length > 0 && File.Exists(entry.Seed)
-                        ? entry.Seed
-                        : SequenceScanner.FindFirstImage(entry.Folder, _decoders) ?? string.Empty;
-
-                    if (seed.Length == 0) continue;
-
-                    var scanned = SequenceScanner.Scan(seed, _decoders);
-                    if (scanned is null) continue;
-
-                    int count = scanned.Count;
-                    int gaps = scanned.MissingNumbers().Count;
-
-                    Dispatcher.BeginInvoke(new Action(() =>
-                    {
-                        if (generation != _listGeneration) return;
-
-                        entry.Frames = count;
-                        entry.Missing = gaps;
-                        RefreshSequenceItem(entry);
-                    }));
-                }
-                catch (Exception)
-                {
-                    // Ein Ordner, der nicht lesbar ist, bleibt eben ohne Zahl.
-                }
-            }
-        });
-    }
-
-    private ToggleButton BuildSequenceItem(RenderEntry entry)
+    private ToggleButton BuildSequenceItem(DashboardSequenceEntry entry)
     {
         var row = new Grid();
         row.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
@@ -738,7 +642,7 @@ public partial class MainWindow : Window
     }
 
     /// <summary>Beschriftung und Marke einer Zeile - getrennt, weil sie nachgetragen werden.</summary>
-    private void Dress(RenderEntry entry, TextBlock meta, Border tag)
+    private void Dress(DashboardSequenceEntry entry, TextBlock meta, Border tag)
     {
         meta.Text = entry.HasOutput
             ? Path.GetFileName(entry.Folder.TrimEnd('\\', '/')) + " \u00b7 " + Ago(entry.SeenUtc)
@@ -756,7 +660,7 @@ public partial class MainWindow : Window
         label.Foreground = (Brush)FindResource(warn ? "DesktopWarn" : "DesktopMuted");
     }
 
-    private void RefreshSequenceItem(RenderEntry entry)
+    private void RefreshSequenceItem(DashboardSequenceEntry entry)
     {
         foreach (var (button, other) in _sequenceButtons)
         {
@@ -785,50 +689,35 @@ public partial class MainWindow : Window
 
     private bool Select(string seedOrFolder)
     {
-        foreach (var (button, entry) in _sequenceButtons)
-        {
-            if (!string.Equals(entry.Folder, seedOrFolder, StringComparison.OrdinalIgnoreCase) &&
-                !string.Equals(entry.Seed, seedOrFolder, StringComparison.OrdinalIgnoreCase) &&
-                !string.Equals(entry.BlendPath, seedOrFolder, StringComparison.OrdinalIgnoreCase))
-                continue;
-
-            button.IsChecked = true;
-            return true;
-        }
-
-        return false;
+        var entry = _sequences.Find(seedOrFolder);
+        if (entry is null) return false;
+        Select(entry);
+        return true;
     }
 
-    private void Select(RenderEntry entry)
+    private void Select(DashboardSequenceEntry entry)
     {
-        _current = entry;
+        if (_sequences.Select(entry)) ApplySequenceSelection();
+    }
 
-        foreach (var (button, other) in _sequenceButtons)
-            button.IsChecked = ReferenceEquals(other, entry);
-
+    private void ApplySequenceSelection()
+    {
         Pause();
-        _sequence = null;
+        DropCache();
+        foreach (var (button, other) in _sequenceButtons)
+            button.IsChecked = ReferenceEquals(other, _current);
 
-        try
+        if (_current is not { } entry)
         {
-            string seed = entry.Seed.Length > 0 && File.Exists(entry.Seed)
-                ? entry.Seed
-                : entry.HasOutput
-                    ? SequenceScanner.FindFirstImage(entry.Folder, _decoders) ?? string.Empty
-                    : string.Empty;
-
-            if (seed.Length > 0) _sequence = SequenceScanner.Scan(seed, _decoders);
-        }
-        catch (Exception)
-        {
-            // Ein Ordner, der inzwischen weg ist, darf das Fenster nicht mitnehmen.
-            _sequence = null;
+            _live.WatchFolder(null);
+            ShowEmptyStage();
+            return;
         }
 
         if (_sequence is null || _sequence.Count == 0)
         {
             ShowEmptyStage();
-            WatchFolder(entry.Folder);
+            _live.WatchFolder(entry.Folder);
 
             // Der Name bleibt stehen, auch ohne Bild: Die Zeile ist ausgewaehlt,
             // und eine leere Kopfzeile sieht aus wie ein Fehler statt wie ein
@@ -842,20 +731,13 @@ public partial class MainWindow : Window
         SequenceName.Text = entry.Name;
 
         _missing = _sequence.MissingNumbers();
-        _inPoint = _sequence.StartNumber;
-        _outPoint = _sequence.EndNumber;
+        _playback.ResetRange(_sequence);
 
-        // Eine andere Folge, andere Bilder. Was noch im Speicher liegt, gehoert nicht
-        // mehr hierher.
-        DropCache();
-
-        entry.Frames = _sequence.Count;
-        entry.Missing = _missing.Count;
         RefreshSequenceItem(entry);
 
         Note(Strings.T("D_LogOpened", entry.Name, _sequence.Count));
 
-        WatchFolder(entry.Folder);
+        _live.WatchFolder(entry.Folder);
         ShapeStage();
         BuildStrip();
         BuildGaps();
@@ -870,14 +752,7 @@ public partial class MainWindow : Window
     /// Ohne das Merken spraenge waehrend eines laufenden Renders die Auswahl auf die
     /// oberste Zeile zurueck - mitten im Zusehen.
     /// </summary>
-    private void ReloadSequencesKeepingSelection()
-    {
-        string? keep = _current?.BlendPath.Length > 0 ? _current.BlendPath : _current?.Folder;
-
-        LoadSequences();
-
-        if (keep is { Length: > 0 }) Select(keep);
-    }
+    private void ReloadSequencesKeepingSelection() => LoadSequenceList(keepSelection: true);
 
     /// <summary>
     /// Eine Bildsequenz von Hand oeffnen.
@@ -908,23 +783,7 @@ public partial class MainWindow : Window
     /// </summary>
     private bool OpenPath(string path)
     {
-        if (path.Length == 0 || !File.Exists(path)) return false;
-        if (!_decoders.IsSupported(Path.GetExtension(path))) return false;
-
-        string? folder = Path.GetDirectoryName(path);
-        if (folder is null) return false;
-
-        var entry = new RenderEntry
-        {
-            Name = Path.GetFileName(folder.TrimEnd('\\', '/')),
-            Folder = folder,
-            Seed = path,
-            SeenUtc = DateTime.UtcNow,
-            Adhoc = true,
-        };
-
-        _adhoc.RemoveAll(a => string.Equals(a.Folder, folder, StringComparison.OrdinalIgnoreCase));
-        _adhoc.Insert(0, entry);
+        if (!_sequences.AddPath(path)) return false;
 
         LoadSequences();
         Select(path);
@@ -935,7 +794,7 @@ public partial class MainWindow : Window
         // hier, weil erst die Auswahl weiss, wieviele Bilder es geworden sind.
         RecentSequences.Remember(new RecentSequence
         {
-            Folder = folder,
+            Folder = _current!.Folder,
             Seed = path,
             First = opened.StartNumber,
             Last = opened.EndNumber,
@@ -949,152 +808,32 @@ public partial class MainWindow : Window
 
     // ================================================================ Live
 
-    /// <summary>
-    /// Dem Ausgabeordner zusehen.
-    ///
-    /// Zwei Quellen melden neue Bilder, und beide werden gebraucht: Die Bruecke
-    /// weiss es zuerst, aber nur waehrend eines Renders, den FrameFlip mitbekommt.
-    /// Der Ordnerwaechter weiss es auch dann, wenn Blender ohne Bruecke laeuft oder
-    /// jemand von Hand Dateien hineinlegt. Beide muenden in denselben Sammelpunkt,
-    /// damit doppelte Meldungen nichts doppelt tun.
-    /// </summary>
-    private void WatchFolder(string? folder)
-    {
-        StopWatching();
-
-        if (string.IsNullOrEmpty(folder) || !Directory.Exists(folder)) return;
-
-        try
-        {
-            _watcher = new FileSystemWatcher(folder)
-            {
-                // Die Groesse zaehlt mit: Ein Renderer legt die Datei zuerst leer an
-                // und fuellt sie danach. Nur auf das Anlegen zu hoeren hiesse, das
-                // halbe Bild zu lesen.
-                NotifyFilter = NotifyFilters.FileName | NotifyFilters.Size | NotifyFilters.LastWrite,
-                IncludeSubdirectories = false,
-                EnableRaisingEvents = true,
-            };
-
-            _watcher.Created += OnFolderChanged;
-            _watcher.Changed += OnFolderChanged;
-            _watcher.Renamed += OnFolderChanged;
-        }
-        catch (Exception)
-        {
-            // Ein Netzlaufwerk ohne Benachrichtigungen, ein Ordner ohne Rechte:
-            // Dann bleibt es beim Takt der Bruecke, und mehr passiert nicht.
-            StopWatching();
-        }
-    }
-
-    private void StopWatching()
-    {
-        if (_watcher is null) return;
-
-        try
-        {
-            _watcher.EnableRaisingEvents = false;
-            _watcher.Created -= OnFolderChanged;
-            _watcher.Changed -= OnFolderChanged;
-            _watcher.Renamed -= OnFolderChanged;
-            _watcher.Dispose();
-        }
-        catch (Exception)
-        {
-            // Beim Abbauen ist nichts mehr zu retten.
-        }
-
-        _watcher = null;
-    }
-
-    /// <summary>Kommt vom Waechterfaden, nicht vom Oberflaechenfaden.</summary>
-    private void OnFolderChanged(object sender, FileSystemEventArgs e)
-    {
-        if (!_decoders.IsSupported(Path.GetExtension(e.Name ?? string.Empty))) return;
-
-        Dispatcher.BeginInvoke(new Action(NoteNewFrames));
-    }
-
-    /// <summary>
-    /// Nicht sofort nachsehen, sondern gleich.
-    ///
-    /// Ein Render schreibt in Schueben, und ein Ordner mit tausend Bildern neu
-    /// einzulesen kostet mehr, als das Ergebnis wert ist, wenn es gleich wieder
-    /// veraltet. Die Frist beginnt mit jeder Meldung von vorn; ruht der Ordner eine
-    /// halbe Sekunde, wird einmal gelesen.
-    /// </summary>
-    private void NoteNewFrames()
-    {
-        _settle ??= CreateSettleTimer();
-
-        _settle.Stop();
-        _settle.Start();
-    }
-
-    private DispatcherTimer CreateSettleTimer()
-    {
-        var timer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(500) };
-
-        timer.Tick += (_, _) =>
-        {
-            timer.Stop();
-            RescanLive();
-        };
-
-        return timer;
-    }
-
     /// <summary>Die Sequenz neu einlesen, ohne die Auswahl oder die Stelle zu verlieren.</summary>
     private void RescanLive()
     {
-        if (_current is null || _sequence is null) return;
-
-        ImageSequence? fresh;
-
-        try
+        var change = _sequences.Rescan();
+        if (change is null) return;
+        if (change.Previous is null)
         {
-            string seed = _sequence.Frames[0].Path;
-
-            fresh = File.Exists(seed)
-                ? SequenceScanner.Scan(seed, _decoders)
-                : SequenceScanner.FindFirstImage(_current.Folder, _decoders) is { } other
-                    ? SequenceScanner.Scan(other, _decoders)
-                    : null;
-        }
-        catch (Exception)
-        {
+            ApplySequenceSelection();
             return;
         }
-
-        if (fresh is null || fresh.Count == 0) return;
-        if (fresh.Count == _sequence.Count && fresh.EndNumber == _sequence.EndNumber) return;
-
-        bool grewAtEnd = fresh.EndNumber > _sequence.EndNumber;
-
-        // Stand das Ende auf dem letzten Bild, wandert es mit. Hatte jemand den
-        // Bereich von Hand gesetzt, bleibt er stehen - ein laufender Render darf die
-        // Auswahl des Benutzers nicht ueberschreiben.
-        bool outWasAtEnd = _outPoint == _sequence.EndNumber;
-
-        _sequence = fresh;
+        var fresh = change.Current;
         _missing = fresh.MissingNumbers();
 
         // Der Render hat weitergeschrieben: Die Stellen stimmen nicht mehr ueberein.
         DropCache();
 
-        if (outWasAtEnd) _outPoint = fresh.EndNumber;
-        if (_inPoint < fresh.StartNumber) _inPoint = fresh.StartNumber;
+        // Ein von Hand gesetztes Ende bleibt stehen; nur das offene Ende waechst mit.
+        int? follow = _playback.Rescan(change.Previous, fresh);
 
-        _current.Frames = fresh.Count;
-        _current.Missing = _missing.Count;
-        RefreshSequenceItem(_current);
+        RefreshSequenceItem(_current!);
 
         BuildStrip();
         BuildGaps();
         DrawScrub();
 
-        if (_follow && grewAtEnd && !_playing) ShowFrame(fresh.EndNumber);
+        if (follow is int newest) ShowFrame(newest);
         else UpdateStripSelection();
 
         Refresh();
@@ -1104,9 +843,7 @@ public partial class MainWindow : Window
     {
         if (sender is not ToggleButton toggle) return;
 
-        _follow = toggle.IsChecked == true;
-
-        if (_follow && _sequence is { Count: > 0 } sequence && !_playing) ShowFrame(sequence.EndNumber);
+        if (_playback.SetFollow(toggle.IsChecked == true) is int newest) ShowFrame(newest);
     }
 
     /// <summary>
@@ -1118,28 +855,23 @@ public partial class MainWindow : Window
     /// </summary>
     private void DropCache()
     {
-        // Eine Vorbereitung, die zu einer anderen Folge gehoert, ist wertlos.
-        _prepping?.Cancel();
-        _prepared = null;
-
-        if (_cache.Length == 0) return;
-
-        _cache = Array.Empty<BitmapSource?>();
-
-        GC.Collect(2, GCCollectionMode.Optimized, blocking: false);
+        if (_frames.IsPreloading) CancelPreload();
+        _frames.Reset(_sequence);
+        _lastPreload = null;
+        _videos.Reset();
     }
-
     private void ShowEmptyStage()
     {
-        _sequence = null;
         _missing = Array.Empty<int>();
 
         StageImage.Source = null;
         StageEmpty.Visibility = Visibility.Visible;
+        StageEmpty.SetResourceReference(TextBlock.TextProperty, "D_StageStartHint");
 
-        SequenceName.Text = string.Empty;
+        SequenceName.SetResourceReference(TextBlock.TextProperty, "D_StageTitle");
         SequenceFile.Text = string.Empty;
         StageHead.Text = string.Empty;
+        StageZoom.Text = string.Empty;
         StageDecode.Text = string.Empty;
 
         FilmStrip.Children.Clear();
@@ -1216,13 +948,10 @@ public partial class MainWindow : Window
 
     private void ShowFrame(int number)
     {
-        if (_sequence is null || _sequence.Count == 0) return;
-
-        int index = _sequence.IndexNearestNumber(number);
-        if (index < 0) return;
+        int index = _playback.Seek(number);
+        if (_sequence is null || index < 0) return;
 
         var frame = _sequence.Frames[index];
-        _head = frame.Number;
 
         SequenceFile.Text = "/ " + frame.FileName;
         StageHead.Text = frame.Number.ToString(_sequence.NumberFormat, CultureInfo.InvariantCulture);
@@ -1235,88 +964,21 @@ public partial class MainWindow : Window
         UpdateStripSelection();
         MoveHead();
 
-        // Liegt das Bild schon im Speicher, ist Anzeigen alles, was zu tun ist -
-        // kein Faden, keine Platte, kein Warten. Genau dafuer wurde vorausgeladen.
-        if (index < _cache.Length && _cache[index] is { } ready)
-        {
-            StageImage.Source = ready;
-            StageEmpty.Visibility = Visibility.Collapsed;
-            StageDecode.Text = _format;
-            _wanted = null;
-            return;
-        }
-
-        _wanted = frame.Path;
-        Decode();
+        _frames.Request(index);
     }
 
-    /// <summary>
-    /// Das zuletzt verlangte Bild lesen - und immer nur eines auf einmal.
-    ///
-    /// Beim Abspielen kommt der naechste Wunsch, bevor der vorige gelesen ist. Alle
-    /// zu lesen hiesse bei 60 fps sechzig Dekodierungen je Sekunde, von denen die
-    /// meisten ungesehen weggeworfen wuerden - Arbeit, die der Renderer nebenan
-    /// besser gebrauchen kann.
-    ///
-    /// Gespeichert wird darum nur der WUNSCH, nicht der Auftrag: Waehrend gelesen
-    /// wird, ueberschreiben spaetere Wuensche einander, und sobald der Leser frei
-    /// ist, nimmt er den letzten. So bleibt hoechstens ein Bild Rueckstand, und der
-    /// holt sich selbst wieder ein.
-    /// </summary>
-    private void Decode()
+    private void ShowDecodedFrame(BitmapSource image)
     {
-        if (_decoding || _wanted is not { Length: > 0 } path) return;
-
-        _wanted = null;
-        _decoding = true;
-
-        // Dieselbe Breite wie beim Vorausladen, damit ein einzelnes Bild nicht
-        // schaerfer oder gröber aussieht als die abgespielte Folge. Vorher standen
-        // hier feste 1280 Punkte - auf einem breiten Fenster sichtbar zu wenig.
-        int crisp = DecodeWidth(atLeast: 960);
-
-        // Gelesen wird abseits des Oberflaechenfadens: Ein 4K-PNG kostet
-        // zweistellige Millisekunden, und die faellt bei jedem Schritt an.
-        Task.Run(() =>
-        {
-            BitmapSource? image = null;
-
-            try
-            {
-                var bitmap = new BitmapImage();
-                bitmap.BeginInit();
-                bitmap.UriSource = new Uri(path);
-                bitmap.CacheOption = BitmapCacheOption.OnLoad;
-                bitmap.CreateOptions = BitmapCreateOptions.IgnoreColorProfile;
-                bitmap.DecodePixelWidth = crisp;
-                bitmap.EndInit();
-                bitmap.Freeze();
-                image = bitmap;
-            }
-            catch (Exception)
-            {
-                // Halb geschrieben oder gesperrt - dann bleibt der vorige Frame stehen.
-            }
-
-            Dispatcher.BeginInvoke(new Action(() =>
-            {
-                _decoding = false;
-
-                if (image is not null)
-                {
-                    StageImage.Source = image;
-                    StageEmpty.Visibility = Visibility.Collapsed;
-                    StageDecode.Text = _format;
-                }
-
-                // Waehrend gelesen wurde, kann laengst ein neueres Bild gewuenscht
-                // sein. Dann gleich weiter - sonst bliebe die Buehne stehen, bis der
-                // naechste Takt kommt.
-                Decode();
-            }));
-        });
+        StageImage.Source = image;
+        StageEmpty.Visibility = Visibility.Collapsed;
+        StageDecode.Text = _format;
     }
 
+    private void DispatchFrame(Action action)
+    {
+        if (Dispatcher.CheckAccess()) action();
+        else Dispatcher.BeginInvoke(action);
+    }
     // ================================================================ Zeitleiste
 
     /// <summary>
@@ -1342,12 +1004,12 @@ public partial class MainWindow : Window
         // Der gewaehlte Bereich als Flaeche.
         var range = new Rectangle
         {
-            Width = Math.Max(0, AtScrub(_outPoint) - AtScrub(_inPoint)),
+            Width = Math.Max(0, AtScrub(_playback.OutPoint) - AtScrub(_playback.InPoint)),
             Height = height,
             Fill = new SolidColorBrush(Color.FromArgb(0x2E, 0xA8, 0x55, 0xF7)),
         };
 
-        Canvas.SetLeft(range, AtScrub(_inPoint));
+        Canvas.SetLeft(range, AtScrub(_playback.InPoint));
         ScrubCanvas.Children.Add(range);
 
         // Unterkante: wie weit der Ordner geschrieben ist.
@@ -1420,7 +1082,7 @@ public partial class MainWindow : Window
     {
         if (_headMark is null || _sequence is null) return;
 
-        Canvas.SetLeft(_headMark, Math.Max(0, Math.Min(ScrubCanvas.ActualWidth - 3, AtScrub(_head))));
+        Canvas.SetLeft(_headMark, Math.Max(0, Math.Min(ScrubCanvas.ActualWidth - 3, AtScrub(_playback.Head))));
     }
 
     private int ScrubSpan => _sequence is null ? 1 : Math.Max(1, _sequence.EndNumber - _sequence.StartNumber);
@@ -1517,7 +1179,7 @@ public partial class MainWindow : Window
 
         int count = _sequence.Count;
         int cells = FilmStrip.Children.Count;
-        int centre = _sequence.IndexNearestNumber(_head);
+        int centre = _sequence.IndexNearestNumber(_playback.Head);
         int start = Math.Max(0, Math.Min(Math.Max(0, count - cells), centre - cells / 2));
 
         for (int i = 0; i < FilmStrip.Children.Count; i++)
@@ -1537,7 +1199,7 @@ public partial class MainWindow : Window
             cell.Visibility = Visibility.Visible;
             cell.Tag = frame.Number;
             cell.Content = frame.Number.ToString(_sequence.NumberFormat, CultureInfo.InvariantCulture);
-            cell.IsChecked = frame.Number == _head;
+            cell.IsChecked = frame.Number == _playback.Head;
         }
     }
 
@@ -1547,13 +1209,13 @@ public partial class MainWindow : Window
     {
         // Waehrend geladen wird, bricht derselbe Knopf ab. Sonst muesste man auf
         // etwas warten, das man gar nicht mehr will.
-        if (_preloader is not null)
+        if (_frames.IsPreloading)
         {
             CancelPreload();
             return;
         }
 
-        if (_playing) Pause();
+        if (_playback.IsPlaying) Pause();
         else if (_prebuffer && NeedsPreload()) StartPreload();
         else Play();
     }
@@ -1561,89 +1223,28 @@ public partial class MainWindow : Window
     // ================================================================ Vorausladen
 
     /// <summary>Ob fuer den gewaehlten Bereich noch Bilder fehlen.</summary>
-    private bool NeedsPreload()
-    {
-        if (_sequence is null || _sequence.Count < 2) return false;
-        if (_cache.Length != _sequence.Count) return true;
-
-        for (int i = 0; i < _sequence.Count; i++)
-        {
-            var frame = _sequence.Frames[i];
-
-            if (frame.Number < _inPoint || frame.Number > _outPoint) continue;
-            if (_cache[i] is null) return true;
-        }
-
-        return false;
-    }
+    private bool NeedsPreload() => _frames.NeedsPreload(_playback.InPoint, _playback.OutPoint);
 
     private async void StartPreload()
     {
-        if (_sequence is null || _preloader is not null) return;
-
-        var sequence = _sequence;
-        var paths = sequence.Frames.Select(f => f.Path).ToList();
-
-        var loader = new SequencePreloader(paths, CurrentPace, ShowPreloadProgress);
-        _preloader = loader;
-
+        if (_sequence is null || _frames.IsPreloading) return;
+        int total = _sequence.Count;
         ShowPlayGlyph(playing: true);
         PreloadBar.Visibility = Visibility.Visible;
         PreloadNote.Text = string.Empty;
-        ShowPreloadProgress(new PreloadProgress(0, paths.Count, CurrentPace(), 0));
+        ShowPreloadProgress(new PreloadProgress(0, total, CurrentPace(), 0));
+        Note(Strings.T("D_LogPreload", total));
 
-        Note(Strings.T("D_LogPreload", paths.Count));
-
-        bool whole;
-
-        try
-        {
-            whole = await loader.RunAsync(DecodeWidth(), PreloadBudget(), StageAspect());
-        }
-        catch (Exception)
-        {
-            whole = false;
-        }
-
-        bool cancelled = !ReferenceEquals(_preloader, loader);
-
-        if (cancelled)
-        {
-            loader.Dispose();
-            return;
-        }
-
-        _preloader = null;
+        var result = await _frames.PreloadAsync(DecodeWidth(), PreloadBudget(), StageAspect());
+        // Zwischen Rueckgabe und Fortsetzung kann schon eine neue Auswahl gelten.
+        if (result is null || !_frames.IsCurrent(result)) return;
         PreloadBar.Visibility = Visibility.Collapsed;
-
-        // Die Folge kann sich waehrend des Ladens geaendert haben - ein Render
-        // schreibt weiter. Dann gehoeren die gelesenen Bilder nicht mehr zu dem,
-        // was hier steht.
-        if (!ReferenceEquals(_sequence, sequence))
-        {
-            loader.Dispose();
-            return;
-        }
-
-        _cache = loader.Frames;
-
-        // Hier stand ein Aufruf des Speicheraufraeumers. Er war falsch am Platz: Er
-        // gibt den Arbeitssatz ans Betriebssystem zurueck - also genau die Seiten, die
-        // eben mit Bildern gefuellt wurden. Gemessen blieben von 1594 MB geladener
-        // Bilder 344 MB im Arbeitssatz stehen; der Rest waere beim Abspielen einzeln
-        // zurueckgeholt worden, und dafuer wurde nicht vorausgeladen. Aufgeraeumt wird
-        // beim Verwerfen des Zwischenspeichers, nicht beim Fuellen.
-
-        Note(whole
-            ? Strings.T("D_LogPreloadDone", loader.Loaded)
-            : Strings.T("D_LogPreloadPart", loader.Loaded, paths.Count));
-
-        loader.Dispose();
-
-        ShowFrame(_inPoint);
+        Note(result.Whole
+            ? Strings.T("D_LogPreloadDone", result.Loaded)
+            : Strings.T("D_LogPreloadPart", result.Loaded, result.Total));
+        ShowFrame(_playback.InPoint);
         Play();
     }
-
     /// <summary>
     /// Nebenher schon das Video kodieren.
     ///
@@ -1658,13 +1259,22 @@ public partial class MainWindow : Window
     /// </summary>
     private async Task PrepareVideoAsync(ImageSequence sequence)
     {
-        if (_prepping is not null) return;
+        if (_videos.IsPreparing) return;
 
         string? exe = FfmpegLocator.Locate(_getSettings().FfmpegPath);
-        if (exe is null) return;
+
+        // Frueher stand hier ein blankes return. Der Knopf tat dann nichts und sagte
+        // auch nicht warum - fuer jemanden, der FrameFlip gerade geholt hat, ist das
+        // ein kaputtes Programm und kein fehlendes Werkzeug.
+        if (exe is null)
+        {
+            Note(Strings.T("S_ReadyNoFfmpegForExport"));
+            RefreshReadiness();
+            return;
+        }
 
         var frames = sequence.Frames
-            .Where(f => f.Number >= _inPoint && f.Number <= _outPoint)
+            .Where(f => f.Number >= _playback.InPoint && f.Number <= _playback.OutPoint)
             .ToList();
 
         if (frames.Count < 2) return;
@@ -1681,78 +1291,14 @@ public partial class MainWindow : Window
             height = ph;
         }
 
-        double fps = _fps;
-        var stop = new CancellationTokenSource();
-        _prepping = stop;
-
+        var request = new DashboardVideoRequest(exe, sequence.Pattern.Describe(), _playback.InPoint, _playback.OutPoint,
+            frames, _playback.Fps, width, height, preset, Math.Max(1, Environment.ProcessorCount / 4));
         Note(Strings.T("D_LogPrepare"));
-
-        try
-        {
-            var print = await Task.Run(() => new VideoFingerprint(
-                sequence.Pattern.Describe(), _inPoint, _outPoint, frames.Count, fps,
-                width, height, 0, preset.Name, nameof(GapHandling.HoldLast),
-                PreparedVideo.NewestTicks(frames.Select(f => f.Path))), stop.Token);
-
-            if (PreparedVideo.TryFind(print, preset.Extension, out string already))
-            {
-                Note(Strings.T("D_LogPrepareReady"));
-                _prepared = already;
-                return;
-            }
-
-            PreparedVideo.Prepare();
-
-            string target = PreparedVideo.PathFor(print, preset.Extension);
-
-            var request = new ExportRequest
-            {
-                Frames = frames,
-                Preset = preset,
-                OutputPath = target,
-                Fps = fps,
-                Gaps = GapHandling.HoldLast,
-                TargetWidth = 0,
-                SourceWidth = Math.Max(1, width),
-                SourceHeight = Math.Max(1, height),
-                Threads = Math.Max(1, Environment.ProcessorCount / 4),
-            };
-
-            var exporter = new VideoExporter(exe);
-
-            // Waehrend eines Renders ganz unten: Was hier entsteht, will niemand
-            // gerade sehen, und der Render schon.
-            var priority = _monitor?.Job?.IsRunning == true
-                ? System.Diagnostics.ProcessPriorityClass.Idle
-                : System.Diagnostics.ProcessPriorityClass.BelowNormal;
-
-            var result = await exporter.RunAsync(request, priority, stop.Token);
-
-            if (result.Success && result.OutputPath is { Length: > 0 } made)
-            {
-                PreparedVideo.Note(print, made);
-                _prepared = made;
-                Note(Strings.T("D_LogPrepareDone"));
-            }
-            else if (!result.Cancelled)
-            {
-                Note(Strings.T("D_LogPrepareFailed", result.Error ?? "?"));
-            }
-        }
-        catch (OperationCanceledException)
-        {
-            // Fenster zu oder Folge gewechselt.
-        }
-        catch (Exception error)
-        {
-            Note(Strings.T("D_LogPrepareFailed", error.Message));
-        }
-        finally
-        {
-            if (ReferenceEquals(_prepping, stop)) _prepping = null;
-
-            stop.Dispose();
-        }
+        var result = await _videos.PrepareAsync(request);
+        if (result is null || !_videos.IsCurrent(result)) return;
+        Note(result.Path is { Length: > 0 }
+            ? Strings.T(result.Reused ? "D_LogPrepareReady" : "D_LogPrepareDone")
+            : Strings.T("D_LogPrepareFailed", result.Error ?? "?"));
     }
 
     /// <summary>
@@ -1841,10 +1387,7 @@ public partial class MainWindow : Window
 
     private void CancelPreload()
     {
-        var loader = _preloader;
-        _preloader = null;
-
-        loader?.Cancel();
+        _frames.CancelPreload();
 
         PreloadBar.Visibility = Visibility.Collapsed;
         ShowPlayGlyph(playing: false);
@@ -1898,10 +1441,9 @@ public partial class MainWindow : Window
 
     private void Play()
     {
-        if (_sequence is null || _sequence.Count < 2) return;
+        if (!_playback.Play()) return;
 
-        _playing = true;
-        _player.Interval = TimeSpan.FromSeconds(1.0 / Clean(_fps));
+        _player.Interval = _playback.Interval;
         _player.Start();
 
         ShowPlayGlyph(playing: true);
@@ -1914,9 +1456,8 @@ public partial class MainWindow : Window
 
     private void Pause()
     {
-        if (!_playing) return;
+        if (!_playback.Pause()) return;
 
-        _playing = false;
         _player.Stop();
 
         ShowPlayGlyph(playing: false);
@@ -1945,23 +1486,11 @@ public partial class MainWindow : Window
 
     private void Advance()
     {
-        if (_sequence is null || _sequence.Count == 0) return;
-
-        int index = _sequence.IndexNearestNumber(_head) + 1;
-
-        if (index >= _sequence.Count || _sequence.Frames[index].Number > _outPoint)
+        switch (_playback.Advance(loop: _loopChip?.IsChecked == true, out int next))
         {
-            if (_loopChip?.IsChecked == true)
-            {
-                ShowFrame(_inPoint);
-                return;
-            }
-
-            Pause();
-            return;
+            case DashboardTick.Show: ShowFrame(next); break;
+            case DashboardTick.Stop: Pause(); break;
         }
-
-        ShowFrame(_sequence.Frames[index].Number);
     }
 
     private void OnStepBack(object sender, RoutedEventArgs e) => Step(-1);
@@ -1970,29 +1499,74 @@ public partial class MainWindow : Window
 
     private void Step(int delta)
     {
-        if (_sequence is null || _sequence.Count == 0) return;
+        if (_playback.StepTarget(delta) is not int target) return;
 
         Pause();
-
-        int index = Math.Clamp(_sequence.IndexNearestNumber(_head) + delta, 0, _sequence.Count - 1);
-        ShowFrame(_sequence.Frames[index].Number);
+        ShowFrame(target);
     }
 
-    private void OnJumpIn(object sender, RoutedEventArgs e) { Pause(); ShowFrame(_inPoint); }
+    private void OnJumpIn(object sender, RoutedEventArgs e) { Pause(); ShowFrame(_playback.InPoint); }
 
-    private void OnJumpOut(object sender, RoutedEventArgs e) { Pause(); ShowFrame(_outPoint); }
+    private void OnJumpOut(object sender, RoutedEventArgs e) { Pause(); ShowFrame(_playback.OutPoint); }
 
     private void OnWindowKeyDown(object sender, KeyEventArgs e)
     {
-        if (_page != "dashboard") return;
+        if (TermsHost.Visibility == Visibility.Visible)
+        {
+            if (e.Key == Key.Escape) { OnTermsLater(sender, e); e.Handled = true; }
+            return;
+        }
+        if (PairHost.Visibility == Visibility.Visible)
+        {
+            if (e.Key == Key.Escape) { OnPairClose(sender, e); e.Handled = true; }
+            return;
+        }
+        if (Keyboard.Modifiers == ModifierKeys.Control)
+        {
+            if (e.Key == Key.O)
+            {
+                NavDashboard.IsChecked = true;
+                ShowOpenDialog();
+                e.Handled = true;
+                return;
+            }
+            double? scale = e.Key switch
+            {
+                Key.Add or Key.OemPlus => _layout.Scale + .05,
+                Key.Subtract or Key.OemMinus => _layout.Scale - .05,
+                Key.D0 or Key.NumPad0 => 1,
+                _ => null,
+            };
+            if (scale is { } requested)
+            {
+                _layout.Scale = requested;
+                _layout.Save();
+                e.Handled = true;
+            }
+            return;
+        }
+        // Die Werkzeugspalte des Ateliers hoert auf V, W, C, H, I - dieselben
+        // Buchstaben wie anderswo, damit niemand sie neu lernen muss. Tastendruecke
+        // kommen im Fenster an und nicht auf der Seite, deshalb der Umweg hierher.
+        if (_page == "atelier" && Keyboard.Modifiers == ModifierKeys.None
+            && !OwnsNavigationKeys(e.OriginalSource as DependencyObject)
+            && _atelierPage is { } atelier && atelier.HandleToolKey(e.Key))
+        {
+            e.Handled = true;
+
+            return;
+        }
+
+        if (_page != "dashboard" || Keyboard.Modifiers != ModifierKeys.None
+            || OwnsNavigationKeys(e.OriginalSource as DependencyObject)) return;
 
         switch (e.Key)
         {
             case Key.Space: OnTogglePlay(sender, e); e.Handled = true; break;
             case Key.Left: Step(-1); e.Handled = true; break;
             case Key.Right: Step(+1); e.Handled = true; break;
-            case Key.Home: Pause(); ShowFrame(_inPoint); e.Handled = true; break;
-            case Key.End: Pause(); ShowFrame(_outPoint); e.Handled = true; break;
+            case Key.Home: Pause(); ShowFrame(_playback.InPoint); e.Handled = true; break;
+            case Key.End: Pause(); ShowFrame(_playback.OutPoint); e.Handled = true; break;
         }
     }
 
@@ -2030,7 +1604,7 @@ public partial class MainWindow : Window
         setIn.Checked += (_, _) =>
         {
             setIn.IsChecked = false;
-            _inPoint = Math.Min(_head, _outPoint);
+            _playback.MarkIn();
             DrawScrub();
             Refresh();
         };
@@ -2040,7 +1614,7 @@ public partial class MainWindow : Window
         setOut.Checked += (_, _) =>
         {
             setOut.IsChecked = false;
-            _outPoint = Math.Max(_head, _inPoint);
+            _playback.MarkOut();
             DrawScrub();
             Refresh();
         };
@@ -2057,8 +1631,8 @@ public partial class MainWindow : Window
     {
         foreach (double rate in CommonRates) RateBox.Items.Add(Rate(rate));
 
-        _fps = Clean(_getSettings().Fps);
-        RateBox.Text = Rate(_fps);
+        _playback.UseRate(_getSettings().Fps);
+        RateBox.Text = Rate(_playback.Fps);
 
         // Getippt wird erst uebernommen, wenn das Feld den Fokus verlaesst oder die
         // Eingabetaste kommt - sonst bekaeme die Wiedergabe bei "2" aus "24" kurz
@@ -2089,20 +1663,12 @@ public partial class MainWindow : Window
     /// </summary>
     private void TakeRate(string? text)
     {
-        double wanted = _fps;
-
-        if (double.TryParse(text?.Replace(',', '.'), NumberStyles.Float,
-                            CultureInfo.InvariantCulture, out double parsed))
-        {
-            wanted = Clean(parsed);
-        }
-
-        _fps = wanted;
+        double wanted = _playback.TakeRate(text);
 
         string shown = Rate(wanted);
         if (RateBox.Text != shown) RateBox.Text = shown;
 
-        if (_player is not null) _player.Interval = TimeSpan.FromSeconds(1.0 / wanted);
+        if (_player is not null) _player.Interval = _playback.Interval;
 
         // Waehrend des Aufbaus wird nur der Wert gesetzt, nichts gespeichert: Der
         // Stand kommt ja gerade aus den Einstellungen.
@@ -2118,10 +1684,6 @@ public partial class MainWindow : Window
 
         RefreshStatusBar(_monitor?.Job);
     }
-
-    /// <summary>Dieselben Grenzen wie in den Einstellungen - eine Regel, ein Ort.</summary>
-    private static double Clean(double rate)
-        => double.IsNaN(rate) || rate <= 0 ? 24 : Math.Clamp(rate, 1, 240);
 
     private static string Rate(double value)
         => value.ToString(Math.Abs(value - Math.Round(value)) < 0.001 ? "0" : "0.###",
@@ -2146,7 +1708,7 @@ public partial class MainWindow : Window
         // Vorbereitung nur beim Druck auf Abspielen an, und das Umlegen tat sichtbar
         // nichts.
         if (on && _sequence is { Count: > 1 } running) _ = PrepareVideoAsync(running);
-        else if (!on) _prepping?.Cancel();
+        else if (!on) _videos.Cancel();
     }
 
     private void SetPrebuffer(bool on)
@@ -2275,7 +1837,7 @@ public partial class MainWindow : Window
         if (_sequence is null || _sequence.Count == 0) return;
 
         var range = _sequence.Frames
-            .Where(f => f.Number >= _inPoint && f.Number <= _outPoint)
+            .Where(f => f.Number >= _playback.InPoint && f.Number <= _playback.OutPoint)
             .ToList();
 
         if (range.Count == 0) return;
@@ -2289,7 +1851,7 @@ public partial class MainWindow : Window
             height = probedH;
         }
 
-        var window = new ExportWindow(_sequence, range, _fps, width, height,
+        var window = new ExportWindow(_sequence, range, _playback.Fps, width, height,
                                       _getSettings(), s => _persist?.Invoke(s),
                                       () => Math.Max(1, Environment.ProcessorCount / 2))
         {
@@ -2318,9 +1880,15 @@ public partial class MainWindow : Window
         PairHost.Visibility = Visibility.Visible;
         RefreshPairing();
         RefreshWatch();
+        PairScroll.ScrollToTop();
+        PairCloseButton.Focus();
     }
 
-    private void OnPairClose(object sender, RoutedEventArgs e) => PairHost.Visibility = Visibility.Collapsed;
+    private void OnPairClose(object sender, RoutedEventArgs e)
+    {
+        PairHost.Visibility = Visibility.Collapsed;
+        RestorePageFocus();
+    }
 
     // ================================================================ Zusehen im Netz
 
@@ -2334,6 +1902,8 @@ public partial class MainWindow : Window
     private void OnWatchToggled(object sender, RoutedEventArgs e)
     {
         if (!_ready || sender is not ToggleButton toggle) return;
+        // RefreshWatch bildet nur den Bestand ab; das ist kein neuer Auftrag.
+        if ((toggle.IsChecked == true) == _getSettings().WatchEnabled) return;
 
         // Einschalten heisst: eine Verbindung nach draussen. Vorher wird gefragt.
         // Beim Ausschalten nicht - wer zumacht, braucht keine Zustimmung.
@@ -2554,7 +2124,13 @@ public partial class MainWindow : Window
 
         return () =>
         {
-            kopie.TermsAccepted = _getSettings().TermsAccepted;
+            var aktuell = _getSettings();
+            kopie.TermsAccepted = aktuell.TermsAccepted;
+            kopie.MainLeft = aktuell.MainLeft;
+            kopie.MainTop = aktuell.MainTop;
+            kopie.MainWidth = aktuell.MainWidth;
+            kopie.MainHeight = aktuell.MainHeight;
+            kopie.MainMaximized = aktuell.MainMaximized;
 
             if (_apply(kopie) is not null) return;
 
@@ -2571,7 +2147,7 @@ public partial class MainWindow : Window
     /// Zeigt die Tafel und fuehrt <paramref name="dann"/> aus, wenn zugestimmt wurde.
     /// Liegt die Zustimmung schon vor, geht es ohne Umweg weiter.
     /// </summary>
-    private void AskTerms(Action dann)
+    private void AskTerms(Action dann, string? relayHost = null)
     {
         if (_getSettings().TermsOk) { dann(); return; }
 
@@ -2587,7 +2163,7 @@ public partial class MainWindow : Window
          * Die Zustimmung bleibt trotzdem noetig. Worum es hier geht, ist der Schritt
          * nach draussen und dass FrameFlip ohne Gewaehr kommt - und das haengt nicht
          * daran, wem der Server gehoert. */
-        bool eigener = !string.Equals(_getSettings().RelayHost, AppSettings.DefaultRelayHost,
+        bool eigener = !string.Equals(relayHost ?? _getSettings().RelayHost, AppSettings.DefaultRelayHost,
                                       StringComparison.OrdinalIgnoreCase);
 
         TermsBody.Text = Strings.T(eigener ? "D_TermsBodyOwn" : "D_TermsBody");
@@ -2596,6 +2172,21 @@ public partial class MainWindow : Window
 
         // Keine Links auf meine Texte, wenn sie nicht gelten.
         TermsLinks.Visibility = eigener ? Visibility.Collapsed : Visibility.Visible;
+
+        /* Die Ziele der beiden Links entstehen hier, nicht im Markup.
+         *
+         * Sie zeigen auf die Rechtstexte des VOREINGESTELLTEN Relays, und das ist
+         * richtig so - sie gelten fuer ihn und fuer keinen anderen. Falsch waere nur,
+         * den Namen ins Markup zu schreiben: dann stuende an einer zweiten Stelle, wo
+         * FrameFlip hinzeigt, und ein Umzug des Servers braeuchte eine Suche statt
+         * einer Konstanten.
+         *
+         * Wer einen eigenen Wirt eingetragen hat, sieht die Zeile ohnehin nicht. */
+        if (!eigener)
+        {
+            TermsUseLink.NavigateUri = Recht("nutzungsbedingungen");
+            TermsPrivacyLink.NavigateUri = Recht("datenschutz");
+        }
 
         /* Die Kopplungstafel weicht.
          *
@@ -2609,6 +2200,7 @@ public partial class MainWindow : Window
         TermsAgree.IsChecked = false;
         TermsGo.IsEnabled = false;
         TermsHost.Visibility = Visibility.Visible;
+        TermsScroll.ScrollToTop();
 
         // Den Tastaturschein auf die Tafel holen, damit Esc und Tab dort wirken.
         TermsAgree.Focus();
@@ -2616,6 +2208,17 @@ public partial class MainWindow : Window
 
     /// <summary>Stand die Kopplungstafel offen, als die Frage kam?</summary>
     private bool _pairWasOpen;
+
+    /// <summary>
+    /// Die Adresse eines Rechtstextes beim voreingestellten Relay.
+    ///
+    /// Die einzige Stelle im ganzen Programm, die einen bestimmten Wirtsnamen nennt -
+    /// und sie nennt ihn nicht selbst, sondern holt ihn aus
+    /// <see cref="AppSettings.DefaultRelayHost"/>. Zieht der Server um, aendert sich
+    /// eine Konstante und nicht eine unbekannte Zahl von Zeichenketten.
+    /// </summary>
+    private static Uri Recht(string seite)
+        => new($"https://{AppSettings.DefaultRelayHost}/recht/{seite}.html");
 
     private void OnTermsChecked(object sender, RoutedEventArgs e)
     {
@@ -2629,6 +2232,7 @@ public partial class MainWindow : Window
         _afterTerms = null;
         _pairWasOpen = false;
         TermsHost.Visibility = Visibility.Collapsed;
+        RestorePageFocus();
 
         Note(Strings.T("D_TermsDeclined"));
     }
@@ -2651,7 +2255,8 @@ public partial class MainWindow : Window
 
         // Wer den Kopplungscode sehen wollte, bekommt ihn jetzt - diesmal einen,
         // der sich auch einloesen laesst.
-        if (_pairWasOpen) PairHost.Visibility = Visibility.Visible;
+        if (_pairWasOpen) { PairHost.Visibility = Visibility.Visible; PairCloseButton.Focus(); }
+        else RestorePageFocus();
         _pairWasOpen = false;
 
         var dann = _afterTerms;
@@ -2692,7 +2297,7 @@ public partial class MainWindow : Window
     {
         if (!ReferenceEquals(e.OriginalSource, PairHost)) return;
 
-        PairHost.Visibility = Visibility.Collapsed;
+        OnPairClose(sender, e);
     }
 
     /// <summary>
@@ -2855,7 +2460,7 @@ public partial class MainWindow : Window
                 && string.Equals(folder.TrimEnd('\\', '/'), shown.Folder.TrimEnd('\\', '/'),
                                  StringComparison.OrdinalIgnoreCase))
             {
-                NoteNewFrames();
+                _live.NoteNewFrames();
             }
         }));
     }
@@ -2869,6 +2474,10 @@ public partial class MainWindow : Window
 
     private void Refresh()
     {
+        // Haengt am selben Takt wie alles Langsame. Neu gezeichnet wird nur, wenn
+        // sich die Zeilen wirklich geaendert haben.
+        RefreshReadiness();
+
         RenderJob? job = _monitor?.Job;
         bool running = job?.IsRunning == true;
 
@@ -2932,7 +2541,10 @@ public partial class MainWindow : Window
         // leuchtet mit, solange der Kopf wirklich auf dem letzten Bild steht -
         // sonst waere "Neueste" eine Behauptung statt einer Anzeige.
         FollowToggle.Visibility = _sequence is { Count: > 0 } ? Visibility.Visible : Visibility.Collapsed;
-        NewestDot.Opacity = _sequence is { } shown && _head == shown.EndNumber ? 1 : 0.35;
+        bool hasFrames = _sequence is { Count: > 0 };
+        TransportControls.IsEnabled = ViewChips.IsEnabled = hasFrames;
+        StageAnnotations.Visibility = hasFrames ? Visibility.Visible : Visibility.Collapsed;
+        NewestDot.Opacity = _sequence is { } shown && _playback.Head == shown.EndNumber ? 1 : 0.35;
 
         // ---------------------------------------------------------- Protokoll
         PhaseText.Text = job?.Stats.Activity ?? Strings.T("D_NoActivity");
@@ -2944,13 +2556,13 @@ public partial class MainWindow : Window
         RangeInfo.Text = _sequence is null
             ? string.Empty
             : Strings.T("D_InOut",
-                        _inPoint.ToString(_sequence.NumberFormat, CultureInfo.InvariantCulture),
-                        _outPoint.ToString(_sequence.NumberFormat, CultureInfo.InvariantCulture),
+                        _playback.InPoint.ToString(_sequence.NumberFormat, CultureInfo.InvariantCulture),
+                        _playback.OutPoint.ToString(_sequence.NumberFormat, CultureInfo.InvariantCulture),
 
                         // Vorhandene Bilder, nicht die Spanne: Bei einem abgebrochenen
                         // Render liegen zwischen Start und Ende weniger Dateien, als
                         // die Differenz verspricht - und exportiert werden die Dateien.
-                        _sequence.Frames.Count(f => f.Number >= _inPoint && f.Number <= _outPoint));
+                        _sequence.Frames.Count(f => f.Number >= _playback.InPoint && f.Number <= _playback.OutPoint));
     }
 
     private void UpdateGraph(RenderJob? job)
@@ -3151,7 +2763,7 @@ public partial class MainWindow : Window
                 : "—";
 
         StatusDecode.Text = _sequence?.Pattern.Extension.TrimStart('.').ToUpperInvariant() ?? string.Empty;
-        StatusFps.Text = Rate(_fps) + " fps";
+        StatusFps.Text = Rate(_playback.Fps) + " fps";
         StatusMissing.Text = _missing.Count > 0 ? Strings.T("D_NMissing", _missing.Count) : string.Empty;
         StatusHotkey.Text = _getSettings().Hotkey + " · " + Strings.T("D_Overlay");
 
@@ -3166,6 +2778,8 @@ public partial class MainWindow : Window
     private void OnLayoutChanged()
     {
         ApplyScale();
+        ApplyDashboardLayout();
+        PairCode.LightModules = WatchCode.LightModules = _layout.LightQr;
 
         // Der Streifen misst in geraetunabhaengigen Punkten; nach einer neuen
         // Skalierung passen andere Zellenzahlen ins selbe Fenster.

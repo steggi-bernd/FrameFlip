@@ -47,10 +47,20 @@ public interface IFrameDecoder
 /// <summary>Was sich ohne vollstaendiges Dekodieren aus dem Dateikopf lesen laesst.</summary>
 public readonly record struct ImageInfo(int Width, int Height, int BitsPerPixel, string? Format)
 {
+    /// <summary>
+    /// Kanalzahl, wenn der Decoder sie kennt. Null heisst: aus dem Formatnamen raten.
+    ///
+    /// Das Raten stammt aus der Zeit, als es nur den WIC-Decoder gab, und arbeitet
+    /// auf dessen Namen ("Bgra32", "Rgba64"). Ein EXR-Kopf nennt seine Kanaele
+    /// dagegen beim Namen; die Zahl zu erraten, wo sie danebensteht, waere eine
+    /// stille Kopplung an eine Zeichenkette, die fuer die Anzeige gedacht ist.
+    /// </summary>
+    public int? ChannelCount { get; init; }
+
     /// <summary>Bit je Kanal - das ist die Angabe, die in einer Renderpipeline zaehlt.</summary>
     public int BitsPerChannel => Channels > 0 ? BitsPerPixel / Channels : 0;
 
-    public int Channels => Format switch
+    public int Channels => ChannelCount ?? Format switch
     {
         null => 0,
         var f when f.Contains("Cmyk", StringComparison.OrdinalIgnoreCase) => 4,

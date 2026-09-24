@@ -370,16 +370,16 @@ public static class ImagingInvariants
 
             // Bei 24 fps stehen 41,7 ms je Bild zur Verfuegung. Die Korrektur darf
             // davon nur einen kleinen Teil brauchen, sonst kostet sie Bilder.
-            Check.That(everything < 20,
+            Check.Timing(everything < 20,
                 "die volle Korrektur bleibt deutlich unter dem Bildabstand bei 24 fps (41,7 ms)",
                 $"{everything:0.0} ms");
-            Check.That(neutral < 5,
+            Check.Timing(neutral < 5,
                 "ohne Korrektur ist es ein reiner Speicherkopiervorgang", $"{neutral:0.0} ms");
 
             var histogram = new Histogram();
             var measured = Time(() => FrameProcessor.Measure(source, w, h, w * 4, histogram, 4, full));
             Console.WriteLine($"         Histogramm getrennt (jedes 4. Pixel): {measured:0.0} ms");
-            Check.That(measured < 15, "das Histogramm laesst sich nebenher messen",
+            Check.Timing(measured < 15, "das Histogramm laesst sich nebenher messen",
                 $"{measured:0.0} ms");
         }
         finally

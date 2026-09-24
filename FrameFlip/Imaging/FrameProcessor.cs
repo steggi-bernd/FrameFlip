@@ -16,6 +16,16 @@ public sealed class Histogram
     public double ClippedHigh { get; private set; }
     public double ClippedLow { get; private set; }
 
+    /// <summary>
+    /// Anteil der Pixel, die in der DATEI oberhalb von Weiss liegen. Nur bei
+    /// Gleitkommamaterial von null verschieden.
+    ///
+    /// Das ist nicht dasselbe wie <see cref="ClippedHigh"/>: Dort steht, was in der
+    /// Anzeige anliegt, hier, wieviel Reserve der Belichtungsregler noch heben kann.
+    /// Ein Bild kann ausgebrannt aussehen und trotzdem voller Zeichnung sein.
+    /// </summary>
+    public double AboveWhite { get; internal set; }
+
     public void Clear()
     {
         Array.Clear(Red);
@@ -25,6 +35,7 @@ public sealed class Histogram
         Peak = 0;
         ClippedHigh = 0;
         ClippedLow = 0;
+        AboveWhite = 0;
     }
 
     internal void Finish(long sampled)

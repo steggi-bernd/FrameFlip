@@ -2,11 +2,55 @@ using FrameFlip.Tests;
 
 // WPF-Typen (WriteableBitmap, Image, RenderTargetBitmap) verlangen einen STA-Thread.
 int exit = 1;
-var thread = new Thread(() => exit = RunAll()) { Name = "FrameFlipTests" };
+
+// Mit Namen nur diese Pruefungen - fuer die Runde zwischen zwei Aenderungen, in der die
+// ganze Reihe zu lange dauert. Ohne Namen alles. Beide Schreibweisen gelten:
+//   NodeParityInvariants WatchLifecycleInvariants
+//   --only=WatchLifecycleInvariants,ExportInvariants.RequestMath
+var only = args;
+var thread = new Thread(() => exit = only.Length > 0 ? RunOnly(only) : RunAll()) { Name = "FrameFlipTests" };
 thread.SetApartmentState(ApartmentState.STA);
 thread.Start();
 thread.Join();
 return exit;
+
+static int RunOnly(string[] args)
+{
+    LoadDictionaries();
+
+    var names = args.SelectMany(arg =>
+        arg == "--watch-lifecycle" ? new[] { nameof(WatchLifecycleInvariants) }
+        : arg.StartsWith("--only=", StringComparison.Ordinal)
+            ? arg[7..].Split(',', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries)
+            : new[] { arg }).ToArray();
+
+    if (names.Length == 0)
+    {
+        Console.WriteLine("Keine Testgruppe angegeben.");
+        return 2;
+    }
+
+    foreach (string name in names)
+    {
+        // "Klasse" ruft Run auf, "Klasse.Methode" eine einzelne weitere Gruppe.
+        var parts = name.Split('.');
+        var type = typeof(Check).Assembly.GetType("FrameFlip.Tests." + parts[0]);
+        var run = parts.Length <= 2 ? type?.GetMethod(parts.Length == 2 ? parts[1] : "Run",
+            System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Static,
+            System.Type.EmptyTypes) : null;
+
+        if (run is null || run.ReturnType != typeof(void))
+        {
+            Console.WriteLine($"Keine Pruefung namens {name}.");
+            return 2;
+        }
+
+        Console.WriteLine("Testgruppe: " + name);
+        run.Invoke(null, null);
+    }
+
+    return Check.Report();
+}
 
 static int RunAll()
 {
@@ -23,6 +67,46 @@ static int RunAll()
     PlacementInvariants.Run();
     GovernorInvariants.Run();
     ImagingInvariants.Run();
+    ViewTransformInvariants.Run();
+    FloatImagingInvariants.Run();
+    GradingInvariants.Run();
+    GradingColourInvariants.Run();
+    GradingBandInvariants.Run();
+    CurveEditingInvariants.Run();
+    CurveRenderInvariants.Run();
+    AtelierPageInvariants.Run();
+    PanelPolishInvariants.Run();
+    ColourWheelInvariants.Run();
+    BlendInvariants.Run();
+    LayerInvariants.Run();
+    MaskInvariants.Run();
+    AdjustmentInvariants.Run();
+    ImageAndGroupInvariants.Run();
+    ClipAndCoverageInvariants.Run();
+    NodeParityInvariants.Run();
+    NodeExportInvariants.Run();
+    NodeModeInvariants.Run();
+    NodeEditInvariants.Run();
+    NodeValueInvariants.Run();
+    LayerPlacementInvariants.Run();
+    PlacementDragInvariants.Run();
+    LocalToolInvariants.Run();
+    OpticsInvariants.Run();
+    RenderDataInvariants.Run();
+    ExportParityInvariants.Run();
+    PngLayerInvariants.Run();
+    StackReproInvariants.Run();
+    BlendSpaceInvariants.Run();
+    LayerPanelInvariants.Run();
+    PassRebuildInvariants.Run();
+    CryptomatteInvariants.Run();
+    ImageHitInvariants.Run();
+    SortInvariants.Run();
+    DockLayoutInvariants.Run();
+    AtelierLayerInvariants.Run();
+    GradeBatchInvariants.Run();
+    GradeVideoInvariants.Run();
+    ExrInvariants.Run();
     RawCacheInvariants.Run();
     CadenceInvariants.Run();
     RangeInvariants.Run();
@@ -33,7 +117,19 @@ static int RunAll()
     RemoteInvariants.Run();
     RelayClientInvariants.Run();
     WatchInvariants.Run();
+    WatchLifecycleInvariants.Run();
+    DashboardLiveInvariants.Run();
+    DashboardLiveControllerInvariants.Run();
+    DashboardSelectionInvariants.Run();
+    DashboardSelectionInvariants.EmptyTransitions();
+    DashboardSequenceControllerInvariants.Run();
+    DashboardFrameInvariants.Run();
+    DashboardFrameInvariants.RetiredWork();
+    DashboardMediaControllerInvariants.Run();
+    DashboardPlaybackInvariants.Run();
+    DashboardPlaybackControllerInvariants.Run();
     PaceInvariants.Run();
+    ReadinessInvariants.Run();
     MachineInvariants.Run();
     RemoteCommandRouterInvariants.Run();
     RemotePreviewFollowInvariants.Run();
@@ -59,6 +155,11 @@ static int RunAll()
     VaultInvariants.Run();
     BrowseInvariants.Run();
     BrowseInvariants.Movies();
+    PaintedMaskInvariants.Run();
+    DitherInvariants.Run();
+    DitherPipelineInvariants.Run();
+    DitherPanelInvariants.Run();
+    GradingGroupInvariants.Run();
     RenderInvariants.Run();
     RenderServiceInvariants.Run();
     UploadInvariants.Run();
@@ -95,10 +196,38 @@ static void LoadDictionaries()
                 // Application samt Ressourcen und Dispatcher beenden.
                 app.ShutdownMode = System.Windows.ShutdownMode.OnExplicitShutdown;
 
-                using var stream = System.IO.File.OpenRead(candidate);
-
-                app.Resources.MergedDictionaries.Add(
-                    (System.Windows.ResourceDictionary)System.Windows.Markup.XamlReader.Load(stream));
+                /* Dieselben Woerterbuecher wie die Anwendung, in derselben Reihenfolge.
+                 *
+                 * Frueher stand hier nur die Sprachdatei. Dass Theme.xaml trotzdem zur
+                 * Verfuegung stand, war eine NEBENWIRKUNG: ViewerPlaybackInvariants
+                 * haengt es ein, und es laeuft zufaellig vorher. Damit entschied die
+                 * Reihenfolge der Tests darueber, ob eine Ansicht ueberhaupt laedt -
+                 * und als die Projektseite von Theme- auf Desktop-Marken umzog, fiel
+                 * sie um, obwohl an ihr nichts falsch war.
+                 *
+                 * Die Reihenfolge zaehlt: DashboardTokens ueberschreibt Farben aus
+                 * DesktopTheme, genau wie in App.xaml.
+                 *
+                 * Ueber pack-Adressen, nicht als lose Datei: Einzeln eingelesen sieht
+                 * ein Woerterbuch die vorher geladenen NICHT, weil StaticResource beim
+                 * Einlesen aufloest und der Leser nur das eine Dokument kennt.
+                 * DashboardTokens greift aber auf DashFocus aus Theme.xaml zu und
+                 * faellt sofort um. Die pack-Adresse nennt die Assembly ausdruecklich,
+                 * damit sie auch aus einem Testlaeufer heraus aufloest - der Weg, den
+                 * TrayInvariants schon benutzt. */
+                foreach (string sheet in new[]
+                         {
+                             "Views/Theme.xaml",
+                             "Views/DesktopTheme.xaml",
+                             "Views/DashboardTokens.xaml",
+                             "Localization/Strings.de.xaml",
+                         })
+                {
+                    app.Resources.MergedDictionaries.Add(new System.Windows.ResourceDictionary
+                    {
+                        Source = new Uri("/FrameFlip;component/" + sheet, UriKind.Relative),
+                    });
+                }
 
                 return;
             }

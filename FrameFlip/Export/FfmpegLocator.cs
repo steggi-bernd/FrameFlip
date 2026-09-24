@@ -250,10 +250,116 @@ public static class FfmpegLocator
         catch (Exception) { }
     }
 
-    /// <summary>Hinweis fuer den Dialog, wenn nichts gefunden wurde.</summary>
-    public static string InstallHint =>
-        "FrameFlip liefert ffmpeg nicht mit, weil uebliche Builds unter der GPL stehen.\n\n" +
-        "Installation per winget:\n" +
-        "    winget install Gyan.FFmpeg\n\n" +
-        "Danach FrameFlip neu starten oder den Pfad hier von Hand auswählen.";
+    /// <summary>
+    /// Der Ressourcenschluessel fuer den Hinweis, wenn nichts gefunden wurde.
+    ///
+    /// Ein Schluessel und nicht der Text. Frueher stand hier eine fest eingebaute
+    /// deutsche Zeichenkette - auf Englisch gestellt erschien sie trotzdem deutsch.
+    /// Der Text selbst aufzuloesen waere aber genauso falsch: Diese Klasse ist
+    /// absichtlich frei von Oberflaeche, damit sich jede Zeile ohne Fenster pruefen
+    /// laesst, und <see cref="Localization.Strings.T"/> gibt ohne laufende
+    /// WPF-Anwendung den Schluessel statt des Satzes zurueck. Wer den Satz braucht,
+    /// hat ein Fenster - und loest ihn dort auf.
+    /// </summary>
+    public static string InstallHintKey => WingetAvailable ? "S_FfmpegHintWinget" : "S_FfmpegHintManual";
+
+    // ------------------------------------------------------------- Holen lassen
+
+    /// <summary>Die Kennung im Paketverzeichnis von Windows.</summary>
+    public const string WingetPackage = "Gyan.FFmpeg";
+
+    /// <summary>
+    /// Steht die Paketverwaltung von Windows zur Verfuegung?
+    ///
+    /// Einmal ermittelt und behalten: Der Weg aendert sich waehrend einer Sitzung
+    /// nicht, und die Bereitschaftsanzeige fragt bei jedem Zeichnen nach.
+    /// </summary>
+    public static bool WingetAvailable => _winget ??= PathDirectories()
+        .Any(dir =>
+        {
+            try { return File.Exists(Path.Combine(dir, "winget.exe")); }
+            catch (ArgumentException) { return false; }   // ungueltiger PATH-Eintrag
+        });
+    private static bool? _winget;
+
+    /// <summary>
+    /// ffmpeg von Windows holen lassen.
+    ///
+    /// Hier steht die Lizenzentscheidung NICHT im Weg, und der Unterschied ist
+    /// wichtig genug, um ihn aufzuschreiben: Nicht mitgeliefert wird ffmpeg, weil
+    /// Mitliefern Verteilen waere - uebliche Builds enthalten libx264 und stehen
+    /// unter GPL, und was FrameFlip verteilt, bestimmt seine eigene Lizenz mit.
+    ///
+    /// Auf Klick vom offiziellen Ort holen LASSEN ist etwas anderes. FrameFlip
+    /// verteilt dabei nichts; es bittet die Paketverwaltung des Betriebssystems, und
+    /// die laedt, prueft die Signatur und traegt den Pfad ein. Dass ffmpeg danach
+    /// ueber eine Prozessgrenze aufgerufen wird, aendert sich nicht - es ist genau
+    /// dasselbe fremde Programm wie vorher, nur ohne den Umweg ueber eine Anleitung,
+    /// die niemand tippt.
+    ///
+    /// Der Rueckgabewert ist der gefundene Pfad oder null. Erfolg heisst hier
+    /// ausdruecklich "danach gefunden", nicht "winget meldete 0": Ein Paket kann
+    /// installiert sein und trotzdem nicht auffindbar, und das waere fuer den
+    /// Benutzer derselbe Fehlschlag.
+    /// </summary>
+    public static async Task<string?> InstallAsync(
+        IProgress<string>? progress = null, CancellationToken cancellation = default)
+    {
+        if (!WingetAvailable) return null;
+
+        var start = new ProcessStartInfo("winget")
+        {
+            UseShellExecute = false,
+            RedirectStandardOutput = true,
+            RedirectStandardError = true,
+            CreateNoWindow = true,
+            StandardOutputEncoding = Encoding.UTF8,
+        };
+
+        // Einzeln statt als Zeichenkette: So kann nichts an einer Anfuehrungszeichen-
+        // Regel zerbrechen, und es gibt keine Stelle, an der sich etwas einschleusen
+        // liesse. Die Zustimmungen sind noetig, weil winget sonst auf eine Eingabe
+        // wartet, die in einem Fenster ohne Konsole niemand geben kann.
+        foreach (var arg in new[]
+                 {
+                     "install", "--id", WingetPackage, "--exact",
+                     "--accept-package-agreements", "--accept-source-agreements",
+                     "--disable-interactivity",
+                 })
+        {
+            start.ArgumentList.Add(arg);
+        }
+
+        try
+        {
+            using var process = Process.Start(start);
+            if (process is null) return null;
+
+            // Mitlesen, damit die Anzeige etwas sagen kann - und damit der Puffer
+            // nicht volllaeuft und winget an seiner eigenen Ausgabe haengenbleibt.
+            var reading = Task.Run(async () =>
+            {
+                string? line;
+                while ((line = await process.StandardOutput.ReadLineAsync().ConfigureAwait(false)) is not null)
+                {
+                    if (line.Trim() is { Length: > 0 } text) progress?.Report(text);
+                }
+            }, cancellation);
+
+            await process.WaitForExitAsync(cancellation).ConfigureAwait(false);
+            await IgnoreFailure(reading).ConfigureAwait(false);
+        }
+        catch (Exception)
+        {
+            return null;
+        }
+
+        /* Der frisch erweiterte PATH erreicht uns nicht mehr.
+         *
+         * Eine laufende Anwendung hat ihre Umgebung beim Start geerbt; was winget
+         * gerade eingetragen hat, steht dort nicht. Genau dafuer sucht Locate auch
+         * die Ablageorte der Paketverwaltungen ab - ohne das waere die Antwort
+         * unmittelbar nach einer erfolgreichen Installation "nicht gefunden". */
+        return Locate();
+    }
 }

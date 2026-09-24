@@ -1,0 +1,495 @@
+using System.Text.Json.Serialization;
+
+namespace FrameFlip.Imaging.Grading;
+
+/// <summary>Was eine Ebene beitraegt.</summary>
+public enum LayerContent
+{
+    /// <summary>Ein Pass aus der Datei - sie bringt Licht mit.</summary>
+    Pass,
+
+    /// <summary>
+    /// Eine Korrektur auf das, was darunter liegt - sie bringt nichts mit, sondern
+    /// veraendert.
+    ///
+    /// Mit einer Schnittmaske wirkt sie nur auf die eine Ebene darunter, ohne sie auf
+    /// alles. Das ist derselbe Griff wie in Photoshop und der Grund, warum die
+    /// Schnittmaske hier schon vor den Einstellungsebenen gebaut wurde: Sie ist es,
+    /// die "waerme nur den Glanz" ueberhaupt erst sagbar macht.
+    /// </summary>
+    Adjustment,
+
+    /// <summary>
+    /// Eine andere Datei: ein Einzelbild oder eine zweite Sequenz.
+    ///
+    /// Der Fall, der sie rechtfertigt, ist nicht das Logo, sondern der Vergleich:
+    /// Zwei Fassungen desselben Renders uebereinander, die obere auf Differenz, und
+    /// man sieht in einem Blick, was sich geaendert hat. Traegt die Datei eine
+    /// Bildnummer, laeuft sie mit der Sequenz mit.
+    /// </summary>
+    Image,
+
+    /// <summary>
+    /// Eine Gruppe: mehrere Ebenen, die eine Maske und eine Deckkraft teilen.
+    ///
+    /// Sie rechnet DURCH und nicht abgeschottet - ihre Kinder sehen, was unter der
+    /// Gruppe liegt. Das ist die Entscheidung, an der alles haengt: Eine Gruppe aus
+    /// Einstellungsebenen soll "diese drei Korrekturen, aber nur hier" heissen.
+    /// Abgeschottet faenden ihre Kinder Schwarz vor, und genau der Fall - eine Maske
+    /// ueber mehreren Korrekturen - ist der, um dessentwillen es Gruppen gibt.
+    ///
+    /// Am Ende wird das Ergebnis der Gruppe auf den Stand von vorher gemischt, mit
+    /// ihrer Mischung, ihrer Deckkraft und ihrer Maske. Ohne all das ist eine Gruppe
+    /// damit genau so, als waere sie nicht da - und das ist die Probe, die eine
+    /// Gruppe bestehen muss.
+    /// </summary>
+    Group,
+}
+
+/// <summary>
+/// Eine Ebene: ein Pass aus der Datei, und wie er auf das wirkt, was unter ihm liegt.
+///
+/// Die Ebene traegt keine Bilddaten. Sie nennt nur den Pass, aus dem sie kommt -
+/// alles andere ist Einstellung. Damit laesst sich derselbe Stapel auf jedes Bild
+/// der Sequenz anwenden, und genau das ist der Zweck: ein Bild einrichten,
+/// dreihundert rechnen.
+///
+/// Sie laesst sich mehrfach anlegen. Zweimal derselbe Pass mit verschiedener
+/// Mischung ist ein gewoehnlicher Griff - Glanz einmal additiv fuer die Helligkeit
+/// und einmal weich fuer den Schimmer.
+/// </summary>
+public sealed class ImageLayer
+{
+    /// <summary>
+    /// Was die Ebene ist: ein Pass, oder eine Korrektur auf das, was darunter liegt.
+    ///
+    /// Beides in einer Klasse und nicht in zweien, weil beides dieselben sieben Dinge
+    /// hat - Reihenfolge, Sichtbarkeit, Mischung, Deckkraft, Schnittmaske, Maske,
+    /// Name - und sich nur darin unterscheidet, woher der Wert kommt. Zwei Klassen
+    /// hiessen zwei Listen, zwei Zeilenarten und zwei Wege durch den Composer.
+    /// </summary>
+    public LayerContent Content { get; set; } = LayerContent.Pass;
+
+    /// <summary>
+    /// Der Pass in der Datei, etwa "ViewLayer.GlossDir". Leer heisst: die Farbkanaele,
+    /// die das Bild ohnehin ergeben - bei einem PNG die einzige Wahl. Bei einer
+    /// Einstellungsebene ohne Bedeutung.
+    /// </summary>
+    public string Source { get; set; } = "";
+
+    /// <summary>
+    /// Ob eine Bildebene der Bildnummer folgt.
+    ///
+    /// Bei einer zweiten Fassung desselben Renders will man das; bei einem Logo, das
+    /// zufaellig eine Nummer im Namen hat, nicht. Ein Einzelbild ohne Nummer ist von
+    /// der Frage ohnehin nicht betroffen.
+    /// </summary>
+    public bool FollowSequence { get; set; } = true;
+
+    /// <summary>
+    /// Die Grundkorrektur der Einstellungsebene - dieselben Regler wie unten im
+    /// Streifen. Null bei einer Passebene.
+    /// </summary>
+    public ImageAdjustments? Adjustments { get; set; }
+
+    /// <summary>
+    /// Die Werkzeuge der Einstellungsebene. Null bei einer Passebene.
+    ///
+    /// Derselbe Stapel wie fuer das ganze Bild, und damit dieselben Werkzeuge: Es
+    /// gibt sie einmal, und eine Kurve rechnet auf einer Ebene, was sie auch am Ende
+    /// rechnet.
+    /// </summary>
+    public GradingStack? Tools { get; set; }
+
+    /// <summary>
+    /// Was in der Liste steht. Frei, weil eine Kopie sonst genauso hiesse wie ihr
+    /// Original und niemand die beiden auseinanderhielte.
+    /// </summary>
+    public string Name { get; set; } = "";
+
+    public bool Visible { get; set; } = true;
+
+    /// <summary>
+    /// Ab welcher Deckung eine Bildebene ueberhaupt als vorhanden gilt. 0 heisst:
+    /// so wie die Datei es sagt.
+    ///
+    /// Gebraucht, weil "freigestellt" in einer Datei selten "Deckung genau null"
+    /// heisst. Ein Entrauscher, der ueber den Alphakanal mitlaeuft, ein Glanz im
+    /// Compositing, ein Export ueber ein Programm, das zwischendurch auf etwas
+    /// legt - all das hinterlaesst im Hintergrund einen Schleier von wenigen Stufen.
+    /// Und unter diesem Schleier steht in den meisten Dateien Muell.
+    ///
+    /// Vier von 255 klingen nach nichts und sind es nicht: Auf Schwarz stehen sie
+    /// noch als Byte elf, und wenn der Muell darunter rauscht, rauscht das Bild.
+    /// Auf "Negativ multiplizieren" faellt es am meisten auf, weil dort nichts
+    /// dunkler werden kann - was hineinkommt, bleibt.
+    ///
+    /// Gerechnet wird nicht mit einem Schnitt, sondern mit einer Spanne: Was unter
+    /// dem Wert liegt, wird null, der Rest wird wieder auf ganz gezogen. Ein
+    /// Schnitt allein liesse die weiche Kante um den Betrag springen.
+    /// </summary>
+    public float MatteFloor { get; set; }
+
+    /// <summary>
+    /// Ob diese Ebene im ANZEIGERAUM gemischt wird statt in linearem Licht.
+    ///
+    /// Falsch ist die Voreinstellung und der Normalfall: Passe sind Licht, und Licht
+    /// mischt sich linear. Wahr ist der Weg, den Photoshop geht - und der ist fuer
+    /// eine Bildebene ueber einer Bildebene oft der erwartete.
+    ///
+    /// Der Unterschied faellt bei SCHWACHEN Beitraegen auf. Lineares Licht heisst
+    /// dekodieren, mischen, wieder kodieren; die sRGB-Kurve staucht die Tiefen und
+    /// die Rueckkodierung dehnt sie. Ein Beitrag mit kleiner Deckung kommt dadurch
+    /// ungefaehr zehnmal heller heraus - weshalb ein Alphakanal, der nicht genau
+    /// null ist, hier rauscht und in Photoshop nicht.
+    ///
+    /// Der Preis steht am Werkzeug: Diese Mischung kennt kein Weiss darueber.
+    /// </summary>
+    public bool BlendInDisplay { get; set; }
+
+    /// <summary>
+    /// Die gesaeuberte Deckung eines Bildpunktes.
+    ///
+    /// An einer Stelle, weil zwei Wege sie brauchen: der Composer fuer die Ebenen im
+    /// Stapel und die Auftragung fuer die, die obenauf liegen. Zwei Fassungen
+    /// derselben Spanne liefen beim naechsten Griff auseinander, und der Unterschied
+    /// waere ein Saum, den es nur in einem der beiden Wege gibt.
+    /// </summary>
+    public static float CleanMatte(float alpha, float floor)
+    {
+        if (floor <= 0f) return alpha;
+
+        float span = 1f - Math.Clamp(floor, 0f, 0.9f);
+
+        return Math.Clamp((alpha - floor) / span, 0f, 1f);
+    }
+
+    /// <summary>
+    /// Wie die Ebene auf die darunter wirkt. Add ist die Grundstellung, weil
+    /// Renderpasse additiv zerlegt sind: Alle Passe auf Add ergeben wieder das
+    /// Bild, das Blender gerendert hat.
+    /// </summary>
+    /// <summary>
+    /// Die Mischung. Normal als Voreinstellung, und das ist eine Korrektur.
+    ///
+    /// Vorher stand hier Add, weil der Stapel fuer PASSE gebaut wurde und deren
+    /// Summe wieder das Bild ergibt. Nur legt sie jeder, der die Klasse benutzt,
+    /// ohnehin ausdruecklich fest - der Passaufbau ebenso wie der Menuepunkt fuer
+    /// eine Bildebene. Uebrig blieb eine Voreinstellung, die nur den erwischt, der
+    /// eine Ebene im Vorbeigehen anlegt, und die dann ein Logo zum Leuchten bringt.
+    /// </summary>
+    public BlendMode Mode { get; set; } = BlendMode.Normal;
+
+    /// <summary>0 bis 1.</summary>
+    public float Opacity { get; set; } = 1f;
+
+    /// <summary>
+    /// Blendenstufen auf diese Ebene allein. Eine Multiplikation im linearen Licht,
+    /// also dasselbe, was der Belichtungsregler mit dem ganzen Bild tut - nur hier
+    /// auf einen Pass beschraenkt. "Mehr Glanz" ist damit ein Griff.
+    /// </summary>
+    public float Exposure { get; set; }
+
+    /// <summary>
+    /// Farbe der Ebene, als Faktor je Kanal. 1,1,1 ist unveraendert.
+    ///
+    /// Multiplikativ und nicht additiv, weil eine Ebene eingefaerbt und nicht
+    /// uebermalt werden soll: Was schwarz ist, bleibt schwarz.
+    /// </summary>
+    public ColourTriplet Tint { get; set; } = new(1, 1, 1);
+
+    /// <summary>
+    /// Wirkt nur auf die Ebene direkt darunter, nicht auf alles darunter.
+    ///
+    /// In Photoshop heisst das Schnittmaske, und fuer Renderpasse ist es keine
+    /// Feinheit, sondern die Bedingung dafuer, dass die Rechnung aufgeht. Cycles
+    /// zerlegt nicht in Summanden, sondern in Licht und Farbe: Das fertige Bild ist
+    ///
+    ///     (DiffDir + DiffInd) * DiffCol + (GlossDir + GlossInd) * GlossCol + Emit
+    ///
+    /// Die Farbpasse sind also Faktoren und keine Summanden. Ohne Beschraenkung
+    /// wuerde ein multiplizierender DiffCol auch den Glanz darunter daempfen, und
+    /// das Bild waere zu dunkel - richtig aussehend genug, dass es niemand merkt,
+    /// und falsch genug, dass die Ausgabe nicht mehr dem Render entspricht.
+    /// </summary>
+    public bool Clipped { get; set; }
+
+    /// <summary>
+    /// Wo die Ebene wirkt. Immer vorhanden, in Grundstellung ohne Wirkung.
+    ///
+    /// Als Objekt und nicht als Nullwert, weil die Oberflaeche sonst bei jedem
+    /// Reglerzug erst eines anlegen muesste - und weil "keine Maske" eine Einstellung
+    /// ist und kein Fehlen.
+    /// </summary>
+    public LayerMask Mask { get; set; } = new();
+
+    /// <summary>
+    /// Wo die Ebene liegt und wie gross sie ist. In Grundstellung: ueber dem ganzen
+    /// Bild, wenn sie dessen Groesse hat, sonst mittig eingepasst.
+    /// </summary>
+    public LayerTransform Place { get; set; } = new();
+
+    /// <summary>
+    /// Liegt ueber allem - auch ueber der Bildwerdung und der Korrektur.
+    ///
+    /// Fuer ein Wasserzeichen ist das die halbe Miete. Eine gewoehnliche Bildebene
+    /// wird mit dem Bild zusammen durch AgX geschickt und mitkorrigiert: Ein reines
+    /// Weiss kaeme als Grau heraus, und eine angehobene Kurve hoebe das Zeichen mit
+    /// an. Obenauf bleibt es in jedem Bild genau, wie es in der Datei steht.
+    ///
+    /// Gilt nur fuer Bildebenen. Eine Korrektur obenauf waere dasselbe wie die
+    /// Korrektur am Ende, und die gibt es schon.
+    /// </summary>
+    public bool OnTop { get; set; }
+
+    /// <summary>
+    /// Die Ebenen einer Gruppe, von unten nach oben - dieselbe Richtung wie im
+    /// Stapel selbst. Bei allem anderen leer.
+    ///
+    /// Immer vorhanden und nie null, aus demselben Grund wie bei der Maske: Eine
+    /// leere Gruppe ist eine Gruppe ohne Inhalt und kein fehlender Wert. Das erspart
+    /// jedem Leser eine Pruefung - und es waren die Pruefungen, die man vergisst.
+    /// </summary>
+    public List<ImageLayer> Children { get; set; } = new();
+
+    /// <summary>
+    /// True, wenn an der Ebene selbst nichts eingestellt ist. Die Mischung zaehlt
+    /// hier NICHT mit: Sie sagt, wie die Ebene auf die darunter wirkt, und das ist
+    /// eine Aussage ueber den Stapel, nicht ueber die Ebene. Auf der untersten
+    /// Ebene, die auf Schwarz liegt, sind Add und Normal ohnehin dasselbe.
+    /// </summary>
+    [JsonIgnore]
+    public bool IsNeutral
+        => Content == LayerContent.Pass &&
+           Opacity >= 0.999f && MathF.Abs(Exposure) < 0.001f && Tint.Near(1f) &&
+           Mask.IsNeutral && Place.IsNeutral &&
+           // Und die eigenen Werkzeuge der Ebene. Sie hier zu uebergehen war die
+           // zweite Haelfte desselben Fehlers: Der Composer reicht einen einzelnen
+           // unveraenderten Pass unbesehen durch, und "unveraendert" hiess bisher
+           // "ohne Maske, ohne Versatz" - eine Kurve an derselben Ebene zaehlte
+           // nicht mit. Man stellte sie ein, und das Bild kam ungerechnet zurueck.
+           (Adjustments is null || Adjustments.IsNeutral) &&
+           (Tools is null || Tools.IsNeutral);
+
+    /// <summary>Die Kette dieser Einstellungsebene, fertig vorbereitet.</summary>
+    public LayerGrade Grade() => LayerGrade.Prepare(Adjustments, Tools);
+
+    /// <summary>True, wenn die Mischung auf Schwarz nichts anderes ergibt als die Ebene selbst.</summary>
+    [JsonIgnore]
+    public bool LiesOnBlack => Mode is BlendMode.Add or BlendMode.Normal;
+
+    /// <summary>
+    /// Wieviel von dem gezeigt wird, was UNTER der Freistellung steht. 0 bis 1.
+    ///
+    /// Das fing als Fehler an. Eine freigestellte PNG, deren Deckung niemand
+    /// anwandte, zeigte die Farbe, die in ihren durchsichtigen Stellen steht - und
+    /// dort steht in den meisten Dateien, was zufaellig im Puffer stand: das
+    /// unmaskierte Original, das Rauschen des Renders, Reste der Ebene darunter. Es
+    /// sah aus wie pixeliger Nebel im Farbschema des Bildes, und das war es auch.
+    ///
+    /// Es sah aber auch nach etwas aus. Deshalb steht es jetzt als Regler da, statt
+    /// als Fehler behoben zu sein - und der entscheidende Unterschied zu einem Filter
+    /// in irgendeinem Programm ist, dass die MASKE dieser Ebene bestimmt, wo es
+    /// erscheint. Eine Kryptomatte waehlt ein Objekt, kein Rechteck; ein Tiefenpass
+    /// waehlt eine Entfernung. Solche Saetze kann ein Prozedurfilter am Regler nicht
+    /// sagen.
+    ///
+    /// Was es NICHT kann: etwas zeigen, das nicht da ist. Eine sauber
+    /// vormultiplizierte Datei traegt unter ihrer Deckung Schwarz, und dann passiert
+    /// nichts. Der Effekt braucht Material.
+    /// </summary>
+    public float Reveal { get; set; }
+
+    /// <summary>
+    /// Zieht eine Deckung zum Vollen hin - der Regler von oben, als Rechnung.
+    ///
+    /// Bei 0 bleibt alles, wie es ist. Bei 1 deckt die Ebene ueberall, und was unter
+    /// ihrer Freistellung steht, steht im Bild. Dazwischen liegt ein Schleier.
+    /// </summary>
+    public static float Lift(float matte, float reveal)
+        => reveal <= 0f ? matte : matte + (1f - matte) * Math.Clamp(reveal, 0f, 1f);
+
+    public ImageLayer Clone() => new()
+    {
+        Source = Source,
+        Name = Name,
+        Visible = Visible,
+        Mode = Mode,
+        Opacity = Opacity,
+        Exposure = Exposure,
+        Clipped = Clipped,
+        Mask = Mask.Clone(),
+        Content = Content,
+        FollowSequence = FollowSequence,
+        MatteFloor = MatteFloor,
+        Reveal = Reveal,
+        BlendInDisplay = BlendInDisplay,
+        Place = Place.Clone(),
+        OnTop = OnTop,
+        Children = Children.Select(c => c.Clone()).ToList(),
+        Adjustments = Adjustments,
+        Tools = Tools?.Clone(),
+        Tint = Tint.Clone(),
+    };
+}
+
+/// <summary>
+/// Der Ebenenstapel, von unten nach oben.
+///
+/// Index 0 liegt unten. Das ist die umgekehrte Reihenfolge zu der, in der die Liste
+/// angezeigt wird - oben in der Liste ist oben im Bild, wie in jedem Bildprogramm.
+/// Die Umkehrung steht in der Oberflaeche und nicht hier, weil das Rechnen von
+/// unten nach oben laeuft und eine rueckwaerts gelesene Schleife eine Fehlerquelle
+/// mehr ist.
+/// </summary>
+/// <summary>Was eine Ebene zu lesen verlangt.</summary>
+/// <param name="Key">
+/// Unter diesem Namen liegt das Ergebnis - ein Passname oder ein Dateipfad.
+/// </param>
+public readonly record struct LayerRead(string Key, LayerContent Kind, bool FollowSequence);
+
+public sealed class LayerStack
+{
+    public List<ImageLayer> Layers { get; set; } = new();
+
+    /// <summary>
+    /// True, wenn der Stapel nichts anderes ergibt als das Bild selbst: keine Ebene,
+    /// oder genau eine unveraenderte auf dem Hauptbild.
+    ///
+    /// Dann wird gar nicht erst zusammengesetzt - und das ist nicht nur schneller,
+    /// sondern auch genauer: Der Weg ohne Zusammensetzung reicht den Frame durch,
+    /// wie er gelesen wurde.
+    /// </summary>
+    [JsonIgnore]
+    public bool IsPassThrough
+        => Layers.Count == 0 ||
+           (Layers.Count == 1 && Layers[0].Visible && Layers[0].Source.Length == 0 &&
+            Layers[0].IsNeutral && Layers[0].LiesOnBlack);
+
+    /// <summary>
+    /// Die Passe, die tatsaechlich gelesen werden muessen.
+    ///
+    /// Auch die der Masken: Eine Ebene, die ihre Maske aus dem Nebelpass zieht,
+    /// braucht diesen Pass genauso wie ihren eigenen. Ihn zu vergessen ergaebe eine
+    /// Maske, die still nichts tut - der unangenehmste Fehler, weil das Bild
+    /// aussieht, als waere die Maske falsch eingestellt.
+    /// </summary>
+    /// <summary>
+    /// Die Quellen, die der Stapel ueberhaupt nennt - auch die der ausgeblendeten
+    /// Ebenen.
+    ///
+    /// Das ist bewusst MEHR als <see cref="Reads"/>. Gelesen wird nur, was sichtbar
+    /// ist; ein 4K-Pass sind hundert Megabyte, und einen fuer eine ausgeblendete
+    /// Ebene zu holen waere Verschwendung. BEHALTEN wird dagegen alles, was der
+    /// Stapel nennt.
+    ///
+    /// Der Unterschied ist nicht akademisch. Vorher waren beide Fragen dieselbe, und
+    /// damit warf das Ausblenden einer Ebene ihre gelesene Quelle weg. Beim
+    /// Einblenden musste sie neu von der Platte kommen - die Ebene blieb so lange
+    /// unsichtbar, ihre Miniatur verschwand, und wer schnell zweimal klickte, sah
+    /// zwei verschiedene Bilder. Das Auge ist ein Schalter und keine Ladeaufforderung.
+    /// </summary>
+    public IReadOnlyList<string> NamedSources()
+    {
+        var names = new List<string>();
+
+        Walk(Layers);
+
+        return names;
+
+        void Walk(IEnumerable<ImageLayer> layers)
+        {
+            foreach (var layer in layers)
+            {
+                if (layer.Source.Length > 0 && !names.Contains(layer.Source, StringComparer.Ordinal))
+                    names.Add(layer.Source);
+
+                foreach (string source in layer.Mask.Sources())
+                    if (!names.Contains(source, StringComparer.Ordinal)) names.Add(source);
+
+                if (layer.Content == LayerContent.Group) Walk(layer.Children);
+            }
+        }
+    }
+
+    public IReadOnlyList<string> NeededSources()
+        => Reads().Select(r => r.Key).ToList();
+
+    /// <summary>
+    /// Was gelesen werden muss, und woher.
+    ///
+    /// Der Schluessel ist zugleich der Name, unter dem das Ergebnis abgelegt wird -
+    /// bei einem Pass sein Name, bei einer Bildebene ihr Pfad. Dass beides derselbe
+    /// Behaelter ist, ist kein Trick: Fuer den Composer ist es dieselbe Frage
+    /// ("woher kommen die Werte dieser Ebene?"), und zwei Behaelter hiessen zwei
+    /// Wege, die auseinanderlaufen koennen.
+    /// </summary>
+    public IReadOnlyList<LayerRead> Reads()
+    {
+        var reads = new List<LayerRead>();
+
+        void Add(LayerRead read)
+        {
+            if (!reads.Any(r => r.Key.Equals(read.Key, StringComparison.Ordinal))) reads.Add(read);
+        }
+
+        Walk(Layers);
+
+        return reads;
+
+        void Walk(IEnumerable<ImageLayer> layers)
+        {
+            foreach (var layer in layers)
+            {
+                if (!layer.Visible) continue;
+
+                // Eine Einstellungsebene liest nichts - sie rechnet mit dem, was
+                // schon da ist. Ihre Maske kann trotzdem einen Pass brauchen.
+                switch (layer.Content)
+                {
+                    case LayerContent.Pass:
+                        Add(new LayerRead(layer.Source, LayerContent.Pass, false));
+                        break;
+
+                    case LayerContent.Image when layer.Source.Length > 0:
+                        Add(new LayerRead(layer.Source, LayerContent.Image, layer.FollowSequence));
+                        break;
+
+                    // In eine Gruppe muss hineingesehen werden: Ihre Kinder lesen
+                    // ihre Passe selbst, und wer sie nicht mitzaehlt, komponiert
+                    // eine Gruppe aus lauter fehlenden Quellen.
+                    case LayerContent.Group:
+                        Walk(layer.Children);
+                        break;
+                }
+
+                foreach (string source in layer.Mask.Sources())
+                    Add(new LayerRead(source, LayerContent.Pass, false));
+            }
+        }
+    }
+
+    /// <summary>
+    /// Alle Ebenen, auch die in Gruppen - von unten nach oben, Gruppen vor ihren
+    /// Kindern.
+    /// </summary>
+    public IEnumerable<ImageLayer> All()
+    {
+        foreach (var layer in Walk(Layers)) yield return layer;
+
+        static IEnumerable<ImageLayer> Walk(IEnumerable<ImageLayer> layers)
+        {
+            foreach (var layer in layers)
+            {
+                yield return layer;
+
+                foreach (var child in Walk(layer.Children)) yield return child;
+            }
+        }
+    }
+
+    public LayerStack Clone() => new()
+    {
+        Layers = Layers.Select(l => l.Clone()).ToList(),
+    };
+}
