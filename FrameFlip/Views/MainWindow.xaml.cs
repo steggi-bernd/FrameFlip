@@ -42,9 +42,9 @@ namespace FrameFlip.Views;
 /// die Menues zeigt. Sie legen sich ueber die drei Spalten, statt sie zu ersetzen:
 /// Wer zurueckwechselt, findet dieselbe Sequenz an derselben Stelle wieder.
 ///
-/// Auswahl, Ordnerbeobachtung, Bildspeicher und Videovorbereitung haben eigene
-/// Controller. Abspielposition, Bildrate, Follow und Bereich bleiben vorerst hier;
-/// das Fenster verbindet diese Entscheidungen mit den WPF-Eingaben und Anzeigen.
+/// Auswahl, Ordnerbeobachtung, Bildspeicher, Videovorbereitung und Wiedergabe haben
+/// eigene Controller. Das Fenster verbindet deren Entscheidungen mit Zeitgebern,
+/// WPF-Eingaben und Anzeigen.
 /// </summary>
 public partial class MainWindow : Window
 {
@@ -90,10 +90,9 @@ public partial class MainWindow : Window
     private string _lastJobId = string.Empty;
     private IReadOnlyList<int> _missing = Array.Empty<int>();
 
-    private int _head;
-    private int _inPoint;
-    private int _outPoint;
-    private bool _playing;
+    /// <summary>Kopf, Bereich, Abspielzustand, Follow und Bildrate.</summary>
+    private readonly DashboardPlaybackController _playback;
+
     private bool _scrubbing;
 
     /// <summary>Ob Abspielen erst vorauslaedt. Wird mit den Einstellungen gemerkt.</summary>
@@ -107,7 +106,6 @@ public partial class MainWindow : Window
 
     private string _page = "dashboard";
     private string _panel = "metrics";
-    private double _fps = 24;
 
     private ToggleButton? _loopChip;
 
@@ -116,9 +114,6 @@ public partial class MainWindow : Window
 
     /// <summary>Ordnerbeobachtung und Ruhefrist der aktuell gewaehlten Folge.</summary>
     private readonly DashboardLiveController _live;
-
-    /// <summary>Ob der Kopf auf dem neuesten Bild bleiben soll.</summary>
-    private bool _follow = true;
 
     /// <summary>Der zuletzt gemeldete Ladestand - fuer den Balken beim Groessenwechsel.</summary>
     private PreloadProgress? _lastPreload;
@@ -221,6 +216,7 @@ public partial class MainWindow : Window
 
         _sequences = new DashboardSequenceController(DashboardSequenceSources.Default(_decoders),
             action => Dispatcher.BeginInvoke(action), RefreshSequenceItem);
+        _playback = new DashboardPlaybackController(() => _sequences.Sequence);
         _live = new DashboardLiveController(DashboardLiveSources.Default(Dispatcher), _decoders.IsSupported, RescanLive);
         _layout = DesktopLayout.Load();
 
@@ -262,7 +258,7 @@ public partial class MainWindow : Window
         _ticker.Tick += (_, _) => Refresh();
         _ticker.Start();
 
-        _player = new DispatcherTimer { Interval = TimeSpan.FromSeconds(1.0 / Clean(_fps)) };
+        _player = new DispatcherTimer { Interval = _playback.Interval };
         _player.Tick += (_, _) => Advance();
 
         if (_monitor is not null)
@@ -735,8 +731,7 @@ public partial class MainWindow : Window
         SequenceName.Text = entry.Name;
 
         _missing = _sequence.MissingNumbers();
-        _inPoint = _sequence.StartNumber;
-        _outPoint = _sequence.EndNumber;
+        _playback.ResetRange(_sequence);
 
         RefreshSequenceItem(entry);
 
@@ -824,16 +819,13 @@ public partial class MainWindow : Window
             return;
         }
         var fresh = change.Current;
-        bool grewAtEnd = fresh.EndNumber > change.Previous.EndNumber;
-        // Ein von Hand gesetztes Ende bleibt stehen; nur das offene Ende waechst mit.
-        bool outWasAtEnd = _outPoint == change.Previous.EndNumber;
         _missing = fresh.MissingNumbers();
 
         // Der Render hat weitergeschrieben: Die Stellen stimmen nicht mehr ueberein.
         DropCache();
 
-        if (outWasAtEnd) _outPoint = fresh.EndNumber;
-        if (_inPoint < fresh.StartNumber) _inPoint = fresh.StartNumber;
+        // Ein von Hand gesetztes Ende bleibt stehen; nur das offene Ende waechst mit.
+        int? follow = _playback.Rescan(change.Previous, fresh);
 
         RefreshSequenceItem(_current!);
 
@@ -841,7 +833,7 @@ public partial class MainWindow : Window
         BuildGaps();
         DrawScrub();
 
-        if (_follow && grewAtEnd && !_playing) ShowFrame(fresh.EndNumber);
+        if (follow is int newest) ShowFrame(newest);
         else UpdateStripSelection();
 
         Refresh();
@@ -851,9 +843,7 @@ public partial class MainWindow : Window
     {
         if (sender is not ToggleButton toggle) return;
 
-        _follow = toggle.IsChecked == true;
-
-        if (_follow && _sequence is { Count: > 0 } sequence && !_playing) ShowFrame(sequence.EndNumber);
+        if (_playback.SetFollow(toggle.IsChecked == true) is int newest) ShowFrame(newest);
     }
 
     /// <summary>
@@ -958,13 +948,10 @@ public partial class MainWindow : Window
 
     private void ShowFrame(int number)
     {
-        if (_sequence is null || _sequence.Count == 0) return;
-
-        int index = _sequence.IndexNearestNumber(number);
-        if (index < 0) return;
+        int index = _playback.Seek(number);
+        if (_sequence is null || index < 0) return;
 
         var frame = _sequence.Frames[index];
-        _head = frame.Number;
 
         SequenceFile.Text = "/ " + frame.FileName;
         StageHead.Text = frame.Number.ToString(_sequence.NumberFormat, CultureInfo.InvariantCulture);
@@ -1017,12 +1004,12 @@ public partial class MainWindow : Window
         // Der gewaehlte Bereich als Flaeche.
         var range = new Rectangle
         {
-            Width = Math.Max(0, AtScrub(_outPoint) - AtScrub(_inPoint)),
+            Width = Math.Max(0, AtScrub(_playback.OutPoint) - AtScrub(_playback.InPoint)),
             Height = height,
             Fill = new SolidColorBrush(Color.FromArgb(0x2E, 0xA8, 0x55, 0xF7)),
         };
 
-        Canvas.SetLeft(range, AtScrub(_inPoint));
+        Canvas.SetLeft(range, AtScrub(_playback.InPoint));
         ScrubCanvas.Children.Add(range);
 
         // Unterkante: wie weit der Ordner geschrieben ist.
@@ -1095,7 +1082,7 @@ public partial class MainWindow : Window
     {
         if (_headMark is null || _sequence is null) return;
 
-        Canvas.SetLeft(_headMark, Math.Max(0, Math.Min(ScrubCanvas.ActualWidth - 3, AtScrub(_head))));
+        Canvas.SetLeft(_headMark, Math.Max(0, Math.Min(ScrubCanvas.ActualWidth - 3, AtScrub(_playback.Head))));
     }
 
     private int ScrubSpan => _sequence is null ? 1 : Math.Max(1, _sequence.EndNumber - _sequence.StartNumber);
@@ -1192,7 +1179,7 @@ public partial class MainWindow : Window
 
         int count = _sequence.Count;
         int cells = FilmStrip.Children.Count;
-        int centre = _sequence.IndexNearestNumber(_head);
+        int centre = _sequence.IndexNearestNumber(_playback.Head);
         int start = Math.Max(0, Math.Min(Math.Max(0, count - cells), centre - cells / 2));
 
         for (int i = 0; i < FilmStrip.Children.Count; i++)
@@ -1212,7 +1199,7 @@ public partial class MainWindow : Window
             cell.Visibility = Visibility.Visible;
             cell.Tag = frame.Number;
             cell.Content = frame.Number.ToString(_sequence.NumberFormat, CultureInfo.InvariantCulture);
-            cell.IsChecked = frame.Number == _head;
+            cell.IsChecked = frame.Number == _playback.Head;
         }
     }
 
@@ -1228,7 +1215,7 @@ public partial class MainWindow : Window
             return;
         }
 
-        if (_playing) Pause();
+        if (_playback.IsPlaying) Pause();
         else if (_prebuffer && NeedsPreload()) StartPreload();
         else Play();
     }
@@ -1236,7 +1223,7 @@ public partial class MainWindow : Window
     // ================================================================ Vorausladen
 
     /// <summary>Ob fuer den gewaehlten Bereich noch Bilder fehlen.</summary>
-    private bool NeedsPreload() => _frames.NeedsPreload(_inPoint, _outPoint);
+    private bool NeedsPreload() => _frames.NeedsPreload(_playback.InPoint, _playback.OutPoint);
 
     private async void StartPreload()
     {
@@ -1255,7 +1242,7 @@ public partial class MainWindow : Window
         Note(result.Whole
             ? Strings.T("D_LogPreloadDone", result.Loaded)
             : Strings.T("D_LogPreloadPart", result.Loaded, result.Total));
-        ShowFrame(_inPoint);
+        ShowFrame(_playback.InPoint);
         Play();
     }
     /// <summary>
@@ -1287,7 +1274,7 @@ public partial class MainWindow : Window
         }
 
         var frames = sequence.Frames
-            .Where(f => f.Number >= _inPoint && f.Number <= _outPoint)
+            .Where(f => f.Number >= _playback.InPoint && f.Number <= _playback.OutPoint)
             .ToList();
 
         if (frames.Count < 2) return;
@@ -1304,8 +1291,8 @@ public partial class MainWindow : Window
             height = ph;
         }
 
-        var request = new DashboardVideoRequest(exe, sequence.Pattern.Describe(), _inPoint, _outPoint,
-            frames, _fps, width, height, preset, Math.Max(1, Environment.ProcessorCount / 4));
+        var request = new DashboardVideoRequest(exe, sequence.Pattern.Describe(), _playback.InPoint, _playback.OutPoint,
+            frames, _playback.Fps, width, height, preset, Math.Max(1, Environment.ProcessorCount / 4));
         Note(Strings.T("D_LogPrepare"));
         var result = await _videos.PrepareAsync(request);
         if (result is null || !_videos.IsCurrent(result)) return;
@@ -1454,10 +1441,9 @@ public partial class MainWindow : Window
 
     private void Play()
     {
-        if (_sequence is null || _sequence.Count < 2) return;
+        if (!_playback.Play()) return;
 
-        _playing = true;
-        _player.Interval = TimeSpan.FromSeconds(1.0 / Clean(_fps));
+        _player.Interval = _playback.Interval;
         _player.Start();
 
         ShowPlayGlyph(playing: true);
@@ -1470,9 +1456,8 @@ public partial class MainWindow : Window
 
     private void Pause()
     {
-        if (!_playing) return;
+        if (!_playback.Pause()) return;
 
-        _playing = false;
         _player.Stop();
 
         ShowPlayGlyph(playing: false);
@@ -1501,23 +1486,11 @@ public partial class MainWindow : Window
 
     private void Advance()
     {
-        if (_sequence is null || _sequence.Count == 0) return;
-
-        int index = _sequence.IndexNearestNumber(_head) + 1;
-
-        if (index >= _sequence.Count || _sequence.Frames[index].Number > _outPoint)
+        switch (_playback.Advance(loop: _loopChip?.IsChecked == true, out int next))
         {
-            if (_loopChip?.IsChecked == true)
-            {
-                ShowFrame(_inPoint);
-                return;
-            }
-
-            Pause();
-            return;
+            case DashboardTick.Show: ShowFrame(next); break;
+            case DashboardTick.Stop: Pause(); break;
         }
-
-        ShowFrame(_sequence.Frames[index].Number);
     }
 
     private void OnStepBack(object sender, RoutedEventArgs e) => Step(-1);
@@ -1526,17 +1499,15 @@ public partial class MainWindow : Window
 
     private void Step(int delta)
     {
-        if (_sequence is null || _sequence.Count == 0) return;
+        if (_playback.StepTarget(delta) is not int target) return;
 
         Pause();
-
-        int index = Math.Clamp(_sequence.IndexNearestNumber(_head) + delta, 0, _sequence.Count - 1);
-        ShowFrame(_sequence.Frames[index].Number);
+        ShowFrame(target);
     }
 
-    private void OnJumpIn(object sender, RoutedEventArgs e) { Pause(); ShowFrame(_inPoint); }
+    private void OnJumpIn(object sender, RoutedEventArgs e) { Pause(); ShowFrame(_playback.InPoint); }
 
-    private void OnJumpOut(object sender, RoutedEventArgs e) { Pause(); ShowFrame(_outPoint); }
+    private void OnJumpOut(object sender, RoutedEventArgs e) { Pause(); ShowFrame(_playback.OutPoint); }
 
     private void OnWindowKeyDown(object sender, KeyEventArgs e)
     {
@@ -1594,8 +1565,8 @@ public partial class MainWindow : Window
             case Key.Space: OnTogglePlay(sender, e); e.Handled = true; break;
             case Key.Left: Step(-1); e.Handled = true; break;
             case Key.Right: Step(+1); e.Handled = true; break;
-            case Key.Home: Pause(); ShowFrame(_inPoint); e.Handled = true; break;
-            case Key.End: Pause(); ShowFrame(_outPoint); e.Handled = true; break;
+            case Key.Home: Pause(); ShowFrame(_playback.InPoint); e.Handled = true; break;
+            case Key.End: Pause(); ShowFrame(_playback.OutPoint); e.Handled = true; break;
         }
     }
 
@@ -1633,7 +1604,7 @@ public partial class MainWindow : Window
         setIn.Checked += (_, _) =>
         {
             setIn.IsChecked = false;
-            _inPoint = Math.Min(_head, _outPoint);
+            _playback.MarkIn();
             DrawScrub();
             Refresh();
         };
@@ -1643,7 +1614,7 @@ public partial class MainWindow : Window
         setOut.Checked += (_, _) =>
         {
             setOut.IsChecked = false;
-            _outPoint = Math.Max(_head, _inPoint);
+            _playback.MarkOut();
             DrawScrub();
             Refresh();
         };
@@ -1660,8 +1631,8 @@ public partial class MainWindow : Window
     {
         foreach (double rate in CommonRates) RateBox.Items.Add(Rate(rate));
 
-        _fps = Clean(_getSettings().Fps);
-        RateBox.Text = Rate(_fps);
+        _playback.UseRate(_getSettings().Fps);
+        RateBox.Text = Rate(_playback.Fps);
 
         // Getippt wird erst uebernommen, wenn das Feld den Fokus verlaesst oder die
         // Eingabetaste kommt - sonst bekaeme die Wiedergabe bei "2" aus "24" kurz
@@ -1692,20 +1663,12 @@ public partial class MainWindow : Window
     /// </summary>
     private void TakeRate(string? text)
     {
-        double wanted = _fps;
-
-        if (double.TryParse(text?.Replace(',', '.'), NumberStyles.Float,
-                            CultureInfo.InvariantCulture, out double parsed))
-        {
-            wanted = Clean(parsed);
-        }
-
-        _fps = wanted;
+        double wanted = _playback.TakeRate(text);
 
         string shown = Rate(wanted);
         if (RateBox.Text != shown) RateBox.Text = shown;
 
-        if (_player is not null) _player.Interval = TimeSpan.FromSeconds(1.0 / wanted);
+        if (_player is not null) _player.Interval = _playback.Interval;
 
         // Waehrend des Aufbaus wird nur der Wert gesetzt, nichts gespeichert: Der
         // Stand kommt ja gerade aus den Einstellungen.
@@ -1721,10 +1684,6 @@ public partial class MainWindow : Window
 
         RefreshStatusBar(_monitor?.Job);
     }
-
-    /// <summary>Dieselben Grenzen wie in den Einstellungen - eine Regel, ein Ort.</summary>
-    private static double Clean(double rate)
-        => double.IsNaN(rate) || rate <= 0 ? 24 : Math.Clamp(rate, 1, 240);
 
     private static string Rate(double value)
         => value.ToString(Math.Abs(value - Math.Round(value)) < 0.001 ? "0" : "0.###",
@@ -1878,7 +1837,7 @@ public partial class MainWindow : Window
         if (_sequence is null || _sequence.Count == 0) return;
 
         var range = _sequence.Frames
-            .Where(f => f.Number >= _inPoint && f.Number <= _outPoint)
+            .Where(f => f.Number >= _playback.InPoint && f.Number <= _playback.OutPoint)
             .ToList();
 
         if (range.Count == 0) return;
@@ -1892,7 +1851,7 @@ public partial class MainWindow : Window
             height = probedH;
         }
 
-        var window = new ExportWindow(_sequence, range, _fps, width, height,
+        var window = new ExportWindow(_sequence, range, _playback.Fps, width, height,
                                       _getSettings(), s => _persist?.Invoke(s),
                                       () => Math.Max(1, Environment.ProcessorCount / 2))
         {
@@ -2585,7 +2544,7 @@ public partial class MainWindow : Window
         bool hasFrames = _sequence is { Count: > 0 };
         TransportControls.IsEnabled = ViewChips.IsEnabled = hasFrames;
         StageAnnotations.Visibility = hasFrames ? Visibility.Visible : Visibility.Collapsed;
-        NewestDot.Opacity = _sequence is { } shown && _head == shown.EndNumber ? 1 : 0.35;
+        NewestDot.Opacity = _sequence is { } shown && _playback.Head == shown.EndNumber ? 1 : 0.35;
 
         // ---------------------------------------------------------- Protokoll
         PhaseText.Text = job?.Stats.Activity ?? Strings.T("D_NoActivity");
@@ -2597,13 +2556,13 @@ public partial class MainWindow : Window
         RangeInfo.Text = _sequence is null
             ? string.Empty
             : Strings.T("D_InOut",
-                        _inPoint.ToString(_sequence.NumberFormat, CultureInfo.InvariantCulture),
-                        _outPoint.ToString(_sequence.NumberFormat, CultureInfo.InvariantCulture),
+                        _playback.InPoint.ToString(_sequence.NumberFormat, CultureInfo.InvariantCulture),
+                        _playback.OutPoint.ToString(_sequence.NumberFormat, CultureInfo.InvariantCulture),
 
                         // Vorhandene Bilder, nicht die Spanne: Bei einem abgebrochenen
                         // Render liegen zwischen Start und Ende weniger Dateien, als
                         // die Differenz verspricht - und exportiert werden die Dateien.
-                        _sequence.Frames.Count(f => f.Number >= _inPoint && f.Number <= _outPoint));
+                        _sequence.Frames.Count(f => f.Number >= _playback.InPoint && f.Number <= _playback.OutPoint));
     }
 
     private void UpdateGraph(RenderJob? job)
@@ -2804,7 +2763,7 @@ public partial class MainWindow : Window
                 : "—";
 
         StatusDecode.Text = _sequence?.Pattern.Extension.TrimStart('.').ToUpperInvariant() ?? string.Empty;
-        StatusFps.Text = Rate(_fps) + " fps";
+        StatusFps.Text = Rate(_playback.Fps) + " fps";
         StatusMissing.Text = _missing.Count > 0 ? Strings.T("D_NMissing", _missing.Count) : string.Empty;
         StatusHotkey.Text = _getSettings().Hotkey + " · " + Strings.T("D_Overlay");
 

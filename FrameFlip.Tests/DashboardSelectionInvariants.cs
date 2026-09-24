@@ -41,12 +41,12 @@ public static class DashboardSelectionInvariants
         Check.That((bool)h.Call("Select", known.Path.ToUpperInvariant())!, "Projektpfade werden ohne Gross-/Kleinschreibung gefunden");
         Check.That(h.Sequence?.StartNumber == 5 && h.Sequence.Count == 2 && h.Buttons.Count(b => b.IsChecked == true) == 1,
             "die Auswahl setzt genau eine Zeile und die zugehoerige Sequenz");
-        Set(window, "_playing", true);
+        DashboardPlaybackInvariants.Poke(window, "IsPlaying", true);
         var same = h.Sequence;
         h.Call("Select", seed);
-        Check.That(ReferenceEquals(same, h.Sequence) && Read(window, "_playing") is true,
+        Check.That(ReferenceEquals(same, h.Sequence) && DashboardPlaybackInvariants.Playback(window).IsPlaying is true,
             "die erneute Auswahl derselben Folge unterbricht die Wiedergabe nicht");
-        Set(window, "_playing", false);
+        DashboardPlaybackInvariants.Poke(window, "IsPlaying", false);
         Check.That(!(bool)h.Call("Select", "unknown")! && ReferenceEquals(same, h.Sequence),
             "ein unbekanntes Auswahlziel veraendert nichts");
 
@@ -95,12 +95,12 @@ public static class DashboardSelectionInvariants
         h.PumpUntil(() => watch.ElapsedMilliseconds >= 900);
         Check.That(h.Sequence is { Count: 1, StartNumber: 1 },
             "der erste geschriebene Frame erscheint in der ausgewaehlten leeren Ausgabe");
-        Set(window, "_playing", true);
+        DashboardPlaybackInvariants.Poke(window, "IsPlaying", true);
         h.Save();
         h.Call("ReloadSequencesKeepingSelection");
         Check.That(h.Buttons.Length == 0 && h.Sequence is null && Read(window, "_current") is null,
             "eine geleerte Bibliothek gibt auch Auswahl und Sequenz frei");
-        Check.That(Read(window, "_playing") is false, "ohne Auswahl endet die Wiedergabe");
+        Check.That(DashboardPlaybackInvariants.Playback(window).IsPlaying is false, "ohne Auswahl endet die Wiedergabe");
         h.Frame(folder, 2);
         watch.Restart();
         h.PumpUntil(() => watch.ElapsedMilliseconds >= 900);
@@ -111,8 +111,6 @@ public static class DashboardSelectionInvariants
     internal static object? Read(object target, string name)
         => target.GetType().GetField(name, BindingFlags.Instance | BindingFlags.NonPublic)?.GetValue(target)
            ?? target.GetType().GetProperty(name, BindingFlags.Instance | BindingFlags.NonPublic)?.GetValue(target);
-    private static void Set(object target, string name, object value)
-        => target.GetType().GetField(name, BindingFlags.Instance | BindingFlags.NonPublic)!.SetValue(target, value);
 
     private sealed class Harness : IDisposable
     {

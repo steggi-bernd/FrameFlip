@@ -221,9 +221,9 @@ public static class DashboardMediaControllerInvariants
             });
         var settings = new AppSettings { Prebuffer = false, PrepareVideo = false, MemoryBudgetMb = 128, FfmpegPath = executable };
         h.Open(sources, settings);
-        h.Set("_inPoint", 2);
-        h.Set("_outPoint", 3);
-        h.Set("_fps", 30d);
+        h.Poke("InPoint", 2);
+        h.Poke("OutPoint", 3);
+        h.Poke("Fps", 30d);
         var controller = (DashboardVideoController)h.Read("_videos")!;
         var sequence = (ImageSequence)h.Read("_sequence")!;
         try

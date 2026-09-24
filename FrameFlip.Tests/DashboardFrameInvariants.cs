@@ -61,8 +61,8 @@ public static class DashboardFrameInvariants
         h.Open();
         h.Until(() => h.Image.Source is not null);
         Check.That((bool)h.Call("NeedsPreload")!, "eine noch nicht gepufferte Folge muss vorladen");
-        h.Set("_inPoint", 2);
-        h.Set("_outPoint", 3);
+        h.Poke("InPoint", 2);
+        h.Poke("OutPoint", 3);
         h.Call("StartPreload");
         var loader = h.Loaders.Single();
         Check.That(loader.Paths.Count == 3 && loader.Paths[0].EndsWith("0001.png"),
@@ -76,7 +76,7 @@ public static class DashboardFrameInvariants
             "Teilfortschritt und reduzierte Aufloesung erscheinen im Dashboard");
         loader.Frames = new BitmapSource?[] { null, h.Picture, h.Picture };
         loader.Complete(false);
-        h.Until(() => loader.Disposals == 1 && h.Read("_playing") is true);
+        h.Until(() => loader.Disposals == 1 && h.Playback.IsPlaying is true);
         h.Call("Pause");
         Check.That(h.Bar.Visibility == Visibility.Collapsed && !(bool)h.Call("NeedsPreload")!,
             "auch eine teilweise geladene Folge startet und deckt einen vollstaendigen Teilbereich ab");
@@ -84,7 +84,7 @@ public static class DashboardFrameInvariants
         h.Call("ShowFrame", 3);
         Check.That(h.Reads.Count == reads && ReferenceEquals(h.Image.Source, h.Picture),
             "ein Cache-Treffer wird ohne weiteren Dateizugriff angezeigt");
-        h.Set("_inPoint", 1);
+        h.Poke("InPoint", 1);
         Check.That((bool)h.Call("NeedsPreload")!, "eine Luecke im erweiterten Bereich fordert weiteres Vorladen");
         h.Call("StartPreload");
         var cancelled = h.Loaders.Last();
@@ -93,7 +93,7 @@ public static class DashboardFrameInvariants
             "derselbe Abspielknopf bricht einen laufenden Ladevorgang ab");
         cancelled.Complete(true);
         h.Until(() => cancelled.Disposals == 1);
-        Check.That(h.Read("_playing") is false, "ein abgebrochener Vorlader startet keine spaete Wiedergabe");
+        Check.That(h.Playback.IsPlaying is false, "ein abgebrochener Vorlader startet keine spaete Wiedergabe");
     }
 
     private static void DefaultPreloader()
@@ -175,7 +175,7 @@ public static class DashboardFrameInvariants
                 "ein Wechsel zur leeren Ausgabe bricht den Vorlader sofort ab");
             current.Complete(true);
             h.Until(() => current.Disposals == 1);
-            Check.That(h.Read("_playing") is false, "die alte Folge startet nach dem Wechsel nicht wieder");
+            Check.That(h.Playback.IsPlaying is false, "die alte Folge startet nach dem Wechsel nicht wieder");
             h.Call("Select", h.Render);
             h.Call("StartPreload");
             var closing = h.Loaders.Last();
@@ -266,6 +266,8 @@ public static class DashboardFrameInvariants
         internal FrameworkElement Bar => (FrameworkElement)Window.FindName("PreloadBar");
         internal string Text(string name) => ((TextBlock)Window.FindName(name)).Text;
         internal object? Read(string name) => DashboardSelectionInvariants.Read(Window, name);
+        internal DashboardPlaybackController Playback => DashboardPlaybackInvariants.Playback(Window);
+        internal void Poke(string property, object value) => DashboardPlaybackInvariants.Poke(Window, property, value);
         internal void Set(string name, object value) => typeof(MainWindow).GetField(name, Hidden)!.SetValue(Window, value);
         internal object? Call(string name, params object[] args) => typeof(MainWindow).GetMethods(Hidden)
             .Single(m => m.Name == name && m.GetParameters().Length == args.Length

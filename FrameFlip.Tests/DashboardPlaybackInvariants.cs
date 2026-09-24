@@ -1,11 +1,14 @@
 using System.IO;
+using System.Reflection;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Controls.Primitives;
 using System.Windows.Media.Imaging;
 using System.Windows.Threading;
 using FrameFlip.Configuration;
+using FrameFlip.Dashboard;
 using FrameFlip.Localization;
+using FrameFlip.Views;
 
 namespace FrameFlip.Tests;
 
@@ -174,9 +177,9 @@ public static class DashboardPlaybackInvariants
             var follow = (ToggleButton)h.Window.FindName("FollowToggle");
             h.Call("ShowFrame", 1);
             follow.IsChecked = false;
-            Check.That(Head(h) == 1 && !(bool)h.Read("_follow")!, "Follow ausschalten laesst den Kopf stehen");
+            Check.That(Head(h) == 1 && !h.Playback.Follow, "Follow ausschalten laesst den Kopf stehen");
             follow.IsChecked = true;
-            Check.That(Head(h) == 3 && (bool)h.Read("_follow")!, "Follow einschalten springt im Stillstand ans Ende");
+            Check.That(Head(h) == 3 && h.Playback.Follow, "Follow einschalten springt im Stillstand ans Ende");
             h.Call("ShowFrame", 1);
             Toggle(h);
             follow.IsChecked = false;
@@ -206,13 +209,24 @@ public static class DashboardPlaybackInvariants
     }
 
     private static void Toggle(DashboardFrameInvariants.Harness h) => h.Call("OnTogglePlay", h.Window, new RoutedEventArgs());
-    private static int Head(DashboardFrameInvariants.Harness h) => (int)h.Read("_head")!;
-    private static int In(DashboardFrameInvariants.Harness h) => (int)h.Read("_inPoint")!;
-    private static int Out(DashboardFrameInvariants.Harness h) => (int)h.Read("_outPoint")!;
-    private static bool Playing(DashboardFrameInvariants.Harness h) => (bool)h.Read("_playing")!;
-    private static double Fps(DashboardFrameInvariants.Harness h) => (double)h.Read("_fps")!;
+    private static int Head(DashboardFrameInvariants.Harness h) => h.Playback.Head;
+    private static int In(DashboardFrameInvariants.Harness h) => h.Playback.InPoint;
+    private static int Out(DashboardFrameInvariants.Harness h) => h.Playback.OutPoint;
+    private static bool Playing(DashboardFrameInvariants.Harness h) => h.Playback.IsPlaying;
+    private static double Fps(DashboardFrameInvariants.Harness h) => h.Playback.Fps;
     private static string? Glyph(DashboardFrameInvariants.Harness h) => ((Button)h.Window.FindName("PlayButton")).ToolTip as string;
     private static ToggleButton Loop(DashboardFrameInvariants.Harness h) => (ToggleButton)h.Read("_loopChip")!;
     private static ToggleButton Chip(DashboardFrameInvariants.Harness h, int index)
         => (ToggleButton)((Panel)h.Window.FindName("PlayChips")).Children[index];
+
+    internal static DashboardPlaybackController Playback(MainWindow window)
+        => (DashboardPlaybackController)DashboardSelectionInvariants.Read(window, "_playback")!;
+
+    /// <summary>
+    /// Nur den Zustand setzen, ohne Zeitgeber, Anzeige oder Begrenzung - so wie die
+    /// Pruefungen frueher die Felder des Fensters gesetzt haben.
+    /// </summary>
+    internal static void Poke(MainWindow window, string property, object value)
+        => typeof(DashboardPlaybackController).GetProperty(property, BindingFlags.Instance | BindingFlags.NonPublic)!
+            .SetValue(Playback(window), value);
 }
