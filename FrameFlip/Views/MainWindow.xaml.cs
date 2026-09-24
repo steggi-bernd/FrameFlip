@@ -42,10 +42,9 @@ namespace FrameFlip.Views;
 /// die Menues zeigt. Sie legen sich ueber die drei Spalten, statt sie zu ersetzen:
 /// Wer zurueckwechselt, findet dieselbe Sequenz an derselben Stelle wieder.
 ///
-/// Was hier bewusst NICHT passiert: Das Dashboard baut keinen zweiten Abspieler.
-/// Es zeigt den gewaehlten Frame als Einzelbild - ohne Ringpuffer, ohne Bildratenuhr,
-/// ohne Dekodierkette. Die liegen im Vorschaufenster, und zweimal dieselbe Mechanik
-/// waere zweimal derselbe Fehler.
+/// Auswahl, Ordnerbeobachtung, Bildspeicher und Videovorbereitung haben eigene
+/// Controller. Abspielposition, Bildrate, Follow und Bereich bleiben vorerst hier;
+/// das Fenster verbindet diese Entscheidungen mit den WPF-Eingaben und Anzeigen.
 /// </summary>
 public partial class MainWindow : Window
 {
@@ -73,6 +72,7 @@ public partial class MainWindow : Window
 
     private readonly FrameDecoderRegistry _decoders = FrameDecoderRegistry.CreateDefault();
     private readonly DashboardFrameController _frames;
+    private readonly DashboardVideoController _videos;
 
     private readonly DispatcherTimer _ticker;
     private readonly DispatcherTimer _player;
@@ -96,21 +96,11 @@ public partial class MainWindow : Window
     private bool _playing;
     private bool _scrubbing;
 
-
-
-
     /// <summary>Ob Abspielen erst vorauslaedt. Wird mit den Einstellungen gemerkt.</summary>
     private bool _prebuffer = true;
 
     /// <summary>Ob beim Vorausladen nebenher ein Video entsteht.</summary>
     private bool _prepareVideo;
-
-    /// <summary>Laeuft, solange im Hintergrund kodiert wird.</summary>
-    private CancellationTokenSource? _prepping;
-
-    /// <summary>Die zuletzt fertiggestellte Vorbereitung - oder null.</summary>
-    private string? _prepared;
-
 
     /// <summary>Format und Farbtiefe der Sequenz - einmal ermittelt, dann angezeigt.</summary>
     private string _format = string.Empty;
@@ -163,7 +153,7 @@ public partial class MainWindow : Window
         Action showSettings, Action<string> openSequence, Action showPairing, AppSettings? settings = null,
         Action<AppSettings>? persist = null, Func<AppSettings, string?>? applySettings = null,
         Func<AppSettings>? getSettings = null, Func<Web.WatchService?>? watch = null,
-        Action? renewWatch = null, Action<string?>? setWatchCode = null)
+        Action? renewWatch = null, Action<string?>? setWatchCode = null, DashboardVideoSources? videoSources = null)
     {
         _frames = new DashboardFrameController(frameSources, DispatchFrame, ShowDecodedFrame,
             ShowPreloadProgress, () => DecodeWidth(atLeast: 960), CurrentPace);
@@ -172,6 +162,10 @@ public partial class MainWindow : Window
         _setWatchCode = setWatchCode;
 
         _monitor = monitor;
+        _videos = new DashboardVideoController(videoSources ?? DashboardVideoSources.Default,
+            () => _monitor?.Job?.IsRunning == true
+                ? System.Diagnostics.ProcessPriorityClass.Idle
+                : System.Diagnostics.ProcessPriorityClass.BelowNormal);
         _remoteState = remoteState;
         _openSequence = openSequence;
         _persist = persist;
@@ -287,6 +281,7 @@ public partial class MainWindow : Window
         Closed += (_, _) =>
         {
             _frames.Dispose();
+            _videos.Dispose();
             Strings.Changed -= OnLanguageChanged;
             _layout.Changed -= OnLayoutChanged;
             _settingsPage?.Dispose();
@@ -296,7 +291,6 @@ public partial class MainWindow : Window
             _sequences.Dispose();
             CancelPreload();
             DropCache();
-            _prepping?.Cancel();
         };
 
         _ready = true;
@@ -874,8 +868,7 @@ public partial class MainWindow : Window
         if (_frames.IsPreloading) CancelPreload();
         _frames.Reset(_sequence);
         _lastPreload = null;
-        _prepping?.Cancel();
-        _prepared = null;
+        _videos.Reset();
     }
     private void ShowEmptyStage()
     {
@@ -1279,7 +1272,7 @@ public partial class MainWindow : Window
     /// </summary>
     private async Task PrepareVideoAsync(ImageSequence sequence)
     {
-        if (_prepping is not null) return;
+        if (_videos.IsPreparing) return;
 
         string? exe = FfmpegLocator.Locate(_getSettings().FfmpegPath);
 
@@ -1311,78 +1304,14 @@ public partial class MainWindow : Window
             height = ph;
         }
 
-        double fps = _fps;
-        var stop = new CancellationTokenSource();
-        _prepping = stop;
-
+        var request = new DashboardVideoRequest(exe, sequence.Pattern.Describe(), _inPoint, _outPoint,
+            frames, _fps, width, height, preset, Math.Max(1, Environment.ProcessorCount / 4));
         Note(Strings.T("D_LogPrepare"));
-
-        try
-        {
-            var print = await Task.Run(() => new VideoFingerprint(
-                sequence.Pattern.Describe(), _inPoint, _outPoint, frames.Count, fps,
-                width, height, 0, preset.Name, nameof(GapHandling.HoldLast),
-                PreparedVideo.NewestTicks(frames.Select(f => f.Path))), stop.Token);
-
-            if (PreparedVideo.TryFind(print, preset.Extension, out string already))
-            {
-                Note(Strings.T("D_LogPrepareReady"));
-                _prepared = already;
-                return;
-            }
-
-            PreparedVideo.Prepare();
-
-            string target = PreparedVideo.PathFor(print, preset.Extension);
-
-            var request = new ExportRequest
-            {
-                Frames = frames,
-                Preset = preset,
-                OutputPath = target,
-                Fps = fps,
-                Gaps = GapHandling.HoldLast,
-                TargetWidth = 0,
-                SourceWidth = Math.Max(1, width),
-                SourceHeight = Math.Max(1, height),
-                Threads = Math.Max(1, Environment.ProcessorCount / 4),
-            };
-
-            var exporter = new VideoExporter(exe);
-
-            // Waehrend eines Renders ganz unten: Was hier entsteht, will niemand
-            // gerade sehen, und der Render schon.
-            var priority = _monitor?.Job?.IsRunning == true
-                ? System.Diagnostics.ProcessPriorityClass.Idle
-                : System.Diagnostics.ProcessPriorityClass.BelowNormal;
-
-            var result = await exporter.RunAsync(request, priority, stop.Token);
-
-            if (result.Success && result.OutputPath is { Length: > 0 } made)
-            {
-                PreparedVideo.Note(print, made);
-                _prepared = made;
-                Note(Strings.T("D_LogPrepareDone"));
-            }
-            else if (!result.Cancelled)
-            {
-                Note(Strings.T("D_LogPrepareFailed", result.Error ?? "?"));
-            }
-        }
-        catch (OperationCanceledException)
-        {
-            // Fenster zu oder Folge gewechselt.
-        }
-        catch (Exception error)
-        {
-            Note(Strings.T("D_LogPrepareFailed", error.Message));
-        }
-        finally
-        {
-            if (ReferenceEquals(_prepping, stop)) _prepping = null;
-
-            stop.Dispose();
-        }
+        var result = await _videos.PrepareAsync(request);
+        if (result is null || !_videos.IsCurrent(result)) return;
+        Note(result.Path is { Length: > 0 }
+            ? Strings.T(result.Reused ? "D_LogPrepareReady" : "D_LogPrepareDone")
+            : Strings.T("D_LogPrepareFailed", result.Error ?? "?"));
     }
 
     /// <summary>
@@ -1820,7 +1749,7 @@ public partial class MainWindow : Window
         // Vorbereitung nur beim Druck auf Abspielen an, und das Umlegen tat sichtbar
         // nichts.
         if (on && _sequence is { Count: > 1 } running) _ = PrepareVideoAsync(running);
-        else if (!on) _prepping?.Cancel();
+        else if (!on) _videos.Cancel();
     }
 
     private void SetPrebuffer(bool on)

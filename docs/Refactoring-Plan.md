@@ -45,7 +45,7 @@ beschrieben, sind aber implementiert. Offene Wünsche wie Undo, weitere
 Glitch-Effekte oder ablösbare Panels sind keine Voraussetzung für sämtliche
 Refactoring-Schritte und werden nicht als bereits umgesetzt gezählt.
 
-## Fortschritt am 22. September 2026
+## Fortschritt am 23. September 2026
 
 Die Strukturarbeit liegt separat auf `codex/refactor-watch-lifecycle`, inzwischen
 auf Claudes gespeichertem Feature-Stand `7e92276`. Der gemeinsam benutzte
@@ -68,8 +68,8 @@ implementiert und geprüft**, noch nicht in `feature/atelier` oder `main` gemerg
   eigener Commit nach der reinen Auslagerung.
 - **D1b abgeschlossen:** `DashboardSequenceController` besitzt Bibliotheks-
   und Sitzungseinträge, Auswahl, Seed-/Ordnersuche, Live-Scan und die
-  Hintergrundzählungen. `MainWindow` zeichnet die Zeilen und hält weiterhin
-  Abspielposition, Follow, Bereiche und Bildspeicher. 22 Prüfungen am echten
+  Hintergrundzählungen. `MainWindow` zeichnet die Zeilen und hält nach diesem
+  Schnitt noch Abspielposition, Follow, Bereiche und Bildspeicher. 22 Prüfungen am echten
   Dashboard sichern Auswahl, Verlauf, Neuaufbau und leere Ausgaben; 33
   Controller-Prüfungen sichern Lesefehler, Dispatcher-Zustellung und verspätete
   Ergebnisse. Höchstens eine Hintergrundzählung liest gleichzeitig; überholte
@@ -81,8 +81,27 @@ implementiert und geprüft**, noch nicht in `feature/atelier` oder `main` gemerg
   mit drei zunächst fehlgeschlagenen Zusicherungen nachgewiesen: Der erste
   Frame erscheint jetzt auch in einer zuvor leeren Ausgabe, und eine geleerte
   Bibliothek gibt Auswahl und Wiedergabestatus frei.
-- **D1 bleibt offen:** Vorladen/Cache und danach Playback sind die nächsten
-  getrennten Schnitte. Follow-Entscheidungen und WPF-Darstellung bleiben
+- **D1c abgeschlossen:** `DashboardFrameController` besitzt Einzelbilddecoder,
+  den jeweils letzten Bildwunsch, Vorlader und Bildspeicher. Die vorhandenen
+  Decoder-/Preloader-Algorithmen bleiben erhalten; Decode-Breite, Speicherbudget
+  und Lastregelung liefert weiterhin das Fenster. 17 Charakterisierungsprüfungen
+  sichern Bildwünsche, Teilvorladen, Bereichsprüfung, Fortschritt und Abbruch.
+  Acht Regressionstests sichern verspätete Bilder und Fortschrittsmeldungen
+  nach Auswahlwechsel, Cache-Treffer oder Schließen; sieben davon schlugen vor
+  der separat committed Korrektur fehl. Auch eine leere Auswahl gibt den
+  Bildspeicher und die laufende Vorbereitung sofort frei.
+  `DashboardVideoController` besitzt die optionale Videovorbereitung. Bereich,
+  Frame-Liste und Exportwerte werden vor dem Hintergrundzugriff festgehalten.
+  Ein abgebrochener Auftrag liefert keine Cache-Metadaten oder UI-Rückgaben an
+  seinen Nachfolger. Der bisherige `PreparedVideo`-Cache und `VideoExporter`
+  bleiben erhalten. `DashboardMediaControllerInvariants` ergänzt 32 Prüfungen:
+  zehn für Sitzungen und Fehlerrückgaben des Bildcontrollers, 17 für die
+  Videovorbereitung am Controller und fünf für ihre Fensteranbindung. Sie sichern
+  Wiederverwendung, Fehler, Abbruch während des Dateizugriffs, erneuten Start,
+  Besitzwechsel und Schließen. Die neuen Videotests verwenden einen
+  austauschbaren Encoder; sie prüfen den Ablauf, keine reale Kodierung.
+- **D1 bleibt offen:** Playback ist der nächste getrennte Schnitt.
+  Follow-Entscheidungen, Bereiche, Abspieltimer und WPF-Darstellung bleiben
   zunächst in `MainWindow`. Auswahl- und Live-Scans laufen wie bisher synchron;
   die Begrenzung der Leser betrifft die beiläufigen Zeilenzählungen.
 - **S0–S6 bleiben zurückgestellt:** Atelier-Dateien und die gemeinsamen
@@ -93,11 +112,18 @@ Der Testläufer unterstützt jetzt `--only=Klasse` beziehungsweise
 in kurzen Gruppen laufen können. Ohne Filter bleibt der bisherige Gesamtlauf
 erhalten. Tests verwenden eigene Konfigurationen und synthetische Bilder.
 
-Abnahme dieses Branchstands: **3.601 Zusicherungen aus 92 registrierten
-Kern-Testaufrufen** in zehn Gruppen (jede unter 55 Sekunden) sowie **227
-UI-Prüfungen** erfolgreich; beide Projekte bauen in Release. Vier bereits
-vorhandene Nullable-Warnungen bleiben in `AtelierLayerInvariants` und
-`StackReproInvariants`. Claudes weitere Atelier-Commits nach `7e92276` gehören
+Abnahme des Branchstands bis zum Bildspeicher-Schnitt (`d0239e7`): **3.601
+Zusicherungen aus 92 registrierten Kern-Testaufrufen** in zehn Gruppen (jede
+unter 55 Sekunden) sowie **227 UI-Prüfungen** erfolgreich; beide Projekte bauen
+in Release. Vier bereits vorhandene Nullable-Warnungen bleiben in
+`AtelierLayerInvariants` und `StackReproInvariants`. Der anschließende
+Video-Schnitt wurde am 24. September gezielt geprüft: Debug-Build ohne neue
+Warnungen und **140 Zusicherungen** aus den sieben Dashboard-Testaufrufen
+(`DashboardMediaControllerInvariants`, `DashboardFrameInvariants` mit
+`RetiredWork`, `DashboardSelectionInvariants`, `DashboardLiveInvariants`,
+`DashboardSequenceControllerInvariants`, `DashboardLiveControllerInvariants`).
+Die vollständigen Prüfreihen stehen für diesen Schnitt noch aus und folgen beim
+Zusammenführen mit `feature/atelier`. Claudes weitere Atelier-Commits nach `7e92276` gehören
 nicht zu diesem geprüften Branchstand und werden beim späteren Zusammenführen
 erneut abgeglichen.
 
@@ -288,13 +314,15 @@ sofort koppeln, ohne zusätzliche Schritte.
 
 ## Nächster Startpunkt
 
-**Aktiv: D1, Dashboard-Sitzung.** D2, D1a (Ordnerbeobachtung/Ruhefrist) und
-D1b (Auswahl/Scan-Zustand) sind im separaten Branch umgesetzt. Als Nächstes
-Vorladen und Bildspeicher charakterisieren und aus `MainWindow` lösen:
-Wechsel auf andere oder leere Folgen, verspätete Decoder-/Preloader-Rückgaben,
-Abbruch beim Schließen und vorbereitete Videos. Danach folgt Playback als
-eigener Schnitt, dann die übrigen offenen Schritte in der oben festgelegten
-Reihenfolge. Die Atelier-Seite bleibt außerhalb dieser Schnitte.
+**Aktiv: D1, Dashboard-Sitzung.** D2, D1a (Ordnerbeobachtung/Ruhefrist),
+D1b (Auswahl/Scan-Zustand) und D1c (Decoder, Vorladen, Bildspeicher und
+Videovorbereitung) sind im separaten Branch umgesetzt. Als Nächstes folgt
+Playback als eigener Schnitt: zunächst Abspielen/Pause, Loop, Follow,
+Lücken, In-/Out-Punkte, Bildratenwechsel und den Übergang vom Vorladen
+charakterisieren. Danach die Unterschiede zum vorhandenen
+`ViewerPlaybackController` bewerten und Uhr/Position/Abspielzustand aus
+`MainWindow` lösen. Anschließend folgen die übrigen offenen Schritte in der
+oben festgelegten Reihenfolge. Die Atelier-Seite bleibt außerhalb dieser Schnitte.
 
 **Erst abschließend S0–S6.** Vor dem Einstieg den dann aktuellen Atelier-Stand
 neu lesen: Die jetzt dokumentierten Codebefunde können durch die laufende
