@@ -27,6 +27,10 @@
   <ItemGroup>
     <Using Remove="System.Windows.Forms" />
     <ProjectReference Include="..\FrameFlip\FrameFlip.csproj" />
+    <!-- Der echte Einstellungsweg wechselt die Sprache ueber relative Pack-Adressen.
+         Im Pruefstand liegt deren Einstieg in dieser Assembly; dieselben Quellen
+         einbetten, statt fuer Hosttests die Sprachumschaltung zu umgehen. -->
+    <Page Include="..\FrameFlip\Localization\Strings.*.xaml" Link="Localization\%(Filename)%(Extension)" />
   </ItemGroup>
 
 </Project>

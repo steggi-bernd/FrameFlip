@@ -11,6 +11,7 @@ using System.Windows.Threading;
 using FrameFlip.Bridge;
 using FrameFlip.Configuration;
 using FrameFlip.Decoding;
+using FrameFlip.Dashboard;
 using FrameFlip.Export;
 using FrameFlip.Diagnostics;
 using FrameFlip.Localization;
@@ -41,10 +42,9 @@ namespace FrameFlip.Views;
 /// die Menues zeigt. Sie legen sich ueber die drei Spalten, statt sie zu ersetzen:
 /// Wer zurueckwechselt, findet dieselbe Sequenz an derselben Stelle wieder.
 ///
-/// Was hier bewusst NICHT passiert: Das Dashboard baut keinen zweiten Abspieler.
-/// Es zeigt den gewaehlten Frame als Einzelbild - ohne Ringpuffer, ohne Bildratenuhr,
-/// ohne Dekodierkette. Die liegen im Vorschaufenster, und zweimal dieselbe Mechanik
-/// waere zweimal derselbe Fehler.
+/// Auswahl, Ordnerbeobachtung, Bildspeicher und Videovorbereitung haben eigene
+/// Controller. Abspielposition, Bildrate, Follow und Bereich bleiben vorerst hier;
+/// das Fenster verbindet diese Entscheidungen mit den WPF-Eingaben und Anzeigen.
 /// </summary>
 public partial class MainWindow : Window
 {
@@ -71,22 +71,20 @@ public partial class MainWindow : Window
     private Web.WatchService? _watched;
 
     private readonly FrameDecoderRegistry _decoders = FrameDecoderRegistry.CreateDefault();
+    private readonly DashboardFrameController _frames;
+    private readonly DashboardVideoController _videos;
 
     private readonly DispatcherTimer _ticker;
     private readonly DispatcherTimer _player;
 
-    private readonly List<(ToggleButton Button, RenderEntry Entry)> _sequenceButtons = new();
+    private readonly List<(ToggleButton Button, DashboardSequenceEntry Entry)> _sequenceButtons = new();
 
-    /// <summary>Von Hand geoeffnete Ordner - leben nur, solange das Fenster offen ist.</summary>
-    private readonly List<RenderEntry> _adhoc = new();
+    private readonly DashboardSequenceController _sequences;
     private readonly List<string> _log = new();
     private readonly List<MetricTile> _tiles = new();
 
-    private ImageSequence? _sequence;
-    private RenderEntry? _current;
-
-    /// <summary>Laeuft mit jedem Neuaufbau der Liste hoch; spaete Zaehlungen verfallen.</summary>
-    private int _listGeneration;
+    private ImageSequence? _sequence => _sequences.Sequence;
+    private DashboardSequenceEntry? _current => _sequences.Current;
 
     /// <summary>Die zuletzt gesehene Auftragsnummer - daran haengt der Neuaufbau der Liste.</summary>
     private string _lastJobId = string.Empty;
@@ -98,29 +96,11 @@ public partial class MainWindow : Window
     private bool _playing;
     private bool _scrubbing;
 
-    /// <summary>Der Pfad, der als naechstes auf die Buehne soll - oder null.</summary>
-    private string? _wanted;
-
-    /// <summary>Die vorausgeladene Folge, an derselben Stelle wie ihre Bilder.</summary>
-    private BitmapSource?[] _cache = Array.Empty<BitmapSource?>();
-
-    /// <summary>Laeuft, solange vorausgeladen wird.</summary>
-    private SequencePreloader? _preloader;
-
     /// <summary>Ob Abspielen erst vorauslaedt. Wird mit den Einstellungen gemerkt.</summary>
     private bool _prebuffer = true;
 
     /// <summary>Ob beim Vorausladen nebenher ein Video entsteht.</summary>
     private bool _prepareVideo;
-
-    /// <summary>Laeuft, solange im Hintergrund kodiert wird.</summary>
-    private CancellationTokenSource? _prepping;
-
-    /// <summary>Die zuletzt fertiggestellte Vorbereitung - oder null.</summary>
-    private string? _prepared;
-
-    /// <summary>Ob gerade ein Bild gelesen wird. Es laeuft immer hoechstens eines.</summary>
-    private bool _decoding;
 
     /// <summary>Format und Farbtiefe der Sequenz - einmal ermittelt, dann angezeigt.</summary>
     private string _format = string.Empty;
@@ -134,11 +114,8 @@ public partial class MainWindow : Window
     /// <summary>Der Zeiger auf der Zeitleiste - wandert, statt neu zu entstehen.</summary>
     private Rectangle? _headMark;
 
-    /// <summary>Sieht dem Ausgabeordner beim Wachsen zu. Einer, und nur fuer die Auswahl.</summary>
-    private FileSystemWatcher? _watcher;
-
-    /// <summary>Sammelt Dateimeldungen ein, statt jede einzeln zu beantworten.</summary>
-    private DispatcherTimer? _settle;
+    /// <summary>Ordnerbeobachtung und Ruhefrist der aktuell gewaehlten Folge.</summary>
+    private readonly DashboardLiveController _live;
 
     /// <summary>Ob der Kopf auf dem neuesten Bild bleiben soll.</summary>
     private bool _follow = true;
@@ -167,12 +144,28 @@ public partial class MainWindow : Window
         Action<AppSettings>? persist = null, Func<AppSettings, string?>? applySettings = null,
         Func<AppSettings>? getSettings = null, Func<Web.WatchService?>? watch = null,
         Action? renewWatch = null, Action<string?>? setWatchCode = null)
+        : this(DashboardFrameSources.Default, monitor, remoteState, showSettings, openSequence, showPairing,
+            settings, persist, applySettings, getSettings, watch, renewWatch, setWatchCode)
     {
+    }
+
+    internal MainWindow(DashboardFrameSources frameSources, RenderMonitor? monitor, Func<RelayState?> remoteState,
+        Action showSettings, Action<string> openSequence, Action showPairing, AppSettings? settings = null,
+        Action<AppSettings>? persist = null, Func<AppSettings, string?>? applySettings = null,
+        Func<AppSettings>? getSettings = null, Func<Web.WatchService?>? watch = null,
+        Action? renewWatch = null, Action<string?>? setWatchCode = null, DashboardVideoSources? videoSources = null)
+    {
+        _frames = new DashboardFrameController(frameSources, DispatchFrame, ShowDecodedFrame,
+            ShowPreloadProgress, () => DecodeWidth(atLeast: 960), CurrentPace);
         _watch = watch ?? (() => null);
         _renewWatch = renewWatch;
         _setWatchCode = setWatchCode;
 
         _monitor = monitor;
+        _videos = new DashboardVideoController(videoSources ?? DashboardVideoSources.Default,
+            () => _monitor?.Job?.IsRunning == true
+                ? System.Diagnostics.ProcessPriorityClass.Idle
+                : System.Diagnostics.ProcessPriorityClass.BelowNormal);
         _remoteState = remoteState;
         _openSequence = openSequence;
         _persist = persist;
@@ -226,6 +219,9 @@ public partial class MainWindow : Window
             return null;
         };
 
+        _sequences = new DashboardSequenceController(DashboardSequenceSources.Default(_decoders),
+            action => Dispatcher.BeginInvoke(action), RefreshSequenceItem);
+        _live = new DashboardLiveController(DashboardLiveSources.Default(Dispatcher), _decoders.IsSupported, RescanLive);
         _layout = DesktopLayout.Load();
 
         InitializeComponent();
@@ -284,16 +280,17 @@ public partial class MainWindow : Window
 
         Closed += (_, _) =>
         {
+            _frames.Dispose();
+            _videos.Dispose();
             Strings.Changed -= OnLanguageChanged;
             _layout.Changed -= OnLayoutChanged;
             _settingsPage?.Dispose();
             _ticker.Stop();
             _player.Stop();
-            _settle?.Stop();
-            StopWatching();
+            _live.Dispose();
+            _sequences.Dispose();
             CancelPreload();
             DropCache();
-            _prepping?.Cancel();
         };
 
         _ready = true;
@@ -528,71 +525,20 @@ public partial class MainWindow : Window
 
     // ================================================================ Sequenzen
 
-    /// <summary>
-    /// Eine Zeile in der Sequenzspalte: eine Blender-Datei, die gerendert hat.
-    ///
-    /// Nicht jeder Bildordner auf der Platte, sondern die Renders, die FrameFlip
-    /// mitbekommen hat. Ein Ordner voller Bilder sagt nicht, woraus er entstanden
-    /// ist; die Bruecke sagt es, und das ist der Unterschied zwischen einer Liste
-    /// von Ordnern und einer Liste von Arbeit.
-    /// </summary>
-    private sealed class RenderEntry
+    private void LoadSequences() => LoadSequenceList(keepSelection: false);
+
+    private void LoadSequenceList(bool keepSelection)
     {
-        public string Name { get; init; } = string.Empty;
-        public string BlendPath { get; init; } = string.Empty;
-        public string Folder { get; init; } = string.Empty;
-        public string Seed { get; init; } = string.Empty;
-        public int Width { get; set; }
-        public int Height { get; set; }
-        public DateTime SeenUtc { get; init; }
-
-        /// <summary>Von Hand geoeffnet statt protokolliert - nur fuer diese Sitzung.</summary>
-        public bool Adhoc { get; init; }
-
-        /// <summary>Nachgetragen vom Hintergrunddurchgang; null, solange ungezaehlt.</summary>
-        public int? Frames { get; set; }
-
-        public int Missing { get; set; }
-
-        public bool HasOutput => Folder.Length > 0 && Directory.Exists(Folder);
-    }
-
-    private void LoadSequences()
-    {
+        _sequences.Reload(keepSelection);
         SequenceList.Children.Clear();
         _sequenceButtons.Clear();
-
-        var entries = new List<RenderEntry>();
-
-        // Was von Hand geoeffnet wurde, bleibt oben stehen, solange das Fenster
-        // offen ist. Sonst waere ein gerade geoeffneter Ordner ausgewaehlt, ohne
-        // dass er irgendwo in der Liste steht - Auswahl ohne Zeile.
-        entries.AddRange(_adhoc);
-
-        foreach (var known in ProjectLibrary.Load().Files)
-        {
-            if (!BlendProjects.IsBlendFile(known.Path)) continue;
-
-            entries.Add(new RenderEntry
-            {
-                Name = Path.GetFileName(known.Path),
-                BlendPath = known.Path,
-                Folder = known.Output,
-                Seed = known.Seed,
-                Width = known.Width,
-                Height = known.Height,
-                SeenUtc = known.SeenUtc,
-            });
-        }
-
-        foreach (var entry in entries)
+        foreach (var entry in _sequences.Entries)
         {
             var button = BuildSequenceItem(entry);
             SequenceList.Children.Add(button);
             _sequenceButtons.Add((button, entry));
         }
-
-        if (entries.Count == 0)
+        if (_sequences.Entries.Count == 0)
         {
             SequenceList.Children.Add(new TextBlock
             {
@@ -602,72 +548,11 @@ public partial class MainWindow : Window
                 FontSize = 11.5,
                 Foreground = (Brush)FindResource("DesktopFaint"),
             });
-
-            ShowEmptyStage();
-            return;
         }
-
-        CountFramesInBackground(entries);
-
-        var first = entries.FirstOrDefault(e => e.HasOutput) ?? entries[0];
-        Select(first);
+        ApplySequenceSelection();
     }
 
-    /// <summary>
-    /// Die Bildzahl je Zeile nachtragen.
-    ///
-    /// Abseits des Oberflaechenfadens, und erst nachdem die Liste steht: Ein Dutzend
-    /// Ordner zu zaehlen dauert laenger, als das Fenster auf sich warten lassen darf,
-    /// und die Zahl ist Beiwerk - der Name ist die Auskunft.
-    /// </summary>
-    private void CountFramesInBackground(List<RenderEntry> entries)
-    {
-        var pending = entries.Where(e => e.Frames is null && e.HasOutput).ToList();
-        if (pending.Count == 0) return;
-
-        int generation = ++_listGeneration;
-
-        Task.Run(() =>
-        {
-            foreach (var entry in pending)
-            {
-                if (generation != _listGeneration) return;
-
-                try
-                {
-                    // Derselbe Leser wie bei der Auswahl. Die Zahl von Hand zu
-                    // ermitteln waere schneller, muesste aber dieselbe Namensregel
-                    // ein zweites Mal treffen - und zwei Regeln driften auseinander.
-                    string seed = entry.Seed.Length > 0 && File.Exists(entry.Seed)
-                        ? entry.Seed
-                        : SequenceScanner.FindFirstImage(entry.Folder, _decoders) ?? string.Empty;
-
-                    if (seed.Length == 0) continue;
-
-                    var scanned = SequenceScanner.Scan(seed, _decoders);
-                    if (scanned is null) continue;
-
-                    int count = scanned.Count;
-                    int gaps = scanned.MissingNumbers().Count;
-
-                    Dispatcher.BeginInvoke(new Action(() =>
-                    {
-                        if (generation != _listGeneration) return;
-
-                        entry.Frames = count;
-                        entry.Missing = gaps;
-                        RefreshSequenceItem(entry);
-                    }));
-                }
-                catch (Exception)
-                {
-                    // Ein Ordner, der nicht lesbar ist, bleibt eben ohne Zahl.
-                }
-            }
-        });
-    }
-
-    private ToggleButton BuildSequenceItem(RenderEntry entry)
+    private ToggleButton BuildSequenceItem(DashboardSequenceEntry entry)
     {
         var row = new Grid();
         row.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
@@ -761,7 +646,7 @@ public partial class MainWindow : Window
     }
 
     /// <summary>Beschriftung und Marke einer Zeile - getrennt, weil sie nachgetragen werden.</summary>
-    private void Dress(RenderEntry entry, TextBlock meta, Border tag)
+    private void Dress(DashboardSequenceEntry entry, TextBlock meta, Border tag)
     {
         meta.Text = entry.HasOutput
             ? Path.GetFileName(entry.Folder.TrimEnd('\\', '/')) + " \u00b7 " + Ago(entry.SeenUtc)
@@ -779,7 +664,7 @@ public partial class MainWindow : Window
         label.Foreground = (Brush)FindResource(warn ? "DesktopWarn" : "DesktopMuted");
     }
 
-    private void RefreshSequenceItem(RenderEntry entry)
+    private void RefreshSequenceItem(DashboardSequenceEntry entry)
     {
         foreach (var (button, other) in _sequenceButtons)
         {
@@ -808,50 +693,35 @@ public partial class MainWindow : Window
 
     private bool Select(string seedOrFolder)
     {
-        foreach (var (button, entry) in _sequenceButtons)
-        {
-            if (!string.Equals(entry.Folder, seedOrFolder, StringComparison.OrdinalIgnoreCase) &&
-                !string.Equals(entry.Seed, seedOrFolder, StringComparison.OrdinalIgnoreCase) &&
-                !string.Equals(entry.BlendPath, seedOrFolder, StringComparison.OrdinalIgnoreCase))
-                continue;
-
-            button.IsChecked = true;
-            return true;
-        }
-
-        return false;
+        var entry = _sequences.Find(seedOrFolder);
+        if (entry is null) return false;
+        Select(entry);
+        return true;
     }
 
-    private void Select(RenderEntry entry)
+    private void Select(DashboardSequenceEntry entry)
     {
-        _current = entry;
+        if (_sequences.Select(entry)) ApplySequenceSelection();
+    }
 
-        foreach (var (button, other) in _sequenceButtons)
-            button.IsChecked = ReferenceEquals(other, entry);
-
+    private void ApplySequenceSelection()
+    {
         Pause();
-        _sequence = null;
+        DropCache();
+        foreach (var (button, other) in _sequenceButtons)
+            button.IsChecked = ReferenceEquals(other, _current);
 
-        try
+        if (_current is not { } entry)
         {
-            string seed = entry.Seed.Length > 0 && File.Exists(entry.Seed)
-                ? entry.Seed
-                : entry.HasOutput
-                    ? SequenceScanner.FindFirstImage(entry.Folder, _decoders) ?? string.Empty
-                    : string.Empty;
-
-            if (seed.Length > 0) _sequence = SequenceScanner.Scan(seed, _decoders);
-        }
-        catch (Exception)
-        {
-            // Ein Ordner, der inzwischen weg ist, darf das Fenster nicht mitnehmen.
-            _sequence = null;
+            _live.WatchFolder(null);
+            ShowEmptyStage();
+            return;
         }
 
         if (_sequence is null || _sequence.Count == 0)
         {
             ShowEmptyStage();
-            WatchFolder(entry.Folder);
+            _live.WatchFolder(entry.Folder);
 
             // Der Name bleibt stehen, auch ohne Bild: Die Zeile ist ausgewaehlt,
             // und eine leere Kopfzeile sieht aus wie ein Fehler statt wie ein
@@ -868,17 +738,11 @@ public partial class MainWindow : Window
         _inPoint = _sequence.StartNumber;
         _outPoint = _sequence.EndNumber;
 
-        // Eine andere Folge, andere Bilder. Was noch im Speicher liegt, gehoert nicht
-        // mehr hierher.
-        DropCache();
-
-        entry.Frames = _sequence.Count;
-        entry.Missing = _missing.Count;
         RefreshSequenceItem(entry);
 
         Note(Strings.T("D_LogOpened", entry.Name, _sequence.Count));
 
-        WatchFolder(entry.Folder);
+        _live.WatchFolder(entry.Folder);
         ShapeStage();
         BuildStrip();
         BuildGaps();
@@ -893,14 +757,7 @@ public partial class MainWindow : Window
     /// Ohne das Merken spraenge waehrend eines laufenden Renders die Auswahl auf die
     /// oberste Zeile zurueck - mitten im Zusehen.
     /// </summary>
-    private void ReloadSequencesKeepingSelection()
-    {
-        string? keep = _current?.BlendPath.Length > 0 ? _current.BlendPath : _current?.Folder;
-
-        LoadSequences();
-
-        if (keep is { Length: > 0 }) Select(keep);
-    }
+    private void ReloadSequencesKeepingSelection() => LoadSequenceList(keepSelection: true);
 
     /// <summary>
     /// Eine Bildsequenz von Hand oeffnen.
@@ -931,23 +788,7 @@ public partial class MainWindow : Window
     /// </summary>
     private bool OpenPath(string path)
     {
-        if (path.Length == 0 || !File.Exists(path)) return false;
-        if (!_decoders.IsSupported(Path.GetExtension(path))) return false;
-
-        string? folder = Path.GetDirectoryName(path);
-        if (folder is null) return false;
-
-        var entry = new RenderEntry
-        {
-            Name = Path.GetFileName(folder.TrimEnd('\\', '/')),
-            Folder = folder,
-            Seed = path,
-            SeenUtc = DateTime.UtcNow,
-            Adhoc = true,
-        };
-
-        _adhoc.RemoveAll(a => string.Equals(a.Folder, folder, StringComparison.OrdinalIgnoreCase));
-        _adhoc.Insert(0, entry);
+        if (!_sequences.AddPath(path)) return false;
 
         LoadSequences();
         Select(path);
@@ -958,7 +799,7 @@ public partial class MainWindow : Window
         // hier, weil erst die Auswahl weiss, wieviele Bilder es geworden sind.
         RecentSequences.Remember(new RecentSequence
         {
-            Folder = folder,
+            Folder = _current!.Folder,
             Seed = path,
             First = opened.StartNumber,
             Last = opened.EndNumber,
@@ -972,135 +813,20 @@ public partial class MainWindow : Window
 
     // ================================================================ Live
 
-    /// <summary>
-    /// Dem Ausgabeordner zusehen.
-    ///
-    /// Zwei Quellen melden neue Bilder, und beide werden gebraucht: Die Bruecke
-    /// weiss es zuerst, aber nur waehrend eines Renders, den FrameFlip mitbekommt.
-    /// Der Ordnerwaechter weiss es auch dann, wenn Blender ohne Bruecke laeuft oder
-    /// jemand von Hand Dateien hineinlegt. Beide muenden in denselben Sammelpunkt,
-    /// damit doppelte Meldungen nichts doppelt tun.
-    /// </summary>
-    private void WatchFolder(string? folder)
-    {
-        StopWatching();
-
-        if (string.IsNullOrEmpty(folder) || !Directory.Exists(folder)) return;
-
-        try
-        {
-            _watcher = new FileSystemWatcher(folder)
-            {
-                // Die Groesse zaehlt mit: Ein Renderer legt die Datei zuerst leer an
-                // und fuellt sie danach. Nur auf das Anlegen zu hoeren hiesse, das
-                // halbe Bild zu lesen.
-                NotifyFilter = NotifyFilters.FileName | NotifyFilters.Size | NotifyFilters.LastWrite,
-                IncludeSubdirectories = false,
-                EnableRaisingEvents = true,
-            };
-
-            _watcher.Created += OnFolderChanged;
-            _watcher.Changed += OnFolderChanged;
-            _watcher.Renamed += OnFolderChanged;
-        }
-        catch (Exception)
-        {
-            // Ein Netzlaufwerk ohne Benachrichtigungen, ein Ordner ohne Rechte:
-            // Dann bleibt es beim Takt der Bruecke, und mehr passiert nicht.
-            StopWatching();
-        }
-    }
-
-    private void StopWatching()
-    {
-        if (_watcher is null) return;
-
-        try
-        {
-            _watcher.EnableRaisingEvents = false;
-            _watcher.Created -= OnFolderChanged;
-            _watcher.Changed -= OnFolderChanged;
-            _watcher.Renamed -= OnFolderChanged;
-            _watcher.Dispose();
-        }
-        catch (Exception)
-        {
-            // Beim Abbauen ist nichts mehr zu retten.
-        }
-
-        _watcher = null;
-    }
-
-    /// <summary>Kommt vom Waechterfaden, nicht vom Oberflaechenfaden.</summary>
-    private void OnFolderChanged(object sender, FileSystemEventArgs e)
-    {
-        if (!_decoders.IsSupported(Path.GetExtension(e.Name ?? string.Empty))) return;
-
-        Dispatcher.BeginInvoke(new Action(NoteNewFrames));
-    }
-
-    /// <summary>
-    /// Nicht sofort nachsehen, sondern gleich.
-    ///
-    /// Ein Render schreibt in Schueben, und ein Ordner mit tausend Bildern neu
-    /// einzulesen kostet mehr, als das Ergebnis wert ist, wenn es gleich wieder
-    /// veraltet. Die Frist beginnt mit jeder Meldung von vorn; ruht der Ordner eine
-    /// halbe Sekunde, wird einmal gelesen.
-    /// </summary>
-    private void NoteNewFrames()
-    {
-        _settle ??= CreateSettleTimer();
-
-        _settle.Stop();
-        _settle.Start();
-    }
-
-    private DispatcherTimer CreateSettleTimer()
-    {
-        var timer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(500) };
-
-        timer.Tick += (_, _) =>
-        {
-            timer.Stop();
-            RescanLive();
-        };
-
-        return timer;
-    }
-
     /// <summary>Die Sequenz neu einlesen, ohne die Auswahl oder die Stelle zu verlieren.</summary>
     private void RescanLive()
     {
-        if (_current is null || _sequence is null) return;
-
-        ImageSequence? fresh;
-
-        try
+        var change = _sequences.Rescan();
+        if (change is null) return;
+        if (change.Previous is null)
         {
-            string seed = _sequence.Frames[0].Path;
-
-            fresh = File.Exists(seed)
-                ? SequenceScanner.Scan(seed, _decoders)
-                : SequenceScanner.FindFirstImage(_current.Folder, _decoders) is { } other
-                    ? SequenceScanner.Scan(other, _decoders)
-                    : null;
-        }
-        catch (Exception)
-        {
+            ApplySequenceSelection();
             return;
         }
-
-        if (fresh is null || fresh.Count == 0) return;
-        if (fresh.Count == _sequence.Count && fresh.EndNumber == _sequence.EndNumber) return;
-
-        bool grewAtEnd = fresh.EndNumber > _sequence.EndNumber;
-
-        // Stand das Ende auf dem letzten Bild, wandert es mit. Hatte jemand den
-        // Bereich von Hand gesetzt, bleibt er stehen - ein laufender Render darf die
-        // Auswahl des Benutzers nicht ueberschreiben.
-        bool outWasAtEnd = _outPoint == _sequence.EndNumber;
-
-        _sequence = fresh;
+        var fresh = change.Current;
+        bool grewAtEnd = fresh.EndNumber > change.Previous.EndNumber;
+        // Ein von Hand gesetztes Ende bleibt stehen; nur das offene Ende waechst mit.
+        bool outWasAtEnd = _outPoint == change.Previous.EndNumber;
         _missing = fresh.MissingNumbers();
 
         // Der Render hat weitergeschrieben: Die Stellen stimmen nicht mehr ueberein.
@@ -1109,9 +835,7 @@ public partial class MainWindow : Window
         if (outWasAtEnd) _outPoint = fresh.EndNumber;
         if (_inPoint < fresh.StartNumber) _inPoint = fresh.StartNumber;
 
-        _current.Frames = fresh.Count;
-        _current.Missing = _missing.Count;
-        RefreshSequenceItem(_current);
+        RefreshSequenceItem(_current!);
 
         BuildStrip();
         BuildGaps();
@@ -1141,20 +865,13 @@ public partial class MainWindow : Window
     /// </summary>
     private void DropCache()
     {
-        // Eine Vorbereitung, die zu einer anderen Folge gehoert, ist wertlos.
-        _prepping?.Cancel();
-        _prepared = null;
-
-        if (_cache.Length == 0) return;
-
-        _cache = Array.Empty<BitmapSource?>();
-
-        GC.Collect(2, GCCollectionMode.Optimized, blocking: false);
+        if (_frames.IsPreloading) CancelPreload();
+        _frames.Reset(_sequence);
+        _lastPreload = null;
+        _videos.Reset();
     }
-
     private void ShowEmptyStage()
     {
-        _sequence = null;
         _missing = Array.Empty<int>();
 
         StageImage.Source = null;
@@ -1260,88 +977,21 @@ public partial class MainWindow : Window
         UpdateStripSelection();
         MoveHead();
 
-        // Liegt das Bild schon im Speicher, ist Anzeigen alles, was zu tun ist -
-        // kein Faden, keine Platte, kein Warten. Genau dafuer wurde vorausgeladen.
-        if (index < _cache.Length && _cache[index] is { } ready)
-        {
-            StageImage.Source = ready;
-            StageEmpty.Visibility = Visibility.Collapsed;
-            StageDecode.Text = _format;
-            _wanted = null;
-            return;
-        }
-
-        _wanted = frame.Path;
-        Decode();
+        _frames.Request(index);
     }
 
-    /// <summary>
-    /// Das zuletzt verlangte Bild lesen - und immer nur eines auf einmal.
-    ///
-    /// Beim Abspielen kommt der naechste Wunsch, bevor der vorige gelesen ist. Alle
-    /// zu lesen hiesse bei 60 fps sechzig Dekodierungen je Sekunde, von denen die
-    /// meisten ungesehen weggeworfen wuerden - Arbeit, die der Renderer nebenan
-    /// besser gebrauchen kann.
-    ///
-    /// Gespeichert wird darum nur der WUNSCH, nicht der Auftrag: Waehrend gelesen
-    /// wird, ueberschreiben spaetere Wuensche einander, und sobald der Leser frei
-    /// ist, nimmt er den letzten. So bleibt hoechstens ein Bild Rueckstand, und der
-    /// holt sich selbst wieder ein.
-    /// </summary>
-    private void Decode()
+    private void ShowDecodedFrame(BitmapSource image)
     {
-        if (_decoding || _wanted is not { Length: > 0 } path) return;
-
-        _wanted = null;
-        _decoding = true;
-
-        // Dieselbe Breite wie beim Vorausladen, damit ein einzelnes Bild nicht
-        // schaerfer oder gröber aussieht als die abgespielte Folge. Vorher standen
-        // hier feste 1280 Punkte - auf einem breiten Fenster sichtbar zu wenig.
-        int crisp = DecodeWidth(atLeast: 960);
-
-        // Gelesen wird abseits des Oberflaechenfadens: Ein 4K-PNG kostet
-        // zweistellige Millisekunden, und die faellt bei jedem Schritt an.
-        Task.Run(() =>
-        {
-            BitmapSource? image = null;
-
-            try
-            {
-                var bitmap = new BitmapImage();
-                bitmap.BeginInit();
-                bitmap.UriSource = new Uri(path);
-                bitmap.CacheOption = BitmapCacheOption.OnLoad;
-                bitmap.CreateOptions = BitmapCreateOptions.IgnoreColorProfile;
-                bitmap.DecodePixelWidth = crisp;
-                bitmap.EndInit();
-                bitmap.Freeze();
-                image = bitmap;
-            }
-            catch (Exception)
-            {
-                // Halb geschrieben oder gesperrt - dann bleibt der vorige Frame stehen.
-            }
-
-            Dispatcher.BeginInvoke(new Action(() =>
-            {
-                _decoding = false;
-
-                if (image is not null)
-                {
-                    StageImage.Source = image;
-                    StageEmpty.Visibility = Visibility.Collapsed;
-                    StageDecode.Text = _format;
-                }
-
-                // Waehrend gelesen wurde, kann laengst ein neueres Bild gewuenscht
-                // sein. Dann gleich weiter - sonst bliebe die Buehne stehen, bis der
-                // naechste Takt kommt.
-                Decode();
-            }));
-        });
+        StageImage.Source = image;
+        StageEmpty.Visibility = Visibility.Collapsed;
+        StageDecode.Text = _format;
     }
 
+    private void DispatchFrame(Action action)
+    {
+        if (Dispatcher.CheckAccess()) action();
+        else Dispatcher.BeginInvoke(action);
+    }
     // ================================================================ Zeitleiste
 
     /// <summary>
@@ -1572,7 +1222,7 @@ public partial class MainWindow : Window
     {
         // Waehrend geladen wird, bricht derselbe Knopf ab. Sonst muesste man auf
         // etwas warten, das man gar nicht mehr will.
-        if (_preloader is not null)
+        if (_frames.IsPreloading)
         {
             CancelPreload();
             return;
@@ -1586,89 +1236,28 @@ public partial class MainWindow : Window
     // ================================================================ Vorausladen
 
     /// <summary>Ob fuer den gewaehlten Bereich noch Bilder fehlen.</summary>
-    private bool NeedsPreload()
-    {
-        if (_sequence is null || _sequence.Count < 2) return false;
-        if (_cache.Length != _sequence.Count) return true;
-
-        for (int i = 0; i < _sequence.Count; i++)
-        {
-            var frame = _sequence.Frames[i];
-
-            if (frame.Number < _inPoint || frame.Number > _outPoint) continue;
-            if (_cache[i] is null) return true;
-        }
-
-        return false;
-    }
+    private bool NeedsPreload() => _frames.NeedsPreload(_inPoint, _outPoint);
 
     private async void StartPreload()
     {
-        if (_sequence is null || _preloader is not null) return;
-
-        var sequence = _sequence;
-        var paths = sequence.Frames.Select(f => f.Path).ToList();
-
-        var loader = new SequencePreloader(paths, CurrentPace, ShowPreloadProgress);
-        _preloader = loader;
-
+        if (_sequence is null || _frames.IsPreloading) return;
+        int total = _sequence.Count;
         ShowPlayGlyph(playing: true);
         PreloadBar.Visibility = Visibility.Visible;
         PreloadNote.Text = string.Empty;
-        ShowPreloadProgress(new PreloadProgress(0, paths.Count, CurrentPace(), 0));
+        ShowPreloadProgress(new PreloadProgress(0, total, CurrentPace(), 0));
+        Note(Strings.T("D_LogPreload", total));
 
-        Note(Strings.T("D_LogPreload", paths.Count));
-
-        bool whole;
-
-        try
-        {
-            whole = await loader.RunAsync(DecodeWidth(), PreloadBudget(), StageAspect());
-        }
-        catch (Exception)
-        {
-            whole = false;
-        }
-
-        bool cancelled = !ReferenceEquals(_preloader, loader);
-
-        if (cancelled)
-        {
-            loader.Dispose();
-            return;
-        }
-
-        _preloader = null;
+        var result = await _frames.PreloadAsync(DecodeWidth(), PreloadBudget(), StageAspect());
+        // Zwischen Rueckgabe und Fortsetzung kann schon eine neue Auswahl gelten.
+        if (result is null || !_frames.IsCurrent(result)) return;
         PreloadBar.Visibility = Visibility.Collapsed;
-
-        // Die Folge kann sich waehrend des Ladens geaendert haben - ein Render
-        // schreibt weiter. Dann gehoeren die gelesenen Bilder nicht mehr zu dem,
-        // was hier steht.
-        if (!ReferenceEquals(_sequence, sequence))
-        {
-            loader.Dispose();
-            return;
-        }
-
-        _cache = loader.Frames;
-
-        // Hier stand ein Aufruf des Speicheraufraeumers. Er war falsch am Platz: Er
-        // gibt den Arbeitssatz ans Betriebssystem zurueck - also genau die Seiten, die
-        // eben mit Bildern gefuellt wurden. Gemessen blieben von 1594 MB geladener
-        // Bilder 344 MB im Arbeitssatz stehen; der Rest waere beim Abspielen einzeln
-        // zurueckgeholt worden, und dafuer wurde nicht vorausgeladen. Aufgeraeumt wird
-        // beim Verwerfen des Zwischenspeichers, nicht beim Fuellen.
-
-        Note(whole
-            ? Strings.T("D_LogPreloadDone", loader.Loaded)
-            : Strings.T("D_LogPreloadPart", loader.Loaded, paths.Count));
-
-        loader.Dispose();
-
+        Note(result.Whole
+            ? Strings.T("D_LogPreloadDone", result.Loaded)
+            : Strings.T("D_LogPreloadPart", result.Loaded, result.Total));
         ShowFrame(_inPoint);
         Play();
     }
-
     /// <summary>
     /// Nebenher schon das Video kodieren.
     ///
@@ -1683,7 +1272,7 @@ public partial class MainWindow : Window
     /// </summary>
     private async Task PrepareVideoAsync(ImageSequence sequence)
     {
-        if (_prepping is not null) return;
+        if (_videos.IsPreparing) return;
 
         string? exe = FfmpegLocator.Locate(_getSettings().FfmpegPath);
 
@@ -1715,78 +1304,14 @@ public partial class MainWindow : Window
             height = ph;
         }
 
-        double fps = _fps;
-        var stop = new CancellationTokenSource();
-        _prepping = stop;
-
+        var request = new DashboardVideoRequest(exe, sequence.Pattern.Describe(), _inPoint, _outPoint,
+            frames, _fps, width, height, preset, Math.Max(1, Environment.ProcessorCount / 4));
         Note(Strings.T("D_LogPrepare"));
-
-        try
-        {
-            var print = await Task.Run(() => new VideoFingerprint(
-                sequence.Pattern.Describe(), _inPoint, _outPoint, frames.Count, fps,
-                width, height, 0, preset.Name, nameof(GapHandling.HoldLast),
-                PreparedVideo.NewestTicks(frames.Select(f => f.Path))), stop.Token);
-
-            if (PreparedVideo.TryFind(print, preset.Extension, out string already))
-            {
-                Note(Strings.T("D_LogPrepareReady"));
-                _prepared = already;
-                return;
-            }
-
-            PreparedVideo.Prepare();
-
-            string target = PreparedVideo.PathFor(print, preset.Extension);
-
-            var request = new ExportRequest
-            {
-                Frames = frames,
-                Preset = preset,
-                OutputPath = target,
-                Fps = fps,
-                Gaps = GapHandling.HoldLast,
-                TargetWidth = 0,
-                SourceWidth = Math.Max(1, width),
-                SourceHeight = Math.Max(1, height),
-                Threads = Math.Max(1, Environment.ProcessorCount / 4),
-            };
-
-            var exporter = new VideoExporter(exe);
-
-            // Waehrend eines Renders ganz unten: Was hier entsteht, will niemand
-            // gerade sehen, und der Render schon.
-            var priority = _monitor?.Job?.IsRunning == true
-                ? System.Diagnostics.ProcessPriorityClass.Idle
-                : System.Diagnostics.ProcessPriorityClass.BelowNormal;
-
-            var result = await exporter.RunAsync(request, priority, stop.Token);
-
-            if (result.Success && result.OutputPath is { Length: > 0 } made)
-            {
-                PreparedVideo.Note(print, made);
-                _prepared = made;
-                Note(Strings.T("D_LogPrepareDone"));
-            }
-            else if (!result.Cancelled)
-            {
-                Note(Strings.T("D_LogPrepareFailed", result.Error ?? "?"));
-            }
-        }
-        catch (OperationCanceledException)
-        {
-            // Fenster zu oder Folge gewechselt.
-        }
-        catch (Exception error)
-        {
-            Note(Strings.T("D_LogPrepareFailed", error.Message));
-        }
-        finally
-        {
-            if (ReferenceEquals(_prepping, stop)) _prepping = null;
-
-            stop.Dispose();
-        }
+        var result = await _videos.PrepareAsync(request);
+        if (result is null || !_videos.IsCurrent(result)) return;
+        Note(result.Path is { Length: > 0 }
+            ? Strings.T(result.Reused ? "D_LogPrepareReady" : "D_LogPrepareDone")
+            : Strings.T("D_LogPrepareFailed", result.Error ?? "?"));
     }
 
     /// <summary>
@@ -1875,10 +1400,7 @@ public partial class MainWindow : Window
 
     private void CancelPreload()
     {
-        var loader = _preloader;
-        _preloader = null;
-
-        loader?.Cancel();
+        _frames.CancelPreload();
 
         PreloadBar.Visibility = Visibility.Collapsed;
         ShowPlayGlyph(playing: false);
@@ -2227,7 +1749,7 @@ public partial class MainWindow : Window
         // Vorbereitung nur beim Druck auf Abspielen an, und das Umlegen tat sichtbar
         // nichts.
         if (on && _sequence is { Count: > 1 } running) _ = PrepareVideoAsync(running);
-        else if (!on) _prepping?.Cancel();
+        else if (!on) _videos.Cancel();
     }
 
     private void SetPrebuffer(bool on)
@@ -2979,7 +2501,7 @@ public partial class MainWindow : Window
                 && string.Equals(folder.TrimEnd('\\', '/'), shown.Folder.TrimEnd('\\', '/'),
                                  StringComparison.OrdinalIgnoreCase))
             {
-                NoteNewFrames();
+                _live.NoteNewFrames();
             }
         }));
     }

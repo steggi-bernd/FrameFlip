@@ -10,7 +10,7 @@ fest. Jeder Schnitt baut auf einem getesteten Sicherheits- und Funktionsstand au
 keine Voraussetzung für das übrige Refactoring. Die aktive Atelier-Entwicklung
 läuft separat weiter.
 
-## Aktueller Stand am 20. September 2026
+## Bestandsaufnahme vom 20. September 2026
 
 Die ursprünglichen Desktop-Schnitte sind vorhanden. Seitdem sind das Dashboard
 als Hauptoberfläche, die Zuschauerseite und insbesondere **Studio / Atelier**
@@ -44,6 +44,88 @@ Einige Statusangaben sind überholt: gemalte Masken werden dort noch als fehlend
 beschrieben, sind aber implementiert. Offene Wünsche wie Undo, weitere
 Glitch-Effekte oder ablösbare Panels sind keine Voraussetzung für sämtliche
 Refactoring-Schritte und werden nicht als bereits umgesetzt gezählt.
+
+## Fortschritt am 23. September 2026
+
+Die Strukturarbeit liegt separat auf `codex/refactor-watch-lifecycle`, inzwischen
+auf Claudes gespeichertem Feature-Stand `7e92276`. Der gemeinsam benutzte
+Feature-Checkout bleibt bei Claude. Die folgenden Schnitte sind **im Branch
+implementiert und geprüft**, noch nicht in `feature/atelier` oder `main` gemergt:
+
+- **D2 abgeschlossen:** `AppWatchController` besitzt Start, Austausch,
+  Einstellungsvergleich und Ende des Zuschauerdienstes. Schlüsselverwaltung,
+  Zustimmung, Kennwort und die öffentliche `WatchService`-Fassade bleiben im
+  bisherigen Ablauf. 51 Zusicherungen sichern die Host-Integration ab. Der
+  fehlende Lastbedarf für allein laufendes Watch wurde vor der Auslagerung
+  separat nachgewiesen und korrigiert.
+- **D1a abgeschlossen:** `DashboardLiveController` besitzt Ordnerbeobachtung
+  und die gemeinsame Ruhefrist von Dateimeldungen und Bridge. 13 Prüfungen am
+  echten Dashboard charakterisieren Follow, Bereichsenden, gefüllte Lücken,
+  Ordnerwechsel und einen entfernten Seed. Weitere 19 Controller-Prüfungen
+  sichern Filter, Bündelung, Fehler beim Ordnerwechsel und das Beenden ab.
+  Neun zunächst fehlgeschlagene Zusicherungen haben verspätete Rückrufe
+  nach Auswahlwechsel oder Schließen nachgewiesen; die Korrektur ist ein
+  eigener Commit nach der reinen Auslagerung.
+- **D1b abgeschlossen:** `DashboardSequenceController` besitzt Bibliotheks-
+  und Sitzungseinträge, Auswahl, Seed-/Ordnersuche, Live-Scan und die
+  Hintergrundzählungen. `MainWindow` zeichnet die Zeilen und hält nach diesem
+  Schnitt noch Abspielposition, Follow, Bereiche und Bildspeicher. 22 Prüfungen am echten
+  Dashboard sichern Auswahl, Verlauf, Neuaufbau und leere Ausgaben; 33
+  Controller-Prüfungen sichern Lesefehler, Dispatcher-Zustellung und verspätete
+  Ergebnisse. Höchstens eine Hintergrundzählung liest gleichzeitig; überholte
+  Listen beginnen nach einem blockierten Zugriff keinen weiteren Scan.
+  Listen- und Eintragsrevisionen verhindern, dass alte Zählungen neuere
+  Auswahl-/Live-Ergebnisse überschreiben. Schließen wartet nicht auf den
+  Dateizugriff und verwirft seine Rückgaben.
+  Zwei vorhandene Fehler wurden vor der Auslagerung separat korrigiert und
+  mit drei zunächst fehlgeschlagenen Zusicherungen nachgewiesen: Der erste
+  Frame erscheint jetzt auch in einer zuvor leeren Ausgabe, und eine geleerte
+  Bibliothek gibt Auswahl und Wiedergabestatus frei.
+- **D1c abgeschlossen:** `DashboardFrameController` besitzt Einzelbilddecoder,
+  den jeweils letzten Bildwunsch, Vorlader und Bildspeicher. Die vorhandenen
+  Decoder-/Preloader-Algorithmen bleiben erhalten; Decode-Breite, Speicherbudget
+  und Lastregelung liefert weiterhin das Fenster. 17 Charakterisierungsprüfungen
+  sichern Bildwünsche, Teilvorladen, Bereichsprüfung, Fortschritt und Abbruch.
+  Acht Regressionstests sichern verspätete Bilder und Fortschrittsmeldungen
+  nach Auswahlwechsel, Cache-Treffer oder Schließen; sieben davon schlugen vor
+  der separat committed Korrektur fehl. Auch eine leere Auswahl gibt den
+  Bildspeicher und die laufende Vorbereitung sofort frei.
+  `DashboardVideoController` besitzt die optionale Videovorbereitung. Bereich,
+  Frame-Liste und Exportwerte werden vor dem Hintergrundzugriff festgehalten.
+  Ein abgebrochener Auftrag liefert keine Cache-Metadaten oder UI-Rückgaben an
+  seinen Nachfolger. Der bisherige `PreparedVideo`-Cache und `VideoExporter`
+  bleiben erhalten. `DashboardMediaControllerInvariants` ergänzt 32 Prüfungen:
+  zehn für Sitzungen und Fehlerrückgaben des Bildcontrollers, 17 für die
+  Videovorbereitung am Controller und fünf für ihre Fensteranbindung. Sie sichern
+  Wiederverwendung, Fehler, Abbruch während des Dateizugriffs, erneuten Start,
+  Besitzwechsel und Schließen. Die neuen Videotests verwenden einen
+  austauschbaren Encoder; sie prüfen den Ablauf, keine reale Kodierung.
+- **D1 bleibt offen:** Playback ist der nächste getrennte Schnitt.
+  Follow-Entscheidungen, Bereiche, Abspieltimer und WPF-Darstellung bleiben
+  zunächst in `MainWindow`. Auswahl- und Live-Scans laufen wie bisher synchron;
+  die Begrenzung der Leser betrifft die beiläufigen Zeilenzählungen.
+- **S0–S6 bleiben zurückgestellt:** Atelier-Dateien und die gemeinsamen
+  Kopplungs-/Watch-Protokolle wurden in diesen Schnitten nicht geändert.
+
+Der Testläufer unterstützt jetzt `--only=Klasse` beziehungsweise
+`--only=Klasse.Methode,WeitereKlasse`, damit sämtliche registrierten Prüfungen
+in kurzen Gruppen laufen können. Ohne Filter bleibt der bisherige Gesamtlauf
+erhalten. Tests verwenden eigene Konfigurationen und synthetische Bilder.
+
+Abnahme des Branchstands bis zum Bildspeicher-Schnitt (`d0239e7`): **3.601
+Zusicherungen aus 92 registrierten Kern-Testaufrufen** in zehn Gruppen (jede
+unter 55 Sekunden) sowie **227 UI-Prüfungen** erfolgreich; beide Projekte bauen
+in Release. Vier bereits vorhandene Nullable-Warnungen bleiben in
+`AtelierLayerInvariants` und `StackReproInvariants`. Der anschließende
+Video-Schnitt wurde am 24. September gezielt geprüft: Debug-Build ohne neue
+Warnungen und **140 Zusicherungen** aus den sieben Dashboard-Testaufrufen
+(`DashboardMediaControllerInvariants`, `DashboardFrameInvariants` mit
+`RetiredWork`, `DashboardSelectionInvariants`, `DashboardLiveInvariants`,
+`DashboardSequenceControllerInvariants`, `DashboardLiveControllerInvariants`).
+Die vollständigen Prüfreihen stehen für diesen Schnitt noch aus und folgen beim
+Zusammenführen mit `feature/atelier`. Claudes weitere Atelier-Commits nach `7e92276` gehören
+nicht zu diesem geprüften Branchstand und werden beim späteren Zusammenführen
+erneut abgeglichen.
 
 ## Historischer Stand der ersten Desktop-Schnitte (9. September 2026)
 
@@ -232,15 +314,15 @@ sofort koppeln, ohne zusätzliche Schritte.
 
 ## Nächster Startpunkt
 
-**Aktiv: D2, Watch-Lebenszyklus**, im eigenen Worktree auf
-`codex/refactor-watch-lifecycle`, ausgehend von `1333833`. Zuerst das Verhalten
-am Host charakterisieren, danach Start, Austausch, Einstellungsvergleich und
-Beenden aus `AppHost` herauslösen. Ein vorhandener Fehler beim Lastbedarf wird
-mit einem Regressionstest getrennt behandelt.
-
-**Danach D1, Dashboard-Sitzung**, beginnend mit Auswahl und Ordnerbeobachtung.
-Die Atelier-Seite selbst bleibt außerhalb dieses Schnitts. Danach folgen die
-übrigen offenen Schritte in der oben festgelegten Reihenfolge.
+**Aktiv: D1, Dashboard-Sitzung.** D2, D1a (Ordnerbeobachtung/Ruhefrist),
+D1b (Auswahl/Scan-Zustand) und D1c (Decoder, Vorladen, Bildspeicher und
+Videovorbereitung) sind im separaten Branch umgesetzt. Als Nächstes folgt
+Playback als eigener Schnitt: zunächst Abspielen/Pause, Loop, Follow,
+Lücken, In-/Out-Punkte, Bildratenwechsel und den Übergang vom Vorladen
+charakterisieren. Danach die Unterschiede zum vorhandenen
+`ViewerPlaybackController` bewerten und Uhr/Position/Abspielzustand aus
+`MainWindow` lösen. Anschließend folgen die übrigen offenen Schritte in der
+oben festgelegten Reihenfolge. Die Atelier-Seite bleibt außerhalb dieser Schnitte.
 
 **Erst abschließend S0–S6.** Vor dem Einstieg den dann aktuellen Atelier-Stand
 neu lesen: Die jetzt dokumentierten Codebefunde können durch die laufende

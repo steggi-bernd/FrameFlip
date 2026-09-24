@@ -39,6 +39,33 @@ static int RunAll()
 
     LoadDictionaries();
 
+    // Einzelne Gruppen koennen ohne einen langen Gesamtlauf geprueft werden.
+    // Beispiel: --only=WatchLifecycleInvariants,ExportInvariants.RequestMath
+    var args = Environment.GetCommandLineArgs();
+    string? only = args.FirstOrDefault(arg => arg.StartsWith("--only=", StringComparison.Ordinal))?[7..];
+    if (args.Contains("--watch-lifecycle")) only = nameof(WatchLifecycleInvariants);
+    if (only is not null)
+    {
+        var selected = only.Split(',', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries);
+        if (selected.Length == 0) { Console.Error.WriteLine("Keine Testgruppe angegeben."); return 2; }
+        foreach (string name in selected)
+        {
+            var parts = name.Split('.');
+            var type = typeof(Check).Assembly.GetType("FrameFlip.Tests." + parts[0]);
+            var method = parts.Length <= 2 ? type?.GetMethod(parts.Length == 2 ? parts[1] : "Run",
+                System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Static,
+                Type.EmptyTypes) : null;
+            if (method is null || method.ReturnType != typeof(void))
+            {
+                Console.Error.WriteLine("Unbekannte Testgruppe: " + name);
+                return 2;
+            }
+            Console.WriteLine("Testgruppe: " + name);
+            method.Invoke(null, null);
+        }
+        return Check.Report();
+    }
+
     ZoomInvariants.Run();
     BufferInvariants.Run();
     LayoutRegression.Run();
@@ -98,6 +125,15 @@ static int RunAll()
     RemoteInvariants.Run();
     RelayClientInvariants.Run();
     WatchInvariants.Run();
+    WatchLifecycleInvariants.Run();
+    DashboardLiveInvariants.Run();
+    DashboardLiveControllerInvariants.Run();
+    DashboardSelectionInvariants.Run();
+    DashboardSelectionInvariants.EmptyTransitions();
+    DashboardSequenceControllerInvariants.Run();
+    DashboardFrameInvariants.Run();
+    DashboardFrameInvariants.RetiredWork();
+    DashboardMediaControllerInvariants.Run();
     PaceInvariants.Run();
     ReadinessInvariants.Run();
     MachineInvariants.Run();
