@@ -42,6 +42,83 @@ public static class NodeEditInvariants
         DuplicatingKeepsTheInputs(sources);
         ThePageBuildsAndUndoes();
         ThePageWiresPassesAndPicks();
+        ThePageFetchesHiddenLayers();
+    }
+
+    /// <summary>
+    /// Ein Graph aus der Zeit, als ausgeblendete Ebenen beim Umwandeln wegfielen: Die
+    /// Ebenenliste sagt, was fehlt, und holt es mit einem Knopf - Bernds Glare-Ebenen.
+    /// </summary>
+    private static void ThePageFetchesHiddenLayers()
+    {
+        Check.Group("Knoten bauen: ein alter Graph holt seine ausgeblendeten Ebenen");
+
+        string folder = Path.Combine(Path.GetTempPath(), "frameflip-glare-" + Guid.NewGuid().ToString("N")[..8]);
+        Directory.CreateDirectory(folder);
+
+        string picture = Png(Path.Combine(folder, "Image0035.png"));
+        string glare = Png(Path.Combine(folder, "Glare_10035.png"));
+
+        var stack = new LayerStack
+        {
+            Layers =
+            {
+                new ImageLayer { Content = LayerContent.Pass, Source = "", Name = "Image", Visible = false },
+                new ImageLayer { Content = LayerContent.Image, Source = glare, Name = "Glare_1", Visible = false, Mode = BlendMode.Screen },
+                new ImageLayer { Content = LayerContent.Image, Source = picture, Name = "Image0035.png", FollowSequence = false },
+            },
+        };
+
+        // Der Graph, wie der Umwandler ihn frueher baute: ohne die ausgeblendeten Ebenen.
+        var old = StackToGraph.Convert(stack, ImageAdjustments.Neutral, new GradingStack());
+
+        foreach (var mix in old.Nodes.OfType<MixNode>().Where(m => m.Muted).ToList()) NodeEdits.Remove(old, mix, reconnect: true);
+
+        var live = old.Order()!.Select(n => n.Id).ToHashSet();
+        foreach (var node in old.Nodes.Where(n => !live.Contains(n.Id)).ToList()) NodeEdits.Remove(old, node, reconnect: false);
+        foreach (var node in old.Nodes) node.Label = null;
+
+        var settings = new AppSettings { Layers = stack, AtelierNodes = old.Save() };
+        var page = new AtelierPage(FrameDecoderRegistry.CreateDefault(() => null), settings, _ => { });
+        var window = Window(page);
+
+        try
+        {
+            page.Open(picture);
+
+            var size = (TextBlock)page.FindName("SourceText");
+            if (!Pump(TimeSpan.FromSeconds(10), () => size.Text.Length > 0))
+            {
+                Check.That(false, "das Bild wird geladen");
+                return;
+            }
+
+            Settle();
+
+            var list = (NodeLayerList)page.FindName("NodeLayers");
+
+            Check.That(page.InNodes && list.Missing.SequenceEqual(new[] { "Image", "Glare_1" }),
+                       "die Ebenenliste nennt die ausgeblendeten Ebenen, die dem Graphen fehlen",
+                       string.Join(", ", list.Missing));
+
+            byte[] before = Pixels(page);
+            Call(page, "AdoptHiddenLayers");
+            Settle();
+
+            Check.That(list.Missing.Count == 0 && list.Shown.Any(l => l.Name == "Glare_1" && l.Mix?.Muted == true),
+                       "ein Klick holt sie - stumm, mit ihrem Namen", string.Join(" | ", list.Shown.Select(l => l.Name)));
+            Check.That(Pixels(page).AsSpan().SequenceEqual(before), "und das Bild bleibt, wie es war");
+
+            page.StepNodes(back: true);
+            Settle();
+
+            Check.That(list.Missing.Count == 2, "Rueckgaengig nimmt sie wieder heraus - und der Hinweis ist wieder da");
+        }
+        finally
+        {
+            window.Close();
+            try { Directory.Delete(folder, recursive: true); } catch (Exception) { }
+        }
     }
 
     // ------------------------------------------------------------ Modell

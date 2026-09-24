@@ -1023,6 +1023,9 @@
     <sys:String x:Key="S_NodeLayerClipped">clipped</sys:String>
     <sys:String x:Key="S_NodeLayerGroup">Group</sys:String>
     <sys:String x:Key="S_NodeLayerBase">Base</sys:String>
+    <sys:String x:Key="S_NodeLayersMissing">The stack has hidden layers that are missing here: {0}. The graph was converted before they came along – they can be inserted muted, without changing the picture or your nodes.</sys:String>
+    <sys:String x:Key="S_NodeLayersMissingRebuild">The stack has hidden layers that are missing here: {0}. The graph has changed so much that they can no longer be inserted – only a rebuild from the stack brings them (Ctrl+Z brings the current graph back).</sys:String>
+    <sys:String x:Key="S_NodeLayersAdopt">Bring into the graph</sys:String>
     <sys:String x:Key="S_NodeLayerMask">The layer's mask</sys:String>
     <sys:String x:Key="S_NodeLayerHidden">hidden</sys:String>
     <sys:String x:Key="S_NodeLayerName">Layer name</sys:String>

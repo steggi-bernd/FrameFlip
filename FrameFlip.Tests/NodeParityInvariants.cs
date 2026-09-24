@@ -46,6 +46,128 @@ public static class NodeParityInvariants
         CachedCases(world);
         ThePoolLeavesNoTrace(world);
         HiddenLayers(world);
+        OldGraphsGetTheirHiddenLayers(world);
+    }
+
+    /// <summary>
+    /// Ein Graph, der umgewandelt wurde, als ausgeblendete Ebenen noch wegfielen - und an
+    /// dem seitdem gebaut wurde. Bernds Fall: Grundbild aus, zwei Glare-Ebenen aus, ein
+    /// Bild an, eine Einstellungsebene mit gemalter Maske, und zwei eigene Knoten hinter
+    /// dem Rueckfall. Die fehlenden Ebenen kommen hinein, ohne dass sich etwas aendert.
+    /// </summary>
+    private static void OldGraphsGetTheirHiddenLayers(World world)
+    {
+        Check.Group("Knoten: ein alter Graph bekommt seine ausgeblendeten Ebenen");
+
+        var painted = new LayerMask { Kind = MaskKind.Painted, PaintLocked = true, Paint = PaintedMask.For(Width, Height) };
+        var cover = painted.Paint!.Cover();
+        for (int i = 0; i < cover.Length / 2; i++) cover[i] = 255;
+        painted.Paint.Keep();
+
+        ImageLayer Named(ImageLayer layer, string name, bool visible)
+        {
+            layer.Name = name;
+            layer.Visible = visible;
+            return layer;
+        }
+
+        var stack = new LayerStack
+        {
+            Layers =
+            {
+                Named(new ImageLayer { Content = LayerContent.Pass, Source = "" }, "Image", visible: false),
+                Named(Image("ohne.png", BlendMode.Screen), "Glare_2", visible: false),
+                Named(Image("logo.png", BlendMode.Add), "Glare_1", visible: false),
+                Named(Image("bild.png"), "Image0035.png", visible: true),
+                Named(Masked(Adjustment(Adjust(0.6, 1, 0, 1, 1)), painted), "Mask", visible: true),
+            },
+        };
+
+        var picture = new GradingStack { Optics = { new VignetteTool { Amount = -0.3f } } };
+
+        // Eigene Knoten hinter dem Rueckfall - wie aus der Palette eingesetzt.
+        void Edit(NodeGraph graph)
+        {
+            var fallback = graph.Nodes.OfType<FallbackNode>().Single();
+            NodeEdits.InsertAfter(graph, fallback, new PointToolNode { Tool = new VibranceTool { Amount = 0.4f } });
+            NodeEdits.InsertAfter(graph, fallback, new LightNode { Exposure = 0.3 });
+        }
+
+        var fresh = StackToGraph.Convert(stack, ImageAdjustments.Neutral, picture);
+        var old = Old(StackToGraph.Convert(stack, ImageAdjustments.Neutral, picture));
+        Edit(old);
+
+        var before = RenderGraph(world, old, 1, 0, false);
+        var missing = FrameFlip.Imaging.Nodes.HiddenLayers.Missing(old, fresh);
+
+        Check.That(missing.SequenceEqual(new[] { "Image", "Glare_2", "Glare_1" }),
+                   "es fehlen die drei ausgeblendeten Ebenen, von unten nach oben", string.Join(", ", missing));
+        Check.That(FrameFlip.Imaging.Nodes.HiddenLayers.CanAdopt(old, fresh), "und sie lassen sich hineinsetzen - die sichtbaren Ebenen sind noch dieselben");
+
+        Check.That(FrameFlip.Imaging.Nodes.HiddenLayers.Adopt(old, fresh) && old.Problems().Count == 0, "hineingesetzt ist der Graph heil",
+                   string.Join("; ", old.Problems()));
+        Check.That(Diff(before, RenderGraph(world, old, 1, 0, false), 1).Differ == 0, "und das Bild dasselbe");
+        Check.That(old.Nodes.OfType<LightNode>().Count(l => l.Exposure == 0.3) == 1 &&
+                   old.Nodes.OfType<PointToolNode>().Any(p => p.Tool is VibranceTool { Amount: 0.4f }),
+                   "die eigenen Knoten sind noch da");
+
+        var names = NodeLayerList.Of(old).Select(l => l.Name).ToList();
+        Check.That(names.SequenceEqual(new[] { "Mask", "Image0035.png", "Glare_1", "Glare_2", "Image" }),
+                   "die Ebenenliste zeigt alle fuenf Ebenen des Stapels, mit ihren Namen", string.Join(" | ", names));
+        Check.That(FrameFlip.Imaging.Nodes.HiddenLayers.Missing(old, fresh).Count == 0, "danach fehlt nichts mehr");
+
+        // Eingeschaltet wirkt eine geholte Ebene wie im frisch umgewandelten Graphen.
+        Edit(fresh);
+        old.Nodes.OfType<MixNode>().Single(m => m.Label == "Glare_1").Muted = false;
+        fresh.Nodes.OfType<MixNode>().Single(m => m.Label == "Glare_1").Muted = false;
+
+        var (differOn, worstOn) = Diff(RenderGraph(world, fresh, 1, 0, false), RenderGraph(world, old, 1, 0, false), 1);
+
+        Check.That(differOn == 0 && Diff(before, RenderGraph(world, old, 1, 0, false), 1).Differ > 0,
+                   "eingeschaltet wirkt Glare_1 wie im frisch umgewandelten Graphen", $"{differOn} Bytes anders, bis {worstOn}");
+
+        // Eine verstellte Ebene ist noch dieselbe Ebene.
+        var fresh2 = StackToGraph.Convert(stack, ImageAdjustments.Neutral, picture);
+        var tuned = Old(StackToGraph.Convert(stack, ImageAdjustments.Neutral, picture));
+        foreach (var mix in tuned.Nodes.OfType<MixNode>()) { mix.Mode = BlendMode.Screen; mix.Opacity = 0.7f; }
+
+        Check.That(FrameFlip.Imaging.Nodes.HiddenLayers.CanAdopt(tuned, fresh2),
+                   "eine Ebene mit anderer Mischart und Deckkraft wird noch erkannt");
+
+        // Ein Graph, dessen Ebenen nicht mehr die des Stapels sind, bleibt unberuehrt -
+        // hier ist eine Ebene aus einer anderen Datei hinzugekommen, und eine andere fehlt.
+        var rebuilt = Old(StackToGraph.Convert(stack, ImageAdjustments.Neutral, picture));
+        var swapped = rebuilt.Nodes.OfType<PictureNode>().First();
+        swapped.Path = "ohne.png";
+        int nodes = rebuilt.Nodes.Count;
+
+        bool can = FrameFlip.Imaging.Nodes.HiddenLayers.CanAdopt(rebuilt, fresh2);
+        bool did = FrameFlip.Imaging.Nodes.HiddenLayers.Adopt(rebuilt, fresh2);
+
+        Check.That(!can && !did && rebuilt.Nodes.Count == nodes,
+                   "ist die Kette umgebaut, wird nichts hineingesetzt - dann bleibt der Neuaufbau",
+                   $"kann {can}, getan {did}, Knoten {rebuilt.Nodes.Count} statt {nodes}, Kette " +
+                   string.Join(",", FrameFlip.Imaging.Nodes.HiddenLayers.Chain(rebuilt).Select(n => n.GetType().Name)) + " gegen " +
+                   string.Join(",", FrameFlip.Imaging.Nodes.HiddenLayers.Chain(fresh2).Select(n => n.GetType().Name + (n.Muted ? "~" : ""))));
+    }
+
+    /// <summary>
+    /// Ein Graph, wie der Umwandler ihn frueher baute: ohne ausgeblendete Ebenen und ohne
+    /// Namen. Die stummen Mischen kommen heraus, und was nur an ihnen hing, gleich mit.
+    /// </summary>
+    private static NodeGraph Old(NodeGraph graph)
+    {
+        foreach (var mix in graph.Nodes.OfType<MixNode>().Where(m => m.Muted).ToList())
+            NodeEdits.Remove(graph, mix, reconnect: true);
+
+        var live = graph.Order()!.Select(n => n.Id).ToHashSet();
+
+        foreach (var node in graph.Nodes.Where(n => !live.Contains(n.Id)).ToList())
+            NodeEdits.Remove(graph, node, reconnect: false);
+
+        foreach (var node in graph.Nodes) node.Label = null;
+
+        return graph;
     }
 
     // ------------------------------------------------------------ Ausgeblendete Ebenen

@@ -53,6 +53,14 @@ public sealed class NodeLayerList : Border
     /// <summary>Das Auge einer Ebene wurde angeklickt.</summary>
     public event Action<MixNode>? MuteWanted;
 
+    /// <summary>Die fehlenden ausgeblendeten Ebenen sollen in den Graphen - oder, wenn das nicht geht, der Graph neu.</summary>
+    public event Action<bool>? MissingWanted;
+
+    private readonly Border _missing;
+    private readonly TextBlock _missingText;
+    private readonly Button _missingButton;
+    private bool _adoptable;
+
     public NodeLayerList()
     {
         Padding = new Thickness(10, 8, 10, 8);
@@ -75,6 +83,34 @@ public sealed class NodeLayerList : Border
             FontSize = 11,
             Margin = new Thickness(2, 0, 2, 8),
         });
+        _missingText = new TextBlock
+        {
+            TextWrapping = TextWrapping.Wrap,
+            Foreground = Brushes.White,
+            FontSize = 11,
+            Margin = new Thickness(0, 0, 0, 6),
+        };
+
+        _missingButton = new Button { HorizontalAlignment = HorizontalAlignment.Stretch, FontSize = 11 };
+        _missingButton.Click += (_, _) => MissingWanted?.Invoke(_adoptable);
+
+        var missingPanel = new StackPanel();
+        missingPanel.Children.Add(_missingText);
+        missingPanel.Children.Add(_missingButton);
+
+        _missing = new Border
+        {
+            Child = missingPanel,
+            Background = new SolidColorBrush(Color.FromArgb(0x40, 0xA4, 0x7B, 0xF0)),
+            BorderBrush = new SolidColorBrush(Color.FromArgb(0x90, 0xA4, 0x7B, 0xF0)),
+            BorderThickness = new Thickness(1),
+            CornerRadius = new CornerRadius(3),
+            Padding = new Thickness(8, 6, 8, 8),
+            Margin = new Thickness(0, 0, 0, 8),
+            Visibility = Visibility.Collapsed,
+        };
+
+        content.Children.Add(_missing);
         content.Children.Add(_rows);
         content.Children.Add(_empty);
 
@@ -83,6 +119,34 @@ public sealed class NodeLayerList : Border
 
     /// <summary>Die Zeilen, wie sie gerade dastehen - fuer die Probe.</summary>
     internal IReadOnlyList<NodeLayer> Shown { get; private set; } = Array.Empty<NodeLayer>();
+
+    /// <summary>Welche ausgeblendeten Ebenen des Stapels im Graphen fehlen, wie der Hinweis sie nennt - fuer die Probe.</summary>
+    internal IReadOnlyList<string> Missing { get; private set; } = Array.Empty<string>();
+
+    /// <summary>
+    /// Nennt ausgeblendete Ebenen des Stapels, die dem Graphen fehlen - er wurde umgewandelt,
+    /// bevor sie mitkamen. <paramref name="adoptable"/>: Sie lassen sich hineinsetzen; sonst
+    /// bleibt nur, den Graphen neu aufzubauen.
+    /// </summary>
+    public void ShowMissing(IReadOnlyList<string> names, bool adoptable)
+    {
+        Missing = names;
+        _adoptable = adoptable;
+
+        if (names.Count == 0)
+        {
+            _missing.Visibility = Visibility.Collapsed;
+            return;
+        }
+
+        _missingText.Text = Strings.T(adoptable ? "S_NodeLayersMissing" : "S_NodeLayersMissingRebuild",
+                                      string.Join(", ", names.Select(n => n.Length > 0 ? n : "?")));
+        _missingButton.Content = Strings.T(adoptable ? "S_NodeLayersAdopt" : "S_NodeMenuRebuild");
+
+        if (TryFindResource("OverlayButton") is Style style) _missingButton.Style = style;
+
+        _missing.Visibility = Visibility.Visible;
+    }
 
     /// <summary>
     /// Zeigt die Ebenen eines Graphen. <paramref name="picture"/> liefert die Miniatur einer

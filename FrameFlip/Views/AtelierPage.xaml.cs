@@ -319,6 +319,10 @@ public sealed partial class AtelierPage : UserControl
         Render();
         Measure();
 
+        // Erst jetzt steht der Stapel da - und damit, was einem alten Graphen an
+        // ausgeblendeten Ebenen fehlt.
+        if (InNodes) ShowMissingLayers();
+
         // Braucht der Stapel Passe, die noch nicht gelesen sind, kommen sie
         // nachtraeglich - das Bild steht schon, waehrend sie eintreffen. Im
         // Knotenmodus fragt der Graph, was er braucht.

@@ -1023,6 +1023,9 @@
     <sys:String x:Key="S_NodeLayerClipped">angeschnitten</sys:String>
     <sys:String x:Key="S_NodeLayerGroup">Gruppe</sys:String>
     <sys:String x:Key="S_NodeLayerBase">Grundlage</sys:String>
+    <sys:String x:Key="S_NodeLayersMissing">Im Stapel stehen ausgeblendete Ebenen, die hier fehlen: {0}. Der Graph wurde umgewandelt, bevor sie mitkamen – sie lassen sich stumm hineinsetzen, ohne dass sich am Bild oder an deinen Knoten etwas ändert.</sys:String>
+    <sys:String x:Key="S_NodeLayersMissingRebuild">Im Stapel stehen ausgeblendete Ebenen, die hier fehlen: {0}. Der Graph ist inzwischen so umgebaut, dass sie sich nicht mehr einsetzen lassen – nur ein Neuaufbau aus dem Stapel holt sie (Strg+Z holt den jetzigen Graphen zurück).</sys:String>
+    <sys:String x:Key="S_NodeLayersAdopt">In den Graphen holen</sys:String>
     <sys:String x:Key="S_NodeLayerMask">Die Maske der Ebene</sys:String>
     <sys:String x:Key="S_NodeLayerHidden">ausgeblendet</sys:String>
     <sys:String x:Key="S_NodeLayerName">Name der Ebene</sys:String>

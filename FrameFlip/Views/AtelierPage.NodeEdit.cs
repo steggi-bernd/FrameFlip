@@ -83,6 +83,7 @@ public partial class AtelierPage
         ShowNodeWarning();
         ShowNodeSettings();
         ShowNodeLayers();
+        ShowMissingLayers();
         FetchNodeSources();
     }
 

@@ -291,8 +291,16 @@ Only the alpha channel of exports changes, and only in those cases.
    - **Names.** Every Mix carries its layer's name ("Mask", "Glare_2…"), shown in its title
      and in the layer list, and editable in its fields. The list shows each layer's mask
      next to its thumbnail.
-   - **Rebuild from the stack.** A graph converted before this rebuilds from the stored
-     stack via the menu. Ctrl+Z brings the old graph back.
+   - **Fetching hidden layers into an older graph.** A graph converted before this, and
+     edited since, gets the missing hidden layers without being rebuilt. The stack is
+     converted again, and the two chains of layers are laid side by side. The visible
+     layers are recognised by their source (file, pass, adjustment, group), not by their
+     settings. Each hidden layer is placed at its position with its branch, muted. The
+     picture and the user's own nodes stay as they are. The layer list says which layers
+     are missing and offers a button. If the chain no longer matches the stack, it
+     offers a rebuild instead.
+   - **Rebuild from the stack.** Rebuilds the graph from the stored stack via the menu.
+     Ctrl+Z brings the old graph back.
 
    Tests:
    - Map range on depth has the same bytes as the pass mask, full and coarse.

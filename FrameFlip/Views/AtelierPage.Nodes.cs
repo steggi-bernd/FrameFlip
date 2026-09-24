@@ -79,6 +79,7 @@ public partial class AtelierPage
         ShowNodeWarning();
         ShowPlacement();
         ShowNodeLayers();
+        ShowMissingLayers();
     }
 
     /// <summary>Schreibt den Graphen in die Einstellungen.</summary>

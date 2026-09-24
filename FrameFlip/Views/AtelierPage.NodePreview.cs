@@ -29,6 +29,60 @@ public partial class AtelierPage
 
         NodeLayers.Chosen += OnLayerChosen;
         NodeLayers.MuteWanted += OnLayerMuted;
+        NodeLayers.MissingWanted += adoptable =>
+        {
+            if (adoptable) AdoptHiddenLayers();
+            else RebuildFromStack();
+        };
+    }
+
+    /// <summary>
+    /// Der Stapel, frisch umgewandelt - der Massstab fuer das, was dem Graphen fehlt. Solange
+    /// der Streifen noch keinen geladen hat (beim Start stellt sich der Graph vor der Datei
+    /// her), der gespeicherte.
+    /// </summary>
+    private NodeGraph FreshFromStack()
+        => StackToGraph.Convert(Stack(), _settings.Adjustments ?? ImageAdjustments.Neutral,
+                                _settings.Grading ?? new GradingStack());
+
+    private LayerStack Stack()
+        => Layers.Stack.Layers.Count > 0 ? Layers.Stack : _settings.Layers ?? Layers.Stack;
+
+    /// <summary>
+    /// Sagt in der Ebenenliste, welche ausgeblendeten Ebenen des Stapels dem Graphen fehlen.
+    /// Nach jeder Aenderung am Aufbau - der Stapel selbst aendert sich im Knotenmodus nicht.
+    /// </summary>
+    private void ShowMissingLayers()
+    {
+        if (_graph is null) return;
+
+        var fresh = FreshFromStack();
+        var missing = HiddenLayers.Missing(_graph, fresh);
+
+        NodeLayers.ShowMissing(missing, missing.Count > 0 && HiddenLayers.CanAdopt(_graph, fresh));
+    }
+
+    /// <summary>
+    /// Setzt die ausgeblendeten Ebenen des Stapels, die dem Graphen fehlen, hinein - stumm,
+    /// an ihre Stelle, mit ihren Namen. Was sonst am Graphen gebaut wurde, bleibt.
+    /// </summary>
+    private void AdoptHiddenLayers()
+    {
+        if (_graph is null) return;
+
+        var fresh = FreshFromStack();
+        if (!HiddenLayers.CanAdopt(_graph, fresh)) return;
+
+        RememberNodes();
+
+        HiddenLayers.Adopt(_graph, fresh);
+        NodeLayout.Arrange(_graph);
+
+        _cache.Clear();
+        NodeView.Replace(_graph);
+        NodeView.Frame();
+
+        AfterNodeEdit();
     }
 
     /// <summary>
@@ -182,8 +236,7 @@ public partial class AtelierPage
 
         RememberNodes();
 
-        _graph = StackToGraph.Convert(Layers.Stack, _settings.Adjustments ?? ImageAdjustments.Neutral,
-                                      _settings.Grading ?? new GradingStack());
+        _graph = FreshFromStack();
         _cache.Clear();
 
         NodeView.Replace(_graph);
