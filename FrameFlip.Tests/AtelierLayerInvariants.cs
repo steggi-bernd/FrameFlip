@@ -1149,9 +1149,13 @@ public static class AtelierLayerInvariants
             Check.Near(strip.ActualHeight, colourHeight, 1,
                        "und zwar in derselben vollen Hoehe wie vorher die Farbe");
 
-            Check.That(colourHeight > 500,
+            // Gemessen an der Spalte, nicht in Pixeln: Auf einem Bildschirm mit 768
+            // Zeilen (so der CI-Rechner) stutzt Windows das 900 hohe Fenster, und die
+            // Spalte ist kuerzer. Hier sind es rund drei Viertel, beim alten Fehler
+            // war es ein Drittel.
+            Check.That(colourHeight > dock.ActualHeight * 0.6,
                        "und die ist fast die ganze Spalte, nicht ein Drittel davon",
-                       $"{colourHeight:0}");
+                       $"{colourHeight:0} von {dock.ActualHeight:0}");
 
             // Und nun der Grund fuer das Andocken: die Ebenen nach links, als eigenes
             // Feld. Danach stehen Farbe UND Ebenen gleichzeitig da.
