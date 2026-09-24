@@ -34,6 +34,7 @@ public partial class AtelierPage
         NodeView.SectionDropped += DropFromPalette;
         NodeView.ViewWanted += OnViewWanted;
         SetUpNodePreviews();
+        SetUpNodeLayerList();
         NodeView.UndoWanted += () => StepNodes(back: true);
         NodeView.RedoWanted += () => StepNodes(back: false);
 
@@ -212,7 +213,7 @@ public partial class AtelierPage
                 layer.Click += (_, _) => AddImageLayer();
                 item.Items.Add(layer);
 
-                if (PassMenu("S_NodeMenuPassLayer", AddPassLayer) is { } passLayer) item.Items.Add(passLayer);
+                if (PassMenu("S_NodeMenuPassLayer", pass => AddPassLayer(pass)) is { } passLayer) item.Items.Add(passLayer);
 
                 var file = new MenuItem { Header = Strings.T("S_NodeMenuPictureFile") };
                 file.Click += (_, _) =>
@@ -367,18 +368,23 @@ public partial class AtelierPage
 
     /// <summary>
     /// Ein Bild als Ebene: Bilddatei, Platzieren und Mischen, hinter den gewaehlten
-    /// Knoten gesetzt. Drei Knoten und vier Kabel in einem Griff - so haeufig, wie ein
-    /// Logo ins Bild soll, waere alles andere eine Schikane.
+    /// Knoten gesetzt - oder hinter <paramref name="target"/>. Drei Knoten und vier Kabel
+    /// in einem Griff - so haeufig, wie ein Logo ins Bild soll, waere alles andere eine
+    /// Schikane.
     /// </summary>
-    private void AddImageLayer()
+    private void AddImageLayer(Node? target = null)
     {
-        if (_graph is null || ChoosePicture() is not { } path || LayerTarget() is not { } after) return;
+        if (_graph is null || (target ?? LayerTarget()) is not { } after || ChoosePicture() is not { } path) return;
 
         RememberNodes();
 
+        bool clip = LayerEdits.InClip(_graph, after);
         var picture = _graph.Add(new PictureNode { Path = path, FollowSequence = false });
 
         if (NodeEdits.AddLayer(_graph, after, picture, "Bild", BlendMode.Normal) is not var (place, mix)) return;
+
+        // In einer Schnittkette wird die neue Ebene angeschnitten wie ihre Nachbarn.
+        mix.Clip = clip;
 
         ArrangeLayer(after, picture, place, mix);
         picture.X = place.X - NodeLayout.ColumnStep;
@@ -394,17 +400,21 @@ public partial class AtelierPage
     /// Ein Pass als Ebene - wie im Ebenenstreifen auf Addieren: Die Passe einer Datei
     /// setzen das Bild zusammen, und das Licht eines Passes kommt zum Bisherigen dazu.
     /// </summary>
-    private void AddPassLayer(string pass)
+    private void AddPassLayer(string pass, Node? target = null)
     {
-        if (_graph?.Nodes.OfType<RenderNode>().FirstOrDefault() is not { } file || LayerTarget() is not { } after) return;
+        if (_graph?.Nodes.OfType<RenderNode>().FirstOrDefault() is not { } file || (target ?? LayerTarget()) is not { } after) return;
 
         RememberNodes();
+
+        bool clip = LayerEdits.InClip(_graph, after);
 
         if (!NodeEdits.ShowPass(_graph, file, pass, on: true) ||
             NodeEdits.AddLayer(_graph, after, file, pass, BlendMode.Add) is not var (place, mix))
         {
             return;
         }
+
+        mix.Clip = clip;
 
         ArrangeLayer(after, file, place, mix);
 
@@ -419,7 +429,7 @@ public partial class AtelierPage
     /// darueber. Kommt die Ebene aus demselben Knoten - ein Pass auf die Datei selbst -,
     /// steht Platzieren eine Spalte weiter rechts, sonst liefe sein Kabel rueckwaerts.
     /// </summary>
-    private void ArrangeLayer(Node after, Node source, PlaceNode place, MixNode mix)
+    private void ArrangeLayer(Node after, Node source, Node place, MixNode mix)
     {
         int columns = source.X >= after.X - 1 ? 2 : 1;
 

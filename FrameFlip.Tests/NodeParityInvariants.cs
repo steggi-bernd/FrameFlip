@@ -47,6 +47,310 @@ public static class NodeParityInvariants
         ThePoolLeavesNoTrace(world);
         HiddenLayers(world);
         OldGraphsGetTheirHiddenLayers(world);
+        LayerMoves(world);
+    }
+
+    // ------------------------------------------------------------ Ebenen bewegen
+
+    /// <summary>
+    /// Ebenen im Graphen verschieben, loeschen, verdoppeln, eine Einstellungsebene
+    /// hinzufuegen - und im Stapel dasselbe. Beide muessen danach dieselben Bytes rechnen.
+    /// Die Stapel haben Gruppen, Traeger mit angeschnittenen Ebenen, ausgeblendete Ebenen,
+    /// Masken auf dem Untergrund und Einstellungsebenen: alles, was beim Verschieben den
+    /// Untergrund wechseln muss.
+    /// </summary>
+    private static void LayerMoves(World world)
+    {
+        Check.Group("Knoten: Ebenen verschieben, loeschen, verdoppeln - wie im Stapel");
+
+        int ops = 0, failed = 0, refused = 0, broken = 0, twins = 0;
+        var kinds = new int[5];
+        string first = "";
+
+        for (int seed = 1; seed <= 120; seed++)
+        {
+            var random = new Random(9000 + seed);
+            int number = 0;
+
+            var stack = new LayerStack();
+            if (random.Next(4) != 0) stack.Layers.Add(new ImageLayer { Content = LayerContent.Pass, Source = "", Name = "Grund" });
+            stack.Layers.AddRange(Units(world, random, 0, ref number));
+
+            var graph = StackToGraph.Convert(stack, ImageAdjustments.Neutral, new GradingStack());
+
+            for (int step = 0; step < 5; step++)
+            {
+                var chains = LayerEdits.Chains(graph);
+                var layers = chains.Where(c => c.Kind != LayerChainKind.Overlay)
+                                   .SelectMany(c => c.Members).OfType<MixNode>()
+                                   .Where(m => m.Label is not null).ToList();
+                if (layers.Count == 0) break;
+
+                var mix = layers[random.Next(layers.Count)];
+                var chain = LayerEdits.ChainOf(chains, mix)!;
+                int kind = random.Next(10) switch { < 5 => 0, < 7 => 1, 7 => 2, 8 => 3, _ => 4 };
+                string what;
+                bool done;
+
+                switch (kind)
+                {
+                    case 0:
+                    {
+                        var targets = layers.Where(t => LayerEdits.CanMove(graph, mix, t, chains)).ToList();
+                        if (targets.Count == 0) continue;
+
+                        var target = targets[random.Next(targets.Count)];
+                        bool above = random.Next(2) == 0;
+
+                        what = $"{mix.Label} {(above ? "ueber" : "unter")} {target.Label}";
+                        done = LayerEdits.Move(graph, mix, target, above);
+                        if (done) MoveInStack(stack, mix.Label!, target.Label!, above);
+                        break;
+                    }
+
+                    case 1:
+                    {
+                        bool up = random.Next(2) == 0;
+                        int at = chain.Members.IndexOf(mix);
+                        var neighbour = up ? (at + 1 < chain.Members.Count ? chain.Members[at + 1] : null)
+                                           : (at > 0 ? chain.Members[at - 1] : null);
+                        if (neighbour is not MixNode { Label: { } other }) continue;
+
+                        what = $"{mix.Label} einen Platz {(up ? "hoch" : "runter")}";
+                        done = LayerEdits.Step(graph, mix, up);
+                        if (done) MoveInStack(stack, mix.Label!, other, above: up);
+                        break;
+                    }
+
+                    case 2:
+                        what = $"{mix.Label} loeschen";
+                        done = LayerEdits.Remove(graph, mix);
+                        if (done) RemoveInStack(stack, mix.Label!);
+                        break;
+
+                    case 3:
+                    {
+                        what = $"{mix.Label} verdoppeln";
+                        var twin = LayerEdits.Duplicate(graph, mix);
+                        done = twin is not null;
+
+                        if (done)
+                        {
+                            string suffix = "+" + ++twins;
+
+                            foreach (var copy in LayerEdits.Branch(graph, twin!).Select(graph.Find).OfType<MixNode>().Append((MixNode)twin!))
+                                copy.Label += suffix;
+
+                            DuplicateInStack(stack, mix.Label!, suffix);
+                        }
+
+                        break;
+                    }
+
+                    default:
+                    {
+                        string name = "A" + number++;
+                        what = $"Einstellungsebene {name} ueber {mix.Label}";
+
+                        var added = LayerEdits.AddAdjustment(graph, mix);
+                        done = added is not null;
+
+                        if (done)
+                        {
+                            var adjust = Adjust(0.4, 0.7, 0.01, 1.1, 1.2);
+                            added!.Value.Grade.Adjustments = adjust;
+                            added.Value.Mix.Label = name;
+
+                            AddAdjustmentInStack(stack, mix.Label!, name, adjust, clipped: chain.Kind == LayerChainKind.Clip);
+                        }
+
+                        break;
+                    }
+                }
+
+                if (!done)
+                {
+                    refused++;
+                    if (first.Length == 0) first = $"Fall {seed}: {what} ging nicht";
+                    break;
+                }
+
+                ops++;
+                kinds[kind]++;
+
+                if (graph.Problems().Count > 0)
+                {
+                    broken++;
+                    if (first.Length == 0) first = $"Fall {seed}, {what}: " + string.Join("; ", graph.Problems());
+                    break;
+                }
+
+                // Was eine geloeschte Ebene brauchte, geht mit - es bleibt nichts liegen, das niemand liest.
+                var loose = graph.Nodes.Where(n => n is not OutputNode && !graph.Links.Any(l => l.From == n.Id)).ToList();
+
+                if (loose.Count > 0)
+                {
+                    broken++;
+                    if (first.Length == 0) first = $"Fall {seed}, {what}: liegen geblieben " + string.Join(", ", loose.Select(n => n.GetType().Name));
+                    break;
+                }
+
+                // Meist das volle Raster, manchmal das grobe beim Ziehen, manchmal 16 Bit - das
+                // gibt es nur auf dem vollen, wie beim Ausgeben.
+                bool sixteen = ops % 7 == 0;
+                int grid = !sixteen && ops % 5 == 0 ? 3 : 1;
+                var (differ, worst) = Diff(RenderStack(world, stack, ImageAdjustments.Neutral, new GradingStack(), grid, 0, sixteen),
+                                           RenderGraph(world, graph, grid, 0, sixteen), sixteen ? 2 : 1);
+
+                if (differ > 0)
+                {
+                    failed++;
+                    if (first.Length == 0) first = $"Fall {seed}, {what} (Raster {grid}{(sixteen ? ", 16 Bit" : "")}): {differ} Werte anders, bis {worst}";
+                    break;
+                }
+            }
+        }
+
+        Check.That(ops > 400 && failed == 0 && refused == 0 && broken == 0,
+                   $"{ops} Aenderungen an zufaelligen Stapeln, alle byte-gleich mit dem Stapel",
+                   (first.Length > 0 ? first + " - " : "") +
+                   $"verschoben {kinds[0]}, Schritte {kinds[1]}, geloescht {kinds[2]}, verdoppelt {kinds[3]}, Einstellungsebenen {kinds[4]}");
+
+        Check.That(kinds.All(k => k > 10), "jede Art Aenderung kam oft vor", string.Join(", ", kinds));
+    }
+
+    /// <summary>
+    /// Ebenen in Einheiten, wie sie der Graph als Ganzes bewegt: eine einzelne Ebene, ein
+    /// Traeger mit seinen angeschnittenen Ebenen, eine Gruppe. Traeger sind sichtbar - ein
+    /// ausgeblendeter gaebe seine angeschnittenen Ebenen an den Traeger davor weiter.
+    /// </summary>
+    private static List<ImageLayer> Units(World world, Random random, int depth, ref int number)
+    {
+        var list = new List<ImageLayer>();
+        int count = random.Next(depth == 0 ? 3 : 1, depth == 0 ? 6 : 4);
+
+        for (int i = 0; i < count; i++)
+        {
+            int roll = random.Next(10);
+
+            if (roll < 2 && depth == 0)
+            {
+                var group = new ImageLayer
+                {
+                    Content = LayerContent.Group,
+                    Name = "G" + number++,
+                    Mode = random.Next(3) == 0 ? BlendMode.Multiply : BlendMode.Normal,
+                    Opacity = 0.5f + (float)random.NextDouble() * 0.5f,
+                    Visible = random.Next(6) != 0,
+                };
+
+                if (random.Next(2) == 0) group.Mask = world.Mask(random.Next(2) == 0 ? MaskKind.Underlying : MaskKind.Gradient, random);
+
+                group.Children.AddRange(Units(world, random, depth + 1, ref number));
+                list.Add(group);
+            }
+            else if (roll < 4)
+            {
+                var carrier = world.Plain(random);
+                carrier.Visible = true;
+                if (carrier.Opacity <= 0.0005f) carrier.Opacity = 1f;
+                carrier.Name = "L" + number++;
+                list.Add(carrier);
+
+                for (int c = random.Next(1, 3); c > 0; c--)
+                {
+                    var clipped = world.Plain(random);
+                    clipped.Clipped = true;
+                    clipped.Name = "L" + number++;
+                    list.Add(clipped);
+                }
+            }
+            else
+            {
+                var plain = world.Plain(random);
+                plain.Name = "L" + number++;
+                list.Add(plain);
+            }
+        }
+
+        return list;
+    }
+
+    /// <summary>Wo eine Ebene im Stapel steht - in welcher Liste und an welcher Stelle.</summary>
+    private static (List<ImageLayer> Owner, int Index) Locate(List<ImageLayer> list, string name)
+    {
+        for (int i = 0; i < list.Count; i++)
+        {
+            if (list[i].Name == name) return (list, i);
+
+            if (list[i].Content == LayerContent.Group && list[i].Children.Count > 0)
+            {
+                var inner = Locate(list[i].Children, name);
+                if (inner.Index >= 0) return inner;
+            }
+        }
+
+        return (list, -1);
+    }
+
+    /// <summary>Wie viele Ebenen ab hier zusammengehoeren: ein Traeger und was an ihn geschnitten ist.</summary>
+    private static int UnitLength(List<ImageLayer> owner, int index)
+    {
+        if (owner[index].Clipped || owner[index].Content == LayerContent.Group) return 1;
+
+        int end = index + 1;
+        while (end < owner.Count && owner[end].Clipped) end++;
+
+        return end - index;
+    }
+
+    private static void MoveInStack(LayerStack stack, string name, string target, bool above)
+    {
+        var (from, at) = Locate(stack.Layers, name);
+        int length = UnitLength(from, at);
+
+        var unit = from.GetRange(at, length);
+        from.RemoveRange(at, length);
+
+        var (to, there) = Locate(stack.Layers, target);
+        to.InsertRange(above ? there + UnitLength(to, there) : there, unit);
+    }
+
+    private static void RemoveInStack(LayerStack stack, string name)
+    {
+        var (owner, at) = Locate(stack.Layers, name);
+        owner.RemoveRange(at, UnitLength(owner, at));
+    }
+
+    private static void DuplicateInStack(LayerStack stack, string name, string suffix)
+    {
+        var (owner, at) = Locate(stack.Layers, name);
+        int length = UnitLength(owner, at);
+
+        var copies = owner.GetRange(at, length).Select(l => l.Clone()).ToList();
+
+        void Rename(ImageLayer layer)
+        {
+            layer.Name += suffix;
+            foreach (var child in layer.Children) Rename(child);
+        }
+
+        copies.ForEach(Rename);
+        owner.InsertRange(at + length, copies);
+    }
+
+    private static void AddAdjustmentInStack(LayerStack stack, string after, string name, ImageAdjustments adjust, bool clipped)
+    {
+        var (owner, at) = Locate(stack.Layers, after);
+
+        owner.Insert(clipped ? at + 1 : at + UnitLength(owner, at), new ImageLayer
+        {
+            Content = LayerContent.Adjustment,
+            Name = name,
+            Adjustments = adjust,
+            Tools = new GradingStack(),
+            Clipped = clipped,
+        });
     }
 
     /// <summary>
@@ -1194,6 +1498,15 @@ public static class NodeParityInvariants
             }
 
             return mask;
+        }
+
+        /// <summary>Eine zufaellige Ebene ohne Gruppe, nicht obenauf und nicht angeschnitten.</summary>
+        public ImageLayer Plain(Random random)
+        {
+            var layer = RandomLayer(random, depth: 2);
+            layer.OnTop = false;
+            layer.Clipped = false;
+            return layer;
         }
 
         public LayerStack RandomStack(Random random)

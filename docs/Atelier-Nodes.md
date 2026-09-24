@@ -347,3 +347,40 @@ Only the alpha channel of exports changes, and only in those cases.
    - An unknown node shows the output, and the pass shown is read.
    - In the page: the badge and the outline appear, the picture changes and comes back,
      and several outputs are shown in turn.
+
+8. **Working layer list** (like the layers strip).
+
+   *Done (2026-09-24).*
+   - **A layer is a Mix and its branch:** source, Place, correction, mask, a group's
+     children, the layers clipped to a carrier. Moving, deleting and duplicating act on
+     all of it. Whatever in the branch reads the layer below (an adjustment layer, a mask
+     on the underlying picture, the lowest child of a group) reads the layer below at the
+     new position afterwards. That is what the stack does when a layer moves there.
+   - **Chains.** The list is read from chains, not from the computation order: the main
+     chain below the fallback, one chain per group (its children, lying on what the group
+     lies on) and per carrier (its clipped layers, lying on its picture), and the runs of
+     watermarks. Children follow their group and clipped layers their carrier, indented.
+     Mixes in no chain (built by hand) are listed at the end and cannot be dragged.
+   - **Dragging.** Rows can be dragged; a line shows where the layer will land, indented
+     like the chain it would join. The lower half of a group or carrier row means "into it,
+     on top". Layers move freely between the main chain and groups. Clipped layers stay
+     with their carrier, and watermarks stay among themselves: moving them anywhere else
+     would turn them into something else. A group cannot go into itself.
+   - **Buttons under the list:** + (adjustment layer, image as layer, pass as layer,
+     above the selected layer or on top of the layers), duplicate, delete, one place up
+     or down. A new layer in a clip chain is clipped like its neighbours.
+   - **Blend mode and opacity** of the selected layer or watermark, below the buttons.
+   - **Undo** covers every structural change; a drop that changes nothing leaves no step.
+     After moving or duplicating, the graph is laid out again, since the branch would
+     otherwise stay at its old place with its wires across the graph.
+
+   Tests:
+   - 528 random changes (move, one step, delete, duplicate, add an adjustment layer) to
+     random stacks with groups, carriers, clipped and hidden layers, masks on the
+     underlying picture and adjustment layers. The same change is made in the stack.
+     Both give the same bytes on the full grid, the coarse grid and in 16 bit, and
+     nothing is left behind that nobody reads.
+   - Three counter-checks turn them red: the branch keeps reading the old layer below;
+     all readers follow when inserting, not just those above; delete leaves the branch.
+   - In the page: dropping, the buttons, blend mode and opacity change picture and list,
+     and undo restores the bytes.

@@ -1016,7 +1016,7 @@
     <sys:String x:Key="S_NodeGrow">Grow / shrink (pixels)</sys:String>
     <sys:String x:Key="S_NodeSoften">Soften (pixels)</sys:String>
     <sys:String x:Key="S_SocketWert">Value</sys:String>
-    <sys:String x:Key="S_NodeLayersHint">Every layer is a “Mix” in the graph. A click selects the node and brings it into view, the dot on the left mutes the layer.</sys:String>
+    <sys:String x:Key="S_NodeLayersHint">Each layer is a “Mix” in the graph. A click selects the node and brings it into view, the dot on the left mutes the layer. Rows can be dragged – the layer takes its branch along.</sys:String>
     <sys:String x:Key="S_NodeLayersEmpty">Nothing is mixed in the graph – there are no layers.</sys:String>
     <sys:String x:Key="S_NodeLayerMute">Mute the layer or show it again</sys:String>
     <sys:String x:Key="S_NodeLayerNothing">(nothing plugged in)</sys:String>
@@ -1029,6 +1029,9 @@
     <sys:String x:Key="S_NodeLayerMask">The layer's mask</sys:String>
     <sys:String x:Key="S_NodeLayerHidden">hidden</sys:String>
     <sys:String x:Key="S_NodeLayerOnTop">on top</sys:String>
+    <sys:String x:Key="S_NodeLayerAdd">Add a layer – above the selected one</sys:String>
+    <sys:String x:Key="S_NodeLayerDuplicate">Duplicate the layer with its branch</sys:String>
+    <sys:String x:Key="S_NodeLayerRemove">Delete the layer with its branch</sys:String>
     <sys:String x:Key="S_NodeViewerTag">Viewer</sys:String>
     <sys:String x:Key="S_ViewerShowing">Viewer: {0}</sys:String>
     <sys:String x:Key="S_ViewerBack">Back to the output</sys:String>

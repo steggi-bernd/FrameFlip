@@ -1016,7 +1016,7 @@
     <sys:String x:Key="S_NodeGrow">Ausdehnen / schrumpfen (Bildpunkte)</sys:String>
     <sys:String x:Key="S_NodeSoften">Weichzeichnen (Bildpunkte)</sys:String>
     <sys:String x:Key="S_SocketWert">Wert</sys:String>
-    <sys:String x:Key="S_NodeLayersHint">Jede Ebene ist ein „Mischen“ im Graphen. Ein Klick wählt den Knoten und rückt ihn ins Bild, der Punkt links schaltet die Ebene stumm.</sys:String>
+    <sys:String x:Key="S_NodeLayersHint">Jede Ebene ist ein „Mischen“ im Graphen. Ein Klick wählt den Knoten und rückt ihn ins Bild, der Punkt links schaltet die Ebene stumm. Zeilen lassen sich ziehen – die Ebene nimmt ihren Zweig mit.</sys:String>
     <sys:String x:Key="S_NodeLayersEmpty">Im Graphen wird nichts gemischt – es gibt keine Ebenen.</sys:String>
     <sys:String x:Key="S_NodeLayerMute">Ebene stumm schalten oder wieder zeigen</sys:String>
     <sys:String x:Key="S_NodeLayerNothing">(nichts angesteckt)</sys:String>
@@ -1029,6 +1029,9 @@
     <sys:String x:Key="S_NodeLayerMask">Die Maske der Ebene</sys:String>
     <sys:String x:Key="S_NodeLayerHidden">ausgeblendet</sys:String>
     <sys:String x:Key="S_NodeLayerOnTop">obenauf</sys:String>
+    <sys:String x:Key="S_NodeLayerAdd">Ebene hinzufügen – über der gewählten</sys:String>
+    <sys:String x:Key="S_NodeLayerDuplicate">Ebene samt ihrem Zweig verdoppeln</sys:String>
+    <sys:String x:Key="S_NodeLayerRemove">Ebene samt ihrem Zweig löschen</sys:String>
     <sys:String x:Key="S_NodeViewerTag">Betrachter</sys:String>
     <sys:String x:Key="S_ViewerShowing">Betrachter: {0}</sys:String>
     <sys:String x:Key="S_ViewerBack">Zurück zur Ausgabe</sys:String>

@@ -464,7 +464,7 @@ public static class NodeEditInvariants
             string diffuse = passes.First(p => p.Label == "DiffCol").Name;
 
             editor.Select(null);
-            Call(page, "AddPassLayer", diffuse);
+            Call(page, "AddPassLayer", diffuse, null!);
             Pump(TimeSpan.FromSeconds(3), () => !Pixels(page).AsSpan().SequenceEqual(plain));
 
             var file = page.Graph!.Nodes.OfType<RenderNode>().Single();
@@ -533,6 +533,129 @@ public static class NodeEditInvariants
             Check.That(!page.Graph!.Nodes.OfType<RenderNode>().Single().Passes.Contains(diffuse) &&
                        Pixels(page).AsSpan().SequenceEqual(plain),
                        "Rueckgaengig nimmt alles wieder heraus");
+
+            // Die Ebenenliste zum Arbeiten: eine Ebene und eine Einstellungsebene darueber -
+            // ziehen, die Knoepfe darunter, Mischung und Deckkraft.
+            editor.Select(null);
+            Call(page, "AddPassLayer", diffuse, null!);
+            var diffMix = (MixNode)editor.Selected!;
+
+            Call(page, "AddAdjustmentLayer", diffMix);
+            var grade = (LayerGradeNode)editor.Selected!;
+            var adjustMix = page.Graph!.Nodes.OfType<MixNode>().Single(m => page.Graph.Into(m.Id, "Oben")?.From == grade.Id);
+
+            grade.Adjustments = new ImageAdjustments { Exposure = -1.5 };
+            Call(page, "Refresh", false, false);
+            Settle();
+
+            byte[] layered = Pixels(page);
+            string Names() => string.Join(" | ", layerList.Shown.Select(l => l.Name));
+            MixNode Mix(string id) => page.Graph!.Nodes.OfType<MixNode>().Single(m => m.Id == id);
+            void Press(Button button) => button.RaiseEvent(new RoutedEventArgs(System.Windows.Controls.Primitives.ButtonBase.ClickEvent));
+
+            Check.That(layerList.Shown.Count == 3 && layerList.Shown[0].Mix == adjustMix && layerList.Shown[1].Mix == diffMix &&
+                       !layered.AsSpan().SequenceEqual(plain),
+                       "eine Einstellungsebene aus der Liste liegt ueber der gewaehlten Ebene", Names());
+
+            // Gezogen unter den Pass: Sie dunkelt nur noch die Grundlage ab.
+            Check.That(!layerList.DropOn(adjustMix, layerList.Shown[2], upper: false), "unter die Grundlage laesst sich nichts legen");
+            Check.That(layerList.DropOn(adjustMix, layerList.Shown[1], upper: false), "unter die Ebene darunter schon");
+            Pump(TimeSpan.FromSeconds(3), () => !Pixels(page).AsSpan().SequenceEqual(layered));
+            Settle();
+
+            byte[] moved = Pixels(page);
+
+            Check.That(layerList.Shown[0].Mix?.Id == diffMix.Id && layerList.Shown[1].Mix?.Id == adjustMix.Id &&
+                       !moved.AsSpan().SequenceEqual(layered),
+                       "gezogen liegt sie darunter - und das Bild ist ein anderes", Names());
+
+            page.StepNodes(back: true);
+            Pump(TimeSpan.FromSeconds(3), () => Pixels(page).AsSpan().SequenceEqual(layered));
+
+            Check.That(layerList.Shown[0].Mix?.Id == adjustMix.Id && Pixels(page).AsSpan().SequenceEqual(layered),
+                       "Rueckgaengig legt sie zurueck", Names());
+
+            // Dasselbe mit dem Knopf: einen Platz tiefer.
+            var buttons = layerList.Buttons;
+
+            editor.Select(Mix(adjustMix.Id));
+            Settle();
+
+            Check.That(!buttons.Up.IsEnabled && buttons.Down.IsEnabled && buttons.Remove.IsEnabled,
+                       "die oberste Ebene kann nur tiefer");
+
+            Press(buttons.Down);
+            Pump(TimeSpan.FromSeconds(3), () => Pixels(page).AsSpan().SequenceEqual(moved));
+
+            Check.That(Pixels(page).AsSpan().SequenceEqual(moved) && editor.Selected?.Id == adjustMix.Id,
+                       "der Knopf tut dasselbe wie das Ziehen - und die Ebene bleibt gewaehlt");
+
+            page.StepNodes(back: true);
+            Settle();
+
+            // Verdoppeln und loeschen - samt Zweig, die Datei bleibt.
+            int mixes = page.Graph!.Nodes.OfType<MixNode>().Count();
+            int nodes = page.Graph.Nodes.Count;
+
+            editor.Select(Mix(diffMix.Id));
+            Settle();
+            Press(buttons.Duplicate);
+            Pump(TimeSpan.FromSeconds(3), () => !Pixels(page).AsSpan().SequenceEqual(layered));
+
+            Check.That(page.Graph!.Nodes.OfType<MixNode>().Count() == mixes + 1 && page.Graph.Nodes.Count == nodes + 2 &&
+                       layerList.Shown.Count == 4 && !Pixels(page).AsSpan().SequenceEqual(layered),
+                       "Verdoppeln legt Mischen und Platzieren noch einmal an - der Pass kommt zweimal dazu", Names());
+
+            page.StepNodes(back: true);
+            Settle();
+
+            editor.Select(Mix(diffMix.Id));
+            Settle();
+            Press(buttons.Remove);
+            Settle();
+
+            Check.That(page.Graph!.Nodes.Count == nodes - 2 && !page.Graph.Nodes.Any(n => n.Id == diffMix.Id) &&
+                       page.Graph.Nodes.OfType<RenderNode>().Count() == 1 && editor.Selected is null,
+                       "Loeschen nimmt Mischen und Platzieren heraus - nichts Geloeschtes bleibt gewaehlt");
+
+            page.StepNodes(back: true);
+            Pump(TimeSpan.FromSeconds(3), () => Pixels(page).AsSpan().SequenceEqual(layered));
+
+            Check.That(Pixels(page).AsSpan().SequenceEqual(layered), "und Rueckgaengig holt die Ebene zurueck");
+
+            // Mischung und Deckkraft der gewaehlten Ebene, direkt in der Liste.
+            editor.Select(Mix(diffMix.Id));
+            Settle();
+
+            var (modeBox, opacity, controls) = layerList.Controls;
+
+            Check.That(controls.Visibility == Visibility.Visible && Math.Abs(opacity.Value - 1) < 1e-9 &&
+                       modeBox.SelectedItem is ComboBoxItem { Tag: BlendMode.Add },
+                       "die gewaehlte Ebene zeigt ihre Mischung und Deckkraft");
+
+            modeBox.SelectedItem = modeBox.Items.OfType<ComboBoxItem>().First(i => (BlendMode)i.Tag! == BlendMode.Screen);
+            Pump(TimeSpan.FromSeconds(3), () => !Pixels(page).AsSpan().SequenceEqual(layered));
+            Settle();
+
+            byte[] screened = Pixels(page);
+
+            Check.That(Mix(diffMix.Id).Mode == BlendMode.Screen && !screened.AsSpan().SequenceEqual(layered) &&
+                       layerList.Shown[1].Detail.StartsWith(Localization.Strings.T(NodeTitles.BlendKey(BlendMode.Screen)), StringComparison.Ordinal),
+                       "die Mischung wechselt am Mischen - im Bild und in der Zeile", layerList.Shown[1].Detail);
+
+            opacity.Value = 0.5;
+            Pump(TimeSpan.FromSeconds(3), () => !Pixels(page).AsSpan().SequenceEqual(screened));
+            Settle();
+
+            Check.That(Math.Abs(Mix(diffMix.Id).Opacity - 0.5f) < 1e-4 && !Pixels(page).AsSpan().SequenceEqual(screened),
+                       "die Deckkraft ebenso");
+
+            page.StepNodes(back: true);
+            page.StepNodes(back: true);
+            Pump(TimeSpan.FromSeconds(3), () => Pixels(page).AsSpan().SequenceEqual(plain));
+
+            Check.That(Pixels(page).AsSpan().SequenceEqual(plain) && !page.Graph!.Nodes.OfType<MixNode>().Any(),
+                       "Rueckgaengig raeumt beide Ebenen wieder ab");
 
             // Ein Pass als Ausgang, am Schalter der Datei.
             editor.Select(page.Graph.Nodes.OfType<RenderNode>().Single());
