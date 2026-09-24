@@ -101,16 +101,15 @@ nicht in `main`:
   Wiederverwendung, Fehler, Abbruch während des Dateizugriffs, erneuten Start,
   Besitzwechsel und Schließen. Die neuen Videotests verwenden einen
   austauschbaren Encoder; sie prüfen den Ablauf, keine reale Kodierung.
-- **D1 bleibt offen:** Playback ist der nächste getrennte Schnitt.
-  Follow-Entscheidungen, Bereiche, Abspieltimer und WPF-Darstellung bleiben
-  zunächst in `MainWindow`. Auswahl- und Live-Scans laufen wie bisher synchron;
-  die Begrenzung der Leser betrifft die beiläufigen Zeilenzählungen.
+- **D1 blieb nach diesen Schnitten offen:** Playback folgte am 24. September
+  als eigener Schnitt (siehe unten). Auswahl- und Live-Scans laufen wie bisher
+  synchron; die Begrenzung der Leser betrifft die beiläufigen Zeilenzählungen.
 - **S0–S6 bleiben zurückgestellt:** Atelier-Dateien und die gemeinsamen
   Kopplungs-/Watch-Protokolle wurden in diesen Schnitten nicht geändert.
 
-Der Testläufer unterstützt jetzt `--only=Klasse` beziehungsweise
-`--only=Klasse.Methode,WeitereKlasse`, damit sämtliche registrierten Prüfungen
-in kurzen Gruppen laufen können. Ohne Filter bleibt der bisherige Gesamtlauf
+Der Testläufer nimmt Gruppen als Namen (`Klasse Klasse.Methode`) oder als
+`--only=Klasse,Klasse.Methode`, damit sämtliche registrierten Prüfungen in
+kurzen Gruppen laufen können. Ohne Angabe bleibt der bisherige Gesamtlauf
 erhalten. Tests verwenden eigene Konfigurationen und synthetische Bilder.
 
 Abnahme des Branchstands bis zum Bildspeicher-Schnitt (`d0239e7`): **3.601
@@ -127,6 +126,50 @@ Nach dem Merge in `feature/atelier` liefen beide Prüfreihen vollständig über 
 gemeinsamen Stand, einschließlich Claudes Atelier-Commits bis `4c60517`:
 **4.274 Zusicherungen** in `FrameFlip.Tests` (ein Gesamtlauf, 67 Sekunden) und
 **227 UI-Prüfungen**, beide erfolgreich.
+
+## Fortschritt am 24. September 2026
+
+Der Playback-Schnitt liegt auf `refactor/dashboard-playback`, aufgebaut auf dem
+gemergten Stand `b3bc6c9`. Er ist **implementiert und geprüft**, noch nicht in
+`feature/atelier` oder `main` gemergt.
+
+- **Testläufer nach dem Merge:** Atelier und dieser Strang hatten unabhängig je
+  einen Gruppenfilter eingeführt. Nach dem textlich konfliktfreien Merge landete
+  jedes Argument im Filter der Atelier-Seite; `--only=` und `--watch-lifecycle`
+  meldeten eine unbekannte Gruppe. Ein eigener Commit führt beide Schreibweisen
+  in einem Filter zusammen.
+- **D1d abgeschlossen:** `DashboardPlaybackController` besitzt Kopf, Bereich,
+  Abspielzustand, Follow und Bildrate. Alles zählt in Framenummern: Lücken
+  bleiben Lücken, und ein Bereich überdauert das Nachwachsen der Folge. Der
+  Controller entscheidet den nächsten Takt, Schrittziele, die Begrenzung von
+  Start und Ende, das Mitwachsen beim Live-Scan, Follow-Sprünge und die
+  Ratenregeln. Zeitgeber, Schleifenschalter, Eingaben und Darstellung bleiben
+  wie beim Viewer am Fenster. Der vorhandene `ViewerPlaybackController` wurde
+  bewusst nicht wiederverwendet: Er rechnet mit Positionen statt Framenummern,
+  verwirft einen gegenläufigen Bereich statt ihn zu begrenzen und kennt weder
+  Follow noch eine wachsende Folge.
+  36 Prüfungen am echten Dashboard charakterisieren vor der Auslagerung
+  Abspielen/Pause, Lücken, Schleife mit und ohne Bereich, Einzelschritte,
+  Sprünge, Start/Ende, Bildraten samt Speichern, den Übergang vom Vorladen,
+  Follow und den Auswahlwechsel. Weitere 23 Controller-Prüfungen ohne Fenster
+  sichern leere und einzelne Folgen, Gleichstände beim nächsten Frame, einen
+  Kopf außerhalb des Bereichs, Nachwachsen, Schrumpfen und Ratenfehler ab. Die
+  Charakterisierung lief vor und nach der Auslagerung unverändert grün; die
+  bestehenden Dashboard-Prüfungen setzen den Wiedergabezustand jetzt über den
+  Controller statt über Fensterfelder. Es wurde kein Fehler gefunden.
+- **Beobachtet, nicht geändert:** Ohne Schleife beginnt ein Start am
+  Bereichsende nicht von vorn, sondern hält beim ersten Takt wieder an. Schrumpft
+  eine Folge beim Live-Scan über einen von Hand gesetzten Start oder ein von Hand
+  gesetztes Ende hinweg, kann der Start hinter dem Ende stehen; Export und
+  Bereichsanzeige finden dann keine Bilder. Beides ist Produktverhalten und bleibt einer eigenen
+  Entscheidung vorbehalten.
+
+Abnahme dieses Branchstands: **4.333 Zusicherungen** in `FrameFlip.Tests` (ein
+Gesamtlauf, 65 Sekunden) und **227 UI-Prüfungen**; beide Testprojekte bauen in
+Debug und Release ohne neue Warnungen. Im Gesamtlauf überschritt einmal die
+bekannte Zeitprüfung „beide zusammen bleiben im Rahmen“ in `OpticsInvariants`
+ihre Grenze (95,6 ms). Die Maschine war dabei kaum belastet; die Gruppe lief
+danach einzeln dreimal grün. Der Schnitt berührt keinen Optik-Code.
 
 ## Historischer Stand der ersten Desktop-Schnitte (9. September 2026)
 
@@ -315,15 +358,12 @@ sofort koppeln, ohne zusätzliche Schritte.
 
 ## Nächster Startpunkt
 
-**Aktiv: D1, Dashboard-Sitzung.** D2, D1a (Ordnerbeobachtung/Ruhefrist),
-D1b (Auswahl/Scan-Zustand) und D1c (Decoder, Vorladen, Bildspeicher und
-Videovorbereitung) sind umgesetzt und in `feature/atelier` gemergt. Als Nächstes folgt
-Playback als eigener Schnitt: zunächst Abspielen/Pause, Loop, Follow,
-Lücken, In-/Out-Punkte, Bildratenwechsel und den Übergang vom Vorladen
-charakterisieren. Danach die Unterschiede zum vorhandenen
-`ViewerPlaybackController` bewerten und Uhr/Position/Abspielzustand aus
-`MainWindow` lösen. Anschließend folgen die übrigen offenen Schritte in der
-oben festgelegten Reihenfolge. Die Atelier-Seite bleibt außerhalb dieser Schnitte.
+**D1 ist mit dem Playback-Schnitt abgeschlossen.** D2 und D1a–D1c sind in
+`feature/atelier` gemergt; D1d (Playback) liegt geprüft auf
+`refactor/dashboard-playback` und wartet auf den Merge. Danach folgen die übrigen
+offenen Schritte in der oben festgelegten Reihenfolge: Android-`RemoteHub`,
+feldweise Protokolltypen, Relay/Bridge nur bei Bedarf. Die Atelier-Seite bleibt
+außerhalb dieser Schnitte.
 
 **Erst abschließend S0–S6.** Vor dem Einstieg den dann aktuellen Atelier-Stand
 neu lesen: Die jetzt dokumentierten Codebefunde können durch die laufende
