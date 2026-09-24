@@ -263,7 +263,7 @@ public partial class AtelierPage
         ShowNodeLayers();
     }
 
-    private void OnLayerMuted(MixNode mix)
+    private void OnLayerMuted(Node mix)
     {
         RememberNodes();
         mix.Muted = !mix.Muted;

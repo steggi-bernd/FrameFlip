@@ -19,8 +19,17 @@ namespace FrameFlip.Views;
 /// <param name="Source">Der Knoten, der in "Oben" fliesst - seine Vorschau ist die Miniatur der Ebene.</param>
 public sealed record NodeLayer(MixNode? Mix, Node? Source, string Name, string Detail)
 {
+    /// <summary>Ein Wasserzeichen obenauf - statt eines Mischens.</summary>
+    public OverlayNode? Overlay { get; init; }
+
+    /// <summary>Wie tief die Ebene in Gruppen steckt - 0 ganz aussen.</summary>
+    public int Depth { get; init; }
+
     /// <summary>Welcher Knoten gewaehlt wird, wenn man die Ebene anklickt.</summary>
-    public Node? Target => Mix ?? Source;
+    public Node? Target => (Node?)Mix ?? (Node?)Overlay ?? Source;
+
+    /// <summary>Der Knoten, den das Auge stummschaltet - bei der Grundlage keiner.</summary>
+    public Node? Switch => (Node?)Mix ?? Overlay;
 
     /// <summary>Was in den Faktor des Mischens fliesst - die Maske der Ebene, wenn sie eine hat.</summary>
     public Node? MaskSource { get; init; }
@@ -50,8 +59,8 @@ public sealed class NodeLayerList : Border
     /// <summary>Eine Ebene wurde angeklickt - ihr Mischen, bei der Grundlage ihr Knoten.</summary>
     public event Action<Node>? Chosen;
 
-    /// <summary>Das Auge einer Ebene wurde angeklickt.</summary>
-    public event Action<MixNode>? MuteWanted;
+    /// <summary>Das Auge einer Ebene wurde angeklickt - ihr Mischen oder ihr Wasserzeichen.</summary>
+    public event Action<Node>? MuteWanted;
 
     /// <summary>Die fehlenden ausgeblendeten Ebenen sollen in den Graphen - oder, wenn das nicht geht, der Graph neu.</summary>
     public event Action<bool>? MissingWanted;
@@ -175,10 +184,10 @@ public sealed class NodeLayerList : Border
         grid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
         grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
 
-        bool muted = layer.Mix?.Muted == true;
+        bool muted = layer.Switch?.Muted == true;
 
         // Die Grundlage hat kein Mischen, das man stummschalten koennte.
-        if (layer.Mix is { } mix)
+        if (layer.Switch is { } mix)
         {
             var eye = new ToggleButton
             {
@@ -260,7 +269,7 @@ public sealed class NodeLayerList : Border
             Background = chosen ? ChosenBack : RowBack,
             CornerRadius = new CornerRadius(3),
             Padding = new Thickness(4, 3, 4, 3),
-            Margin = new Thickness(layer.Mix?.Clip == true ? 16 : 0, 0, 0, 3),
+            Margin = new Thickness(16 * layer.Depth + (layer.Mix?.Clip == true ? 16 : 0), 0, 0, 3),
             Cursor = Cursors.Hand,
             Tag = layer,
         };
@@ -284,6 +293,30 @@ public sealed class NodeLayerList : Border
         var order = graph.Order() ?? Array.Empty<Node>();
         var layers = new List<NodeLayer>();
 
+        // Obenauf liegt, was zuletzt aufgetragen wird - die Wasserzeichen nach der Bildwerdung.
+        foreach (var overlay in order.OfType<OverlayNode>().Reverse())
+        {
+            var link = graph.Into(overlay.Id, "Ebene");
+            var source = link is null ? null : graph.Find(link.From);
+
+            string name = overlay.Label is { Length: > 0 } label ? label
+                        : source is null ? Strings.T("S_NodeLayerNothing")
+                        : NameOf(graph, source, link!.Output);
+
+            string detail = Strings.T(NodeTitles.BlendKey(overlay.Mode)) + " · " +
+                            (overlay.Opacity * 100).ToString("0", CultureInfo.CurrentCulture) + " % · " +
+                            Strings.T("S_NodeLayerOnTop") +
+                            (overlay.Muted ? " · " + Strings.T("S_NodeLayerHidden") : "");
+
+            layers.Add(new NodeLayer(null, source, name, detail)
+            {
+                Overlay = overlay,
+                Origin = source is null ? null : Origin(graph, source, link!.Output),
+            });
+        }
+
+        var depths = Depths(graph, order);
+
         foreach (var mix in order.OfType<MixNode>().Reverse())
         {
             var link = graph.Into(mix.Id, "Oben");
@@ -305,6 +338,7 @@ public sealed class NodeLayerList : Border
             {
                 MaskSource = factor is null ? null : graph.Find(factor.From),
                 Origin = origin,
+                Depth = depths.GetValueOrDefault(mix.Id),
             });
         }
 
@@ -353,6 +387,34 @@ public sealed class NodeLayerList : Border
         }
 
         return null;
+    }
+
+    /// <summary>
+    /// Wie tief jedes Mischen in Gruppen steckt. Die Kinder einer Gruppe sind die Kette,
+    /// die ueber "Oben" in ihr Mischen fliesst - bis hinunter zu dem, worauf die Gruppe
+    /// selbst liegt. Von aussen nach innen gerechnet, damit eine Gruppe in einer Gruppe
+    /// ihre Tiefe schon kennt.
+    /// </summary>
+    private static Dictionary<string, int> Depths(NodeGraph graph, IReadOnlyList<Node> order)
+    {
+        var depths = new Dictionary<string, int>(StringComparer.Ordinal);
+
+        foreach (var group in order.OfType<MixNode>().Reverse())
+        {
+            if (graph.Into(group.Id, "Oben") is not { } up || graph.Find(up.From) is not MixNode inner) continue;
+
+            int depth = depths.GetValueOrDefault(group.Id) + 1;
+            string? floor = graph.Into(group.Id, "Unten")?.From;
+            Node? node = inner;
+
+            for (int guard = 0; node is MixNode child && child.Id != floor && guard < 10_000; guard++)
+            {
+                depths[child.Id] = depth;
+                node = graph.Into(child.Id, "Unten") is { } below ? graph.Find(below.From) : null;
+            }
+        }
+
+        return depths;
     }
 
     /// <summary>Die Quelle am Anfang des Bildwegs - eine Bilddatei oder ein Ausgang der Datei. Sonst keine.</summary>

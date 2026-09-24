@@ -80,6 +80,9 @@ public static class NodeParityInvariants
                 Named(Image("logo.png", BlendMode.Add), "Glare_1", visible: false),
                 Named(Image("bild.png"), "Image0035.png", visible: true),
                 Named(Masked(Adjustment(Adjust(0.6, 1, 0, 1, 1)), painted), "Mask", visible: true),
+                Named(Group(0.7f, BlendMode.Screen, Pass("P.a", BlendMode.Add)), "Glow-Gruppe", visible: false),
+                Named(OnTop(Placed("logo.png", 0.4f, 0.2f, 0.2f, 0f)), "Logo", visible: true),
+                Named(OnTop(Placed("ohne.png", 0.3f, -0.1f, 0.1f, 0f)), "Logo aus", visible: false),
             },
         };
 
@@ -100,8 +103,9 @@ public static class NodeParityInvariants
         var before = RenderGraph(world, old, 1, 0, false);
         var missing = FrameFlip.Imaging.Nodes.HiddenLayers.Missing(old, fresh);
 
-        Check.That(missing.SequenceEqual(new[] { "Image", "Glare_2", "Glare_1" }),
-                   "es fehlen die drei ausgeblendeten Ebenen, von unten nach oben", string.Join(", ", missing));
+        Check.That(missing.SequenceEqual(new[] { "Image", "Glare_2", "Glare_1", "Glow-Gruppe", "Logo aus" }),
+                   "es fehlen die ausgeblendeten Ebenen, die Gruppe und das Wasserzeichen, von unten nach oben",
+                   string.Join(", ", missing));
         Check.That(FrameFlip.Imaging.Nodes.HiddenLayers.CanAdopt(old, fresh), "und sie lassen sich hineinsetzen - die sichtbaren Ebenen sind noch dieselben");
 
         Check.That(FrameFlip.Imaging.Nodes.HiddenLayers.Adopt(old, fresh) && old.Problems().Count == 0, "hineingesetzt ist der Graph heil",
@@ -112,19 +116,24 @@ public static class NodeParityInvariants
                    "die eigenen Knoten sind noch da");
 
         var names = NodeLayerList.Of(old).Select(l => l.Name).ToList();
-        Check.That(names.SequenceEqual(new[] { "Mask", "Image0035.png", "Glare_1", "Glare_2", "Image" }),
-                   "die Ebenenliste zeigt alle fuenf Ebenen des Stapels, mit ihren Namen", string.Join(" | ", names));
+        // "a" ist der Pass in der Gruppe - Kinder einer Gruppe stehen als eigene Zeilen da.
+        Check.That(names.SequenceEqual(new[] { "Logo aus", "Logo", "Glow-Gruppe", "a", "Mask", "Image0035.png", "Glare_1", "Glare_2", "Image" }),
+                   "die Ebenenliste zeigt alle Ebenen des Stapels, mit ihren Namen", string.Join(" | ", names));
         Check.That(FrameFlip.Imaging.Nodes.HiddenLayers.Missing(old, fresh).Count == 0, "danach fehlt nichts mehr");
 
         // Eingeschaltet wirkt eine geholte Ebene wie im frisch umgewandelten Graphen.
         Edit(fresh);
-        old.Nodes.OfType<MixNode>().Single(m => m.Label == "Glare_1").Muted = false;
-        fresh.Nodes.OfType<MixNode>().Single(m => m.Label == "Glare_1").Muted = false;
 
-        var (differOn, worstOn) = Diff(RenderGraph(world, fresh, 1, 0, false), RenderGraph(world, old, 1, 0, false), 1);
+        foreach (string name in new[] { "Glare_1", "Glow-Gruppe", "Logo aus" })
+        {
+            old.Nodes.Single(n => n.Label == name && n is MixNode or OverlayNode).Muted = false;
+            fresh.Nodes.Single(n => n.Label == name && n is MixNode or OverlayNode).Muted = false;
 
-        Check.That(differOn == 0 && Diff(before, RenderGraph(world, old, 1, 0, false), 1).Differ > 0,
-                   "eingeschaltet wirkt Glare_1 wie im frisch umgewandelten Graphen", $"{differOn} Bytes anders, bis {worstOn}");
+            var (differOn, worstOn) = Diff(RenderGraph(world, fresh, 1, 0, false), RenderGraph(world, old, 1, 0, false), 1);
+
+            Check.That(differOn == 0 && Diff(before, RenderGraph(world, old, 1, 0, false), 1).Differ > 0,
+                       $"eingeschaltet wirkt {name} wie im frisch umgewandelten Graphen", $"{differOn} Bytes anders, bis {worstOn}");
+        }
 
         // Eine verstellte Ebene ist noch dieselbe Ebene.
         var fresh2 = StackToGraph.Convert(stack, ImageAdjustments.Neutral, picture);
@@ -157,7 +166,7 @@ public static class NodeParityInvariants
     /// </summary>
     private static NodeGraph Old(NodeGraph graph)
     {
-        foreach (var mix in graph.Nodes.OfType<MixNode>().Where(m => m.Muted).ToList())
+        foreach (var mix in graph.Nodes.Where(n => n is MixNode or OverlayNode && n.Muted).ToList())
             NodeEdits.Remove(graph, mix, reconnect: true);
 
         var live = graph.Order()!.Select(n => n.Id).ToHashSet();
@@ -197,6 +206,13 @@ public static class NodeParityInvariants
         faint.Opacity = 0f;
         faint.Name = "ohne Deckkraft";
 
+        var logo = OnTop(Placed("logo.png", 0.4f, 0.2f, 0.2f, 0f));
+        logo.Name = "Logo";
+
+        var emptyOnTop = OnTop(Placed("bild.png", 0.3f, -0.2f, 0.1f, 0f));
+        emptyOnTop.Opacity = 0f;
+        emptyOnTop.Name = "leer obenauf";
+
         var stack = Base(
             Hide(Image("ohne.png", BlendMode.Add), "Glare A"),
             Placed("logo.png", 0.5f, 0.1f, 0f, 0f),
@@ -204,7 +220,11 @@ public static class NodeParityInvariants
             Clip(Image("bild.png")),
             Hide(Clip(Pass("P.a", BlendMode.Add)), "angeschnitten, aus"),
             Hide(Masked(Adjustment(Adjust(0.5, 1, 0, 1, 1)), painted), "Mask"),
-            faint);
+            faint,
+            Hide(Group(0.8f, BlendMode.Screen, Image("bild.png"), Hide(Pass("P.b", BlendMode.Add), "in der Gruppe, aus")), "Gruppe aus"),
+            logo,
+            Hide(OnTop(Placed("ohne.png", 0.3f, 0.1f, -0.2f, 10f)), "Logo aus"),
+            emptyOnTop);
 
         foreach (int step in new[] { 1, 3 })
         {
@@ -219,10 +239,18 @@ public static class NodeParityInvariants
         var graph = StackToGraph.Convert(stack, ImageAdjustments.Neutral, new GradingStack());
         var silent = graph.Nodes.OfType<MixNode>().Where(m => m.Muted).ToList();
 
-        Check.That(silent.Count == 5 && silent.Select(m => m.Label).OrderBy(l => l).SequenceEqual(
-                       new[] { "angeschnitten, aus", "Glare A", "Mask", "ohne Deckkraft", "zwischen Traeger und Schnitt" }.OrderBy(l => l)),
-                   "jede ausgeblendete Ebene steht als stummes Mischen da, mit ihrem Namen",
+        Check.That(silent.Select(m => m.Label).OrderBy(l => l).SequenceEqual(
+                       new[] { "angeschnitten, aus", "Glare A", "Gruppe aus", "in der Gruppe, aus", "Mask", "ohne Deckkraft",
+                               "zwischen Traeger und Schnitt" }.OrderBy(l => l)),
+                   "jede ausgeblendete Ebene steht als stummes Mischen da, mit ihrem Namen - auch eine Gruppe und was darin liegt",
                    string.Join(", ", silent.Select(m => m.Label)));
+
+        var overlays = graph.Nodes.OfType<OverlayNode>().ToList();
+
+        Check.That(overlays.Count == 3 && overlays.Where(o => o.Muted).Select(o => o.Label).OrderBy(l => l)
+                                                  .SequenceEqual(new[] { "leer obenauf", "Logo aus" }),
+                   "ausgeblendete Wasserzeichen stehen stumm da, das sichtbare nicht",
+                   string.Join(", ", overlays.Select(o => $"{o.Label}{(o.Muted ? " (stumm)" : "")}")));
 
         Check.That(!GraphEvaluator.Reads(graph).Any(r => r.Key == "ohne.png"),
                    "was nur eine ausgeblendete Ebene braucht, wird nicht gelesen");
@@ -232,20 +260,27 @@ public static class NodeParityInvariants
                    "und nicht gerechnet", string.Join(", ", ran.Select(n => n.GetType().Name)));
 
         // Die Ebenenliste: Namen der Ebenen, stumme als ausgeblendet, die Maske daneben.
-        var layers = NodeLayerList.Of(graph);
+        var layers = NodeLayerList.Of(graph).ToList();
         var mask = layers.SingleOrDefault(l => l.Name == "Mask");
 
-        Check.That(layers.Count(l => l.Mix?.Muted == true) == 5 && mask?.MaskSource is MaskNode { Mask.Kind: MaskKind.Painted },
+        Check.That(layers.Count(l => l.Switch?.Muted == true) == 9 && mask?.MaskSource is MaskNode { Mask.Kind: MaskKind.Painted },
                    "die Ebenenliste zeigt alle ausgeblendeten Ebenen - und bei der Maskenebene ihre gemalte Maske",
+                   string.Join(" | ", layers.Select(l => l.Name)));
+        Check.That(layers.Single(l => l.Name == "in der Gruppe, aus").Depth == 1 && layers.Single(l => l.Name == "Gruppe aus").Depth == 0 &&
+                   layers.FindIndex(l => l.Name == "in der Gruppe, aus") > layers.FindIndex(l => l.Name == "Gruppe aus"),
+                   "was in einer Gruppe liegt, steht eingerueckt unter ihr");
+        Check.That(layers.Take(3).Select(l => l.Name).SequenceEqual(new[] { "leer obenauf", "Logo aus", "Logo" }) &&
+                   layers.Take(3).All(l => l.Overlay is not null),
+                   "die Wasserzeichen stehen obenauf in der Liste, das zuletzt aufgetragene zuoberst",
                    string.Join(" | ", layers.Select(l => l.Name)));
         Check.That(layers.Single(l => l.Name == "Glare A").Origin is { Node: PictureNode { Path: "ohne.png" } },
                    "eine ausgeblendete Ebene kennt ihre Quelle - fuer die Miniatur, die nicht gerechnet wird");
 
         // Eingeschaltet tut eine Ebene, was sie im Stapel taete.
-        foreach (string name in new[] { "Glare A", "Mask", "angeschnitten, aus" })
+        foreach (string name in new[] { "Glare A", "Mask", "angeschnitten, aus", "Gruppe aus", "Logo aus" })
         {
             var shown = StackToGraph.Convert(stack, ImageAdjustments.Neutral, new GradingStack());
-            shown.Nodes.OfType<MixNode>().Single(m => m.Label == name).Muted = false;
+            shown.Nodes.Single(n => n.Label == name && n is MixNode or OverlayNode).Muted = false;
 
             var visible = stack.Clone();
             Find(visible.Layers, name)!.Visible = true;

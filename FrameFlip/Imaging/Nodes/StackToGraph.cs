@@ -91,9 +91,22 @@ public static class StackToGraph
 
                 if (Hidden(layer))
                 {
-                    // Eine ausgeblendete Gruppe bleibt draussen: Sie zu bauen hiesse, die
-                    // offene Gruppe davor zu schliessen - und das aendert das Bild.
-                    if (layer.Content != LayerContent.Group) Silent(layer, ClipAhead(list, i));
+                    bool clipAhead = ClipAhead(list, i);
+
+                    if (layer.Content != LayerContent.Group)
+                    {
+                        Silent(layer, clipAhead);
+                    }
+                    else if (depth < MaxDepth && !clipAhead)
+                    {
+                        // Eine ausgeblendete Gruppe wird gebaut wie eine sichtbare, mit
+                        // allen Kindern, und ihr Mischen ist stumm. Sie schliesst die offene
+                        // Gruppe davor - das aendert nichts, solange keine sichtbare Ebene
+                        // mehr an diese angeschnitten wird. Sonst bleibt sie draussen: Sie
+                        // haette dann keinen Platz, an dem sie nichts veraendert.
+                        Group(layer, depth, muted: true);
+                    }
+
                     continue;
                 }
 
@@ -117,7 +130,7 @@ public static class StackToGraph
         /// Eine Gruppe: Ihre Kinder rechnen auf dem weiter, was darunter liegt, und das
         /// Ergebnis kommt mit ihrer Mischung, Deckkraft und Maske auf den gesicherten Stand.
         /// </summary>
-        private void Group(ImageLayer group, int depth)
+        private void Group(ImageLayer group, int depth, bool muted = false)
         {
             Close();
 
@@ -131,6 +144,7 @@ public static class StackToGraph
             var mix = _graph.Add(new MixNode
             {
                 Label = group.Name.Length > 0 ? group.Name : null,
+                Muted = muted,
                 Mode = group.Mode,
                 Opacity = Math.Clamp(group.Opacity, 0f, 1f),
                 InDisplay = group.BlendInDisplay,
@@ -469,13 +483,15 @@ public static class StackToGraph
         {
             foreach (var layer in layers.All())
             {
-                if (!layer.OnTop || !layer.Visible || layer.Opacity <= 0.0005f) continue;
-                if (layer.Content != LayerContent.Image) continue;
+                if (!layer.OnTop || layer.Content != LayerContent.Image) continue;
 
                 var source = graph.Add(new PictureNode { Path = layer.Source, FollowSequence = layer.FollowSequence });
 
+                // Ein ausgeblendetes Wasserzeichen steht stumm da - es reicht das Bild
+                // unveraendert durch, und seine Datei wird nicht gelesen.
                 var overlay = new OverlayNode
                 {
+                    Label = layer.Name.Length > 0 ? layer.Name : null,
                     Place = layer.Place.Clone(),
                     Mode = layer.Mode,
                     Opacity = layer.Opacity,
@@ -485,7 +501,7 @@ public static class StackToGraph
                     Reveal = layer.Reveal,
                 };
 
-                Then(overlay);
+                Then(overlay, muted: !layer.Visible || layer.Opacity <= 0.0005f);
                 graph.Connect(source, "Bild", overlay, "Ebene");
             }
         }

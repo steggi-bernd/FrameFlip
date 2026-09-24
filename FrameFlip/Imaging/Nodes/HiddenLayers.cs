@@ -18,26 +18,52 @@ namespace FrameFlip.Imaging.Nodes;
 /// </summary>
 public static class HiddenLayers
 {
-    /// <summary>Welche ausgeblendeten Ebenen des Stapels dem Graphen fehlen - ihre Namen, von unten nach oben.</summary>
+    /// <summary>
+    /// Welche ausgeblendeten Ebenen des Stapels dem Graphen fehlen - ihre Namen, von unten
+    /// nach oben: erst die Ebenen und Gruppen, dann die Wasserzeichen obenauf.
+    /// </summary>
     public static IReadOnlyList<string> Missing(NodeGraph graph, NodeGraph fresh)
     {
-        var have = Chain(graph);
-        var want = Chain(fresh);
+        var names = new List<string>();
 
-        if (want.Count <= have.Count) return Array.Empty<string>();
+        if (Chain(fresh).Count > Chain(graph).Count)
+            names.AddRange(Chain(fresh).OfType<MixNode>().Where(m => m.Muted).Reverse().Select(m => m.Label ?? ""));
 
-        return want.OfType<MixNode>().Where(m => m.Muted).Reverse()
-                   .Select(m => m.Label ?? "").ToList();
+        if (Overlays(fresh).Count > Overlays(graph).Count)
+            names.AddRange(Overlays(fresh).Where(o => o.Muted).Select(o => o.Label ?? ""));
+
+        return names;
     }
 
     /// <summary>
-    /// Setzt die fehlenden ausgeblendeten Ebenen in den Graphen. False, wenn seine Kette
-    /// nicht mehr zu der des Stapels passt - dann bleibt er unberuehrt.
+    /// Setzt die fehlenden ausgeblendeten Ebenen in den Graphen. False, wenn er nicht mehr
+    /// zum Stapel passt - dann bleibt er unberuehrt.
     /// </summary>
     public static bool Adopt(NodeGraph graph, NodeGraph fresh)
     {
         if (!CanAdopt(graph, fresh)) return false;
 
+        if (Chain(fresh).Count > Chain(graph).Count) AdoptChain(graph, fresh);
+        if (Overlays(fresh).Count > Overlays(graph).Count) AdoptOverlays(graph, fresh);
+
+        return true;
+    }
+
+    /// <summary>
+    /// Ob sich die fehlenden Ebenen hineinsetzen lassen - fuer die Kette der Ebenen und
+    /// fuer die Wasserzeichen je fuer sich: Was fehlt, muss einen Platz haben.
+    /// </summary>
+    public static bool CanAdopt(NodeGraph graph, NodeGraph fresh)
+    {
+        bool chain = Chain(fresh).Count > Chain(graph).Count;
+        bool overlays = Overlays(fresh).Count > Overlays(graph).Count;
+
+        return (chain || overlays) && (!chain || ChainFits(graph, fresh)) && (!overlays || OverlaysFit(graph, fresh));
+    }
+
+    /// <summary>Die ausgeblendeten Ebenen und Gruppen in die Kette.</summary>
+    private static void AdoptChain(NodeGraph graph, NodeGraph fresh)
+    {
         var have = Chain(graph);
         var want = Chain(fresh);
         var shown = want.Where(n => n is not MixNode { Muted: true }).ToList();
@@ -58,12 +84,14 @@ public static class HiddenLayers
                 old.Label = label;
         }
 
-        // Die ausgeblendeten Ebenen mit ihren Zweigen kopieren.
+        // Die ausgeblendeten Ebenen mit ihren Zweigen kopieren - bei einer Gruppe mit
+        // allen Kindern, auch den ausgeblendeten darin.
         var copied = new HashSet<string>(StringComparer.Ordinal);
+        var links = new HashSet<string>(want.Select(n => n.Id), StringComparer.Ordinal);
 
         foreach (var hidden in want.OfType<MixNode>().Where(m => m.Muted))
         {
-            foreach (var node in Branch(fresh, hidden, map))
+            foreach (var node in Branch(fresh, hidden, map, links))
             {
                 map[node.Id] = graph.Add(NodeGraph.CopyOf(node));
                 copied.Add(node.Id);
@@ -87,18 +115,108 @@ public static class HiddenLayers
 
         for (int i = 0; i + 1 < want.Count; i++)
             if (map[want[i].Id] is MixNode above) graph.Connect(map[want[i + 1].Id], "Bild", above, "Unten");
-
-        return true;
     }
 
     /// <summary>
-    /// Ob sich die fehlenden Ebenen hineinsetzen lassen: Die sichtbaren Ebenen des Stapels
+    /// Die ausgeblendeten Wasserzeichen: jedes hinter das sichtbare, das im Stapel vor ihm
+    /// liegt - oder vor das naechste. Gibt es keines, vor die Durchgaenge ueber das fertige
+    /// Bild, wo der Umwandler sie hinsetzt.
+    /// </summary>
+    private static void AdoptOverlays(NodeGraph graph, NodeGraph fresh)
+    {
+        var have = Overlays(graph);
+        var want = Overlays(fresh);
+
+        int next = 0;
+        Node? after = null;
+
+        foreach (var overlay in want)
+        {
+            if (!overlay.Muted)
+            {
+                // Der Name kommt mit, wie bei den Ebenen.
+                if (have[next] is { Label: null } known && overlay.Label is { Length: > 0 } label) known.Label = label;
+
+                after = have[next++];
+                continue;
+            }
+
+            var copy = graph.Add((OverlayNode)NodeGraph.CopyOf(overlay));
+
+            if (fresh.Into(overlay.Id, "Ebene") is { } source && fresh.Find(source.From) is PictureNode picture)
+                graph.Connect(graph.Add(NodeGraph.CopyOf(picture)), "Bild", copy, "Ebene");
+
+            if (after is not null)
+                NodeEdits.InsertAfter(graph, after, copy);
+            else if (next < have.Count && graph.Into(have[next].Id, "Bild") is { } before)
+                NodeEdits.InsertInto(graph, before, copy);
+            else if (Tail(graph) is { } tail)
+                NodeEdits.InsertInto(graph, tail, copy);
+
+            after = copy;
+        }
+    }
+
+    /// <summary>Das Kabel vor den Durchgaengen ueber das fertige Bild - oder vor der Ausgabe.</summary>
+    private static NodeLink? Tail(NodeGraph graph)
+    {
+        if (graph.Output is not { } output) return null;
+
+        var link = graph.Into(output.Id, "Bild");
+
+        for (int guard = 0; link is not null && guard < 256 && graph.Find(link.From) is FramePassNode pass; guard++)
+            link = graph.Into(pass.Id, "Bild");
+
+        return link;
+    }
+
+    /// <summary>
+    /// Die Wasserzeichen auf dem Weg zur Ausgabe - in der Reihenfolge, in der sie
+    /// aufgetragen werden. Gesucht wird vom Ende her, den Bildweg entlang, bis zum Stapel.
+    /// </summary>
+    internal static List<OverlayNode> Overlays(NodeGraph graph)
+    {
+        var found = new List<OverlayNode>();
+        Node? node = graph.Output;
+
+        for (int guard = 0; node is not null && node is not FallbackNode && guard < 10_000; guard++)
+        {
+            var (input, _) = NodeEdits.Through(node);
+            if (input is null || graph.Into(node.Id, input) is not { } link) break;
+
+            node = graph.Find(link.From);
+            if (node is OverlayNode overlay) found.Add(overlay);
+        }
+
+        found.Reverse();
+        return found;
+    }
+
+    /// <summary>Ob die sichtbaren Wasserzeichen des Stapels noch die des Graphen sind - an ihrer Datei erkannt.</summary>
+    private static bool OverlaysFit(NodeGraph graph, NodeGraph fresh)
+    {
+        var have = Overlays(graph);
+        var shown = Overlays(fresh).Where(o => !o.Muted).ToList();
+
+        if (shown.Count != have.Count) return false;
+
+        for (int i = 0; i < have.Count; i++)
+            if (Picture(graph, have[i]) != Picture(fresh, shown[i])) return false;
+
+        return graph.Output is not null;
+    }
+
+    private static string? Picture(NodeGraph graph, OverlayNode overlay)
+        => graph.Into(overlay.Id, "Ebene") is { } link && graph.Find(link.From) is PictureNode picture ? picture.Path : null;
+
+    /// <summary>
+    /// Ob die fehlenden Ebenen in die Kette passen: Die sichtbaren Ebenen des Stapels
     /// muessen Stueck fuer Stueck noch die Kette des Graphen sein - dieselben Ebenen, an
     /// ihrer Quelle erkannt, in derselben Reihenfolge. Sonst weiss niemand, zwischen welche
     /// beiden eine ausgeblendete gehoert. Was an einer Ebene seitdem verstellt wurde -
     /// Mischart, Deckkraft, Korrektur -, stoert dabei nicht.
     /// </summary>
-    public static bool CanAdopt(NodeGraph graph, NodeGraph fresh)
+    private static bool ChainFits(NodeGraph graph, NodeGraph fresh)
     {
         var have = Chain(graph);
         var want = Chain(fresh);
@@ -176,7 +294,8 @@ public static class HiddenLayers
     /// "Faktor" in es fliesst - ohne die Datei und ohne Glieder der Kette, die es im
     /// Graphen schon gibt.
     /// </summary>
-    private static List<Node> Branch(NodeGraph fresh, MixNode hidden, Dictionary<string, Node> known)
+    private static List<Node> Branch(NodeGraph fresh, MixNode hidden, Dictionary<string, Node> known,
+                                     IReadOnlySet<string> chain)
     {
         var branch = new List<Node> { hidden };
         var seen = new HashSet<string>(StringComparer.Ordinal) { hidden.Id };
@@ -192,8 +311,10 @@ public static class HiddenLayers
                 // Das Unten des stummen Mischens ist die Kette - die wird neu gelegt.
                 if (ReferenceEquals(node, hidden) && link.Input == "Unten") continue;
 
-                if (known.ContainsKey(link.From) || !seen.Add(link.From)) continue;
-                if (fresh.Find(link.From) is not { } from || from is MixNode { Muted: true } || from is BlackNode) continue;
+                // Glieder der Kette - auch andere ausgeblendete - werden nicht mitkopiert:
+                // Sie gibt es schon oder sie kommen selbst.
+                if (known.ContainsKey(link.From) || chain.Contains(link.From) || !seen.Add(link.From)) continue;
+                if (fresh.Find(link.From) is not { } from || from is BlackNode) continue;
 
                 branch.Add(from);
                 open.Push(from);

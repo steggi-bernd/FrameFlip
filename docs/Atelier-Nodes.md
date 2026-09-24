@@ -288,6 +288,13 @@ Only the alpha channel of exports changes, and only in those cases.
      group unless doing so is harmless. Switched on, the layer does what it would do in
      the stack. A muted node's other inputs are neither read nor computed, so hidden
      layers cost nothing. Their previews show the source file instead.
+   - **Hidden groups and watermarks.** A hidden group is built like a visible one, with
+     all its children, and gets a muted Mix. That is done only where closing the open group
+     before it changes nothing; otherwise it stays out, as before. An "on top" watermark
+     becomes an Overlay node carrying its name, muted when hidden. The layer list shows
+     watermarks at the very top and indents group children under their group. Fetching
+     into an older graph covers both: a group with its children, and a watermark behind
+     the previous visible one or, without one, before the frame passes.
    - **Names.** Every Mix carries its layer's name ("Mask", "Glare_2…"), shown in its title
      and in the layer list, and editable in its fields. The list shows each layer's mask
      next to its thumbnail.

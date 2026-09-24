@@ -1028,6 +1028,7 @@
     <sys:String x:Key="S_NodeLayersAdopt">In den Graphen holen</sys:String>
     <sys:String x:Key="S_NodeLayerMask">Die Maske der Ebene</sys:String>
     <sys:String x:Key="S_NodeLayerHidden">ausgeblendet</sys:String>
+    <sys:String x:Key="S_NodeLayerOnTop">obenauf</sys:String>
     <sys:String x:Key="S_NodeLayerName">Name der Ebene</sys:String>
     <sys:String x:Key="S_NodeMenuRebuild">Aus dem Stapel neu aufbauen (Strg+Z holt den Graphen zurück)</sys:String>
     <sys:String x:Key="S_NodeMenuPreviewOn">Vorschau zeigen (V)</sys:String>
