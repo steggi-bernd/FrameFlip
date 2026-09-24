@@ -318,3 +318,32 @@ Only the alpha channel of exports changes, and only in those cases.
    - Previews change no output.
    - The drop test places the wire under the body, far from the title bar.
    - Counter-checks turn these tests red.
+
+7. **Viewer** (like Blender's).
+
+   *Done (2026-09-24).*
+   - **Ctrl+Shift+click** on a node shows its first output in the big picture instead of
+     the output. Another click on the same node shows its next output. After the last
+     one, the output comes back. A click on *Ausgabe* also returns to the output, and so
+     does the button on the badge above the picture or the node menu.
+   - **What it shows.** A picture from before the view transform (*Anzeige*) passes
+     through it, so it looks the way it would at the output with an *Anzeige* node behind
+     it. A picture from after the view transform is shown as it is. A mask or a value is
+     shown in grey. A data pass is scaled to its own range, so depth appears as a
+     gradient from near to far. Only what leads to the node is computed. A pass shown
+     there is read even if no wire uses it.
+   - **Always marked.** The node gets an orange outline with a tag naming the output. A
+     badge above the picture says what is shown, even when the graph is hidden. The
+     viewer stays when you switch to another tool, so you can paint a mask while you
+     see it. If the node or its output goes away, the output comes back.
+   - **Export unchanged.** The export always writes the output. The histogram measures
+     what the picture shows, as Blender's scopes follow the viewer, so a mask's
+     distribution can be read off directly.
+
+   Tests:
+   - A picture before the view transform equals the graph cut at that point with an
+     *Anzeige* node behind it; after it, the same without.
+   - A loose mask appears grey. Depth runs dark to bright from near to far.
+   - An unknown node shows the output, and the pass shown is read.
+   - In the page: the badge and the outline appear, the picture changes and comes back,
+     and several outputs are shown in turn.

@@ -796,6 +796,40 @@ public static class NodeEditInvariants
             Check.That(editor.Warning is null && Pixels(page).AsSpan().SequenceEqual(darker),
                        "Rueckgaengig steckt sie wieder an");
 
+            // Der Betrachter: das Licht vor der Vignette im grossen Bild, mit Schild und Markierung.
+            var badge = (Border)page.FindName("ViewerBadge");
+            var lit = page.Graph!.Nodes.OfType<LightNode>().Single();
+
+            Call(page, "OnViewWanted", lit);
+            Settle();
+
+            Check.That(badge.Visibility == Visibility.Visible && editor.Viewed is { } shown && ReferenceEquals(shown.Node, lit) &&
+                       !Pixels(page).AsSpan().SequenceEqual(darker),
+                       "Strg+Umschalt+Klick zeigt den Knoten im grossen Bild - und das Schild sagt es");
+
+            // Der Knoten hat nur einen Ausgang - der naechste Klick geht zurueck zur Ausgabe.
+            Call(page, "OnViewWanted", lit);
+            Settle();
+
+            Check.That(badge.Visibility != Visibility.Visible && editor.Viewed is null && Pixels(page).AsSpan().SequenceEqual(darker),
+                       "nach dem letzten Ausgang ist wieder die Ausgabe zu sehen");
+
+            // Die Datei hat vier Ausgaenge - der Klick geht sie der Reihe nach durch.
+            var file = page.Graph!.Nodes.OfType<RenderNode>().Single();
+            var seen = new List<string>();
+
+            for (int k = 0; k < 4; k++)
+            {
+                Call(page, "OnViewWanted", file);
+                if (editor.Viewed is { } now) seen.Add(now.Output);
+            }
+
+            Call(page, "OnViewWanted", file);
+            Settle();
+
+            Check.That(seen.SequenceEqual(file.Outputs.Select(o => o.Name)) && editor.Viewed is null,
+                       "bei mehreren Ausgaengen geht der Betrachter sie der Reihe nach durch", string.Join(", ", seen));
+
             // Aus dem Stapel neu aufbauen: der frische Graph - und Rueckgaengig holt den alten.
             Call(page, "RebuildFromStack");
             Settle();

@@ -260,9 +260,16 @@ public sealed class NodeGraph
     /// Was nicht zur Ausgabe fuehrt, wird nicht gerechnet - ein liegengelassener Knoten
     /// im Editor kostet nichts.
     /// </summary>
-    public IReadOnlyList<Node>? Order()
+    public IReadOnlyList<Node>? Order() => OrderTo(Output);
+
+    /// <summary>
+    /// Dieselbe Reihenfolge bis zu einem beliebigen Knoten - fuer den Betrachter, der
+    /// zeigt, was an einer Stelle des Graphen ankommt. Der Knoten muss dafuer nicht zur
+    /// Ausgabe beitragen.
+    /// </summary>
+    public IReadOnlyList<Node>? OrderTo(Node? target)
     {
-        var output = Output;
+        var output = target;
         if (output is null) return null;
 
         var order = new List<Node>();

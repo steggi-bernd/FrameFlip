@@ -177,6 +177,24 @@
                                        TextAlignment="Center"
                                        Text="{DynamicResource S_AtelierEmpty}" />
 
+                            <!--
+                                Der Betrachter: Das Bild zeigt gerade einen Knoten und nicht die
+                                Ausgabe. Das muss dastehen - auch wenn der Graph ausgeblendet ist.
+                            -->
+                            <Border x:Name="ViewerBadge" Visibility="Collapsed"
+                                    HorizontalAlignment="Right" VerticalAlignment="Top" Margin="12"
+                                    Background="{StaticResource PanelBackground}"
+                                    BorderBrush="#FFE89A3C" BorderThickness="1"
+                                    CornerRadius="4" Padding="10,6">
+                                <StackPanel Orientation="Horizontal">
+                                    <TextBlock x:Name="ViewerText" VerticalAlignment="Center" FontSize="12"
+                                               Foreground="{StaticResource ForegroundBrush}" Margin="0,0,10,0" />
+                                    <Button Style="{StaticResource OverlayButton}"
+                                            Content="{DynamicResource S_ViewerBack}"
+                                            Click="OnViewerClosed" />
+                                </StackPanel>
+                            </Border>
+
                             <Border x:Name="BusyBadge" Visibility="Collapsed"
                                     HorizontalAlignment="Center" VerticalAlignment="Center"
                                     Background="{StaticResource BadgeBackground}" CornerRadius="4" Padding="12,7">

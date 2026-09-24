@@ -91,6 +91,22 @@ public sealed class NodeEditor : FrameworkElement
     /// <summary>Am Knopf im Kopf eines Knotens wurde die Vorschau ein- oder ausgeschaltet.</summary>
     public event Action<Node>? PreviewToggled;
 
+    /// <summary>Strg+Umschalt+Klick auf einen Knoten: Er soll in den Betrachter - oder sein naechster Ausgang.</summary>
+    public event Action<Node>? ViewWanted;
+
+    /// <summary>Was gerade im Betrachter steht - der Knoten ist markiert, der Ausgang benannt.</summary>
+    public (Node Node, string Output)? Viewed
+    {
+        get => _viewed;
+        set
+        {
+            _viewed = value;
+            InvalidateVisual();
+        }
+    }
+
+    private (Node Node, string Output)? _viewed;
+
     /// <summary>Der gewaehlte Knoten - oder keiner.</summary>
     public Node? Selected { get; private set; }
 
@@ -398,6 +414,16 @@ public sealed class NodeEditor : FrameworkElement
         }
 
         if (e.ChangedButton != MouseButton.Left) return;
+
+        // Wie in Blender: Strg+Umschalt+Klick zeigt den Knoten im Betrachter.
+        if ((Keyboard.Modifiers & (ModifierKeys.Control | ModifierKeys.Shift)) == (ModifierKeys.Control | ModifierKeys.Shift) &&
+            NodeAt(at) is { } viewed)
+        {
+            Select(viewed);
+            ViewWanted?.Invoke(viewed);
+            e.Handled = true;
+            return;
+        }
 
         if (SocketAt(at) is { } socket)
         {
@@ -1267,9 +1293,31 @@ public sealed class NodeEditor : FrameworkElement
 
         if (labels && node is not OutputNode) DrawEye(dc, node);
 
+        if (_viewed is var (shown, output) && ReferenceEquals(shown, node)) DrawViewed(dc, box, output, radius);
+
         if (node.Preview) DrawPreview(dc, node);
 
         dc.Pop();
+    }
+
+    private static readonly Pen Viewing = Frozen(new Pen(new SolidColorBrush(Color.FromRgb(0xE8, 0x9A, 0x3C)), 2));
+    private static readonly Brush ViewingBack = Frozen(new SolidColorBrush(Color.FromRgb(0xE8, 0x9A, 0x3C)));
+
+    /// <summary>Der Knoten im Betrachter: orange umrandet, darueber ein Schild mit dem Ausgang.</summary>
+    private void DrawViewed(DrawingContext dc, Rect box, string output, double radius)
+    {
+        var frame = box;
+        frame.Inflate(3, 3);
+        dc.DrawRoundedRectangle(null, Viewing, frame, radius + 2, radius + 2);
+
+        if (Zoom < 0.45) return;
+
+        string label = (Translate?.Invoke("S_NodeViewerTag") ?? "Betrachter") + " · " + (SocketTitle?.Invoke(output) ?? output);
+        var text = Label(label, 10.5 * Zoom, Brushes.Black);
+        var tag = new Rect(box.X, box.Y - text.Height - 8 * Zoom, text.Width + 12 * Zoom, text.Height + 4 * Zoom);
+
+        dc.DrawRoundedRectangle(ViewingBack, null, tag, 3 * Zoom, 3 * Zoom);
+        dc.DrawText(text, new Point(tag.X + 6 * Zoom, tag.Y + 2 * Zoom));
     }
 
     private static readonly Pen EyeOn = Frozen(new Pen(new SolidColorBrush(Color.FromRgb(0xEE, 0xEE, 0xF2)), 1.2));

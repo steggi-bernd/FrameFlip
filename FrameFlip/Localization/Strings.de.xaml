@@ -894,7 +894,7 @@
     <sys:String x:Key="S_DockAsTab">als Reiter hier</sys:String>
     <sys:String x:Key="S_DockAsGroup">als eigenes Feld hier</sys:String>
     <sys:String x:Key="S_ToolNodes">Knoten</sys:String>
-    <sys:String x:Key="S_ToolNodesShort">Ziehen verschiebt, an Anschlüssen verbindet. Rechtsklick oder Umschalt+A fügt hinzu, Entf löscht, Strg+Z macht rückgängig, M schaltet stumm, Pos1 zeigt alles.</sys:String>
+    <sys:String x:Key="S_ToolNodesShort">Ziehen verschiebt, an Anschlüssen verbindet. Rechtsklick oder Umschalt+A fügt hinzu, Entf löscht, Strg+Z macht rückgängig, M schaltet stumm, Pos1 zeigt alles, Strg+Umschalt+Klick zeigt einen Knoten im Betrachter.</sys:String>
     <sys:String x:Key="S_ToolNodesHint">Knoten (N) – der Aufbau des Bildes als Graph über dem Bild. Ein anderes Werkzeug blendet ihn aus; Verschieben und Pinsel wirken dann auf den gewählten Knoten.</sys:String>
     <sys:String x:Key="S_LayersInNodes">Im Knotenmodus stehen die Ebenen als Knoten im Graphen – das Werkzeug „Knoten“ links zeigt sie.</sys:String>
     <sys:String x:Key="S_NodeOfferTitle">In Knoten umwandeln?</sys:String>
@@ -1029,6 +1029,11 @@
     <sys:String x:Key="S_NodeLayerMask">Die Maske der Ebene</sys:String>
     <sys:String x:Key="S_NodeLayerHidden">ausgeblendet</sys:String>
     <sys:String x:Key="S_NodeLayerOnTop">obenauf</sys:String>
+    <sys:String x:Key="S_NodeViewerTag">Betrachter</sys:String>
+    <sys:String x:Key="S_ViewerShowing">Betrachter: {0}</sys:String>
+    <sys:String x:Key="S_ViewerBack">Zurück zur Ausgabe</sys:String>
+    <sys:String x:Key="S_NodeMenuView">Im Betrachter zeigen (Strg+Umschalt+Klick)</sys:String>
+    <sys:String x:Key="S_NodeMenuViewOff">Betrachter aus – wieder die Ausgabe zeigen</sys:String>
     <sys:String x:Key="S_NodeLayerName">Name der Ebene</sys:String>
     <sys:String x:Key="S_NodeMenuRebuild">Aus dem Stapel neu aufbauen (Strg+Z holt den Graphen zurück)</sys:String>
     <sys:String x:Key="S_NodeMenuPreviewOn">Vorschau zeigen (V)</sys:String>

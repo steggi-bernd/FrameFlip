@@ -43,6 +43,12 @@ public sealed class GraphInputs
 
     /// <summary>Wohin die Vorschauen der Knoten gehen - und von welchen eine gewuenscht ist.</summary>
     public NodePreviews? Previews { get; init; }
+
+    /// <summary>
+    /// Der Betrachter: Statt der Ausgabe wird gezeigt, was dieser Knoten an diesem Ausgang
+    /// liefert - wie der Viewer in Blender. Null: die Ausgabe.
+    /// </summary>
+    public (string Node, string Output)? Viewer { get; init; }
 }
 
 /// <summary>
@@ -72,7 +78,11 @@ public static class GraphEvaluator
     /// Das Bild der Datei wird immer gelesen: Es ist die Leinwand, und es ist die
     /// Antwort, wenn keine Ebene etwas beitraegt.
     /// </summary>
-    public static IReadOnlyList<LayerRead> Reads(NodeGraph graph)
+    /// <param name="viewer">
+    /// Was der Betrachter zeigt - dessen Quellen braucht es auch, wenn sie nicht zur
+    /// Ausgabe beitragen, etwa ein Pass der Datei, der nirgends steckt.
+    /// </param>
+    public static IReadOnlyList<LayerRead> Reads(NodeGraph graph, (string Node, string Output)? viewer = null)
     {
         var reads = new List<LayerRead> { new("", LayerContent.Pass, false) };
 
@@ -81,8 +91,7 @@ public static class GraphEvaluator
             if (!reads.Any(r => r.Key.Equals(read.Key, StringComparison.Ordinal))) reads.Add(read);
         }
 
-        var order = Live(graph);
-        var used = Used(graph, order);
+        var (order, used) = Reached(graph, viewer);
 
         foreach (var node in order)
         {
@@ -113,10 +122,9 @@ public static class GraphEvaluator
     }
 
     /// <summary>Welche Renderdaten der Graph braucht - Tiefe, Bewegung, Normalen.</summary>
-    public static IReadOnlyList<PassNeed> Needs(NodeGraph graph)
+    public static IReadOnlyList<PassNeed> Needs(NodeGraph graph, (string Node, string Output)? viewer = null)
     {
-        var order = Live(graph);
-        var used = Used(graph, order);
+        var (order, used) = Reached(graph, viewer);
         var needs = new List<PassNeed>();
 
         foreach (var render in order.OfType<RenderNode>())
@@ -137,10 +145,11 @@ public static class GraphEvaluator
     /// nicht in den Eingang, den er durchreicht: Eine ausgeblendete Ebene haengt an einem
     /// stummen Mischen, und ihr Bild wird weder gelesen noch gerechnet.
     /// </summary>
-    internal static IReadOnlyList<Node> Live(NodeGraph graph)
+    internal static IReadOnlyList<Node> Live(NodeGraph graph, Node? target = null)
     {
-        var order = graph.Order();
-        if (order is null || graph.Output is not { } output) return Array.Empty<Node>();
+        var output = target ?? graph.Output;
+        var order = graph.OrderTo(output);
+        if (order is null || output is null) return Array.Empty<Node>();
 
         var live = new HashSet<string>(StringComparer.Ordinal) { output.Id };
         var open = new Stack<Node>();
@@ -159,6 +168,28 @@ public static class GraphEvaluator
         }
 
         return order.Where(n => live.Contains(n.Id)).ToList();
+    }
+
+    /// <summary>
+    /// Was gerechnet wird und welche Ausgaenge dabei gelesen werden - fuer die Ausgabe und,
+    /// wenn einer zeigt, fuer den Betrachter. Was er zeigt, zaehlt als gelesen.
+    /// </summary>
+    private static (IReadOnlyList<Node> Order, HashSet<(string, string)> Used) Reached(
+        NodeGraph graph, (string Node, string Output)? viewer)
+    {
+        var order = Live(graph);
+        var used = Used(graph, order);
+
+        if (viewer is var (id, output) && graph.Find(id) is { } shown && shown is not OutputNode)
+        {
+            var more = Live(graph, shown);
+
+            order = order.Concat(more.Where(n => !order.Contains(n))).ToList();
+            used.UnionWith(Used(graph, more));
+            used.Add((id, output));
+        }
+
+        return (order, used);
     }
 
     /// <summary>Welche Ausgaenge von Knoten gelesen werden, die selbst gerechnet werden.</summary>
@@ -337,9 +368,17 @@ public static class GraphEvaluator
     /// </summary>
     internal static (GridImage? Image, NodeContext? Context) Evaluate(NodeGraph graph, GraphInputs inputs, bool sixteen)
     {
-        if (graph.Order() is null) return (null, null);
+        // Der Betrachter zeigt einen anderen Knoten als die Ausgabe - dann wird nur
+        // gerechnet, was in ihn fliesst.
+        var viewer = inputs.Viewer is var (viewedId, viewedOutput) && graph.Find(viewedId) is { } viewed &&
+                     viewed is not OutputNode && viewed.Output(viewedOutput) is not null
+            ? viewed
+            : null;
 
-        var order = Live(graph);
+        var target = viewer ?? graph.Output;
+        if (graph.OrderTo(target) is null) return (null, null);
+
+        var order = Live(graph, target);
         if (order.Count == 0) return (null, null);
 
         var (width, height) = Canvas(inputs.Sources);
@@ -494,7 +533,18 @@ public static class GraphEvaluator
             if (previews is not null && previews.Wanted.Contains(last.Id) && last.Outputs.Count > 0)
                 previews.Capture(last.Id, run.Outputs.GetValueOrDefault(last.Outputs[0].Name), context, display.Contains(last.Id));
 
-            if (last is OutputNode)
+            if (viewer is not null && ReferenceEquals(last, viewer))
+            {
+                // Was der Betrachter zeigt - gehalten, bis es in ein Bild fuer die Anzeige
+                // umgesetzt ist.
+                var shown = run.Outputs.GetValueOrDefault(inputs.Viewer!.Value.Output);
+                context.Hold(shown);
+
+                output = Viewable(shown, context, display.Contains(last.Id));
+                context.Hold(output);
+                context.Drop(shown);
+            }
+            else if (last is OutputNode)
             {
                 output = run.Outputs.GetValueOrDefault("Bild") as GridImage;
                 context.Hold(output);
@@ -545,6 +595,93 @@ public static class GraphEvaluator
         }
 
         return (output, context);
+    }
+
+    /// <summary>
+    /// Macht aus dem, was ein Knoten liefert, ein Bild fuer die Anzeige: ein Bild in Licht
+    /// durch die Sichtumwandlung - wie ein Anzeige-Knoten, der dahinter stuende -, eines
+    /// hinter ihr, wie es ist, eine Maske grau. Ein gelesener Graustufenpass, der ueber 0
+    /// bis 1 hinausgeht (eine Tiefe in Metern), wird auf seine Spanne bezogen, sonst waere
+    /// er nur weiss.
+    /// </summary>
+    private static GridImage? Viewable(object? value, NodeContext context, bool display)
+    {
+        int count = context.Count;
+
+        switch (value)
+        {
+            case GridImage image when display:
+                return image;
+
+            case GridImage image:
+            {
+                var rgb = context.Take(count * 3);
+                var source = image.Rgb;
+                var view = context.View;
+
+                Parallel.For(0, context.GridHeight, NodeContext.Parallel, gy =>
+                {
+                    int end = (gy + 1) * context.GridWidth;
+
+                    for (int i = gy * context.GridWidth; i < end; i++)
+                    {
+                        float r = source[i * 3], g = source[i * 3 + 1], b = source[i * 3 + 2];
+                        view.Apply(ref r, ref g, ref b);
+
+                        rgb[i * 3] = r;
+                        rgb[i * 3 + 1] = g;
+                        rgb[i * 3 + 2] = b;
+                    }
+                });
+
+                return new GridImage { Rgb = rgb, A = image.A, Matte = image.Matte, Contributed = true };
+            }
+
+            case GridValue mask:
+            {
+                var rgb = context.Take(count * 3);
+                var a = context.Take(count);
+
+                for (int i = 0; i < count; i++)
+                {
+                    float v = Math.Clamp(mask.V[i], 0f, 1f);
+                    rgb[i * 3] = rgb[i * 3 + 1] = rgb[i * 3 + 2] = v;
+                    a[i] = 1f;
+                }
+
+                return new GridImage { Rgb = rgb, A = a, Contributed = true };
+            }
+
+            case SourceImage source:
+            {
+                var frame = source.Frame;
+                var (low, high) = frame.MaskRange;
+
+                if (NodePreviews.Grey(frame) && (high > 1.0001f || low < -0.0001f) &&
+                    NodeRun.Sample(source, context) is { } data)
+                {
+                    float span = MathF.Max(1e-6f, high - low);
+
+                    for (int i = 0; i < count; i++)
+                    {
+                        float v = data.Rgb[i * 3];
+                        v = v >= FloatFrame.NotHit || !float.IsFinite(v) ? 1f : Math.Clamp((v - low) / span, 0f, 1f);
+
+                        data.Rgb[i * 3] = data.Rgb[i * 3 + 1] = data.Rgb[i * 3 + 2] = v;
+                        data.A[i] = 1f;
+                    }
+
+                    return data;
+                }
+
+                return NodeRun.Sample(source, context) is { } sampled
+                    ? frame.IsSceneReferred ? Viewable(sampled, context, display: false) : sampled
+                    : null;
+            }
+
+            default:
+                return null;
+        }
     }
 
     /// <summary>

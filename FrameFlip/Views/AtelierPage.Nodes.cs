@@ -103,7 +103,7 @@ public partial class AtelierPage
             return;
         }
 
-        var missing = GraphEvaluator.Reads(_graph)
+        var missing = GraphEvaluator.Reads(_graph, _viewer)
             .Where(r => r.Key.Length > 0 && !_sources.ContainsKey(r.Key))
             .ToList();
 
@@ -118,7 +118,7 @@ public partial class AtelierPage
             }
         }
 
-        var dataMissing = GraphEvaluator.Needs(_graph)
+        var dataMissing = GraphEvaluator.Needs(_graph, _viewer)
             .Select(need => FramePasses.NameFor(need, _passes))
             .OfType<string>()
             .Where(name => !_sources.ContainsKey(name))
@@ -141,7 +141,7 @@ public partial class AtelierPage
 
         if (_graph is null) return data;
 
-        foreach (var need in GraphEvaluator.Needs(_graph))
+        foreach (var need in GraphEvaluator.Needs(_graph, _viewer))
         {
             data[need] = FramePasses.NameFor(need, _passes) is { } name && _sources.TryGetValue(name, out var frame)
                 ? frame
@@ -176,6 +176,7 @@ public partial class AtelierPage
             Cache = _cache,
             Focus = NodeView.Selected?.Id,
             Previews = _previews,
+            Viewer = _viewer,
         };
 
         WantPreviews();

@@ -32,6 +32,7 @@ public partial class AtelierPage
         NodeView.Editing += RememberNodes;
         NodeView.MenuWanted += ShowNodeMenu;
         NodeView.SectionDropped += DropFromPalette;
+        NodeView.ViewWanted += OnViewWanted;
         SetUpNodePreviews();
         NodeView.UndoWanted += () => StepNodes(back: true);
         NodeView.RedoWanted += () => StepNodes(back: false);
@@ -84,6 +85,7 @@ public partial class AtelierPage
         ShowNodeSettings();
         ShowNodeLayers();
         ShowMissingLayers();
+        KeepViewer();
         FetchNodeSources();
     }
 
@@ -271,6 +273,10 @@ public partial class AtelierPage
             };
             menu.Items.Add(mute);
 
+            var view = new MenuItem { Header = Strings.T("S_NodeMenuView") };
+            view.Click += (_, _) => OnViewWanted(node);
+            menu.Items.Add(view);
+
             var preview = new MenuItem { Header = Strings.T(node.Preview ? "S_NodeMenuPreviewOff" : "S_NodeMenuPreviewOn") };
             preview.Click += (_, _) => NodeView.TogglePreview(node);
             menu.Items.Add(preview);
@@ -287,6 +293,13 @@ public partial class AtelierPage
             menu.Items.Add(delete);
 
             menu.Items.Add(new Separator());
+        }
+
+        if (_viewer is not null)
+        {
+            var viewOff = new MenuItem { Header = Strings.T("S_NodeMenuViewOff") };
+            viewOff.Click += (_, _) => SetViewer(null);
+            menu.Items.Add(viewOff);
         }
 
         var previews = new MenuItem { Header = Strings.T("S_NodeMenuPreviewAll") };

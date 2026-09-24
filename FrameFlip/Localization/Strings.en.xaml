@@ -894,7 +894,7 @@
     <sys:String x:Key="S_DockAsTab">as a tab here</sys:String>
     <sys:String x:Key="S_DockAsGroup">as its own panel here</sys:String>
     <sys:String x:Key="S_ToolNodes">Nodes</sys:String>
-    <sys:String x:Key="S_ToolNodesShort">Drag moves; drag from a socket connects. Right-click or Shift+A adds, Del deletes, Ctrl+Z undoes, M mutes, Home shows everything.</sys:String>
+    <sys:String x:Key="S_ToolNodesShort">Drag moves; drag from a socket connects. Right-click or Shift+A adds, Del deletes, Ctrl+Z undoes, M mutes, Home shows everything, Ctrl+Shift+Click shows a node in the viewer.</sys:String>
     <sys:String x:Key="S_ToolNodesHint">Nodes (N) – how the picture is built, as a graph over the picture. Another tool hides it; Move and Brush then act on the selected node.</sys:String>
     <sys:String x:Key="S_LayersInNodes">In node mode the layers are nodes in the graph – the Nodes tool on the left shows them.</sys:String>
     <sys:String x:Key="S_NodeOfferTitle">Convert to nodes?</sys:String>
@@ -1029,6 +1029,11 @@
     <sys:String x:Key="S_NodeLayerMask">The layer's mask</sys:String>
     <sys:String x:Key="S_NodeLayerHidden">hidden</sys:String>
     <sys:String x:Key="S_NodeLayerOnTop">on top</sys:String>
+    <sys:String x:Key="S_NodeViewerTag">Viewer</sys:String>
+    <sys:String x:Key="S_ViewerShowing">Viewer: {0}</sys:String>
+    <sys:String x:Key="S_ViewerBack">Back to the output</sys:String>
+    <sys:String x:Key="S_NodeMenuView">Show in the viewer (Ctrl+Shift+Click)</sys:String>
+    <sys:String x:Key="S_NodeMenuViewOff">Viewer off – show the output again</sys:String>
     <sys:String x:Key="S_NodeLayerName">Layer name</sys:String>
     <sys:String x:Key="S_NodeMenuRebuild">Rebuild from the stack (Ctrl+Z brings the graph back)</sys:String>
     <sys:String x:Key="S_NodeMenuPreviewOn">Show preview (V)</sys:String>

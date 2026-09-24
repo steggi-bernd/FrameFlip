@@ -24,6 +24,67 @@ public static class NodeValueInvariants
         MaskShape();
         InTheGraph();
         Previews();
+        Viewer();
+    }
+
+    // ------------------------------------------------------------ Betrachter
+
+    private static void Viewer()
+    {
+        Check.Group("Betrachter: das Bild eines Knotens statt der Ausgabe");
+
+        var graph = new NodeGraph();
+        var render = graph.Add(new RenderNode());
+        var light = graph.Add(new LightNode { Exposure = 1 });
+        var view = graph.Add(new ViewNode());
+        var tone = graph.Add(new ToneNode { Gamma = 2 });
+        var output = graph.Add(new OutputNode());
+        var loose = graph.Add(new MaskNode { Mask = new LayerMask { Kind = MaskKind.Gradient, Angle = 0, Width = 1f } });
+
+        graph.Connect(render, RenderNode.Picture, light, "Bild");
+        graph.Connect(light, "Bild", view, "Bild");
+        graph.Connect(view, "Bild", tone, "Bild");
+        graph.Connect(tone, "Bild", output, "Bild");
+
+        var metres = Enumerable.Range(0, 32 * 18).Select(i => 2f + 10f * (i % 32) / 31f).ToArray();
+        var depth = new FloatFrame { Width = 32, Height = 18, R = metres, G = metres, B = metres, IsSceneReferred = true };
+        var sources = new Dictionary<string, FloatFrame> { [""] = Frame(32, 18) };
+
+        // Der Massstab: der Graph bis dorthin, mit einer Anzeige davor, an der Ausgabe.
+        var cut = new NodeGraph();
+        var cutRender = cut.Add(new RenderNode());
+        var cutLight = cut.Add(new LightNode { Exposure = 1 });
+        var cutView = cut.Add(new ViewNode());
+        var cutOutput = cut.Add(new OutputNode());
+        cut.Connect(cutRender, RenderNode.Picture, cutLight, "Bild");
+        cut.Connect(cutLight, "Bild", cutView, "Bild");
+        cut.Connect(cutView, "Bild", cutOutput, "Bild");
+
+        var expected = Render(cut, sources);
+        var whole = Render(graph, sources);
+
+        Check.That(Render(graph, sources, viewer: (light.Id, "Bild")).AsSpan().SequenceEqual(expected) && !expected.AsSpan().SequenceEqual(whole),
+                   "ein Bild vor der Anzeige wird durch die Sichtumwandlung gezeigt - wie mit einem Anzeige-Knoten dahinter");
+        Check.That(Render(graph, sources, viewer: (view.Id, "Bild")).AsSpan().SequenceEqual(expected),
+                   "eines hinter der Anzeige, wie es ist");
+        Check.That(Render(graph, sources).AsSpan().SequenceEqual(whole), "ohne Betrachter zeigt die Ausgabe dasselbe wie vorher");
+
+        var mask = Render(graph, sources, viewer: (loose.Id, "Maske"));
+        bool grey = true;
+        for (int i = 0; i < mask.Length; i += 4) grey &= mask[i] == mask[i + 1] && mask[i + 1] == mask[i + 2] && mask[i + 3] == 255;
+
+        Check.That(grey && mask[0] != mask[(32 - 1) * 4], "eine Maske - auch eine, die nirgends steckt - erscheint grau");
+
+        var metresShown = Render(graph, sources, viewer: (render.Id, RenderNode.Depth), depth);
+        Check.That(metresShown[0] < 40 && metresShown[(32 - 1) * 4] > 215, "die Tiefe erscheint als Verlauf von nah nach fern",
+                   $"{metresShown[0]} .. {metresShown[(32 - 1) * 4]}");
+
+        Check.That(Render(graph, sources, viewer: ("gibt es nicht", "Bild")).AsSpan().SequenceEqual(whole),
+                   "ein Betrachter auf einen Knoten, den es nicht gibt, zeigt die Ausgabe");
+
+        var reads = GraphEvaluator.Needs(graph, (render.Id, RenderNode.Depth));
+        Check.That(reads.Contains(PassNeed.Depth) && !GraphEvaluator.Needs(graph).Contains(PassNeed.Depth),
+                   "was der Betrachter zeigt, wird gelesen - auch wenn es nirgends steckt");
     }
 
     // ------------------------------------------------------------ Vorschauen
@@ -381,6 +442,10 @@ public static class NodeValueInvariants
     };
 
     private static byte[] Render(NodeGraph graph, Dictionary<string, FloatFrame> sources, NodePreviews? previews = null)
+        => Render(graph, sources, null, null, previews);
+
+    private static byte[] Render(NodeGraph graph, Dictionary<string, FloatFrame> sources, (string, string)? viewer,
+                                 FloatFrame? depth = null, NodePreviews? previews = null)
     {
         var frame = sources[""];
         var pixels = new byte[frame.Width * frame.Height * 4];
@@ -388,8 +453,14 @@ public static class NodeValueInvariants
 
         try
         {
-            GraphEvaluator.Render(graph, new GraphInputs { Sources = sources, View = new StandardViewTransform(), Previews = previews },
-                                  buffer, frame.Width * 4);
+            GraphEvaluator.Render(graph, new GraphInputs
+            {
+                Sources = sources,
+                View = new StandardViewTransform(),
+                Previews = previews,
+                Viewer = viewer,
+                Data = new Dictionary<PassNeed, FloatFrame?> { [PassNeed.Depth] = depth },
+            }, buffer, frame.Width * 4);
             Marshal.Copy(buffer, pixels, 0, pixels.Length);
         }
         finally

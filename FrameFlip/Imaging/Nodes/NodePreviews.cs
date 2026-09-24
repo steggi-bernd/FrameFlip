@@ -184,7 +184,7 @@ public sealed class NodePreviews
     }
 
     /// <summary>Ob ein Bild grau ist - drei gleiche Kanaele, wie ein Tiefen- oder Nebelpass.</summary>
-    private static bool Grey(FloatFrame frame)
+    internal static bool Grey(FloatFrame frame)
     {
         if (ReferenceEquals(frame.R, frame.G) && ReferenceEquals(frame.G, frame.B)) return true;
 
