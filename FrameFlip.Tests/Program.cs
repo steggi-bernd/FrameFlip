@@ -90,6 +90,7 @@ static int RunAll()
     ContextMenuInvariants.Run();
     WheelAndSpacingInvariants.Run();
     PassRoleInvariants.Run();
+    RegionRenderInvariants.Run();
     NodeValueInvariants.Run();
     LayerPlacementInvariants.Run();
     PlacementDragInvariants.Run();

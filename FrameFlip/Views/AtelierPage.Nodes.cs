@@ -166,19 +166,7 @@ public partial class AtelierPage
     {
         if (_graph is null || _base is null) return false;
 
-        var inputs = new GraphInputs
-        {
-            Sources = _sources,
-            Data = NodeData(),
-            View = ViewFor(_base),
-            Step = _coarse ? CoarseStep : 1,
-            Number = _number,
-            Pool = _pool,
-            Cache = _cache,
-            Focus = NodeView.Selected?.Id,
-            Previews = _previews,
-            Viewer = _viewer,
-        };
+        var inputs = NodeInputs(_base, _coarse ? CoarseStep : 1);
 
         WantPreviews();
 
@@ -213,6 +201,71 @@ public partial class AtelierPage
 
         ShowPreviews();
         return done;
+    }
+
+    /// <summary>Was der Graph fuer eine Rechnung dieser Seite bekommt - fuer das ganze Bild und fuer einen Ausschnitt.</summary>
+    private GraphInputs NodeInputs(FloatFrame canvas, int step) => new()
+    {
+        Sources = _sources,
+        Data = NodeData(),
+        View = ViewFor(canvas),
+        Step = step,
+        Number = _number,
+        Pool = _pool,
+        Cache = _cache,
+        Focus = NodeView.Selected?.Id,
+        Previews = _previews,
+        Viewer = _viewer,
+    };
+
+    /// <summary>
+    /// Ob die Anzeigeflaeche gerade ein ganzes, voll aufgeloestes Bild des Graphen traegt.
+    /// Nur darauf darf ein Ausschnitt geschrieben werden: auf ein grobes Bild gesetzt,
+    /// stuende ein scharfes Rechteck in einem unscharfen.
+    /// </summary>
+    private bool _wholeShown;
+
+    /// <summary>
+    /// Beim Malen: rechnet nur, was der Pinsel seit dem letzten Bild beruehrt hat, und
+    /// schreibt es an seine Stelle - siehe <see cref="GraphEvaluator.RenderRegion"/>.
+    /// False, wenn das nicht geht; dann rechnet der Aufrufer wie bisher das ganze Bild grob.
+    /// </summary>
+    private bool PaintRegion()
+    {
+        var touched = Placement.TakeTouched();
+
+        // Kein Tupfer seit dem letzten Bild - nichts zu rechnen, aber auch kein Grund,
+        // das ganze Bild grob zu zeigen.
+        if (touched.IsEmpty) return _wholeShown;
+
+        if (!_wholeShown || _surface is null || _graph is null || _base is null || _showingOriginal || _viewer is not null)
+            return false;
+
+        // Zwei Maskenpunkte Rand: Die Maske wird zwischen ihren Punkten weich gelesen, ein
+        // geaenderter Punkt wirkt also bis zu einem Maskenpunkt weit ins Bild daneben.
+        var region = GraphRegion.Around(touched.X0, touched.Y0, touched.X1, touched.Y1, 2 * PaintedMask.Coarse);
+        if (region.Within(_surface.PixelWidth, _surface.PixelHeight) is not { } inside) return true;
+
+        _surface.Lock();
+
+        try
+        {
+            if (!GraphEvaluator.RenderRegion(_graph, NodeInputs(_base, 1), inside, _surface.BackBuffer, _surface.BackBufferStride))
+                return false;
+
+            _surface.AddDirtyRect(new Int32Rect(inside.X0, inside.Y0, inside.Width, inside.Height));
+            return true;
+        }
+        catch (Exception e) when (e is not OutOfMemoryException)
+        {
+            // Wie beim ganzen Bild: nicht anhalten. Das ganze Bild danach sagt, was fehlt.
+            Configuration.SettingsStore.Trace("Knoten, Ausschnitt: " + e);
+            return false;
+        }
+        finally
+        {
+            _surface.Unlock();
+        }
     }
 
     /// <summary>Ob die letzte Rechnung mit einem Fehler endete - dann steht er im Editor.</summary>

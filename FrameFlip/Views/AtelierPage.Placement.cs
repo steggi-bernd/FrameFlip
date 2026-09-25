@@ -333,13 +333,24 @@ public partial class AtelierPage
     {
         if (_pendingPlace is null && !_pendingPaint) return;
 
+        bool placing = _pendingPlace is not null;
+
         _pendingPlace = null;
         _pendingPaint = false;
 
         // Im Knotenmodus gibt es keinen Stapel, dem man es melden muesste - der Graph
-        // rechnet gleich selbst.
-        if (InNodes) Refresh(interim: true, recompose: false);
-        else Layers.PlaceMovedOutside(true);
+        // rechnet gleich selbst. Beim Malen nur den Teil, den der Pinsel beruehrt hat,
+        // voll aufgeloest; geht das nicht, das ganze Bild grob wie bisher.
+        if (InNodes)
+        {
+            if (!placing && PaintRegion()) return;
+
+            Refresh(interim: true, recompose: false);
+        }
+        else
+        {
+            Layers.PlaceMovedOutside(true);
+        }
     }
 
     /// <summary>

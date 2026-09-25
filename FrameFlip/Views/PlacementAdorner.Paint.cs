@@ -68,6 +68,20 @@ public sealed partial class PlacementAdorner
     /// <summary>Der zuletzt beendete Zug - fuer die Probe.</summary>
     internal PaintStroke? LastStroke { get; private set; }
 
+    /// <summary>Was seit dem letzten <see cref="TakeTouched"/> bemalt wurde, in Bildpunkten der Leinwand.</summary>
+    private PaintBounds _pendingTouched = PaintBounds.Empty;
+
+    /// <summary>
+    /// Gibt heraus, was seit dem letzten Mal bemalt wurde, und beginnt von vorn - damit
+    /// die Seite nur diesen Teil des Bildes neu rechnet.
+    /// </summary>
+    internal PaintBounds TakeTouched()
+    {
+        var touched = _pendingTouched;
+        _pendingTouched = PaintBounds.Empty;
+        return touched;
+    }
+
     /// <summary>Es wurde gemalt. <c>interim</c> heisst: der Strich laeuft noch.</summary>
     public event Action<bool>? Painted;
 
@@ -270,6 +284,8 @@ public sealed partial class PlacementAdorner
     private void Touched(PaintBounds bounds)
     {
         if (_mask is null || bounds.IsEmpty) return;
+
+        _pendingTouched = _pendingTouched.Union(bounds);
 
         // Ein Maskenpunkt Rand auf jeder Seite: Die weiche Kante des Tupfers faellt bis
         // auf null, und der Punkt, auf den sie fast null legt, gehoert noch dazu.
@@ -514,6 +530,10 @@ public sealed partial class PlacementAdorner
 
         // Die rechte Taste nimmt weg, Alt ebenso - siehe OnMouseRightButtonDown.
         _erasing = erase || (Keyboard.Modifiers & ModifierKeys.Alt) != 0;
+
+        // Ein neuer Strich beginnt mit leerer Rechnung - was ein frueherer liegen liess,
+        // hat das ganze Bild danach schon gezeigt.
+        _pendingTouched = PaintBounds.Empty;
 
         _stroke = new PaintStroke
         {

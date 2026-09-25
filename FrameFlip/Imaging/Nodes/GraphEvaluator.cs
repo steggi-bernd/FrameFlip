@@ -62,7 +62,7 @@ public sealed class GraphInputs
 /// Mit Zwischenspeicher wird nur gerechnet, was hinter dem gewaehlten Knoten liegt.
 /// Siehe docs/Atelier-Nodes.md, Abschnitt 3.
 /// </summary>
-public static class GraphEvaluator
+public static partial class GraphEvaluator
 {
     /// <summary>
     /// Fuer die Probe: welche Einheit gerechnet wurde - ihr erster Knoten. Nur so laesst
@@ -366,7 +366,13 @@ public static class GraphEvaluator
     /// <see cref="NodeContext.Drop"/> loslaesst. Mit einem Zwischenspeicher wird nur
     /// gerechnet, was dort nicht schon liegt - siehe <see cref="GraphCache"/>.
     /// </summary>
-    internal static (GridImage? Image, NodeContext? Context) Evaluate(NodeGraph graph, GraphInputs inputs, bool sixteen)
+    /// <param name="region">
+    /// Nur dieses Rechteck, voll aufgeloest - siehe <see cref="RenderRegion"/>. Das Ergebnis
+    /// ist dann so gross wie das Rechteck, oder null, wenn es sich so nicht genau rechnen
+    /// laesst.
+    /// </param>
+    internal static (GridImage? Image, NodeContext? Context) Evaluate(NodeGraph graph, GraphInputs inputs, bool sixteen,
+                                                                      GraphRegion? region = null)
     {
         // Der Betrachter zeigt einen anderen Knoten als die Ausgabe - dann wird nur
         // gerechnet, was in ihn fliesst.
@@ -374,6 +380,11 @@ public static class GraphEvaluator
                      viewed is not OutputNode && viewed.Output(viewedOutput) is not null
             ? viewed
             : null;
+
+        // Ein Ausschnitt braucht, was vor dem gewaehlten Knoten liegt, voll aufgeloest im
+        // Zwischenspeicher - und keinen Betrachter, der etwas anderes zeigt als die Ausgabe.
+        if (region is not null && (sixteen || viewer is not null || inputs.Cache is null || inputs.Focus is null))
+            return (null, null);
 
         var target = viewer ?? graph.Output;
         if (graph.OrderTo(target) is null) return (null, null);
@@ -384,15 +395,18 @@ public static class GraphEvaluator
         var (width, height) = Canvas(inputs.Sources);
         if (width == 0 || height == 0) return (null, null);
 
-        int step = sixteen ? 1 : Math.Clamp(inputs.Step, 1, 16);
+        var box = region?.Within(width, height);
+        if (region is not null && box is null) return (null, null);
+
+        int step = sixteen || box is not null ? 1 : Math.Clamp(inputs.Step, 1, 16);
 
         var context = new NodeContext
         {
             Width = width,
             Height = height,
             Step = step,
-            Columns = LocalPass.Grid(width, step),
-            Rows = LocalPass.Grid(height, step),
+            Columns = box is { } columnsOf ? columnsOf.Columns() : LocalPass.Grid(width, step),
+            Rows = box is { } rowsOf ? rowsOf.Rows() : LocalPass.Grid(height, step),
             Number = inputs.Number,
             View = inputs.View,
             Sources = inputs.Sources,
@@ -432,6 +446,9 @@ public static class GraphEvaluator
         var needed = new bool[units.Count];
         var remembered = new Dictionary<(string, string), object?>();
 
+        // Ob ein Gemerktes sich nicht ausschneiden liess - dann geht der Ausschnitt nicht.
+        bool torn = false;
+
         void Need(int unit)
         {
             if (needed[unit]) return;
@@ -446,6 +463,9 @@ public static class GraphEvaluator
 
                 if (caching && !behind![from] && cache!.TryGet(Key(from, link.Output), out var value))
                 {
+                    // Im Ausschnitt nur das Stueck des gemerkten Bildes, das er braucht.
+                    if (box is { } cut && !Cut(value, width, height, cut, out value)) torn = true;
+
                     remembered[(link.From, link.Output)] = value;
                     continue;
                 }
@@ -454,7 +474,17 @@ public static class GraphEvaluator
             }
         }
 
+        // Ohne gewaehlten Knoten, der mitrechnet, gibt es nichts Gemerktes, auf das ein
+        // Ausschnitt bauen koennte.
+        if (box is not null && !caching) return (null, null);
+
         Need(units.Count - 1);
+
+        // Ein Ausschnitt geht nur, wo jeder Bildpunkt allein aus demselben Bildpunkt davor
+        // folgt - eine Unschaerfe am Rand des Rechtecks laese Punkte, die ausserhalb liegen.
+        // Und nur, wenn alles Gemerkte volle Aufloesung hatte.
+        if (box is not null && (torn || Enumerable.Range(0, units.Count).Any(u => needed[u] && !units[u].All(RegionSafe))))
+            return (null, null);
 
         // Wie oft jeder Ausgang noch gelesen wird. Faellt die Zahl auf null, wird er
         // losgelassen - so haelt der Speicher die breiteste Stelle des Graphen, nicht
@@ -471,8 +501,10 @@ public static class GraphEvaluator
             readers[(link.From, link.Output)] = readers.GetValueOrDefault((link.From, link.Output)) + 1;
         }
 
-        var keep = caching ? Frontier(graph, units, unitOf, behind!, Shape) : null;
-        var next = caching ? new Dictionary<string, GraphCache.Entry>(StringComparer.Ordinal) : null;
+        // Ein Ausschnitt merkt sich nichts: Er ist ein Stueck des Bildes, und im
+        // Zwischenspeicher liegen ganze.
+        var keep = caching && box is null ? Frontier(graph, units, unitOf, behind!, Shape) : null;
+        var next = caching && box is null ? new Dictionary<string, GraphCache.Entry>(StringComparer.Ordinal) : null;
 
         var results = new Dictionary<(string, string), object?>();
         GridImage? output = null;
@@ -538,8 +570,9 @@ public static class GraphEvaluator
 
             Ran?.Invoke(first);
 
-            // Die Vorschau liest ab, was ohnehin dasteht - den ersten Ausgang.
-            if (previews is not null && previews.Wanted.Contains(last.Id) && last.Outputs.Count > 0)
+            // Die Vorschau liest ab, was ohnehin dasteht - den ersten Ausgang. Ein Ausschnitt
+            // zeigt nur ein Stueck; die Vorschau zieht mit dem naechsten ganzen Bild nach.
+            if (box is null && previews is not null && previews.Wanted.Contains(last.Id) && last.Outputs.Count > 0)
                 previews.Capture(last.Id, run.Outputs.GetValueOrDefault(last.Outputs[0].Name), context, display.Contains(last.Id));
 
             if (viewer is not null && ReferenceEquals(last, viewer))
@@ -592,7 +625,12 @@ public static class GraphEvaluator
             context.EndUnit();
         }
 
-        if (cache is not null && caching)
+        if (box is not null)
+        {
+            // Der Zwischenspeicher bleibt, wie er war - der naechste Ausschnitt baut
+            // wieder auf ihn.
+        }
+        else if (cache is not null && caching)
         {
             // Was schon gemerkt war und weiter in den gewaehlten Knoten fliesst, bleibt -
             // auch fuer das andere Raster, damit das Loslassen nach dem Ziehen nicht

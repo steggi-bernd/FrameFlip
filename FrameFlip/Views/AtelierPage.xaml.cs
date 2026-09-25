@@ -643,7 +643,9 @@ public sealed partial class AtelierPage : UserControl
                 // Ergibt der Graph kein Bild - die Ausgabe haengt an nichts -, bleibt die
                 // Flaeche leer. Auf den Stapel zurueckzufallen hiesse, ein Bild zu zeigen,
                 // das niemand mehr eingestellt hat; der Editor sagt, was fehlt.
-                if (!RenderNodes(_surface.BackBuffer, _surface.BackBufferStride))
+                bool done = RenderNodes(_surface.BackBuffer, _surface.BackBufferStride);
+
+                if (!done)
                 {
                     unsafe
                     {
@@ -652,9 +654,14 @@ public sealed partial class AtelierPage : UserControl
                     }
                 }
 
+                // Ein ganzes, scharfes Bild der Ausgabe - darauf darf der Pinsel Ausschnitte setzen.
+                _wholeShown = done && !_coarse && _viewer is null;
+
                 _surface.AddDirtyRect(new Int32Rect(0, 0, frame.Width, frame.Height));
                 return;
             }
+
+            _wholeShown = false;
 
             FloatFrameProcessor.Apply(frame, adjustments, ViewFor(frame), grading,
                                       _surface.BackBuffer, _surface.BackBufferStride,
