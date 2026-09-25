@@ -94,6 +94,7 @@ static int RunAll()
     PersistedEnumInvariants.Run();
     ExportFrameNumberInvariants.Run();
     AtelierOpenRaceInvariants.Run();
+    AtelierOpenInvariants.Run();
     NodeValueInvariants.Run();
     LayerPlacementInvariants.Run();
     PlacementDragInvariants.Run();
