@@ -1046,10 +1046,12 @@ public static class NodeEditInvariants
 
             var file = page.Graph!.Nodes.OfType<RenderNode>().Single();
 
-            Check.That(file.Passes.Contains(diffuse) && editor.Selected is MixNode { Mode: BlendMode.Add } mix &&
+            // Ein Farbpass multipliziert - das verraet sein Name (PassRoles). Frueher kam
+            // jeder Pass auf Addieren.
+            Check.That(file.Passes.Contains(diffuse) && editor.Selected is MixNode { Mode: BlendMode.Multiply } mix &&
                        page.Graph.Into(mix.Id, "Oben") is { } over && page.Graph.Find(over.From) is PlaceNode,
-                       "Pass als Ebene legt einen Ausgang, Platzieren und Mischen auf Addieren an");
-            Check.That(!Pixels(page).AsSpan().SequenceEqual(plain), "und das Bild wird heller");
+                       "Pass als Ebene legt einen Ausgang, Platzieren und Mischen an - ein Farbpass auf Multiplizieren");
+            Check.That(!Pixels(page).AsSpan().SequenceEqual(plain), "und das Bild aendert sich");
 
             // Die Ebenenliste: oben die neue Ebene, darunter das Bild der Datei - mit Miniaturen.
             var list = (NodeLayerList)page.FindName("NodeLayers");
@@ -1118,6 +1120,11 @@ public static class NodeEditInvariants
             editor.Select(null);
             Call(page, "AddPassLayer", diffuse, null!);
             var diffMix = (MixNode)editor.Selected!;
+
+            // Hier soll die Ebene Licht beitragen, dessen Wirkung von der Reihenfolge
+            // abhaengt - also auf Addieren wie ein Lichtpass. Multipliziert vertauschte sich
+            // die Belichtung darueber folgenlos mit ihr.
+            diffMix.Mode = BlendMode.Add;
 
             Call(page, "AddAdjustmentLayer", diffMix);
             var grade = (LayerGradeNode)editor.Selected!;

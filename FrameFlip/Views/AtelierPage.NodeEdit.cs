@@ -266,7 +266,7 @@ public partial class AtelierPage
         bool clip = LayerEdits.InClip(_graph, after);
         var picture = _graph.Add(new PictureNode { Path = path, FollowSequence = false });
 
-        if (NodeEdits.AddLayer(_graph, after, picture, "Bild", BlendMode.Normal) is not var (place, mix)) return;
+        if (NodeEdits.AddLayer(_graph, after, picture, "Bild", ImageProbe.ModeFor(path)) is not var (place, mix)) return;
 
         // In einer Schnittkette wird die neue Ebene angeschnitten wie ihre Nachbarn.
         mix.Clip = clip;
@@ -282,7 +282,8 @@ public partial class AtelierPage
     }
 
     /// <summary>
-    /// Ein Pass als Ebene - wie im Ebenenstreifen auf Addieren: Die Passe einer Datei
+    /// Ein Pass als Ebene - wie im Ebenenstreifen auf Addieren, oder auf dem, was der Name
+    /// verraet (PassRoles: AO multipliziert, Glare addiert). Die Passe einer Datei
     /// setzen das Bild zusammen, und das Licht eines Passes kommt zum Bisherigen dazu.
     /// </summary>
     private void AddPassLayer(string pass, Node? target = null)
@@ -294,7 +295,7 @@ public partial class AtelierPage
         bool clip = LayerEdits.InClip(_graph, after);
 
         if (!NodeEdits.ShowPass(_graph, file, pass, on: true) ||
-            NodeEdits.AddLayer(_graph, after, file, pass, BlendMode.Add) is not var (place, mix))
+            NodeEdits.AddLayer(_graph, after, file, pass, PassRoles.ByName(pass, sceneLinear: true) ?? BlendMode.Add) is not var (place, mix))
         {
             return;
         }

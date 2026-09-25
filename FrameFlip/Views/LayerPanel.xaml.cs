@@ -788,7 +788,9 @@ public partial class LayerPanel : UserControl
             Content = LayerContent.Image,
             Source = path,
             Name = Short(path),
-            Mode = BlendMode.Normal,
+            // Glare, Bloom und was sonst auf Schwarz liegt, kommt gleich dazu - nur hier,
+            // beim Anlegen. Siehe PassRoles.
+            Mode = ImageProbe.ModeFor(path),
         });
     }
 
@@ -885,7 +887,11 @@ public partial class LayerPanel : UserControl
         {
             Source = pass?.Name ?? "",
             Name = pass?.ShortName ?? Strings.T("S_LayerColour"),
-            Mode = Stack.Layers.Count == 0 ? BlendMode.Normal : BlendMode.Add,
+            // Die unterste traegt; darueber verraet der Name, was der Pass tut - Licht
+            // kommt dazu, Verschattung und Farbe multiplizieren. Nur beim Anlegen.
+            Mode = Stack.Layers.Count == 0 ? BlendMode.Normal
+                 : pass is { } named ? PassRoles.ByName(named.Name, sceneLinear: true) ?? BlendMode.Add
+                 : BlendMode.Add,
         };
 
         Stack.Layers.Add(layer);
