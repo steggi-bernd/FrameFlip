@@ -44,6 +44,161 @@ public static class NodeEditInvariants
         ThePageWiresPassesAndPicks();
         ThePageFetchesHiddenLayers();
         ThePageSurvivesWiring();
+        ThePageHubAndMenus();
+    }
+
+    /// <summary>
+    /// Der Hub statt des alten Menues, und das Menue einer Zeile in der Ebenenliste - auf
+    /// der Seite, an der kleinen Kryptomattendatei der Probe.
+    /// </summary>
+    private static void ThePageHubAndMenus()
+    {
+        Check.Group("Knoten bauen: der Hub und das Menue einer Ebene");
+
+        string T(string key) => Localization.Strings.T(key);
+
+        string folder = Path.Combine(Path.GetTempPath(), "frameflip-hub-" + Guid.NewGuid().ToString("N")[..8]);
+        Directory.CreateDirectory(folder);
+
+        string path = Path.Combine(folder, "render_0001.exr");
+        File.WriteAllBytes(path, CryptoSample.Bytes());
+
+        var page = new AtelierPage(FrameDecoderRegistry.CreateDefault(() => null), new AppSettings(), _ => { });
+        var window = Window(page);
+
+        try
+        {
+            page.Open(path);
+
+            var size = (TextBlock)page.FindName("SourceText");
+            if (!Pump(TimeSpan.FromSeconds(10), () => size.Text.Length > 0))
+            {
+                Check.That(false, "die Datei wird geladen");
+                return;
+            }
+
+            Settle();
+            page.ConvertToNodes();
+            ((ToolColumn)page.FindName("MouseTools")).Select(AtelierTool.Nodes, notify: true);
+            Settle();
+
+            var editor = (NodeEditor)page.FindName("NodeView");
+            editor.Frame();
+            editor.UpdateLayout();
+
+            // Ein Rechtsklick auf das Kabel in die Ausgabe: Der Hub sagt, wo Neues hinkommt,
+            // und die Suche findet die Vignette.
+            var output = page.Graph!.Output!;
+            var wire = page.Graph.Into(output.Id, "Bild")!;
+            var from = page.Graph.Find(wire.From)!;
+            var middle = new Point((editor.ScreenOf(from, wire.Output, input: false).X + editor.ScreenOf(output, "Bild", input: true).X) / 2,
+                                   (editor.ScreenOf(from, wire.Output, input: false).Y + editor.ScreenOf(output, "Bild", input: true).Y) / 2);
+
+            editor.Select(null);
+            page.ShowNodeHub(editor.ToGraph(middle));
+            var hub = page.Hub;
+
+            Check.That(hub is not null && editor.NodeAt(middle) is null && editor.LinkAt(middle) == wire,
+                       "Rechtsklick auf ein Kabel oeffnet den Hub - dort, wo nur das Kabel ist");
+
+            hub!.Search("vignet");
+            Check.That(hub.Visible.Count == 1 && hub.Visible[0].Title == T("S_Vignette"), "die Suche findet die Vignette",
+                       string.Join(", ", hub.Visible.Select(v => v.Title)));
+
+            hub.ActivateHighlighted();
+            Settle();
+
+            var vignette = page.Graph!.Nodes.OfType<OpticsNode>().FirstOrDefault(n => n.Tool is VignetteTool);
+
+            Check.That(page.Hub is null && vignette is not null &&
+                       page.Graph.Into(vignette.Id, "Bild")?.From == from.Id && page.Graph.Into(output.Id, "Bild")?.From == vignette.Id,
+                       "Enter setzt sie ein - ins Kabel, auf dem der Rechtsklick war, und der Hub geht zu");
+
+            page.StepNodes(back: true);
+            Settle();
+
+            // Ebenen: die Passe der Datei - Klick als Ebene, Umschalt+Klick als Maske.
+            var passes = (IReadOnlyList<(string Name, string Label)>)Call(page, "NodePasses")!;
+            page.ShowNodeHub(editor.ToGraph(new Point(40, 40)), "layers");
+            hub = page.Hub!;
+
+            var tiles = hub.Visible.Where(v => passes.Any(p => p.Label == v.Title) && v.Alternate is not null).ToList();
+            Check.That(hub.Category == "layers" && tiles.Count == passes.Count,
+                       "bei den Ebenen stehen alle Passe der Datei als Kacheln", $"{tiles.Count} von {passes.Count}");
+
+            int mixes = page.Graph!.Nodes.OfType<MixNode>().Count();
+            tiles[0].Activate();
+            Settle();
+
+            Check.That(page.Graph!.Nodes.OfType<MixNode>().Count() == mixes + 1, "ein Klick holt den Pass als Ebene");
+
+            page.ShowNodeHub(editor.ToGraph(new Point(40, 40)), "layers");
+            var second = page.Hub!.Visible.First(v => v.Title == passes[^1].Label && v.Alternate is not null);
+            second.Alternate!();
+            Settle();
+
+            Check.That(page.Graph!.Nodes.OfType<MaskNode>().Any(m => m.Mask.Kind == MaskKind.Pass && m.Mask.Source == passes[^1].Name),
+                       "Umschalt+Klick holt ihn als Maske");
+
+            page.ShowNodeHub(editor.ToGraph(new Point(40, 40)));
+            var recent = page.Hub!.CategoryByKey("recent");
+
+            Check.That(recent is not null && recent.Groups[0].Entries.Take(2).Select(e => e.Title)
+                                                  .SequenceEqual(new[] { passes[^1].Label, passes[0].Label }),
+                       "unter Zuletzt steht, was zuletzt genommen wurde - das Neueste zuerst",
+                       string.Join(", ", recent?.Groups[0].Entries.Select(e => e.Title) ?? Array.Empty<string>()));
+
+            page.Hub!.Choose(recent);
+            Check.That(page.Hub.Category == "recent", "und der Hub oeffnet sie");
+
+            // Die Leiste unten wirkt auf den gewaehlten Knoten.
+            var light = page.Graph!.Nodes.OfType<LightNode>().FirstOrDefault() ?? (Node)page.Graph.Nodes.OfType<ViewNode>().First();
+            editor.Select(light);
+            page.ShowNodeHub(editor.ToGraph(new Point(40, 40)));
+            page.Hub!.Actions.First(a => a.Label == T("S_HubMute")).Act();
+            Settle();
+
+            Check.That(light.Muted, "Stumm in der Leiste schaltet den gewaehlten Knoten stumm");
+
+            light.Muted = false;
+
+            // Das Menue einer Zeile in der Ebenenliste.
+            var list = (NodeLayerList)page.FindName("NodeLayers");
+            var top = list.Shown.First(l => l.Mix is not null);
+
+            Call(page, "ShowLayerMenu", top);
+            var menu = page.LayerMenu!;
+
+            Check.That(new[] { "S_LayerMenuRename", "S_LayerMenuVisible", "S_LayerMenuShowInGraph", "S_LayerMenuViewAlone",
+                               "S_DuplicateLayer", "S_RemoveLayer", "S_LayerMenuClip" }.All(k => menu.Items.Contains(T(k))),
+                       "das Menue einer Ebene bietet an, was sich mit ihr tun laesst", string.Join(", ", menu.Items));
+
+            menu.Invoke(T("S_LayerMenuRename"));
+            menu.Commit("Glanz");
+
+            Check.That(top.Mix!.Label == "Glanz" && list.Shown.Any(l => l.Name == "Glanz"), "Umbenennen gibt dem Mischen den Namen",
+                       top.Mix.Label);
+
+            mixes = page.Graph!.Nodes.OfType<MixNode>().Count();
+            Call(page, "ShowLayerMenu", list.Shown.First(l => l.Mix is not null));
+            page.LayerMenu!.Invoke(T("S_DuplicateLayer"));
+            Settle();
+
+            Check.That(page.Graph!.Nodes.OfType<MixNode>().Count() == mixes + 1, "Verdoppeln verdoppelt die Ebene samt Zweig");
+
+            Call(page, "ShowLayerMenu", list.Shown.First(l => l.Mix is not null));
+            page.LayerMenu!.Invoke(T("S_LayerMenuViewAlone"));
+            Settle();
+
+            var viewed = ((NodeEditor)page.FindName("NodeView")).Viewed;
+            Check.That(viewed is not null && page.Graph.Links.Any(l => l.From == viewed.Value.Node.Id && l.To == list.Shown.First(s => s.Mix is not null).Mix!.Id && l.Input == "Oben"),
+                       "Allein im Betrachter zeigt, was in das Mischen oben hineinfliesst");
+        }
+        finally
+        {
+            window.Close();
+            try { Directory.Delete(folder, recursive: true); } catch (IOException) { }
+        }
     }
 
     /// <summary>
@@ -913,7 +1068,7 @@ public static class NodeEditInvariants
                 },
             };
 
-            Call(page, "Place", crypto, new Point(0, 0));
+            Call(page, "PlaceAt", crypto, new Point(0, 0), null!);
 
             // Die Stufen kommen nach - gewaehlt werden kann, sobald die unterste da ist.
             var loaded = (System.Collections.IDictionary)Field(page, "_sources")!;
@@ -998,7 +1153,7 @@ public static class NodeEditInvariants
 
             foreach (var node in new Node[] { new MaskMathNode(), new MapRangeNode { Auto = false }, ramp, new MaskShapeNode() })
             {
-                Call(page, "Place", node, new Point(40, 400));
+                Call(page, "PlaceAt", node, new Point(40, 400), null!);
 
                 Check.That(ReferenceEquals(editor.Selected, node) && colourFields.Children.Count > 1,
                            $"{node.GetType().Name}: der Knoten steht da, und seine Felder auch");

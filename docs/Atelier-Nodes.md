@@ -418,3 +418,40 @@ Only the alpha channel of exports changes, and only in those cases.
    - The brush knobs move size and hardness both ways within their limits, the sliders
      follow, and no mask layer appears.
 
+10. **The hub and the layer menus** (feedback after section 9).
+
+    *Done (2026-09-25).*
+    - **The hub replaces the right-click menu** in the node editor (right-click or
+      Shift+A) and the plus of the layer list. It is drawn in the app's own style instead
+      of the Windows menu. At the top is a search: type and press Enter. It searches all
+      categories, ignores case, and "ae" finds "ä". On the left are the categories, with
+      the view actions below them (all previews, arrange, show all, rebuild, viewer off).
+      On the right are the tiles:
+      - Layers: the passes of the file with thumbnails (click adds it as a layer,
+        Shift+click as a mask), new layers (adjustment layer, image as layer, image file),
+        the building blocks, and the layers in the graph with thumbnails to jump to.
+      - Masks: the mask kinds, every pass as a mask, the cryptomattes of the file.
+      - The effects in palette order with the palette's glyphs. They can also be dragged
+        into the editor, freely or onto a wire.
+      - Picture, convert, and "recent" (what was taken last, newest first).
+      At the bottom are the selected node's actions (mute, viewer, preview, duplicate,
+      delete), each with a short name.
+    - **Right-clicking a wire** opens the hub with a note: new nodes drop into that wire.
+    - **The layer lists get a menu per row**, in the same style. The stack strip offers
+      rename (new there), visible, duplicate, remove, up, down, into or out of a group,
+      and clip. Each entry takes the same path as its button. The node list offers
+      rename, visible, show in the graph, alone in the viewer (what flows into the Mix's
+      top), duplicate and delete with the branch, up, down, and clipped. Entries that
+      cannot act (the top layer up, out of no group) are greyed out and do nothing.
+
+    Tests:
+    - Hub: a right-click on the wire into the output finds "vignet" in the search, and
+      Enter inserts the vignette into that wire. All passes stand as tiles; a click adds
+      one as a layer, Shift+click another as a mask; "recent" lists both, newest first.
+      The bottom bar mutes the selected node.
+    - Menus: the stack row menu renames, hides, clips and duplicates, and omits what
+      cannot act. The node row menu renames the Mix, duplicates the layer with its
+      branch, and shows the Mix's top input alone in the viewer. The test found that
+      swapping the rename row for its text field threw in WPF; it is now removed and
+      inserted instead.
+

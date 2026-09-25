@@ -90,6 +90,9 @@ public sealed class NodeLayerList : Border
 
     public event Action<Node>? DuplicateWanted;
 
+    /// <summary>Rechtsklick auf eine Zeile - wer das Menue kennt, zeigt es.</summary>
+    public event Action<NodeLayer>? MenuWanted;
+
     /// <summary>Der Knopf zum Hinzufuegen - wer das Menue kennt, klappt es an ihm auf.</summary>
     public event Action<FrameworkElement>? AddWanted;
 
@@ -531,6 +534,12 @@ public sealed class NodeLayerList : Border
         {
             _pressed = null;
             if (layer.Target is { } target) Chosen?.Invoke(target);
+        };
+
+        row.MouseRightButtonUp += (_, e) =>
+        {
+            e.Handled = true;
+            MenuWanted?.Invoke(layer);
         };
 
         return row;

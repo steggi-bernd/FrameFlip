@@ -69,6 +69,10 @@ public partial class GradingPanel
         ("S_GroupTable", "Lut", "S_Lut", "⊞"),
     };
 
+    /// <summary>Das Zeichen einer Palettenkachel - fuer den Hub im Knoteneditor, der dieselben Zeichen zeigt.</summary>
+    internal static string? GlyphOf(string section)
+        => Sections.FirstOrDefault(s => s.Prefix == section).Glyph;
+
     /// <summary>
     /// Die Kategorien, deren Werkzeuge dem GANZEN Bild gelten. An einer Ebene werden
     /// sie nie gerechnet und sind dort gesperrt.

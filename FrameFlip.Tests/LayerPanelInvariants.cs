@@ -31,7 +31,59 @@ public static class LayerPanelInvariants
             ListReadsTopDown(panel);
             DraggingReordersTheStack(panel);
             TheEyeChoosesNothing(panel);
+            TheRowMenuDoesWhatTheButtonsDo(panel);
         });
+    }
+
+    /// <summary>
+    /// Rechtsklick auf eine Zeile: dasselbe wie die Knoepfe darunter - und Umbenennen,
+    /// das es dort nicht gibt. Was gerade nicht geht, steht grau da und tut nichts.
+    /// </summary>
+    private static void TheRowMenuDoesWhatTheButtonsDo(LayerPanel panel)
+    {
+        Check.Group("Ebenen: das Rechtsklick-Menue einer Zeile");
+
+        string T(string key) => FrameFlip.Localization.Strings.T(key);
+
+        panel.Load(Passes(), new LayerStack
+        {
+            Layers =
+            {
+                new ImageLayer { Source = "ViewLayer.DiffCol", Name = "DiffCol", Mode = BlendMode.Normal },
+                new ImageLayer { Source = "ViewLayer.GlossDir", Name = "GlossDir", Mode = BlendMode.Add },
+            },
+        });
+
+        var gloss = panel.Stack.Layers[1];
+        Select(panel, gloss);
+        panel.ShowRowMenu(gloss);
+
+        var items = panel.RowMenu!.Items;
+
+        Check.That(new[] { "S_LayerMenuRename", "S_LayerMenuVisible", "S_DuplicateLayer", "S_RemoveLayer", "S_MoveLayerDown",
+                           "S_MoveIntoGroup", "S_LayerMenuClip" }.All(k => items.Contains(T(k))),
+                   "das Menue bietet an, was die Knoepfe koennen - und Umbenennen", string.Join(", ", items));
+        Check.That(!items.Contains(T("S_MoveLayerUp")) && !items.Contains(T("S_MoveOutOfGroup")),
+                   "was nicht geht, tut nichts: die oberste Ebene hoeher, heraus aus keiner Gruppe");
+
+        panel.RowMenu.Invoke(T("S_LayerMenuRename"));
+        Check.That(panel.RowMenu.Editing?.Text == "GlossDir", "Umbenennen zeigt den alten Namen zum Aendern", panel.RowMenu.Editing?.Text);
+
+        panel.RowMenu.Commit("Glanz");
+        Check.That(gloss.Name == "Glanz", "und uebernimmt den neuen", gloss.Name);
+
+        panel.ShowRowMenu(gloss);
+        panel.RowMenu!.Invoke(T("S_LayerMenuVisible"));
+        Check.That(!gloss.Visible, "Sichtbar schaltet die Ebene aus - wie das Auge");
+
+        panel.ShowRowMenu(gloss);
+        panel.RowMenu!.Invoke(T("S_LayerMenuClip"));
+        Check.That(gloss.Clipped, "Angeschnitten schneidet sie an - wie der Knopf");
+
+        panel.ShowRowMenu(gloss);
+        panel.RowMenu!.Invoke(T("S_DuplicateLayer"));
+        Check.That(panel.Stack.Layers.Count == 3 && panel.Stack.Layers[2].Source == gloss.Source,
+                   "Verdoppeln legt dieselbe Ebene noch einmal darueber", $"{panel.Stack.Layers.Count}");
     }
 
     /// <summary>
