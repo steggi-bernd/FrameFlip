@@ -101,6 +101,7 @@ static int RunAll()
     AtelierProjectInvariants.Run();
     AtelierProjectPageInvariants.Run();
     SequenceFolderInvariants.Run();
+    WorkspaceInvariants.Run();
     NodeValueInvariants.Run();
     LayerPlacementInvariants.Run();
     PlacementDragInvariants.Run();

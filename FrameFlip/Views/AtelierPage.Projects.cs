@@ -21,6 +21,24 @@ public partial class AtelierPage
     /// <summary>Das Rezept - fuer die Probe.</summary>
     internal AtelierEditingSession Recipe => _recipe;
 
+    /// <summary>
+    /// Die Folge, an der das Atelier arbeitet - oder, solange noch kein Bild steht, die des
+    /// Bildes, das es beim ersten Anzeigen oeffnen wird. Null: keine.
+    /// </summary>
+    internal SequenceKey? ProjectKey
+    {
+        get
+        {
+            if (_projects.Current is { } open) return open;
+
+            string? path = _path ?? _settings.AtelierImage;
+            return path is { Length: > 0 } ? SequenceKey.Of(path) : null;
+        }
+    }
+
+    /// <summary>Ein Bild steht im Atelier - fuer die Uebersicht, die seine Folge zeigen soll.</summary>
+    public event Action<string>? ImageShown;
+
     private void SetUpProjects()
     {
         _projects = new AtelierProjectKeeper(_recipe, new AtelierProjectStore(), _settings, Later,

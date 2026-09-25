@@ -350,6 +350,9 @@ public sealed partial class AtelierPage : UserControl
         // ausgeblendeten Ebenen fehlt.
         if (InNodes) ShowMissingLayers();
 
+        // Die Uebersicht zeigt dieselbe Folge - siehe MainWindow, Arbeitsbereich.
+        ImageShown?.Invoke(path);
+
         // Braucht der Stapel Passe, die noch nicht gelesen sind, kommen sie
         // nachtraeglich - das Bild steht schon, waehrend sie eintreffen. Im
         // Knotenmodus fragt der Graph, was er braucht.

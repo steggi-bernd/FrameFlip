@@ -251,6 +251,7 @@ public partial class MainWindow : Window
         BuildRates();
         BuildRemoteActions();
         LoadSequences();
+        FollowAtelierAtStart();
 
         // Ein Takt fuer alles, was sich langsam aendert. Der Renderzustand kommt
         // ohnehin nur im Sekundenrhythmus herein.
@@ -482,10 +483,77 @@ public partial class MainWindow : Window
         PageContent.Content = key switch
         {
             "projects" => new ProjectsPage(OpenFromProjects),
-            "atelier" => _atelierPage ??= new AtelierPage(_decoders, _getSettings(), next => _persist?.Invoke(next)),
+            "atelier" => Atelier(),
             _ => _settingsPage ??= new SettingsPage(_getSettings, _apply, _remoteState, _layout),
         };
+
+        if (key == "atelier" && !_openingInAtelier) FollowDashboardIntoAtelier(_atelierPage!);
     }
+
+    private AtelierPage Atelier()
+    {
+        if (_atelierPage is not null) return _atelierPage;
+
+        _atelierPage = new AtelierPage(_decoders, _getSettings(), next => _persist?.Invoke(next));
+        _atelierPage.ImageShown += OnAtelierImageShown;
+        return _atelierPage;
+    }
+
+    // ================================================================ Arbeitsbereich
+
+    // Uebersicht und Atelier zeigen dieselbe Folge (docs/Projekte-und-Masken.md, Punkt 7):
+    // Die Auswahl hier bestimmt, woran das Atelier arbeitet, und was das Atelier oeffnet,
+    // wird hier gezeigt. Geladen wird im Atelier erst, wenn es angezeigt wird - eine
+    // 4K-Datei im Hintergrund zu lesen, waehrend jemand nur durch Sequenzen blaettert,
+    // kostet Speicher fuer nichts.
+
+    /// <summary>Waehrend "Im Atelier oeffnen" ein bestimmtes Bild oeffnet, folgt das Atelier nicht der Uebersicht.</summary>
+    private bool _openingInAtelier;
+
+    /// <summary>Beim Start: die Folge, an der das Atelier zuletzt gearbeitet hat.</summary>
+    private void FollowAtelierAtStart()
+    {
+        if (_getSettings().AtelierImage is not { Length: > 0 } last || !File.Exists(last)) return;
+        if (Path.GetDirectoryName(last) is not { } folder) return;
+        if (_current is { } shown && SameFolder(shown.Folder, folder)) return;
+
+        if (!SelectFolder(folder)) OpenPath(last);
+    }
+
+    /// <summary>
+    /// Ins Atelier: Zeigt die Uebersicht eine andere Folge, oeffnet das Atelier das Bild, auf
+    /// dem sie steht - samt dem Projekt dieser Folge. Bei derselben Folge behaelt das
+    /// Atelier sein eigenes Bild.
+    /// </summary>
+    private void FollowDashboardIntoAtelier(AtelierPage atelier)
+    {
+        if (_current is null || FramePath(_playback.Head) is not { } frame) return;
+        if (FrameFlip.Atelier.SequenceKey.Of(frame) is not { } key || key.Equals(atelier.ProjectKey)) return;
+
+        atelier.Open(frame);
+    }
+
+    /// <summary>Das Atelier zeigt ein Bild: die Uebersicht zeigt seine Folge - und merkt sie sich.</summary>
+    private void OnAtelierImageShown(string path)
+    {
+        if (Path.GetDirectoryName(path) is not { } folder) return;
+        if (_current is { } shown && SameFolder(shown.Folder, folder)) return;
+
+        if (!SelectFolder(folder)) OpenPath(path);
+    }
+
+    private bool SelectFolder(string folder)
+    {
+        var entry = _sequences.Entries.FirstOrDefault(e => SameFolder(e.Folder, folder));
+        if (entry is null) return false;
+
+        Select(entry);
+        return true;
+    }
+
+    private static bool SameFolder(string a, string b)
+        => a.Length > 0 && b.Length > 0 &&
+           string.Equals(Path.GetFullPath(a).TrimEnd('\\', '/'), Path.GetFullPath(b).TrimEnd('\\', '/'), StringComparison.OrdinalIgnoreCase);
 
     /// <summary>
     /// Von aussen auf die Einstellungen schalten - der Weg, den AppHost geht, wenn
@@ -1239,7 +1307,12 @@ public partial class MainWindow : Window
     /// <summary>Ein Bild ins Atelier - der Reiter wechselt, und das Atelier oeffnet es.</summary>
     internal void OpenInAtelier(string path)
     {
-        NavAtelier.IsChecked = true;
+        // Dieses Bild und nicht das, auf dem die Uebersicht steht.
+        _openingInAtelier = true;
+
+        try { NavAtelier.IsChecked = true; }
+        finally { _openingInAtelier = false; }
+
         _atelierPage?.Open(path);
     }
 
