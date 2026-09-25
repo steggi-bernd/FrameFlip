@@ -168,7 +168,7 @@ public partial class AtelierPage
     {
         if (_graph is null) return;
 
-        _settings.AtelierNodes = _graph.Save();
+        _recipe.Nodes = _graph.Save();
 
         // Ein Zug an einem Wert ist zu Ende, wenn sein Stand festgehalten wird.
         _valueEditOpen = false;

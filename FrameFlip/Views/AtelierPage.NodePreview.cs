@@ -42,11 +42,11 @@ public partial class AtelierPage
     /// her), der gespeicherte.
     /// </summary>
     private NodeGraph FreshFromStack()
-        => StackToGraph.Convert(Stack(), _settings.Adjustments ?? ImageAdjustments.Neutral,
-                                _settings.Grading ?? new GradingStack());
+        => StackToGraph.Convert(Stack(), _recipe.Adjustments ?? ImageAdjustments.Neutral,
+                                _recipe.Grading ?? new GradingStack());
 
     private LayerStack Stack()
-        => Layers.Stack.Layers.Count > 0 ? Layers.Stack : _settings.Layers ?? Layers.Stack;
+        => Layers.Stack.Layers.Count > 0 ? Layers.Stack : _recipe.Layers ?? Layers.Stack;
 
     /// <summary>
     /// Sagt in der Ebenenliste, welche ausgeblendeten Ebenen des Stapels dem Graphen fehlen.

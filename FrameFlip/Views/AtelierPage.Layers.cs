@@ -101,7 +101,7 @@ public partial class AtelierPage
     /// </summary>
     private void OnLayersChanged(bool interim)
     {
-        _settings.Layers = Layers.Stack;
+        _recipe.Layers = Layers.Stack;
 
         ShowLayerCount();
 

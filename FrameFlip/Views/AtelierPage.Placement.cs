@@ -233,7 +233,7 @@ public partial class AtelierPage
         {
             StopDragFrames();
 
-            _settings.Layers = Layers.Stack;
+            _recipe.Layers = Layers.Stack;
             Layers.PlaceMovedOutside(false);
 
             return;
@@ -310,7 +310,7 @@ public partial class AtelierPage
         if (layer is null) return;
 
         layer.Place = place;
-        _settings.Layers = Layers.Stack;
+        _recipe.Layers = Layers.Stack;
 
         if (!interim)
         {
