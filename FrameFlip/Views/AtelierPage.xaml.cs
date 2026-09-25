@@ -179,6 +179,7 @@ public sealed partial class AtelierPage : UserControl
 
         SetUpBatch();
         SetUpView();
+        SetUpProjects();
 
         _settle.Tick += (_, _) =>
         {
@@ -307,6 +308,11 @@ public sealed partial class AtelierPage : UserControl
 
         _base = loaded;
         _sources[""] = loaded;
+
+        // Eine andere Folge ist ein anderes Projekt - mit seinem eigenen Rezept. Das
+        // bisherige wird dabei geschrieben. Erst hier und nicht beim Oeffnen: Eine Datei,
+        // die sich nicht lesen laesst, wechselt kein Projekt.
+        if (_projects.Enter(path)) ApplyProject();
 
         // Erst jetzt gemerkt, nicht beim Oeffnen: Eine Datei, die sich nicht lesen
         // laesst, soll beim naechsten Start nicht wieder versucht werden.

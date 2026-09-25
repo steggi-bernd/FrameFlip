@@ -276,6 +276,10 @@ public partial class MainWindow : Window
 
         Closed += (_, _) =>
         {
+            // Das Projekt des Ateliers geht mit dem Fenster - vorher wird es geschrieben.
+            // Das Programm laeuft danach im Tray weiter.
+            _atelierPage?.Flush();
+
             _frames.Dispose();
             _videos.Dispose();
             Strings.Changed -= OnLanguageChanged;

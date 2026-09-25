@@ -14,9 +14,12 @@ namespace FrameFlip.Tests;
 
 /// <summary>
 /// Wo das Rezept des Ateliers landet - Grundregler und Werkzeuge des fertigen Bildes,
-/// der Ebenenstapel, der Graph - und wann. Die Charakterisierung vor der
-/// Bearbeitungssitzung (Refactoring-Studio, S2): Nach dem Umbau muessen dieselben Felder
-/// zu denselben Zeitpunkten dasselbe enthalten und geschrieben werden.
+/// der Ebenenstapel, der Graph - und wann.
+///
+/// Zuerst die Charakterisierung vor der Bearbeitungssitzung (Refactoring-Studio, S2):
+/// damals in den Einstellungen. Seit den Projektdateien (docs/Projekte-und-Masken.md,
+/// Phase C) im Rezept des Projekts der Folge; die Einstellungen behalten nur das Bild,
+/// das zuletzt offen war.
 /// </summary>
 public static class AtelierRecipeInvariants
 {
@@ -24,7 +27,7 @@ public static class AtelierRecipeInvariants
 
     public static void Run()
     {
-        Check.Group("Atelier: wo das Rezept landet");
+        Check.Group("Atelier: wo das Rezept landet - im Projekt der Folge");
 
         string folder = Path.Combine(Path.GetTempPath(), "frameflip-rezept-" + Guid.NewGuid().ToString("N")[..8]);
         Directory.CreateDirectory(folder);
@@ -53,20 +56,24 @@ public static class AtelierRecipeInvariants
             var tools = (GradingPanel)page.FindName("Tools");
             var exposure = (Slider)tools.FindName("ExposureSlider");
 
+            var recipe = page.Recipe;
+
             // Nach dem Oeffnen: der Stapel ist der des Streifens, das fertige Bild hat seinen
-            // Stand in den Einstellungen, und das Bild ist gemerkt und geschrieben.
-            Check.That(ReferenceEquals(settings.Layers, strip.Stack) && settings.Grading is not null &&
-                       settings.Adjustments is not null && settings.AtelierImage == path && persisted >= 1,
-                       "nach dem Oeffnen: Stapel, Werkzeuge und Grundregler des Bildes stehen in den Einstellungen");
+            // Stand im Rezept, und das Bild ist in den Einstellungen gemerkt und geschrieben.
+            Check.That(ReferenceEquals(recipe.Layers, strip.Stack) && recipe.Grading is not null &&
+                       recipe.Adjustments is not null && settings.AtelierImage == path && persisted >= 1,
+                       "nach dem Oeffnen: Stapel, Werkzeuge und Grundregler des Bildes stehen im Rezept des Projekts");
+            Check.That(settings.Layers is null && settings.AtelierRecipeMoved,
+                       "die Einstellungen halten keinen Stapel mehr - nur, dass das Rezept uebernommen ist");
 
             // Ein Regler am fertigen Bild: Grundregler und Werkzeugstand wandern sofort mit.
             int writes = persisted;
             exposure.Value = 0.6;
 
-            Check.Near(settings.Adjustments!.Exposure, 0.6, 1e-6, "ein Regler am Bild steht sofort in den Einstellungen");
-            Check.That(Same(settings.Grading, tools.Stack), "und der Werkzeugstand des Bildes auch - als eigene Kopie");
-            Check.That(!ReferenceEquals(settings.Grading, tools.Stack), "nicht als der Stapel des Streifens selbst");
-            Check.That(persisted == writes, "geschrieben wird dabei nicht - nur im Speicher");
+            Check.Near(recipe.Adjustments!.Exposure, 0.6, 1e-6, "ein Regler am Bild steht sofort im Rezept");
+            Check.That(Same(recipe.Grading, tools.Stack), "und der Werkzeugstand des Bildes auch - als eigene Kopie");
+            Check.That(!ReferenceEquals(recipe.Grading, tools.Stack), "nicht als der Stapel des Streifens selbst");
+            Check.That(persisted == writes && recipe.Dirty, "die Einstellungen werden dabei nicht geschrieben - das Projekt ist ungespeichert");
 
             // Eine Einstellungsebene: ihre Werte gehoeren der Ebene, das Bild bleibt.
             strip.AddAdjustment();
@@ -74,9 +81,9 @@ public static class AtelierRecipeInvariants
             exposure.Value = -1.25;
 
             Check.Near(layer.Adjustments!.Exposure, -1.25, 1e-6, "an einer Ebene gehoert der Regler der Ebene");
-            Check.Near(settings.Adjustments!.Exposure, 0.6, 1e-6, "das fertige Bild bleibt, wie es war");
-            Check.That(ReferenceEquals(settings.Layers, strip.Stack) && settings.Layers!.Layers.Contains(layer),
-                       "die Ebene steht im Stapel der Einstellungen");
+            Check.Near(recipe.Adjustments!.Exposure, 0.6, 1e-6, "das fertige Bild bleibt, wie es war");
+            Check.That(ReferenceEquals(recipe.Layers, strip.Stack) && recipe.Layers!.Layers.Contains(layer),
+                       "die Ebene steht im Stapel des Rezepts");
 
             // Zurueck zum Bild: sein Stand kommt aus den Einstellungen zurueck.
             var pass = strip.Stack.Layers.First(l => l.Content == LayerContent.Pass);
@@ -84,14 +91,16 @@ public static class AtelierRecipeInvariants
 
             Check.Near(exposure.Value, 0.6, 1e-6, "zurueck am Bild steht der Regler wieder auf dessen Wert");
 
-            // Knoten: Der Graph kommt als Text in die Einstellungen und wird geschrieben.
-            writes = persisted;
+            // Knoten: Der Graph kommt als Text ins Rezept und mit dem Projekt in die Datei.
             page.ConvertToNodes();
-            Pump(() => settings.AtelierNodes is not null);
+            Pump(() => recipe.Nodes is not null);
+            page.Flush();
 
-            Check.That(settings.AtelierNodes is { Length: > 0 } && page.Graph is not null &&
-                       settings.AtelierNodes == page.Graph.Save() && persisted > writes,
-                       "umgewandelt steht der Graph als Text in den Einstellungen und ist geschrieben");
+            var written = page.Projects.Current is { } key ? page.Projects.Store.Load(key) : null;
+
+            Check.That(recipe.Nodes is { Length: > 0 } && page.Graph is not null && recipe.Nodes == page.Graph.Save() &&
+                       written?.Nodes is not null && settings.AtelierNodes is null,
+                       "umgewandelt steht der Graph im Rezept und in der Projektdatei - nicht in den Einstellungen");
         }
         finally
         {

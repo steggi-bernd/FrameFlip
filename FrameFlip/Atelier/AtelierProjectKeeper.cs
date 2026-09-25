@@ -48,7 +48,6 @@ internal sealed class AtelierProjectKeeper
     private readonly Action<Action> _dispatch;
 
     private Action? _cancelAutosave;
-    private Task _writing = Task.CompletedTask;
     private string? _frame;
     private bool _frameChanged;
 
@@ -169,10 +168,8 @@ internal sealed class AtelierProjectKeeper
         var project = recipe.ToProject(_frame);
         _frameChanged = false;
 
-        _writing = _writing.ContinueWith(_ =>
+        _store.Enqueue(key, project, written =>
         {
-            bool written = _store.Save(key, project);
-
             _dispatch(() =>
             {
                 if (written)
@@ -186,9 +183,15 @@ internal sealed class AtelierProjectKeeper
                        : _session.Dirty ? AtelierSaveState.Unsaved
                        : AtelierSaveState.Saved);
             });
-        }, TaskScheduler.Default);
+        });
 
         if (wait) Wait();
+    }
+
+    /// <summary>Schreibt, was noch nicht geschrieben ist - ohne darauf zu warten. Wenn die Seite geht.</summary>
+    public void Settle()
+    {
+        if (Current is not null && (_session.Dirty || _frameChanged)) Save();
     }
 
     /// <summary>Schreibt, was noch nicht geschrieben ist, und wartet darauf - beim Ende.</summary>
@@ -198,11 +201,7 @@ internal sealed class AtelierProjectKeeper
         else Wait();
     }
 
-    private void Wait()
-    {
-        try { _writing.Wait(TimeSpan.FromSeconds(10)); }
-        catch (AggregateException) { /* ein fehlgeschlagener Schreibvorgang hat sich schon gemeldet */ }
-    }
+    private static void Wait() => AtelierProjectStore.WaitForWrites(TimeSpan.FromSeconds(10));
 
     private void OnChanged()
     {

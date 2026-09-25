@@ -129,6 +129,10 @@ internal sealed class AtelierEditingSession
         get => _store.Nodes;
         set
         {
+            // Derselbe Text ist keine Aenderung - der Graph wird nach jedem Zug festgehalten,
+            // auch wenn der Zug nichts bewegt hat, und ungespeichert soll nur heissen, was es ist.
+            if (string.Equals(_store.Nodes, value, StringComparison.Ordinal)) return;
+
             _store.Nodes = value;
             Touch();
         }

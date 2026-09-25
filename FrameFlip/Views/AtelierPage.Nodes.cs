@@ -34,6 +34,10 @@ public partial class AtelierPage
     /// </summary>
     private void RestoreNodes()
     {
+        // Mit Projektdateien bringt das erste Bild sein Projekt und damit seinen Graphen
+        // mit. Der Graph in den Einstellungen ist dann nur noch die Sicherung von vorher.
+        if (_settings.AtelierRecipeMoved) return;
+
         if (_recipe.Nodes is not { Length: > 0 } json) return;
 
         var graph = NodeGraph.Load(json);

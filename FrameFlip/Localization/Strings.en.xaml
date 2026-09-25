@@ -1162,4 +1162,10 @@
     <sys:String x:Key="S_BrushSpacing">Spacing</sys:String>
     <sys:String x:Key="S_BrushSpacingHint">How far apart the dabs of a stroke lie, measured against the radius. 25 % is a smooth stroke, at 200 % the dabs just touch, above that gaps appear. Ctrl and the mouse wheel over the picture set it too.</sys:String>
     <sys:String x:Key="S_BrushHint">Flow and opacity are not the same: one says how much a SINGLE stroke lays down, the other where even ten strokes stop. At opacity 0.3 the mask stays just under a third however often you go over it. Hold Alt to erase.</sys:String>
+    <sys:String x:Key="S_ProjectSave">Save</sys:String>
+    <sys:String x:Key="S_ProjectSaveHint">Saves this sequence's project now (Ctrl+S). It also saves itself two seconds after the last change – in the FrameFlip folder next to the images.</sys:String>
+    <sys:String x:Key="S_ProjectSavedAt">Saved {0}</sys:String>
+    <sys:String x:Key="S_ProjectOpen">Project open</sys:String>
+    <sys:String x:Key="S_ProjectUnsaved">Not saved</sys:String>
+    <sys:String x:Key="S_ProjectSaveFailed">Saving failed</sys:String>
 </ResourceDictionary>

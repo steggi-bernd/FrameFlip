@@ -134,9 +134,44 @@ internal sealed class AtelierProjectStore
     /// <summary>Wo das Projekt zuletzt geschrieben wurde - fuer die Anzeige.</summary>
     public string? LastWritten { get; private set; }
 
+    private static readonly object Gate = new();
+
+    /// <summary>
+    /// Die Schreibvorgaenge aller Seiten, der Reihe nach. Prozessweit und nicht je Seite:
+    /// Eine Seite, die geht, schreibt vielleicht noch, waehrend die naechste dieselbe
+    /// Folge oeffnet - und die soll den neuen Stand lesen, nicht den davor.
+    /// </summary>
+    private static Task s_pending = Task.CompletedTask;
+
+    /// <summary>
+    /// Reiht einen Schreibvorgang ein. <paramref name="done"/> erfaehrt im Hintergrund, ob
+    /// geschrieben wurde. Der Abdruck muss fertig sein - geschrieben wird er spaeter.
+    /// </summary>
+    internal Task Enqueue(SequenceKey key, AtelierProject project, Action<bool> done)
+    {
+        lock (Gate)
+        {
+            s_pending = s_pending.ContinueWith(_ => done(Save(key, project)), TaskScheduler.Default);
+            return s_pending;
+        }
+    }
+
+    /// <summary>Wartet, bis alles Eingereihte geschrieben ist - beim Ende und vor dem Lesen.</summary>
+    internal static void WaitForWrites(TimeSpan timeout)
+    {
+        Task pending;
+        lock (Gate) pending = s_pending;
+
+        try { pending.Wait(timeout); }
+        catch (AggregateException) { /* ein fehlgeschlagener Schreibvorgang hat sich schon gemeldet */ }
+    }
+
     /// <summary>Liest das Projekt einer Folge - oder null, wenn es keines gibt oder es sich nicht lesen laesst.</summary>
     public AtelierProject? Load(SequenceKey key)
     {
+        // Erst schreiben lassen, was noch unterwegs ist.
+        WaitForWrites(TimeSpan.FromSeconds(10));
+
         foreach (string path in new[] { PrimaryPath(key), FallbackPath(key) })
         {
             try

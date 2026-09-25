@@ -24,6 +24,17 @@
                            Style="{StaticResource DashLabel}"
                            TextTrimming="CharacterEllipsis" MaxWidth="460"
                            Text="{DynamicResource S_NoImage}" />
+
+                <!--
+                    Das Projekt der Folge speichert sich von selbst. Der Knopf ist fuer den
+                    Moment, in dem man sicher sein will - und der Text daneben sagt, ob man
+                    es schon ist.
+                -->
+                <Button x:Name="SaveButton" Style="{StaticResource OverlayButton}" Margin="14,0,0,0"
+                        Content="{DynamicResource S_ProjectSave}" Click="OnSaveClicked" IsEnabled="False"
+                        ToolTip="{DynamicResource S_ProjectSaveHint}" />
+                <TextBlock x:Name="SaveText" VerticalAlignment="Center" Margin="8,0,0,0"
+                           Style="{StaticResource DashLabel}" FontSize="9" />
             </StackPanel>
 
             <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center">
