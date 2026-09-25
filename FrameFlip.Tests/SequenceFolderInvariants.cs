@@ -19,7 +19,21 @@ public static class SequenceFolderInvariants
     public static void Run()
     {
         TheControllerListsRememberedFolders();
-        TheWindowTakesDroppedFolders();
+        KeepingContext(TheWindowTakesDroppedFolders);
+    }
+
+    /// <summary>
+    /// Laesst eine Probe laufen und stellt danach den Synchronisationskontext wieder her.
+    /// Der Testaufbau des Dashboards und der Schnell-Export setzen den des
+    /// Oberflaechenfadens; stehen gelassen, landeten die Fortschrittsmeldungen spaeterer
+    /// Gruppen in einer Warteschlange, die niemand abarbeitet.
+    /// </summary>
+    private static void KeepingContext(Action probe)
+    {
+        var previous = SynchronizationContext.Current;
+
+        try { probe(); }
+        finally { SynchronizationContext.SetSynchronizationContext(previous); }
     }
 
     private static void TheControllerListsRememberedFolders()

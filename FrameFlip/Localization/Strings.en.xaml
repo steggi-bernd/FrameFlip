@@ -1169,4 +1169,6 @@
     <sys:String x:Key="S_ProjectOpen">Project open</sys:String>
     <sys:String x:Key="S_ProjectUnsaved">Not saved</sys:String>
     <sys:String x:Key="S_ProjectSaveFailed">Saving failed</sys:String>
+    <sys:String x:Key="S_QuickExport">Quick export</sys:String>
+    <sys:String x:Key="S_QuickExportHint">Exports without asking into the FrameFlip folder next to the images – or into the chosen target folder. Each export gets a new number (render_FrameFlip_001, _002 …), nothing is overwritten. A sequence goes into its own folder, a single image stays an image.</sys:String>
 </ResourceDictionary>

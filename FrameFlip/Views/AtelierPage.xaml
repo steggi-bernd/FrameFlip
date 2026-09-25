@@ -269,6 +269,16 @@
                     <TextBlock x:Name="BatchStatus" VerticalAlignment="Center" Margin="0,0,12,0"
                                Style="{StaticResource DashLabel}" FontSize="9" />
 
+                    <!--
+                        Schnell-Export: kein Dialog, kein Ziel noetig - in den Ordner FrameFlip
+                        neben den Bildern oder den gewaehlten Zielordner, unter dem naechsten
+                        freien Namen. Er ueberschreibt nie.
+                    -->
+                    <Button x:Name="QuickExportButton" Style="{StaticResource OverlayButton}"
+                            Content="{DynamicResource S_QuickExport}" Click="OnQuickExportClicked"
+                            ToolTip="{DynamicResource S_QuickExportHint}"
+                            IsEnabled="False" MinWidth="110" Margin="0,0,8,0" />
+
                     <Button x:Name="RunButton" Style="{StaticResource OverlayButton}"
                             Content="{DynamicResource S_RunBatch}" Click="OnRunClicked"
                             IsEnabled="False" MinWidth="120" />
