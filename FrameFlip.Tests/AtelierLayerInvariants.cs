@@ -1416,6 +1416,42 @@ public static class AtelierLayerInvariants
                        "und legt dabei keine Ebene an - erst der Strich tut das",
                        $"{strip.Stack.Layers.Count} statt {before}");
 
+            // Groesse und Haerte am Bild: Strg und ziehen. Nach rechts groesser und
+            // haerter, die Regler oben ziehen mit, und gemalt wird dabei nichts.
+            var brushPanel = (PropertiesPanel)page.FindName("Properties");
+            var centre = new System.Windows.Point(frame.ActualWidth / 2, frame.ActualHeight / 2);
+            float radius = frame.BrushRadius, hardness = frame.BrushHardness;
+
+            frame.BeginKnob(centre, PlacementAdorner.BrushKnob.Size);
+            frame.MoveKnob(centre + new System.Windows.Vector(40, 0));
+
+            Check.That(frame.BrushRadius > radius && Math.Abs(brushPanel.BrushRadius - frame.BrushRadius) < 0.01f,
+                       "Strg und nach rechts ziehen macht den Pinsel groesser - und der Regler zieht mit",
+                       $"{radius:0.0} -> {frame.BrushRadius:0.0}, Regler {brushPanel.BrushRadius:0.0}");
+
+            frame.MoveKnob(centre + new System.Windows.Vector(-100000, 0));
+
+            Check.That(frame.BrushRadius >= 1 && Math.Abs(brushPanel.BrushRadius - frame.BrushRadius) < 0.01f,
+                       "und nach links kleiner - aber nie unter einen Punkt", $"{frame.BrushRadius:0.0}");
+
+            frame.EndKnob();
+            frame.BeginKnob(centre, PlacementAdorner.BrushKnob.Hardness);
+            frame.MoveKnob(centre + new System.Windows.Vector(-60, 0));
+
+            Check.That(frame.BrushHardness < hardness && Math.Abs(brushPanel.BrushHardness - frame.BrushHardness) < 0.001f,
+                       "Strg und rechte Taste stellen die Haerte ein - ebenso mit dem Regler",
+                       $"{hardness:0.00} -> {frame.BrushHardness:0.00}");
+
+            frame.MoveKnob(centre + new System.Windows.Vector(100000, 0));
+            frame.EndKnob();
+
+            Check.That(frame.BrushHardness == 1f && frame.Knob == PlacementAdorner.BrushKnob.None &&
+                       strip.Stack.Layers.Count == before,
+                       "hoechstens ganz hart - und beim Einstellen entsteht keine Maskenebene",
+                       $"{frame.BrushHardness:0.00}, {strip.Stack.Layers.Count} Ebenen");
+
+            brushPanel.SetBrush(radius, hardness);
+
             page.HandleToolKey(System.Windows.Input.Key.V);
             page.UpdateLayout();
 

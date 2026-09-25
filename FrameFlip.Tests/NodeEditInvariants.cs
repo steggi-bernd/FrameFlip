@@ -43,6 +43,204 @@ public static class NodeEditInvariants
         ThePageBuildsAndUndoes();
         ThePageWiresPassesAndPicks();
         ThePageFetchesHiddenLayers();
+        ThePageSurvivesWiring();
+    }
+
+    /// <summary>
+    /// Kabel ziehen wie jemand, der ausprobiert: jeder Knoten an sich selbst, dann
+    /// zufaellig von irgendeinem Anschluss zu irgendeinem - auf der Seite, mit Rechnen,
+    /// Vorschauen und Ebenenliste dahinter. Nichts davon darf eine Ausnahme werfen.
+    /// </summary>
+    private static void ThePageSurvivesWiring()
+    {
+        Check.Group("Knoten bauen: Ausprobieren bringt die Seite nicht zum Absturz");
+
+        string folder = Path.Combine(Path.GetTempPath(), "frameflip-kabel-" + Guid.NewGuid().ToString("N")[..8]);
+        Directory.CreateDirectory(folder);
+
+        string path = Path.Combine(folder, "render_0001.exr");
+        File.WriteAllBytes(path, CryptoSample.Bytes());
+
+        var page = new AtelierPage(FrameDecoderRegistry.CreateDefault(() => null), new AppSettings(), _ => { });
+        var window = Window(page);
+        var crashes = new List<string>();
+
+        void Caught(object sender, DispatcherUnhandledExceptionEventArgs e)
+        {
+            crashes.Add(e.Exception.GetType().Name + ": " + e.Exception.Message);
+            e.Handled = true;
+        }
+
+        Dispatcher.CurrentDispatcher.UnhandledException += Caught;
+
+        try
+        {
+            page.Open(path);
+
+            var size = (TextBlock)page.FindName("SourceText");
+            if (!Pump(TimeSpan.FromSeconds(10), () => size.Text.Length > 0))
+            {
+                Check.That(false, "die Datei wird geladen");
+                return;
+            }
+
+            Settle();
+            page.ConvertToNodes();
+            ((ToolColumn)page.FindName("MouseTools")).Select(AtelierTool.Nodes, notify: true);
+            Settle();
+
+            var editor = (NodeEditor)page.FindName("NodeView");
+            var passes = (IReadOnlyList<(string Name, string Label)>)Call(page, "NodePasses")!;
+
+            // Etwas zum Verbinden: zwei Passe als Ebenen und eine Maske.
+            foreach (var (name, _) in passes.Take(2))
+            {
+                editor.Select(null);
+                Call(page, "AddPassLayer", name, null!);
+            }
+
+            Settle();
+            editor.Frame();
+            editor.UpdateLayout();
+
+            void Step(Action act, string what)
+            {
+                try
+                {
+                    act();
+                    Pump(TimeSpan.FromMilliseconds(60), () => false);
+                }
+                catch (Exception e)
+                {
+                    var inner = e is System.Reflection.TargetInvocationException { InnerException: { } real } ? real : e;
+                    string where = inner.StackTrace?.Split(Environment.NewLine).FirstOrDefault()?.Trim() ?? "";
+                    crashes.Add($"{what}: {inner.GetType().Name}: {inner.Message} @ {where}");
+                }
+            }
+
+            // Jeder Knoten an sich selbst - in beide Richtungen.
+            int links = page.Graph!.Links.Count;
+
+            foreach (var node in page.Graph.Nodes.ToList())
+            {
+                foreach (var output in node.Outputs)
+                {
+                    foreach (var input in node.Inputs)
+                    {
+                        Step(() =>
+                        {
+                            if (editor.BeginWire(editor.ScreenOf(node, output.Name, input: false)))
+                                editor.FinishWire(editor.ScreenOf(node, input.Name, input: true));
+                        }, $"{node.GetType().Name}.{output.Name} an sich selbst");
+
+                        Step(() =>
+                        {
+                            if (editor.BeginWire(editor.ScreenOf(node, input.Name, input: true)))
+                                editor.FinishWire(editor.ScreenOf(node, output.Name, input: false));
+                        }, $"{node.GetType().Name}.{input.Name} rueckwaerts an sich selbst");
+                    }
+                }
+            }
+
+            Check.That(crashes.Count == 0, "jeder Knoten an sich selbst - keine Ausnahme", string.Join(" | ", crashes.Take(3)));
+
+            // Wer ein Kabel am eigenen Eingang packt und es auf den eigenen Ausgang fallen
+            // laesst, hat danach nicht weniger Kabel: Ein Anschluss, der nicht passt, legt
+            // das Kabel zurueck. Nur ins Leere geworfen ist es weg.
+            Check.That(page.Graph!.Links.Count == links, "an sich selbst gesteckt, geht auch kein Kabel verloren",
+                       $"{links} vorher, {page.Graph.Links.Count} nachher");
+            Check.That(page.Graph!.Order() is not null && !page.Graph.Links.Any(l => l.From == l.To),
+                       "und keine Verbindung eines Knotens mit sich selbst",
+                       string.Join(", ", page.Graph.Links.Where(l => l.From == l.To).Select(l => $"{l.From}.{l.Output}->{l.Input}")));
+
+            // Und wenn doch einmal das Rechnen wirft - hier ein Pass, dessen Bild kuerzer ist,
+            // als es sagt, wie nach einer halb gelesenen Datei: Der Fehler steht im Editor,
+            // und die Seite rechnet weiter, sobald er weg ist. Dass es wirklich wirft, prueft
+            // erst das Modell.
+            var sourcesOnPage = (Dictionary<string, FloatFrame>)Field(page, "_sources")!;
+            string passKey = sourcesOnPage.Keys.First(k => k.Length > 0 && page.Graph!.Nodes.OfType<RenderNode>().Single().Passes.Contains(k) &&
+                                                           page.Graph.Links.Any(l => l.Output == k));
+            var intact = sourcesOnPage[passKey];
+            var torn = new FloatFrame
+            {
+                Width = intact.Width,
+                Height = intact.Height,
+                R = new float[7],
+                G = new float[7],
+                B = new float[7],
+                IsSceneReferred = intact.IsSceneReferred,
+            };
+
+            var probeSources = new Dictionary<string, FloatFrame>(sourcesOnPage, StringComparer.Ordinal) { [passKey] = torn };
+            var probeBuffer = Marshal.AllocHGlobal(sourcesOnPage[""].Width * sourcesOnPage[""].Height * 4);
+            bool throws = false;
+
+            try
+            {
+                GraphEvaluator.Render(page.Graph!, new GraphInputs { Sources = probeSources, View = View }, probeBuffer, sourcesOnPage[""].Width * 4);
+            }
+            catch (Exception)
+            {
+                throws = true;
+            }
+            finally
+            {
+                Marshal.FreeHGlobal(probeBuffer);
+            }
+
+            Check.That(throws, "ein zerrissenes Passbild wirft beim Rechnen - der Fall fuer das Netz");
+
+            sourcesOnPage[passKey] = torn;
+            Step(() => Call(page, "Refresh", false, false), "zerrissener Pass");
+            Settle();
+
+            Check.That(crashes.Count == 0 && editor.Warning is { } failed &&
+                       failed.StartsWith(Localization.Strings.T("S_NodeWarnFailed", "").Split(':')[0], StringComparison.Ordinal),
+                       "was beim Rechnen wirft, steht als Fehler im Editor - ohne dass die Seite abstuerzt",
+                       editor.Warning + " | " + string.Join(" | ", crashes.Take(2)));
+
+            sourcesOnPage[passKey] = intact;
+            Step(() => Call(page, "Refresh", false, false), "Pass wieder heil");
+            Settle();
+
+            Check.That(crashes.Count == 0 && editor.Warning is null && Pixels(page).Any(b => b != 0),
+                       "ist der Fehler weg, rechnet die Seite wieder, und die Meldung verschwindet", editor.Warning);
+
+            // Dann wild: von irgendeinem Anschluss zu irgendeinem.
+            var random = new Random(4711);
+
+            for (int step = 0; step < 80 && crashes.Count == 0; step++)
+            {
+                var sockets = page.Graph!.Nodes
+                    .SelectMany(n => n.Inputs.Select(s => (Node: n, s.Name, Input: true))
+                                     .Concat(n.Outputs.Select(s => (Node: n, s.Name, Input: false))))
+                    .ToList();
+
+                var a = sockets[random.Next(sockets.Count)];
+                var b = sockets[random.Next(sockets.Count)];
+
+                Step(() =>
+                {
+                    if (editor.BeginWire(editor.ScreenOf(a.Node, a.Name, a.Input)))
+                        editor.FinishWire(editor.ScreenOf(b.Node, b.Name, b.Input));
+                }, $"{a.Node.GetType().Name}.{a.Name} -> {b.Node.GetType().Name}.{b.Name}");
+
+                if (random.Next(8) == 0)
+                    Step(() => page.StepNodes(back: true), "Rueckgaengig");
+            }
+
+            Settle();
+
+            Check.That(crashes.Count == 0, "80 zufaellige Kabel mit Rechnen dahinter - keine Ausnahme", string.Join(" | ", crashes.Take(3)));
+            Check.That(page.Graph!.Order() is not null, "und der Graph hat keinen Kreis");
+
+        }
+        finally
+        {
+            Dispatcher.CurrentDispatcher.UnhandledException -= Caught;
+            window.Close();
+            try { Directory.Delete(folder, recursive: true); } catch (IOException) { }
+        }
     }
 
     /// <summary>

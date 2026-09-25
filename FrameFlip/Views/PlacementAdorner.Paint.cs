@@ -1,8 +1,10 @@
+using System.Globalization;
 using System.Windows;
 using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
 using FrameFlip.Imaging.Grading;
+using FrameFlip.Localization;
 
 using Brush = System.Windows.Media.Brush;
 using Color = System.Windows.Media.Color;
@@ -60,6 +62,82 @@ public sealed partial class PlacementAdorner
 
     /// <summary>Es wurde gemalt. <c>interim</c> heisst: der Strich laeuft noch.</summary>
     public event Action<bool>? Painted;
+
+    /// <summary>Groesse oder Haerte wurden am Bild gezogen - die Regler sollen nachziehen.</summary>
+    public event Action? BrushAdjusted;
+
+    /// <summary>Was ein Zug mit gedrueckter Strg-Taste einstellt.</summary>
+    internal enum BrushKnob { None, Size, Hardness }
+
+    private BrushKnob _knob;
+
+    /// <summary>Wo der Zug begann - dort bleibt der Ring stehen, waehrend er sich aendert.</summary>
+    private Point _knobAnchor;
+
+    private float _knobStart;
+
+    /// <summary>Wie viel Haerte ein Schirmpunkt nach rechts bringt: 200 Punkte von weich bis hart.</summary>
+    private const double HardnessPerPoint = 1.0 / 200;
+
+    /// <summary>Der groesste Radius, den die Regler zulassen - 400 Punkte Durchmesser.</summary>
+    private const float MaxRadius = 200f;
+
+    /// <summary>Ob gerade Groesse oder Haerte gezogen wird - fuer die Probe.</summary>
+    internal BrushKnob Knob => _knob;
+
+    /// <summary>
+    /// Beginnt das Einstellen am Bild: Strg und linke Taste die Groesse, Strg und rechte
+    /// die Haerte. Waagrecht gezogen - nach rechts groesser und haerter. Gemalt wird
+    /// dabei nicht, und eine Maske entsteht auch keine.
+    /// </summary>
+    internal void BeginKnob(Point at, BrushKnob knob)
+    {
+        _knob = knob;
+        _knobAnchor = at;
+        _knobStart = knob == BrushKnob.Size ? BrushRadius : BrushHardness;
+
+        CaptureMouse();
+        InvalidateVisual();
+    }
+
+    /// <summary>
+    /// Der Zug geht weiter. Bei der Groesse folgt die Kante des Rings der Maus: Ein
+    /// Schirmpunkt nach rechts ist ein Schirmpunkt mehr Radius, gleich wie weit das
+    /// Bild gerade vergroessert ist.
+    /// </summary>
+    internal void MoveKnob(Point at)
+    {
+        double dx = at.X - _knobAnchor.X;
+
+        if (_knob == BrushKnob.Size)
+            BrushRadius = (float)Math.Clamp(_knobStart + dx / Math.Max(ReachOnScreen, 1e-6), 1, MaxRadius);
+        else if (_knob == BrushKnob.Hardness)
+            BrushHardness = (float)Math.Clamp(_knobStart + dx * HardnessPerPoint, 0, 1);
+        else
+            return;
+
+        BrushAdjusted?.Invoke();
+        InvalidateVisual();
+    }
+
+    internal void EndKnob()
+    {
+        if (_knob == BrushKnob.None) return;
+
+        _knob = BrushKnob.None;
+        ReleaseMouseCapture();
+        InvalidateVisual();
+    }
+
+    /// <summary>Faengt Strg plus Maustaste ab - dann wird eingestellt statt gemalt.</summary>
+    private bool KnobPressed(MouseButtonEventArgs e, BrushKnob knob)
+    {
+        if ((Keyboard.Modifiers & ModifierKeys.Control) == 0) return false;
+
+        BeginKnob(e.GetPosition(this), knob);
+        e.Handled = true;
+        return true;
+    }
 
     /// <summary>
     /// Woher eine Maske kommt, wenn noch keine da ist - beim ERSTEN Strich gefragt.
@@ -167,6 +245,12 @@ public sealed partial class PlacementAdorner
         // Der Pinselkreis am Zeiger - sonst weiss niemand, wie gross er ist, und der
         // Zeiger selbst ist ausgeblendet. Er haengt NICHT an der Maske: Vor dem
         // ersten Strich gibt es noch keine, und genau dann braucht man ihn am meisten.
+        if (_knob != BrushKnob.None)
+        {
+            RenderKnob(context);
+            return;
+        }
+
         if (!IsMouseOver) return;
 
         var at = Mouse.GetPosition(this);
@@ -175,6 +259,66 @@ public sealed partial class PlacementAdorner
         context.DrawEllipse(null, Shadow, at, radius + 1, radius + 1);
         context.DrawEllipse(null, new Pen(Ring, 1), at, radius, radius);
     }
+
+    /// <summary>
+    /// Waehrend Groesse oder Haerte gezogen werden: der Ring an der Stelle, an der der
+    /// Zug begann, gefuellt mit dem Abfall des Pinsels - innen deckend bis zur harten
+    /// Kante, dann auslaufend. Daneben die beiden Zahlen, die gezogene hervorgehoben.
+    /// </summary>
+    private void RenderKnob(DrawingContext context)
+    {
+        var at = _knobAnchor;
+        double radius = Math.Max(1, BrushRadius * ReachOnScreen);
+        double hard = Math.Clamp(BrushHardness, 0f, 0.999f);
+
+        var fill = new RadialGradientBrush
+        {
+            GradientStops =
+            {
+                new GradientStop(Color.FromArgb(0x70, 0xFF, 0xFF, 0xFF), 0),
+                new GradientStop(Color.FromArgb(0x70, 0xFF, 0xFF, 0xFF), hard),
+                new GradientStop(Color.FromArgb(0x00, 0xFF, 0xFF, 0xFF), 1),
+            },
+        };
+        fill.Freeze();
+
+        context.DrawEllipse(fill, null, at, radius, radius);
+        context.DrawEllipse(null, Shadow, at, radius + 1, radius + 1);
+        context.DrawEllipse(null, new Pen(Ring, 1.5), at, radius, radius);
+
+        // Die harte Kante als eigener, gestrichelter Ring.
+        var dashed = new Pen(Ring, 1) { DashStyle = DashStyles.Dash };
+        dashed.Freeze();
+        context.DrawEllipse(null, dashed, at, radius * hard, radius * hard);
+
+        string size = Strings.T("S_BrushSize") + " " + (BrushRadius * 2).ToString("0", CultureInfo.CurrentCulture);
+        string hardness = Strings.T("S_BrushHardness") + " " + BrushHardness.ToString("0.00", CultureInfo.CurrentCulture);
+
+        var first = KnobLabel(size, _knob == BrushKnob.Size);
+        var second = KnobLabel(hardness, _knob == BrushKnob.Hardness);
+
+        double x = at.X + radius + 12;
+        double y = at.Y - (first.Height + second.Height + 4) / 2;
+
+        // Rechts vom Ring, ausser er ragt dort aus dem Bild - dann links.
+        if (x + Math.Max(first.Width, second.Width) + 16 > ActualWidth)
+            x = at.X - radius - 12 - Math.Max(first.Width, second.Width) - 16;
+
+        var box = new Rect(x, y - 4, Math.Max(first.Width, second.Width) + 16, first.Height + second.Height + 12);
+        context.DrawRoundedRectangle(KnobBack, null, box, 4, 4);
+        context.DrawText(first, new Point(x + 8, y));
+        context.DrawText(second, new Point(x + 8, y + first.Height + 4));
+    }
+
+    private static readonly Brush KnobBack = Frozen(Color.FromArgb(0xD8, 0x18, 0x18, 0x1E));
+    private static readonly Brush KnobActive = Frozen(Color.FromArgb(0xFF, 0xFF, 0xFF, 0xFF));
+    private static readonly Brush KnobQuiet = Frozen(Color.FromArgb(0xFF, 0xA8, 0xA8, 0xB4));
+
+    private FormattedText KnobLabel(string text, bool active) => new(
+        text, CultureInfo.CurrentCulture, FlowDirection.LeftToRight,
+        new Typeface(new System.Windows.Media.FontFamily("Segoe UI"), FontStyles.Normal, active ? FontWeights.SemiBold : FontWeights.Normal,
+                     FontStretches.Normal),
+        12, active ? KnobActive : KnobQuiet, VisualTreeHelper.GetDpi(this).PixelsPerDip);
 
     /// <summary>
     /// Baut den Schleier - einmal je Aenderung und nicht je Bildwiederholung.
@@ -278,6 +422,8 @@ public sealed partial class PlacementAdorner
 
     private void PaintMove(float x, float y)
     {
+        if (_knob != BrushKnob.None) return;
+
         if (!_painting || _mask is null)
         {
             // Der Kreis folgt dem Zeiger, auch wenn nicht gemalt wird.

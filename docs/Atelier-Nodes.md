@@ -147,7 +147,7 @@ Only the alpha channel of exports changes, and only in those cases.
    render data, and took no moved alpha from them; clipped layers leaked outside placed
    carriers; groups and clipping reported the wrong coverage; hiding the picture layer
    while an adjustment layer was visible crashed the composer.
-2. **Overlay.** The node button in the tool column shows the graph over the dimmed picture.
+2. **Overlay.** The node button in the tool column shows the graph over the picture (dimmed at first; since section 9 the picture stays undimmed).
    You can show, move, zoom and select nodes. The selected node's settings appear in the
    colour panel. The first thing to try in the app.
 
@@ -384,3 +384,37 @@ Only the alpha channel of exports changes, and only in those cases.
      all readers follow when inserting, not just those above; delete leaves the branch.
    - In the page: dropping, the buttons, blend mode and opacity change picture and list,
      and undo restores the bytes.
+
+9. **Safety and clarity** (feedback after section 8).
+
+   *Done (2026-09-25).*
+   - **No self-connection, no lost wires.** The editor already refused a node wired to
+     itself, and any loop. But a wire grabbed at a connected input and dropped on a socket
+     that does not fit (its own node's output, or any socket of the same direction) was
+     treated as dropped into empty space: the connection was gone, and the picture went
+     black. That looked like a crash. Now any socket that does not fit puts the wire back
+     and says why. Only empty space disconnects.
+   - **A failing computation is named, not swallowed.** The app swallows unhandled errors,
+     so an exception while computing the graph left the picture frozen. The page now
+     catches it, clears cache and pool, shows the error in the editor and suggests Ctrl+Z.
+     The next successful computation clears it.
+   - **The picture stays true.** The 60 % black veil behind the nodes is gone, because it
+     falsified exactly what one grades with the graph open. Node bodies are opaque anyway;
+     wires get a dark halo so they stay visible on bright pictures.
+   - **Brush size and hardness on the picture.** Ctrl with the left button dragged
+     sideways sets the size, Ctrl with the right button the hardness. The ring stays where
+     the drag began and shows the brush falloff, with both values beside it. The sliders
+     follow live. Nothing is painted, and no mask layer is created.
+
+   Tests:
+   - 1500 random editing steps on random graphs (connect, disconnect, insert, delete,
+     duplicate, mute, move layers, viewer on any output). After each step the graph is
+     computed, laid out, listed and saved. None throws, none builds a loop, and no node
+     accepts itself.
+   - On the page: every node wired to itself in both directions loses no wire, and 80
+     random drags with computing behind them throw nothing. A torn pass picture (arrays
+     shorter than it claims) throws in the model, shows as an error on the page and clears
+     once the picture is whole again. Without the safety net that test turns red.
+   - The brush knobs move size and hardness both ways within their limits, the sliders
+     follow, and no mask layer appears.
+

@@ -951,11 +951,13 @@
     <sys:String x:Key="S_NodeOutputHint">Was hier ankommt, ist die Vorschau und der Export.</sys:String>
     <sys:String x:Key="S_NodePaintHint">Mit dem Pinsel links malen, solange dieser Knoten gewählt ist.</sys:String>
     <sys:String x:Key="S_NodeWhySelf">Ein Knoten kann sich nicht selbst speisen.</sys:String>
+    <sys:String x:Key="S_NodeWhyDirection">Ein Kabel verbindet immer einen Ausgang mit einem Eingang – das Kabel bleibt, wo es war.</sys:String>
     <sys:String x:Key="S_NodeWhyMissing">Diesen Anschluss gibt es nicht.</sys:String>
     <sys:String x:Key="S_NodeWhyType">Das passt nicht zusammen – eine Maske ist kein Bild.</sys:String>
     <sys:String x:Key="S_NodeWhySource">Hier muss ein gelesenes Bild ankommen – direkt aus „Datei“ oder einer Bilddatei, kein gerechnetes.</sys:String>
     <sys:String x:Key="S_NodeWhyLoop">Das ergäbe einen Kreis: Der Knoten speiste sich über Umwege selbst.</sys:String>
     <sys:String x:Key="S_NodeWarnOutput">Die Ausgabe ist nicht verbunden – es gibt kein Bild. Ein Kabel an „Ausgabe“ stecken oder Strg+Z.</sys:String>
+    <sys:String x:Key="S_NodeWarnFailed">Der Graph ließ sich nicht rechnen: {0} – Strg+Z nimmt den letzten Schritt zurück.</sys:String>
     <sys:String x:Key="S_NodeMenuLayers">Ebenen</sys:String>
     <sys:String x:Key="S_NodeMenuMasks">Masken</sys:String>
     <sys:String x:Key="S_NodeMenuPicture">Bild</sys:String>
@@ -1096,7 +1098,7 @@
     <sys:String x:Key="S_GroupTable">Tabelle</sys:String>
     <sys:String x:Key="S_ToolBrush">Pinsel</sys:String>
     <sys:String x:Key="S_ToolBrushHint">Pinsel (B) - trägt eine Maske von Hand auf. Alt hält gedrückt nimmt wieder weg. Die Ebene braucht dafür eine gemalte Maske; die Maske liegt beim Malen als farbiger Schleier über dem Bild, sonst sähe man nur ihre Wirkung.</sys:String>
-    <sys:String x:Key="S_ToolBrushShort">Malt eine Maske – beim ersten Strich entsteht dafür eine Maskenebene. Rechte Maustaste oder Alt nimmt weg.</sys:String>
+    <sys:String x:Key="S_ToolBrushShort">Malt eine Maske – beim ersten Strich entsteht dafür eine Maskenebene. Rechte Maustaste oder Alt nimmt weg. Strg und ziehen stellt die Größe ein, Strg und rechte Maustaste ziehen die Härte.</sys:String>
     <sys:String x:Key="S_MaskPainted">Gemalt</sys:String>
     <sys:String x:Key="S_MaskLock">für alle Bilder</sys:String>
     <sys:String x:Key="S_MaskLockHint">Gesperrt gilt ein Anstrich für die ganze Sequenz. Entsperrt gilt je Bild ein eigener — dann lässt sich ein einzelnes Bild retuschieren, ohne die anderen anzufassen. Beim Entsperren wandert der bisherige Anstrich auf das aktuelle Bild, statt verworfen zu werden.</sys:String>

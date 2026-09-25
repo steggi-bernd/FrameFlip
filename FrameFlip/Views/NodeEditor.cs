@@ -313,6 +313,9 @@ public sealed class NodeEditor : FrameworkElement
     private string? _wireSocket;
     private bool _wireFromInput;
     private NodeLink? _lifted;
+
+    /// <summary>Der Anschluss, an dem das Kabel gepackt wurde - dort losgelassen, war es ein Klick.</summary>
+    private (string Node, string Socket, bool Input)? _wirePressed;
     private Point _wireEnd;
     private Dictionary<(string, string, bool), string?>? _fits;
     private (Node Node, Socket Socket, bool Input)? _hover;
@@ -475,6 +478,7 @@ public sealed class NodeEditor : FrameworkElement
     private void StartWire((Node Node, Socket Socket, bool Input) socket, Point at)
     {
         _lifted = null;
+        _wirePressed = (socket.Node.Id, socket.Socket.Name, socket.Input);
 
         if (socket.Input && _graph!.Into(socket.Node.Id, socket.Socket.Name) is { } link &&
             _graph.Find(link.From) is { } source)
@@ -805,18 +809,30 @@ public sealed class NodeEditor : FrameworkElement
         // Die Liste der passenden Anschluesse VOR dem Aufraeumen festhalten - EndDrag
         // vergisst sie, und danach hiesse jeder Anschluss "passt nicht".
         var fits = _fits;
+        var pressed = _wirePressed;
 
         _warning = null;
         EndDrag();
 
-        if (target is { } t && t.Input != fromInput)
+        // Dort losgelassen, wo gepackt wurde: ein Klick, kein Zug - nichts aendert sich.
+        if (target is { } same && pressed == (same.Node.Id, same.Socket.Name, same.Input)) return;
+
+        if (target is { } t)
         {
-            string? why = fits is not null && fits.TryGetValue((t.Node.Id, t.Socket.Name, t.Input), out var reason)
-                ? reason
-                : "S_NodeWhyMissing";
+            // Auf einem Anschluss derselben Richtung - zwei Ausgaenge, zwei Eingaenge - gibt
+            // es keine Verbindung. Am eigenen Knoten heisst das: an sich selbst.
+            string? why = t.Input == fromInput
+                ? (ReferenceEquals(t.Node, node) ? "S_NodeWhySelf" : "S_NodeWhyDirection")
+                : fits is not null && fits.TryGetValue((t.Node.Id, t.Socket.Name, t.Input), out var reason)
+                    ? reason
+                    : "S_NodeWhyMissing";
 
             // An einen Anschluss, der nicht passt: nichts aendert sich, und der Grund
-            // steht oben links, bis zum naechsten Zug.
+            // steht oben links, bis zum naechsten Zug. Das gilt auch fuer ein Kabel, das
+            // von einem Eingang geloest wurde - es kommt zurueck an seinen Platz. Frueher
+            // war es dann weg: Wer einen Knoten an sich selbst stecken wollte, indem er
+            // das Kabel an seinem Eingang packte und auf seinen Ausgang zog, verlor die
+            // Verbindung, und das Bild wurde schwarz.
             if (why is not null)
             {
                 Warning = Translate?.Invoke(why) ?? why;
@@ -837,7 +853,7 @@ public sealed class NodeEditor : FrameworkElement
             return;
         }
 
-        // Ins Leere: Ein geloestes Kabel ist damit weg, ein neues war nie da.
+        // Wirklich ins Leere: Ein geloestes Kabel ist damit weg, ein neues war nie da.
         if (lifted is not null)
         {
             Editing?.Invoke();
@@ -1013,8 +1029,19 @@ public sealed class NodeEditor : FrameworkElement
 
     // ------------------------------------------------------------ Zeichnen
 
-    /// <summary>Das Bild dahinter bleibt zu sehen, nur gedaempft - genug, um die Knoten zu lesen.</summary>
-    private static readonly Brush Dim = Frozen(new SolidColorBrush(Color.FromArgb(0x9A, 0x0C, 0x0C, 0x10)));
+    /// <summary>
+    /// Die Flaeche hinter den Knoten: durchsichtig, aber sie faengt die Maus.
+    ///
+    /// Frueher lag hier ein Schleier aus 60 % Schwarz - huebsch, und er machte die Knoten
+    /// leicht lesbar. Aber er faelschte genau das, wofuer man den Graphen offen hat: Wer
+    /// an einer Farbe dreht, sah das Bild dunkler und flauer, als es ist, und musste den
+    /// Graphen ausblenden, um es wirklich zu sehen. Jetzt steht das Bild unverfaelscht da;
+    /// die Knoten haben ihren eigenen deckenden Koerper, die Kabel einen dunklen Saum.
+    /// </summary>
+    private static readonly Brush Catch = Brushes.Transparent;
+
+    /// <summary>Der Saum unter jedem Kabel - damit es auch auf einem hellen Bild zu sehen ist.</summary>
+    private static readonly Brush Halo = Frozen(new SolidColorBrush(Color.FromArgb(0x90, 0x08, 0x08, 0x0C)));
 
     private static readonly Brush Body = Frozen(new SolidColorBrush(Color.FromArgb(0xF0, 0x23, 0x23, 0x2A)));
     private static readonly Pen Outline = Frozen(new Pen(new SolidColorBrush(Color.FromRgb(0x3A, 0x3A, 0x46)), 1));
@@ -1074,7 +1101,7 @@ public sealed class NodeEditor : FrameworkElement
 
     protected override void OnRender(DrawingContext dc)
     {
-        dc.DrawRectangle(Dim, null, new Rect(0, 0, ActualWidth, ActualHeight));
+        dc.DrawRectangle(Catch, null, new Rect(0, 0, ActualWidth, ActualHeight));
 
         if (_graph is null) return;
 
@@ -1212,8 +1239,13 @@ public sealed class NodeEditor : FrameworkElement
                       Math.Max(1.2, 2 * Math.Min(1, Zoom)));
         pen.Freeze();
 
+        var path = Path(a, b);
+        var halo = new Pen(Halo, pen.Thickness + 3);
+        halo.Freeze();
+
         dc.PushOpacity(landing ? 1 : from.Muted || to.Muted ? 0.35 : 0.85);
-        dc.DrawGeometry(null, pen, Path(a, b));
+        dc.DrawGeometry(null, halo, path);
+        dc.DrawGeometry(null, pen, path);
         dc.Pop();
     }
 

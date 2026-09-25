@@ -60,6 +60,16 @@ public partial class PropertiesPanel : UserControl
         e.Handled = true;
     }
 
+    /// <summary>
+    /// Setzt Groesse und Haerte von aussen - wenn sie am Bild mit Strg gezogen wurden.
+    /// Die Regler ziehen mit, als haette man an ihnen gedreht.
+    /// </summary>
+    public void SetBrush(float radius, float hardness)
+    {
+        BrushSizeSlider.Value = Math.Clamp(radius * 2, BrushSizeSlider.Minimum, BrushSizeSlider.Maximum);
+        BrushHardnessSlider.Value = Math.Clamp(hardness, BrushHardnessSlider.Minimum, BrushHardnessSlider.Maximum);
+    }
+
     private void ShowBrushValues()
     {
         BrushSizeValue.Text = $"{BrushSizeSlider.Value:0}";

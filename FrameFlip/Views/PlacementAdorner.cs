@@ -224,6 +224,8 @@ public sealed partial class PlacementAdorner : FrameworkElement
             return;
         }
 
+        if (KnobPressed(e, BrushKnob.Hardness)) return;
+
         if (Canvas(e.GetPosition(this), out float px, out float py)) PaintDown(e, px, py, erase: true);
     }
 
@@ -231,6 +233,13 @@ public sealed partial class PlacementAdorner : FrameworkElement
     {
         if (_mode == AdornerMode.Paint)
         {
+            if (Knob != BrushKnob.None)
+            {
+                EndKnob();
+                e.Handled = true;
+                return;
+            }
+
             PaintUp(e);
             return;
         }
@@ -242,6 +251,8 @@ public sealed partial class PlacementAdorner : FrameworkElement
     {
         if (_mode == AdornerMode.Paint)
         {
+            if (KnobPressed(e, BrushKnob.Size)) return;
+
             if (Canvas(e.GetPosition(this), out float px, out float py)) PaintDown(e, px, py);
             return;
         }
@@ -290,6 +301,12 @@ public sealed partial class PlacementAdorner : FrameworkElement
     {
         if (_mode == AdornerMode.Paint)
         {
+            if (Knob != BrushKnob.None)
+            {
+                MoveKnob(e.GetPosition(this));
+                return;
+            }
+
             if (Canvas(e.GetPosition(this), out float px, out float py)) PaintMove(px, py);
             return;
         }
@@ -335,6 +352,13 @@ public sealed partial class PlacementAdorner : FrameworkElement
     {
         if (_mode == AdornerMode.Paint)
         {
+            if (Knob != BrushKnob.None)
+            {
+                EndKnob();
+                e.Handled = true;
+                return;
+            }
+
             PaintUp(e);
             return;
         }

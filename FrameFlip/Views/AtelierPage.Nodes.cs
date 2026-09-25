@@ -180,11 +180,42 @@ public partial class AtelierPage
         };
 
         WantPreviews();
-        bool done = GraphEvaluator.Render(_graph, inputs, target, stride);
+
+        bool done;
+
+        try
+        {
+            done = GraphEvaluator.Render(_graph, inputs, target, stride);
+        }
+        catch (Exception e) when (e is not OutOfMemoryException)
+        {
+            // Ein Graph, der sich nicht rechnen laesst, darf die Seite nicht anhalten. Die
+            // App verschluckt unbehandelte Fehler - das Bild bliebe stehen, jeder weitere
+            // Zug liefe in denselben Fehler, und von aussen saehe das aus wie ein Absturz.
+            // Hier wird er benannt, und was halb gerechnet war, wird verworfen.
+            _cache.Clear();
+            _pool.Clear();
+            _renderFailed = true;
+
+            NodeView.Warning = Strings.T("S_NodeWarnFailed", (e as AggregateException)?.InnerException?.Message ?? e.Message);
+            Configuration.SettingsStore.Trace("Knoten: " + e);
+
+            return false;
+        }
+
+        // Nach einem Fehler, der behoben ist, gilt wieder, was der Aufbau sagt.
+        if (_renderFailed)
+        {
+            _renderFailed = false;
+            ShowNodeWarning();
+        }
 
         ShowPreviews();
         return done;
     }
+
+    /// <summary>Ob die letzte Rechnung mit einem Fehler endete - dann steht er im Editor.</summary>
+    private bool _renderFailed;
 
     /// <summary>
     /// Die Verteilung im Knotenmodus: gemessen am fertig gerechneten Bild.

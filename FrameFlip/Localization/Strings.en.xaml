@@ -951,11 +951,13 @@
     <sys:String x:Key="S_NodeOutputHint">What arrives here is the preview and the export.</sys:String>
     <sys:String x:Key="S_NodePaintHint">Paint with the brush on the left while this node is selected.</sys:String>
     <sys:String x:Key="S_NodeWhySelf">A node cannot feed itself.</sys:String>
+    <sys:String x:Key="S_NodeWhyDirection">A wire always joins an output to an input – the wire stays where it was.</sys:String>
     <sys:String x:Key="S_NodeWhyMissing">This socket does not exist.</sys:String>
     <sys:String x:Key="S_NodeWhyType">These do not fit – a mask is not an image.</sys:String>
     <sys:String x:Key="S_NodeWhySource">This needs an image as read – straight from “File” or an image file, not a computed one.</sys:String>
     <sys:String x:Key="S_NodeWhyLoop">That would make a loop: the node would feed itself in a roundabout way.</sys:String>
     <sys:String x:Key="S_NodeWarnOutput">The output is not connected – there is no picture. Plug a wire into “Output”, or Ctrl+Z.</sys:String>
+    <sys:String x:Key="S_NodeWarnFailed">The graph could not be computed: {0} – Ctrl+Z undoes the last step.</sys:String>
     <sys:String x:Key="S_NodeMenuLayers">Layers</sys:String>
     <sys:String x:Key="S_NodeMenuMasks">Masks</sys:String>
     <sys:String x:Key="S_NodeMenuPicture">Picture</sys:String>
@@ -1096,7 +1098,7 @@
     <sys:String x:Key="S_GroupTable">Table</sys:String>
     <sys:String x:Key="S_ToolBrush">Brush</sys:String>
     <sys:String x:Key="S_ToolBrushHint">Brush (B) - paints a mask by hand. Holding Alt takes it away again. The layer needs a painted mask for this; while painting the mask lies over the picture as a coloured wash, because otherwise you would only see its effect.</sys:String>
-    <sys:String x:Key="S_ToolBrushShort">Paints a mask – the first stroke creates a mask layer for it. Right mouse button or Alt erases.</sys:String>
+    <sys:String x:Key="S_ToolBrushShort">Paints a mask – the first stroke creates a mask layer for it. Right mouse button or Alt erases. Ctrl-drag sets the size, Ctrl with the right button the hardness.</sys:String>
     <sys:String x:Key="S_MaskPainted">Painted</sys:String>
     <sys:String x:Key="S_MaskLock">all frames</sys:String>
     <sys:String x:Key="S_MaskLockHint">Locked, one painting applies to the whole sequence. Unlocked, each frame gets its own - then a single frame can be retouched without touching the others. On unlocking, the painting so far moves to the current frame rather than being discarded.</sys:String>
