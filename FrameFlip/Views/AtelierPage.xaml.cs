@@ -121,6 +121,10 @@ public sealed partial class AtelierPage : UserControl
         _settings = settings;
         _persist = persist;
 
+        // Zugestellt wird wie bisher mit Invoke: Die Rueckgabe kommt vom Lesefaden und
+        // wartet, bis die Seite sie uebernommen hat.
+        _source = new Atelier.AtelierSourceSession(ReadSource, action => Dispatcher.Invoke(action));
+
         InitializeComponent();
 
         SetUpDock();
@@ -218,17 +222,14 @@ public sealed partial class AtelierPage : UserControl
     internal Func<string, (FloatFrame? Frame, IReadOnlyList<ExrPass> Passes, IReadOnlyList<CryptomatteSet> Cryptomattes)>? Reader { get; set; }
 
     /// <summary>
-    /// Zaehlt jedes Oeffnen. Eine Rueckgabe aus dem Hintergrund, die eine andere Nummer
-    /// traegt, gehoert zu einem Oeffnen, das inzwischen abgeloest ist - auch wenn ihr Pfad
-    /// wieder stimmt, weil jemand von A ueber B zurueck zu A gegangen ist.
+    /// Das Oeffnen: laufende Anfrage, Lesen im Hintergrund, Zustellung nur dessen, was noch
+    /// gilt. Siehe <see cref="Atelier.AtelierSourceSession"/>.
     /// </summary>
-    private long _opened;
+    private readonly Atelier.AtelierSourceSession _source;
 
     /// <summary>Oeffnet ein Bild - der Weg, den auch die Projektseite nehmen kann.</summary>
     public void Open(string path)
     {
-        long opened = ++_opened;
-
         _path = path;
 
         // Die Bildnummer aus dem Dateinamen. Sie ist der Wurf fuer das Filmkorn,
@@ -244,26 +245,14 @@ public sealed partial class AtelierPage : UserControl
         BusyBadge.Visibility = Visibility.Visible;
         EmptyHint.Visibility = Visibility.Collapsed;
 
-        // Lesen und Auspacken dauert bei 4K spuerbar lange; auf dem Oberflaechenfaden
-        // staende dabei das ganze Fenster.
-        var read = Reader ?? Load;
+        _source.Open(path, loaded => Show(loaded.Path, loaded.Frame, loaded.Passes, loaded.Cryptomattes));
+    }
 
-        Task.Run(() => read(path)).ContinueWith(task =>
-        {
-            var loaded = task.IsCompletedSuccessfully
-                ? task.Result
-                : (null, Array.Empty<ExrPass>(), Array.Empty<CryptomatteSet>());
-
-            Dispatcher.Invoke(() =>
-            {
-                // Waehrend gelesen wurde, kam ein neueres Oeffnen - dessen Bild gilt. Vorher
-                // uebernahm die Seite hier jedes Ergebnis: Ein langsames A nach einem schnellen
-                // B zeigte A, hielt B fuer offen und merkte sich A fuer den naechsten Start.
-                if (opened != _opened) return;
-
-                Show(path, loaded.Frame, loaded.Passes, loaded.Cryptomattes);
-            });
-        });
+    /// <summary>Liest eine Datei fuer die Quellsitzung - ueber <see cref="Reader"/>, wenn die Probe einen setzt.</summary>
+    private Atelier.AtelierSource ReadSource(string path)
+    {
+        var (frame, passes, cryptomattes) = (Reader ?? Load)(path);
+        return new Atelier.AtelierSource(path, frame, passes, cryptomattes);
     }
 
     private void Show(string path, FloatFrame? loaded, IReadOnlyList<ExrPass> passes,

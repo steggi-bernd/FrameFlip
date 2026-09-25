@@ -202,7 +202,7 @@ public partial class AtelierPage
         if (!_sourceThumbsBusy.Add(key) || _base is null) return null;
 
         string? path = _path;
-        long opened = _opened;
+        long opened = _source.Opened;
         var view = ViewFor(_base);
 
         Task.Run(() => read() is { } frame ? NodePreviews.Draw(frame, view) : null)
@@ -211,7 +211,7 @@ public partial class AtelierPage
                 _sourceThumbsBusy.Remove(key);
 
                 // Waehrend gelesen wurde, kann eine andere Datei geoeffnet worden sein.
-                if (opened != _opened || !string.Equals(path, _path, StringComparison.Ordinal)) return;
+                if (!_source.IsCurrent(opened) || !string.Equals(path, _path, StringComparison.Ordinal)) return;
                 if (!task.IsCompletedSuccessfully || task.Result is not { } thumb) return;
 
                 var image = BitmapSource.Create(thumb.Width, thumb.Height, 96, 96, PixelFormats.Bgra32, null,
@@ -323,7 +323,7 @@ public partial class AtelierPage
         if (passes.Count == 0 || signature == _passThumbsFor) return;
 
         _passThumbsBusy = true;
-        long opened = _opened;
+        long opened = _source.Opened;
         var view = ViewFor(_base);
 
         Task.Run(() =>
@@ -342,7 +342,7 @@ public partial class AtelierPage
             _passThumbsBusy = false;
 
             // Waehrend gelesen wurde, kann eine andere Datei geoeffnet worden sein.
-            if (opened != _opened || !string.Equals(path, _path, StringComparison.Ordinal)) return;
+            if (!_source.IsCurrent(opened) || !string.Equals(path, _path, StringComparison.Ordinal)) return;
 
             _passThumbsFor = signature;
             _passThumbs.Clear();
