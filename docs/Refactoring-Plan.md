@@ -3,6 +3,10 @@
 Dieser Fahrplan hält die Reihenfolge und den erreichten Stand der Strukturarbeit
 fest. Jeder Schnitt baut auf einem getesteten Sicherheits- und Funktionsstand auf.
 
+**Geändert am 25. September:** S0–S2 werden vorgezogen. Projektzustand je
+Sequenz, Autosave und Maskenverlauf bauen auf der `AtelierEditingSession` auf; siehe
+[Projekte, Masken und Autosave](Projekte-und-Masken.md). S3–S6 bleiben am Ende.
+
 **Priorität nach Nutzerentscheidung vom 20. September:** Zuerst D2
 (Watch-Lebenszyklus), danach D1 (Dashboard) und die übrigen offenen Schnitte
 (Android, feldweise Protokolltypen, Relay/Bridge nur bei Bedarf).

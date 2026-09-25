@@ -7,6 +7,11 @@ die laufende, noch uncommittete Arbeit an Farbbereichsmasken. Der Name im Code
 und in der Navigation ist weiterhin **Atelier**. Alle Arbeitspakete unten sind
 **geplant**, nicht in dieser Dokumentationsänderung implementiert oder getestet.
 
+**Vorgezogen am 25. September:** S0–S2 kommen vor den übrigen Schnitten, weil
+Projektzustand, Autosave und Maskenverlauf darauf aufbauen
+([Projekte, Masken und Autosave](Projekte-und-Masken.md)). S3–S6 bleiben zurückgestellt.
+Vor dem Einstieg die Befunde unten gegen den aktuellen Stand prüfen.
+
 **Zurückgestellt nach Nutzerentscheidung vom 20. September:** Dieser Bereich
 wird erst nach den übrigen Refactoring-Schritten bearbeitet. D2, D1 und der
 übrige Gesamtplan hängen nicht von S0 ab. Vor dem späteren Einstieg die
