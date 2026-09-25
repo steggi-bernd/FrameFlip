@@ -894,7 +894,7 @@
     <sys:String x:Key="S_DockAsTab">as a tab here</sys:String>
     <sys:String x:Key="S_DockAsGroup">as its own panel here</sys:String>
     <sys:String x:Key="S_ToolNodes">Nodes</sys:String>
-    <sys:String x:Key="S_ToolNodesShort">Drag moves; drag from a socket connects. Right-click or Shift+A adds, Del deletes, Ctrl+Z undoes, M mutes, Home shows everything, Ctrl+Shift+Click shows a node in the viewer.</sys:String>
+    <sys:String x:Key="S_ToolNodesShort">Drag moves; drag from a socket connects. Right-click or Shift+A adds, Del or Backspace deletes, Ctrl+Z undoes, M mutes, Home shows everything, Ctrl+Shift+Click shows a node in the viewer.</sys:String>
     <sys:String x:Key="S_ToolNodesHint">Nodes (N) – how the picture is built, as a graph over the picture. Another tool hides it; Move and Brush then act on the selected node.</sys:String>
     <sys:String x:Key="S_LayersInNodes">In node mode the layers are nodes in the graph – the Nodes tool on the left shows them.</sys:String>
     <sys:String x:Key="S_NodeOfferTitle">Convert to nodes?</sys:String>
@@ -1042,7 +1042,8 @@
     <sys:String x:Key="S_HubPassMasks">Pass as mask</sys:String>
     <sys:String x:Key="S_HubNew">New</sys:String>
     <sys:String x:Key="S_HubBlocks">Building blocks</sys:String>
-    <sys:String x:Key="S_HubInGraph">Layers in the graph – a click jumps there</sys:String>
+    <sys:String x:Key="S_HubInGraph">Layers in the graph</sys:String>
+    <sys:String x:Key="S_HubInGraphHint">Click: its picture as a new node · Shift+click: jump there</sys:String>
     <sys:String x:Key="S_HubRecent">Recent</sys:String>
     <sys:String x:Key="S_HubCrypto">Cryptomattes</sys:String>
     <sys:String x:Key="S_HubIntoWire">New nodes drop into the wire: {0} → {1}</sys:String>

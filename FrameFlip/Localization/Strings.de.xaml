@@ -894,7 +894,7 @@
     <sys:String x:Key="S_DockAsTab">als Reiter hier</sys:String>
     <sys:String x:Key="S_DockAsGroup">als eigenes Feld hier</sys:String>
     <sys:String x:Key="S_ToolNodes">Knoten</sys:String>
-    <sys:String x:Key="S_ToolNodesShort">Ziehen verschiebt, an Anschlüssen verbindet. Rechtsklick oder Umschalt+A fügt hinzu, Entf löscht, Strg+Z macht rückgängig, M schaltet stumm, Pos1 zeigt alles, Strg+Umschalt+Klick zeigt einen Knoten im Betrachter.</sys:String>
+    <sys:String x:Key="S_ToolNodesShort">Ziehen verschiebt, an Anschlüssen verbindet. Rechtsklick oder Umschalt+A fügt hinzu, Entf oder Rücktaste löscht, Strg+Z macht rückgängig, M schaltet stumm, Pos1 zeigt alles, Strg+Umschalt+Klick zeigt einen Knoten im Betrachter.</sys:String>
     <sys:String x:Key="S_ToolNodesHint">Knoten (N) – der Aufbau des Bildes als Graph über dem Bild. Ein anderes Werkzeug blendet ihn aus; Verschieben und Pinsel wirken dann auf den gewählten Knoten.</sys:String>
     <sys:String x:Key="S_LayersInNodes">Im Knotenmodus stehen die Ebenen als Knoten im Graphen – das Werkzeug „Knoten“ links zeigt sie.</sys:String>
     <sys:String x:Key="S_NodeOfferTitle">In Knoten umwandeln?</sys:String>
@@ -1042,7 +1042,8 @@
     <sys:String x:Key="S_HubPassMasks">Pass als Maske</sys:String>
     <sys:String x:Key="S_HubNew">Neu</sys:String>
     <sys:String x:Key="S_HubBlocks">Bausteine</sys:String>
-    <sys:String x:Key="S_HubInGraph">Ebenen im Graphen – ein Klick springt hin</sys:String>
+    <sys:String x:Key="S_HubInGraph">Ebenen im Graphen</sys:String>
+    <sys:String x:Key="S_HubInGraphHint">Klick: ihr Bild als neuer Knoten · Umschalt+Klick: hinspringen</sys:String>
     <sys:String x:Key="S_HubRecent">Zuletzt</sys:String>
     <sys:String x:Key="S_HubCrypto">Kryptomatten</sys:String>
     <sys:String x:Key="S_HubIntoWire">Neue Knoten fallen ins Kabel: {0} → {1}</sys:String>

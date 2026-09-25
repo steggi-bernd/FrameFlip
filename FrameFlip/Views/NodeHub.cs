@@ -236,6 +236,10 @@ public sealed class NodeHub : Border
 
         PreviewKeyDown += OnKey;
 
+        // Kein Windows-Menue im Hub - auch nicht das eingebaute des Suchfelds. Es sprang
+        // beim Loslassen der rechten Taste auf, die den Hub gerade geoeffnet hatte.
+        ContextMenuOpening += (_, e) => e.Handled = true;
+
         Choose(_categories.FirstOrDefault(c => c.Key == _lastCategory) ?? _categories.FirstOrDefault());
         Loaded += (_, _) => Keyboard.Focus(_search);
     }

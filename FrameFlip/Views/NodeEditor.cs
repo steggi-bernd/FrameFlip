@@ -390,19 +390,22 @@ public sealed class NodeEditor : FrameworkElement
         var at = e.GetPosition(this);
 
         // Rechts bricht einen laufenden Zug ab - der Knoten springt zurueck, das Kabel
-        // steckt wieder, wo es war. Ohne Zug oeffnet es das Menue.
+        // steckt wieder, wo es war. Ohne Zug waehlt es den Knoten darunter; der Hub
+        // oeffnet beim Loslassen. Oeffnete er beim Druecken, landete das Loslassen in
+        // ihm - und dort sprang frueher das Windows-Menue des Suchfelds auf.
         if (e.ChangedButton == MouseButton.Right)
         {
             if (_drag != Drag.None)
             {
                 Cancel();
+                _rightPressed = false;
             }
             else
             {
                 var node = NodeAt(at);
                 if (node is not null) Select(node);
 
-                MenuWanted?.Invoke(ToGraph(at));
+                _rightPressed = true;
             }
 
             e.Handled = true;
@@ -575,9 +578,24 @@ public sealed class NodeEditor : FrameworkElement
         InvalidateVisual();
     }
 
+    /// <summary>Die rechte Taste wurde ueber dem Editor gedrueckt, ohne einen Zug abzubrechen.</summary>
+    private bool _rightPressed;
+
     protected override void OnMouseUp(MouseButtonEventArgs e)
     {
         base.OnMouseUp(e);
+
+        if (e.ChangedButton == MouseButton.Right)
+        {
+            if (_rightPressed)
+            {
+                _rightPressed = false;
+                MenuWanted?.Invoke(ToGraph(e.GetPosition(this)));
+            }
+
+            e.Handled = true;
+            return;
+        }
 
         if (_drag == Drag.None) return;
 
@@ -928,7 +946,7 @@ public sealed class NodeEditor : FrameworkElement
                 e.Handled = true;
                 break;
 
-            case Key.Delete or Key.X when !control && Selected is not null and not OutputNode:
+            case Key.Delete or Key.Back or Key.X when !control && Selected is not null and not OutputNode:
                 Remove(Selected);
                 e.Handled = true;
                 break;

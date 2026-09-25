@@ -455,3 +455,32 @@ Only the alpha channel of exports changes, and only in those cases.
       swapping the rename row for its text field threw in WPF; it is now removed and
       inserted instead.
 
+11. **Fixes after trying it** (feedback after section 10).
+
+    *Done (2026-09-25).*
+    - **The brush in node mode** only caught the mouse while a painted mask node was
+      selected. Otherwise it was dead, and so were the Ctrl drags for size and hardness.
+      Now it always catches. With a painted mask selected, or a layer whose factor
+      comes from one, it paints that mask. Otherwise the first stroke creates a mask
+      layer, as in the stack: an adjustment layer with a painted mask above the selected
+      layer (or on top of the layers). It is named like the stack's, changes nothing until
+      its correction is turned, and the mask is selected so painting continues.
+    - **A layer chosen in the hub** only jumped to it. Now a click adds its picture as a
+      new node: an image file as a new image file node, a pass as a Place wired from the
+      file (which exists only once). A layer without a picture of its own (adjustment,
+      group) is duplicated with its branch. Shift+click jumps to it as before.
+    - **The hub opened on pressing the right button**, so releasing it landed in the
+      hub's search field, whose built-in Windows menu popped up over it. The hub now
+      opens on release, beside the pointer rather than under it, and allows no Windows
+      menu at all.
+    - **Backspace deletes nodes**, like Del and X.
+    - **The visibility mark** in the node layer list is the same dot and ring as in the
+      stack strip (the style moved to the theme); the boxed button with a dash is gone.
+
+    Tests: the hub opens on release and not on press; a layer tile adds a Place with the
+    file's wire, Shift jumps; Backspace deletes; the brush catches without a mask, the Ctrl
+    drag sets the size, the first stroke adds exactly three nodes (correction, Mix,
+    painted mask) and leaves the picture unchanged, the next stroke and the selected
+    layer paint the same mask. The old test that demanded a dead brush now demands the
+    opposite.
+

@@ -436,16 +436,14 @@ public sealed class NodeLayerList : Border
         // Die Grundlage hat kein Mischen, das man stummschalten koennte.
         if (layer.Switch is { } mix)
         {
+            // Derselbe Punkt wie im Ebenenstreifen: gefuellt heisst sichtbar, ein leerer
+            // Ring ausgeblendet.
             var eye = new ToggleButton
             {
-                Style = (Style)FindResource("OverlayToggle"),
+                Style = (Style)FindResource("LayerEye"),
                 IsChecked = !muted,
-                Content = muted ? "–" : "●",
                 ToolTip = Strings.T("S_NodeLayerMute"),
-                Width = 22,
-                Height = 22,
-                Padding = new Thickness(0),
-                FontSize = 10,
+                HorizontalAlignment = HorizontalAlignment.Center,
                 VerticalAlignment = VerticalAlignment.Center,
             };
 

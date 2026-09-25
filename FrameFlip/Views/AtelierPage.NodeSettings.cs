@@ -215,27 +215,77 @@ public partial class AtelierPage
     /// <summary>Der Pinsel im Knotenmodus - auf der gemalten Maske des gewaehlten Knotens.</summary>
     private void ShowNodeBrush()
     {
-        // Im Knotenmodus legt der erste Strich keine Maske an - ohne gemalte Maske am
-        // gewaehlten Knoten gibt es also nichts, worauf der Pinsel malen koennte, und er
-        // darf die Maus nicht nehmen.
-        Placement.MaskWanted = null;
+        // Wie im Stapel: Der Pinsel faengt immer. Ist eine gemalte Maske gewaehlt - oder
+        // eine Ebene, an der eine haengt -, malt er darauf; sonst legt der erste Strich
+        // eine Maskenebene an. Frueher fing er ohne gewaehlte Maske gar nichts, und mit
+        // ihm waren auch Groesse und Haerte am Bild tot.
+        Placement.MaskWanted = MakeNodeMask;
 
-        if (_frame is null || NodeView.Selected is not MaskNode { Mask.Kind: MaskKind.Painted } node)
+        if (_frame is null)
         {
-            // Ohne gemalte Maske gibt es nichts zu bemalen - die Flaeche bleibt
-            // durchlaessig, statt Klicks zu schlucken.
             Placement.Paint(null, 0, 0, false);
             Display.Cursor = null;
 
             return;
         }
 
-        var mask = node.Mask.PaintOn(_number, _frame.Width, _frame.Height);
+        var mask = PaintTarget()?.Mask.PaintOn(_number, _frame.Width, _frame.Height);
 
         Placement.Paint(mask, _frame.Width, _frame.Height, Display.Stretch == Stretch.Uniform);
         Display.Cursor = Cursors.None;
 
         UseBrushSettings();
+    }
+
+    /// <summary>
+    /// Worauf der Pinsel im Knotenmodus malt: die gewaehlte gemalte Maske - oder die, die
+    /// in den Faktor der gewaehlten Ebene fliesst. Sonst keine.
+    /// </summary>
+    private MaskNode? PaintTarget() => NodeView.Selected switch
+    {
+        MaskNode { Mask.Kind: MaskKind.Painted } mask => mask,
+        MixNode mix when _graph?.Into(mix.Id, "Faktor") is { } factor &&
+                         _graph.Find(factor.From) is MaskNode { Mask.Kind: MaskKind.Painted } mask => mask,
+        _ => null,
+    };
+
+    /// <summary>
+    /// Der erste Strich ohne Maske: eine Maskenebene - eine Einstellungsebene mit gemalter
+    /// Maske, ueber der gewaehlten Ebene oder oben auf den Ebenen. Sie aendert nichts, bis
+    /// jemand an ihrer Korrektur dreht; gewaehlt ist danach die Maske, damit weitergemalt
+    /// wird. Dasselbe, was der Stapel beim ersten Strich anlegt.
+    /// </summary>
+    private PaintedMask? MakeNodeMask()
+    {
+        if (_graph is null || _frame is null) return null;
+
+        if (PaintTarget() is { } known) return known.Mask.PaintOn(_number, _frame.Width, _frame.Height);
+
+        if (ListTarget() is not { } after || NodeEdits.Through(after).Output is not { } below) return null;
+
+        RememberNodes();
+
+        if (LayerEdits.AddAdjustment(_graph, after) is not var (grade, mix)) return null;
+
+        mix.Label = Strings.T("S_MaskLayerName");
+
+        var mask = _graph.Add(new MaskNode { Mask = new LayerMask { Kind = MaskKind.Painted }, Preview = true });
+
+        _graph.Connect(grade, "Bild", mask, "Ebene");
+        _graph.Connect(after, below, mask, "Untergrund");
+        _graph.Connect(mask, "Maske", mix, "Faktor");
+
+        ArrangeLayer(after, after, grade, mix);
+        mask.X = grade.X;
+        mask.Y = grade.Y - NodeLayout.Height(mask) - NodeLayout.Gap;
+
+        var paint = mask.Mask.PaintOn(_number, _frame.Width, _frame.Height);
+
+        NodeView.Select(mask);
+        NodeView.InvalidateVisual();
+        AfterNodeEdit();
+
+        return paint;
     }
 
     /// <summary>Am Rahmen wurde gezogen - im Knotenmodus bekommt der Knoten die neue Lage.</summary>

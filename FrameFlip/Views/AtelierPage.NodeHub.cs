@@ -67,10 +67,18 @@ public partial class AtelierPage
         }
         else
         {
-            // Am Zeiger - aber ganz im Editor, auch wenn der Rechtsklick am Rand war.
+            // Neben dem Zeiger, nicht unter ihm: Die rechte Taste, die den Hub geoeffnet
+            // hat, wird ueber ihm losgelassen, und das darf nichts ausloesen. Ganz im
+            // Editor - am rechten oder unteren Rand weicht er nach links oder oben aus.
+            const double Gap = 8;
+
+            double x = screen.X + Gap, y = screen.Y + Gap;
+            if (x + hub.Width > NodeView.ActualWidth) x = screen.X - Gap - hub.Width;
+            if (y + hub.Height > NodeView.ActualHeight) y = screen.Y - Gap - hub.Height;
+
             popup.Placement = PlacementMode.Relative;
-            popup.HorizontalOffset = Math.Clamp(screen.X - 24, 0, Math.Max(0, NodeView.ActualWidth - hub.Width));
-            popup.VerticalOffset = Math.Clamp(screen.Y - 24, 0, Math.Max(0, NodeView.ActualHeight - hub.Height));
+            popup.HorizontalOffset = Math.Clamp(x, 0, Math.Max(0, NodeView.ActualWidth - hub.Width));
+            popup.VerticalOffset = Math.Clamp(y, 0, Math.Max(0, NodeView.ActualHeight - hub.Height));
         }
 
         hub.Done += () => popup.IsOpen = false;
@@ -130,13 +138,16 @@ public partial class AtelierPage
             })),
         };
 
+        // Die Ebenen im Graphen: Ein Klick legt ihr Bild als neuen Knoten an, Umschalt
+        // springt zu ihr.
         var inGraph = NodeLayerList.Of(_graph!)
             .Where(l => l.Target is not null)
-            .Select(l => new HubEntry(l.Name, "❏", () => OnLayerChosen(l.Target!))
+            .Select(l => Used(new HubEntry(l.Name, "❏", () => AddLayerNode(l, at, link))
             {
                 Thumb = LayerThumb(l),
-                Detail = l.Detail,
-            })
+                Detail = l.Detail + " – " + Strings.T("S_HubInGraphHint"),
+                Alternate = () => OnLayerChosen(l.Target!),
+            }))
             .ToList();
 
         categories.Add(new HubCategory("layers", Strings.T(NodeCatalog.Layers), "❏", new[]
@@ -144,7 +155,7 @@ public partial class AtelierPage
             new HubGroup(Strings.T("S_HubPasses"), passLayers, Strings.T("S_HubPassesHint")),
             new HubGroup(Strings.T("S_HubNew"), fresh),
             new HubGroup(Strings.T("S_HubBlocks"), NodeCatalog.All.Where(k => k.Group == NodeCatalog.Layers).Select(Kind).ToList()),
-            new HubGroup(Strings.T("S_HubInGraph"), inGraph),
+            new HubGroup(Strings.T("S_HubInGraph"), inGraph, Strings.T("S_HubInGraphHint")),
         }));
 
         // Masken: die Arten, jeder Pass als Maske, die Kryptomatten der Datei.
@@ -275,6 +286,43 @@ public partial class AtelierPage
 
         NodeView.InvalidateVisual();
         AfterNodeEdit();
+    }
+
+    /// <summary>
+    /// Eine Ebene aus dem Graphen noch einmal als Knoten: ihr Bild, frei an der Stelle -
+    /// eine Bilddatei als neue Bilddatei, ein Pass als Platzieren mit seinem Kabel von der
+    /// Datei (die es nur einmal gibt). Eine Ebene ohne eigenes Bild - eine Einstellungsebene,
+    /// eine Gruppe - wird samt Zweig verdoppelt.
+    /// </summary>
+    private void AddLayerNode(NodeLayer layer, Point at, NodeLink? link)
+    {
+        if (_graph is null) return;
+
+        switch (layer.Origin)
+        {
+            case ({ } picture, _) when picture is PictureNode file:
+                PlaceAt(new PictureNode { Path = file.Path, FollowSequence = file.FollowSequence }, at, link);
+                return;
+
+            case ({ } source, { } output) when source is RenderNode:
+            {
+                RememberNodes();
+
+                var place = _graph.Add(new PlaceNode { Preview = true });
+                place.X = Math.Round(at.X - NodeLayout.Width / 2);
+                place.Y = Math.Round(at.Y - NodeLayout.Header / 2);
+
+                if (output != RenderNode.Picture && source is RenderNode render) NodeEdits.ShowPass(_graph, render, output, on: true);
+                _graph.Connect(source, output, place, "Bild");
+
+                NodeView.Select(place);
+                NodeView.InvalidateVisual();
+                AfterNodeEdit();
+                return;
+            }
+        }
+
+        if (layer.Switch is { } whole) DuplicateLayer(whole);
     }
 
     /// <summary>Ein Pass als Maske - frei an der Stelle, mit seinem Kabel von der Datei.</summary>

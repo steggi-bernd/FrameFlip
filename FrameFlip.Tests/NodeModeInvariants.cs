@@ -257,7 +257,13 @@ public static class NodeModeInvariants
             nodes.Select(graph.Nodes.OfType<ViewNode>().First());
             page.UpdateLayout();
 
-            Check.That(!frame.IsHitTestVisible, "ohne gemalte Maske faengt der Pinsel nichts");
+            // Ohne gemalte Maske faengt der Pinsel trotzdem - wie im Stapel legt der erste
+            // Strich eine Maskenebene an. Frueher fing er nichts, und mit ihm waren Groesse
+            // und Haerte am Bild tot.
+            int count = graph.Nodes.Count;
+
+            Check.That(frame.IsHitTestVisible && frame.MaskWanted is not null && graph.Nodes.Count == count,
+                       "ohne gemalte Maske faengt der Pinsel trotzdem - und legt erst beim Strich etwas an");
 
             page.HandleToolKey(System.Windows.Input.Key.N);
             page.UpdateLayout();

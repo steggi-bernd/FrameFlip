@@ -184,14 +184,8 @@ public partial class AtelierPage
     {
         if (_frame is null) return null;
 
-        // Im Knotenmodus wird keine Ebene angelegt - gemalt wird auf die Maske des
-        // gewaehlten Knotens oder gar nicht.
-        if (InNodes)
-        {
-            return NodeView.Selected is MaskNode { Mask.Kind: MaskKind.Painted } node
-                ? node.Mask.PaintOn(_number, _frame.Width, _frame.Height)
-                : null;
-        }
+        // Im Knotenmodus: die Maske des gewaehlten Knotens - oder eine neue Maskenebene.
+        if (InNodes) return MakeNodeMask();
 
         var layer = Layers.Selection;
 

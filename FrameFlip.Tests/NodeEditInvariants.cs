@@ -101,6 +101,24 @@ public static class NodeEditInvariants
             Check.That(hub is not null && editor.NodeAt(middle) is null && editor.LinkAt(middle) == wire,
                        "Rechtsklick auf ein Kabel oeffnet den Hub - dort, wo nur das Kabel ist");
 
+            // Im Editor geht der Hub erst beim Loslassen der rechten Taste auf - sonst
+            // landete das Loslassen in ihm (frueher sprang dort das Windows-Menue des
+            // Suchfelds auf).
+            hubPopupClose(page);
+
+            System.Windows.Input.MouseButtonEventArgs Right(RoutedEvent routed) =>
+                new(System.Windows.Input.Mouse.PrimaryDevice, 0, System.Windows.Input.MouseButton.Right) { RoutedEvent = routed };
+
+            editor.RaiseEvent(Right(System.Windows.Input.Mouse.MouseDownEvent));
+            bool openOnPress = page.Hub is not null;
+            editor.RaiseEvent(Right(System.Windows.Input.Mouse.MouseUpEvent));
+
+            Check.That(!openOnPress && page.Hub is not null, "der Hub oeffnet beim Loslassen der rechten Taste, nicht beim Druecken");
+
+            hubPopupClose(page);
+            page.ShowNodeHub(editor.ToGraph(middle));
+            hub = page.Hub;
+
             hub!.Search("vignet");
             Check.That(hub.Visible.Count == 1 && hub.Visible[0].Title == T("S_Vignette"), "die Suche findet die Vignette",
                        string.Join(", ", hub.Visible.Select(v => v.Title)));
@@ -193,6 +211,86 @@ public static class NodeEditInvariants
             var viewed = ((NodeEditor)page.FindName("NodeView")).Viewed;
             Check.That(viewed is not null && page.Graph.Links.Any(l => l.From == viewed.Value.Node.Id && l.To == list.Shown.First(s => s.Mix is not null).Mix!.Id && l.Input == "Oben"),
                        "Allein im Betrachter zeigt, was in das Mischen oben hineinfliesst");
+
+            Call(page, "SetViewer", new object[] { null! });
+            Settle();
+
+            // Eine Ebene im Hub: Klick legt ihr Bild als neuen Knoten an, Umschalt springt hin.
+            var passLayer = list.Shown.First(l => l.Origin is { Node: RenderNode } && l.Mix is not null);
+            int places = page.Graph!.Nodes.OfType<PlaceNode>().Count();
+
+            page.ShowNodeHub(editor.ToGraph(new Point(40, 40)), "layers");
+            var layerTile = page.Hub!.Visible.First(v => v.Title == passLayer.Name && v.Detail?.Contains(passLayer.Detail) == true);
+            layerTile.Activate();
+            Settle();
+
+            var fresh = editor.Selected as PlaceNode;
+            Check.That(page.Graph!.Nodes.OfType<PlaceNode>().Count() == places + 1 && fresh is not null &&
+                       page.Graph.Into(fresh.Id, "Bild") is { } read && read.Output == passLayer.Origin!.Value.Output,
+                       "eine Ebene im Hub gewaehlt, kommt ihr Bild als neuer Knoten dazu - mit dem Kabel von der Datei");
+
+            page.ShowNodeHub(editor.ToGraph(new Point(40, 40)), "layers");
+            page.Hub!.Visible.First(v => v.Title == passLayer.Name && v.Detail?.Contains(passLayer.Detail) == true).Alternate!();
+            Settle();
+
+            Check.That(ReferenceEquals(editor.Selected, passLayer.Mix), "Umschalt+Klick springt zu ihr");
+
+            // Die Ruecktaste loescht den gewaehlten Knoten - wie Entf.
+            editor.Select(fresh);
+            editor.Focus();
+            editor.RaiseEvent(new System.Windows.Input.KeyEventArgs(System.Windows.Input.Keyboard.PrimaryDevice,
+                PresentationSource.FromVisual(editor)!, 0, System.Windows.Input.Key.Back)
+            {
+                RoutedEvent = System.Windows.Input.Keyboard.KeyDownEvent,
+            });
+            Settle();
+
+            Check.That(page.Graph!.Find(fresh!.Id) is null, "die Ruecktaste loescht den gewaehlten Knoten");
+
+            // Der Pinsel im Knotenmodus: Er faengt auch ohne gewaehlte Maske, und Groesse und
+            // Haerte lassen sich am Bild ziehen. Der erste Strich legt eine Maskenebene an.
+            editor.Select(null);
+            byte[] before = Pixels(page);
+            int nodes = page.Graph.Nodes.Count;
+
+            Check.That(page.HandleToolKey(System.Windows.Input.Key.B), "B nimmt den Pinsel");
+            page.UpdateLayout();
+
+            var frame = (PlacementAdorner)page.FindName("Placement");
+            Check.That(frame.Mode == AdornerMode.Paint && frame.IsHitTestVisible,
+                       "im Knotenmodus faengt der Pinsel auch ohne gewaehlte Maske");
+
+            float radius = frame.BrushRadius;
+            var centre = new Point(frame.ActualWidth / 2, frame.ActualHeight / 2);
+            frame.BeginKnob(centre, PlacementAdorner.BrushKnob.Size);
+            frame.MoveKnob(centre + new Vector(30, 0));
+            frame.EndKnob();
+
+            Check.That(frame.BrushRadius > radius, "und Strg und ziehen stellt die Groesse ein", $"{radius} -> {frame.BrushRadius}");
+
+            var paint = frame.MaskWanted!();
+            Settle();
+
+            var made = page.Graph!.Nodes.OfType<MaskNode>().LastOrDefault(m => m.Mask.Kind == MaskKind.Painted);
+            var layerMix = made is null ? null : page.Graph.Links.Where(l => l.From == made.Id && l.Input == "Faktor")
+                                                            .Select(l => page.Graph.Find(l.To)).OfType<MixNode>().FirstOrDefault();
+
+            Check.That(paint is not null && made is not null && layerMix?.Label == T("S_MaskLayerName") &&
+                       ReferenceEquals(editor.Selected, made) && page.Graph.Nodes.Count == nodes + 3,
+                       "der erste Strich legt eine Maskenebene an - Korrektur, Mischen und gemalte Maske, die Maske gewaehlt",
+                       $"{page.Graph.Nodes.Count - nodes} neue Knoten");
+            Check.That(Pixels(page).AsSpan().SequenceEqual(before), "und das Bild bleibt, wie es war - die Ebene aendert nichts, bis man dreht");
+            Check.That(ReferenceEquals(frame.MaskWanted!(), paint) && page.Graph.Nodes.Count == nodes + 3,
+                       "der naechste Strich malt auf dieselbe Maske");
+
+            editor.Select(layerMix);
+            page.UpdateLayout();
+
+            Check.That(ReferenceEquals(frame.MaskWanted!(), paint) && page.Graph.Nodes.Count == nodes + 3,
+                       "ist die Ebene gewaehlt, malt der Pinsel auf ihre Maske");
+
+            ((ToolColumn)page.FindName("MouseTools")).Select(AtelierTool.Nodes, notify: true);
+            Settle();
         }
         finally
         {
@@ -1182,6 +1280,11 @@ public static class NodeEditInvariants
             window.Close();
             try { Directory.Delete(folder, recursive: true); } catch (Exception) { }
         }
+    }
+
+    private static void hubPopupClose(AtelierPage page)
+    {
+        if (Field(page, "_hubPopup") is System.Windows.Controls.Primitives.Popup popup) popup.IsOpen = false;
     }
 
     private static object? Call(object target, string method, params object[] arguments)
