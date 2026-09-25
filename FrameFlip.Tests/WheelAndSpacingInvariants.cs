@@ -225,8 +225,13 @@ public static class WheelAndSpacingInvariants
                        "der erste Schritt haelt den Punkt dort, wo das Bild den Ausschnitt fuellt",
                        $"{start.U:0} -> {first.U:0}");
 
-            // Bis das Bild den Ausschnitt ganz fuellt, dann weiter: jetzt in beiden Richtungen.
-            Wheel(3);
+            // Bis 100 %, dann weiter: Dort fuellt das Bild den Ausschnitt in beiden Richtungen.
+            // Nicht eine feste Zahl Rasten - wie viele es bis 100 % sind, haengt von der
+            // Einpassung ab und damit von der Groesse des Ausschnitts auf dem Rechner, auf
+            // dem die Probe laeuft. In der CI endeten drei Rasten vor, zwei danach genau auf
+            // 100 %.
+            for (int step = 0; step < 16 && page.ZoomLevel < 1.0; step++) Wheel(1);
+
             var anchored = Under();
             Wheel(2);
             var deeper = Under();
