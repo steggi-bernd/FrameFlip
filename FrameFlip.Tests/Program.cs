@@ -91,6 +91,7 @@ static int RunAll()
     WheelAndSpacingInvariants.Run();
     PassRoleInvariants.Run();
     RegionRenderInvariants.Run();
+    PersistedEnumInvariants.Run();
     NodeValueInvariants.Run();
     LayerPlacementInvariants.Run();
     PlacementDragInvariants.Run();
