@@ -287,6 +287,47 @@ Offen aus Phase A:
 - Befund, nicht geändert: Im Knotenmodus landet eine Bilddatei, die bei ausgeblendetem
   Graphen aufs Bild gezogen wird, im Ebenenstapel statt im Graphen.
 
+**Phase B** (Studio S0, S1 erster Teil, S2 erster Teil) steht in
+[Refactoring-Studio](Refactoring-Studio.md).
+
+**Phase C ist umgesetzt** (26. September, Zweig `feature/projekte` auf S2):
+
+- **Projektdatei je Sequenz** (9): `<Quellordner>\FrameFlip\<name><endung>.ffproj`, bei
+  nicht beschreibbarem Ordner unter den Einstellungen in `projects\`. Autosave 2 s nach
+  der letzten Änderung, beim Wechsel der Folge, wenn die Seite geht und beim Ende; dazu
+  „Speichern“ in der Kopfzeile und Strg+S, daneben der Stand. Geschrieben wird im
+  Hintergrund, prozessweit der Reihe nach; Lesen wartet darauf. Aufzählungen stehen
+  als Namen in der Datei.
+- **Einmalige Übernahme:** Das erste Projekt ohne Datei bekommt das bisherige Rezept aus
+  `config.json` (`AtelierRecipeMoved`). Die Felder dort bleiben als Sicherung stehen.
+- **Knotenmodus je Projekt:** Er richtet sich nach dem Projekt; es gibt einen Weg zurück
+  in den Stapel für eine Folge ohne Graphen. Rückgängig gilt je Projekt.
+- **Sequenzliste** (8): Früher geöffnete Ordner stehen nach den Blend-Projekten in der
+  Liste, auch nach einem Neustart. Ordner und Bilder lassen sich auf die Liste ziehen;
+  „Aus der Liste nehmen“ im Rechtsklick. Erweitert den vorhandenen
+  `DashboardSequenceController` um zwei Quellen.
+- **Arbeitsbereich** (7): Beim Start wählt die Übersicht die Folge des Ateliers. Beim
+  Wechsel ins Atelier öffnet es das Bild der Übersicht, wenn diese eine andere Folge zeigt;
+  bei derselben Folge behält es sein Bild. Ein im Atelier geöffnetes Bild wählt seine
+  Folge in der Übersicht und bleibt in der Liste.
+- **Schnell-Export** (6): ohne Dialog in den Ordner `FrameFlip` oder den gewählten
+  Zielordner, nächste freie Nummer, nie überschreibend. Einzelbild als Datei, Sequenz als
+  Ordner, Video als Datei.
+
+Entschieden beim Bauen, bitte prüfen:
+
+- **Eine neue Folge beginnt frisch**, nicht mit dem Rezept der vorigen. Ein Rezept von
+  einer Folge auf die nächste zu übernehmen wäre ein eigener Befehl („Rezept übernehmen
+  von …“), noch nicht gebaut.
+- **Die Grundregler des Ateliers gelten je Projekt.** Das Vorschaufenster behält seine
+  eigenen in `config.json`; bisher teilten sich beide dasselbe Feld.
+- **Maskenraster stehen vorerst in der Projektdatei selbst**, nicht getrennt nach Inhalt
+  wie in 3.3 geplant. Eine Maske sind bei 4K 25–100 KB, das Schreiben läuft im
+  Hintergrund. Die Trennung kommt mit dem Maskenverlauf in Phase D, der denselben Ordner
+  braucht.
+- Der normale Export verlangt weiter einen gewählten Zielordner; nur der Schnell-Export
+  hat einen voreingestellten.
+
 ## 6. Entscheidungen
 
 Getroffen am 25. September 2026:
