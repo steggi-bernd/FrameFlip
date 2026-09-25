@@ -88,6 +88,7 @@ static int RunAll()
     NodeModeInvariants.Run();
     NodeEditInvariants.Run();
     ContextMenuInvariants.Run();
+    WheelAndSpacingInvariants.Run();
     NodeValueInvariants.Run();
     LayerPlacementInvariants.Run();
     PlacementDragInvariants.Run();

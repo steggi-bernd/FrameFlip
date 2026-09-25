@@ -1102,7 +1102,7 @@
     <sys:String x:Key="S_ToolCrop">Zuschneiden</sys:String>
     <sys:String x:Key="S_ToolHand">Hand</sys:String>
     <sys:String x:Key="S_ToolPick">Pipette</sys:String>
-    <sys:String x:Key="S_ToolMoveShort">Zieht die gewählte Ebene im Bild. An den Ecken größer und kleiner, am Griff darüber gedreht. Doppelklick stellt sie wieder mittig.</sys:String>
+    <sys:String x:Key="S_ToolMoveShort">Zieht die gewählte Ebene im Bild. An den Ecken größer und kleiner, am Griff darüber gedreht. Doppelklick stellt sie wieder mittig. Das Mausrad zoomt um den Zeiger.</sys:String>
     <sys:String x:Key="S_ToolSelectShort">Ein Klick auf ein Objekt legt eine Kryptomatte an. Die Einstellungen dazu stehen beim Maskenbereich der Ebene.</sys:String>
     <sys:String x:Key="S_ToolSelectNodesShort">Ein Klick auf ein Objekt nimmt es in den gewählten Kryptomatte-Knoten auf – ein zweiter nimmt es wieder heraus.</sys:String>
     <sys:String x:Key="S_ToolCropShort">Zieht die Schnittkanten der gewählten Ebene. Der gedämpfte Rahmen zeigt, wovon abgeschnitten wird. Doppelklick nimmt den Schnitt zurück.</sys:String>
@@ -1148,7 +1148,7 @@
     <sys:String x:Key="S_GroupTable">Tabelle</sys:String>
     <sys:String x:Key="S_ToolBrush">Pinsel</sys:String>
     <sys:String x:Key="S_ToolBrushHint">Pinsel (B) - trägt eine Maske von Hand auf. Alt hält gedrückt nimmt wieder weg. Die Ebene braucht dafür eine gemalte Maske; die Maske liegt beim Malen als farbiger Schleier über dem Bild, sonst sähe man nur ihre Wirkung.</sys:String>
-    <sys:String x:Key="S_ToolBrushShort">Malt eine Maske – beim ersten Strich entsteht dafür eine Maskenebene. Rechte Maustaste oder Alt nimmt weg. Strg und ziehen stellt die Größe ein, Strg und rechte Maustaste ziehen die Härte.</sys:String>
+    <sys:String x:Key="S_ToolBrushShort">Malt eine Maske – beim ersten Strich entsteht dafür eine Maskenebene. Rechte Maustaste oder Alt nimmt weg. Strg und ziehen stellt die Größe ein, Strg und rechte Maustaste ziehen die Härte. Das Mausrad zoomt, Strg und Mausrad stellen den Abstand der Tupfer ein.</sys:String>
     <sys:String x:Key="S_MaskPainted">Gemalt</sys:String>
     <sys:String x:Key="S_MaskLock">für alle Bilder</sys:String>
     <sys:String x:Key="S_MaskLockHint">Gesperrt gilt ein Anstrich für die ganze Sequenz. Entsperrt gilt je Bild ein eigener — dann lässt sich ein einzelnes Bild retuschieren, ohne die anderen anzufassen. Beim Entsperren wandert der bisherige Anstrich auf das aktuelle Bild, statt verworfen zu werden.</sys:String>
@@ -1159,5 +1159,7 @@
     <sys:String x:Key="S_BrushHardness">Härte</sys:String>
     <sys:String x:Key="S_BrushFlow">Stärke</sys:String>
     <sys:String x:Key="S_BrushOpacity">Deckkraft</sys:String>
+    <sys:String x:Key="S_BrushSpacing">Abstand</sys:String>
+    <sys:String x:Key="S_BrushSpacingHint">Wie weit die Tupfer eines Strichs auseinander liegen, gemessen am Radius. 25 % ist ein glatter Strich, bei 200 % berühren sich die Tupfer gerade noch, darüber entstehen Lücken. Strg und Mausrad über dem Bild stellen ihn ebenfalls ein.</sys:String>
     <sys:String x:Key="S_BrushHint">Stärke und Deckkraft sind nicht dasselbe: Die eine sagt, wieviel EIN Strich aufträgt, die andere, wo auch zehn Striche aufhören. Bei Deckkraft 0,3 bleibt die Maske knapp bei einem Drittel, so oft man auch darübergeht. Alt gedrückt halten nimmt weg.</sys:String>
 </ResourceDictionary>

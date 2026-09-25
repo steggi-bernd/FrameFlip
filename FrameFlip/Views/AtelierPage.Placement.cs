@@ -160,9 +160,17 @@ public partial class AtelierPage
         Placement.BrushHardness = Properties.BrushHardness;
         Placement.BrushFlow = Properties.BrushFlow;
         Placement.BrushOpacity = Properties.BrushOpacity;
+        Placement.BrushSpacing = Properties.BrushSpacing;
 
         Placement.InvalidateVisual();
     }
+
+    /// <summary>
+    /// Strg und das Rad beim Pinsel: der Abstand der Tupfer. Der Regler in der
+    /// Eigenschaftsleiste zieht ueber <see cref="PlacementAdorner.BrushAdjusted"/> nach.
+    /// </summary>
+    private void StepBrushSpacing(double notches)
+        => Placement.StepSpacing(notches, System.Windows.Input.Mouse.GetPosition(Placement));
 
     /// <summary>
     /// Liefert die Maske fuer den ersten Strich - und legt dafuer eine EIGENE EBENE an.

@@ -1450,7 +1450,7 @@ public static class AtelierLayerInvariants
                        "hoechstens ganz hart - und beim Einstellen entsteht keine Maskenebene",
                        $"{frame.BrushHardness:0.00}, {strip.Stack.Layers.Count} Ebenen");
 
-            brushPanel.SetBrush(radius, hardness);
+            brushPanel.SetBrush(radius, hardness, PaintStroke.DefaultSpacing);
 
             page.HandleToolKey(System.Windows.Input.Key.V);
             page.UpdateLayout();

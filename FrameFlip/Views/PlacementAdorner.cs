@@ -233,7 +233,7 @@ public sealed partial class PlacementAdorner : FrameworkElement
     {
         if (_mode == AdornerMode.Paint)
         {
-            if (Knob != BrushKnob.None)
+            if (KnobDragged)
             {
                 EndKnob();
                 e.Handled = true;
@@ -301,7 +301,7 @@ public sealed partial class PlacementAdorner : FrameworkElement
     {
         if (_mode == AdornerMode.Paint)
         {
-            if (Knob != BrushKnob.None)
+            if (KnobDragged)
             {
                 MoveKnob(e.GetPosition(this));
                 return;
@@ -352,7 +352,7 @@ public sealed partial class PlacementAdorner : FrameworkElement
     {
         if (_mode == AdornerMode.Paint)
         {
-            if (Knob != BrushKnob.None)
+            if (KnobDragged)
             {
                 EndKnob();
                 e.Handled = true;

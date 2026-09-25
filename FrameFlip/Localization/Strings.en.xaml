@@ -1102,7 +1102,7 @@
     <sys:String x:Key="S_ToolCrop">Crop</sys:String>
     <sys:String x:Key="S_ToolHand">Hand</sys:String>
     <sys:String x:Key="S_ToolPick">Pick</sys:String>
-    <sys:String x:Key="S_ToolMoveShort">Drags the selected layer in the picture. Corners resize, the grip above rotates. Double-click centres it again.</sys:String>
+    <sys:String x:Key="S_ToolMoveShort">Drags the selected layer in the picture. Corners resize, the grip above rotates. Double-click centres it again. The mouse wheel zooms around the pointer.</sys:String>
     <sys:String x:Key="S_ToolSelectShort">Clicking an object creates a cryptomatte. Its settings live with the layer's mask section.</sys:String>
     <sys:String x:Key="S_ToolSelectNodesShort">Clicking an object adds it to the selected cryptomatte node – a second click removes it again.</sys:String>
     <sys:String x:Key="S_ToolCropShort">Drags the crop edges of the selected layer. The faint frame shows what is being cut away. Double-click undoes the crop.</sys:String>
@@ -1148,7 +1148,7 @@
     <sys:String x:Key="S_GroupTable">Table</sys:String>
     <sys:String x:Key="S_ToolBrush">Brush</sys:String>
     <sys:String x:Key="S_ToolBrushHint">Brush (B) - paints a mask by hand. Holding Alt takes it away again. The layer needs a painted mask for this; while painting the mask lies over the picture as a coloured wash, because otherwise you would only see its effect.</sys:String>
-    <sys:String x:Key="S_ToolBrushShort">Paints a mask – the first stroke creates a mask layer for it. Right mouse button or Alt erases. Ctrl-drag sets the size, Ctrl with the right button the hardness.</sys:String>
+    <sys:String x:Key="S_ToolBrushShort">Paints a mask – the first stroke creates a mask layer for it. Right mouse button or Alt erases. Ctrl-drag sets the size, Ctrl with the right button the hardness. The mouse wheel zooms, Ctrl and the wheel set the spacing of the dabs.</sys:String>
     <sys:String x:Key="S_MaskPainted">Painted</sys:String>
     <sys:String x:Key="S_MaskLock">all frames</sys:String>
     <sys:String x:Key="S_MaskLockHint">Locked, one painting applies to the whole sequence. Unlocked, each frame gets its own - then a single frame can be retouched without touching the others. On unlocking, the painting so far moves to the current frame rather than being discarded.</sys:String>
@@ -1159,5 +1159,7 @@
     <sys:String x:Key="S_BrushHardness">Hardness</sys:String>
     <sys:String x:Key="S_BrushFlow">Flow</sys:String>
     <sys:String x:Key="S_BrushOpacity">Opacity</sys:String>
+    <sys:String x:Key="S_BrushSpacing">Spacing</sys:String>
+    <sys:String x:Key="S_BrushSpacingHint">How far apart the dabs of a stroke lie, measured against the radius. 25 % is a smooth stroke, at 200 % the dabs just touch, above that gaps appear. Ctrl and the mouse wheel over the picture set it too.</sys:String>
     <sys:String x:Key="S_BrushHint">Flow and opacity are not the same: one says how much a SINGLE stroke lays down, the other where even ten strokes stop. At opacity 0.3 the mask stays just under a third however often you go over it. Hold Alt to erase.</sys:String>
 </ResourceDictionary>

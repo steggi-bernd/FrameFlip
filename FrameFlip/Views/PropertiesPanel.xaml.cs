@@ -41,6 +41,9 @@ public partial class PropertiesPanel : UserControl
     /// <summary>Bis wohin ein Strich ueberhaupt auftraegt.</summary>
     public float BrushOpacity => (float)BrushOpacitySlider.Value;
 
+    /// <summary>Der Abstand der Tupfer als Anteil des Radius.</summary>
+    public float BrushSpacing => (float)BrushSpacingSlider.Value;
+
     private void OnBrushChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
     {
         if (!IsLoaded) return;
@@ -61,13 +64,14 @@ public partial class PropertiesPanel : UserControl
     }
 
     /// <summary>
-    /// Setzt Groesse und Haerte von aussen - wenn sie am Bild mit Strg gezogen wurden.
-    /// Die Regler ziehen mit, als haette man an ihnen gedreht.
+    /// Setzt Groesse, Haerte und Abstand von aussen - wenn sie am Bild mit Strg gezogen
+    /// oder gedreht wurden. Die Regler ziehen mit, als haette man an ihnen gedreht.
     /// </summary>
-    public void SetBrush(float radius, float hardness)
+    public void SetBrush(float radius, float hardness, float spacing)
     {
         BrushSizeSlider.Value = Math.Clamp(radius * 2, BrushSizeSlider.Minimum, BrushSizeSlider.Maximum);
         BrushHardnessSlider.Value = Math.Clamp(hardness, BrushHardnessSlider.Minimum, BrushHardnessSlider.Maximum);
+        BrushSpacingSlider.Value = Math.Clamp(spacing, BrushSpacingSlider.Minimum, BrushSpacingSlider.Maximum);
     }
 
     private void ShowBrushValues()
@@ -76,6 +80,7 @@ public partial class PropertiesPanel : UserControl
         BrushHardnessValue.Text = $"{BrushHardnessSlider.Value:0.00}";
         BrushFlowValue.Text = $"{BrushFlowSlider.Value:0.00}";
         BrushOpacityValue.Text = $"{BrushOpacitySlider.Value:0.00}";
+        BrushSpacingValue.Text = $"{BrushSpacingSlider.Value * 100:0} %";
     }
 
     private float? _depth;

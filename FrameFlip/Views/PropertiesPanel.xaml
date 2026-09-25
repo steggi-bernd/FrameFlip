@@ -73,7 +73,20 @@
                         Minimum="0.05" Maximum="1" Value="1" SmallChange="0.02" LargeChange="0.1"
                         ValueChanged="OnBrushChanged" MouseDoubleClick="OnBrushReset" Tag="1" />
                 <TextBlock x:Name="BrushOpacityValue" Style="{StaticResource PanelValue}"
-                           VerticalAlignment="Center" Width="36" Margin="6,0,0,0"
+                           VerticalAlignment="Center" Width="36" Margin="6,0,14,0"
+                           HorizontalAlignment="Left" />
+
+                <!-- Der Abstand der Tupfer, als Anteil des Radius. Strg und Rad am Bild tun dasselbe. -->
+                <TextBlock Text="{DynamicResource S_BrushSpacing}" Style="{StaticResource PanelLabel}"
+                           VerticalAlignment="Center" Margin="0,0,6,0"
+                           ToolTip="{DynamicResource S_BrushSpacingHint}" />
+                <Slider x:Name="BrushSpacingSlider" Style="{StaticResource PanelSlider}" Width="80"
+                        VerticalAlignment="Center"
+                        Minimum="0.05" Maximum="4" Value="0.25" SmallChange="0.05" LargeChange="0.25"
+                        ToolTip="{DynamicResource S_BrushSpacingHint}"
+                        ValueChanged="OnBrushChanged" MouseDoubleClick="OnBrushReset" Tag="0.25" />
+                <TextBlock x:Name="BrushSpacingValue" Style="{StaticResource PanelValue}"
+                           VerticalAlignment="Center" Width="40" Margin="6,0,0,0"
                            HorizontalAlignment="Left" />
             </StackPanel>
 
