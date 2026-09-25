@@ -72,9 +72,23 @@ internal sealed class SettingsRecipeStore(AppSettings settings) : IAtelierRecipe
 /// </summary>
 internal sealed class AtelierEditingSession
 {
-    private readonly IAtelierRecipeStore _store;
+    private IAtelierRecipeStore _store;
 
     internal AtelierEditingSession(IAtelierRecipeStore store) => _store = store;
+
+    /// <summary>Die Ablage, hinter der das Rezept gerade liegt.</summary>
+    internal IAtelierRecipeStore Store => _store;
+
+    /// <summary>
+    /// Tauscht die Ablage - ein anderes Projekt. Was die alte hielt, muss vorher
+    /// festgehalten sein; die neue gilt als festgehalten, so wie sie gelesen wurde.
+    /// </summary>
+    public void Switch(IAtelierRecipeStore store)
+    {
+        _store = store;
+        Revision++;
+        Dirty = false;
+    }
 
     /// <summary>Die Grundregler des fertigen Bildes.</summary>
     public ImageAdjustments? Adjustments

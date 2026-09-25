@@ -98,6 +98,7 @@ static int RunAll()
     AtelierSourceSessionInvariants.Run();
     AtelierRecipeInvariants.Run();
     AtelierEditingSessionInvariants.Run();
+    AtelierProjectInvariants.Run();
     NodeValueInvariants.Run();
     LayerPlacementInvariants.Run();
     PlacementDragInvariants.Run();
