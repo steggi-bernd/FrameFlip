@@ -432,6 +432,13 @@ public static class AdjustmentInvariants
     /// Die Schranke steht bewusst grosszuegig: Gemessen werden soll eine
     /// Groessenordnung, nicht die Tagesform der Maschine. Ein Zehnfaches faellt
     /// auf, drei Millisekunden hin oder her nicht.
+    ///
+    /// Und sie steht im Verhaeltnis zu zwei Passen ohne Korrektur, nicht in festen
+    /// Millisekunden. Die alten Grenzen - 150 ms voll, 20 ms beim Ziehen - hielt der
+    /// Entwicklungsrechner mit 85 und 7 ms; der CI-Rechner brauchte 280 bis 380 und
+    /// 20 bis 26 ms und riss sie, ohne dass der Code anders war. Die Verhaeltnisse lagen
+    /// auf beiden weit innerhalb: voll das 2,7- bis 4,9-Fache, beim Ziehen ein Fuenftel
+    /// bis ein Drittel.
     /// </summary>
     private static void WhatItCosts()
     {
@@ -485,41 +492,35 @@ public static class AdjustmentInvariants
         var buffer = LayerComposer.Compose(plain, sources);
         LayerComposer.Compose(graded, sources, buffer);
 
-        double without = Fastest(() => LayerComposer.Compose(plain, sources, buffer));
-        double with = Fastest(() => LayerComposer.Compose(graded, sources, buffer));
-        double coarse = Fastest(() => LayerComposer.Compose(graded, sources, buffer, step: 4));
+        // Voll hoechstens das Achtfache zweier Passe ohne Korrektur, beim Ziehen hoechstens
+        // die Haelfte davon.
+        const double Full = 8, Dragging = 0.5;
+
+        bool Within(double[] t) => t[1] < Full * t[0] && t[2] < Dragging * t[0] && t[2] < t[1] / 4;
+
+        var times = Measure.Fastest(5, Within,
+            () => LayerComposer.Compose(plain, sources, buffer),
+            () => LayerComposer.Compose(graded, sources, buffer),
+            () => LayerComposer.Compose(graded, sources, buffer, step: 4));
+
+        double without = times[0], with = times[1], coarse = times[2];
 
         Console.WriteLine($"         1080p: zwei Passe {without:0.0} ms, " +
                           $"mit Korrektur {with:0.0} ms, beim Ziehen {coarse:0.0} ms");
 
-        Check.Timing(with < 150, "der volle Durchgang bleibt im Rahmen", $"{with:0.0} ms");
+        Check.Timing(with < Full * without, "der volle Durchgang bleibt im Rahmen",
+                     $"{with:0.0} gegen {without:0.0} ms - das {with / without:0.0}-Fache, erlaubt {Full:0}");
         Check.Timing(with > without, "und die Korrektur kostet messbar etwas",
-                   $"{with:0.0} gegen {without:0.0} ms");
+                     $"{with:0.0} gegen {without:0.0} ms");
 
-        // Das ist die Zahl, an der die Bedienbarkeit haengt: Beim Ziehen wird nur
-        // das Gitter gerechnet, und das muss deutlich unter einem Bildabstand
-        // bleiben, sonst ruckelt jeder Regler.
-        Check.Timing(coarse < 20, "beim Ziehen bleibt es bedienbar", $"{coarse:0.0} ms");
+        // Das ist die Zahl, an der die Bedienbarkeit haengt: Beim Ziehen wird nur das
+        // Gitter gerechnet. Kostet das weniger als die Haelfte eines Bildes ohne
+        // Korrektur, ist ein Regler dort fluessig, wo das Bild selbst es ist - auf einem
+        // langsamen Rechner ist beides langsamer, auf einem schnellen beides schneller.
+        Check.Timing(coarse < Dragging * without, "beim Ziehen bleibt es bedienbar",
+                     $"{coarse:0.0} gegen {without:0.0} ms - {coarse / without:0.00} Bilder, erlaubt {Dragging:0.0}");
         Check.Timing(coarse < with / 4, "das Gitter spart ein Vielfaches",
-                   $"{coarse:0.0} gegen {with:0.0} ms");
-    }
-
-    private static double Fastest(Action action)
-    {
-        double best = double.MaxValue;
-
-        // Die schnellste von fuenf: Der Median misst die Maschine mit, die schnellste
-        // misst den Weg.
-        for (int i = 0; i < 5; i++)
-        {
-            var watch = System.Diagnostics.Stopwatch.StartNew();
-            action();
-            watch.Stop();
-
-            best = Math.Min(best, watch.Elapsed.TotalMilliseconds);
-        }
-
-        return best;
+                     $"{coarse:0.0} gegen {with:0.0} ms");
     }
 
     // ------------------------------------------------------------------- Handwerk
