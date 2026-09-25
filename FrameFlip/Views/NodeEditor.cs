@@ -1288,13 +1288,14 @@ public sealed class NodeEditor : FrameworkElement
         double radius = 5 * Zoom;
         bool selected = ReferenceEquals(node, Selected);
 
-        dc.PushOpacity(node.Muted ? 0.5 : 1);
+        dc.PushOpacity(node.Muted ? 0.6 : 1);
 
         dc.DrawRoundedRectangle(Body, selected ? Chosen : Outline, box, radius, radius);
 
         // Der Kopf: oben gerundet, unten gerade - ein zweites Rechteck deckt die untere Rundung.
+        // Ein stummer Knoten verliert seine Farbe: grau, wie abgeschaltet.
         var head = new Rect(box.X, box.Y, box.Width, Header * Zoom);
-        var headBrush = new SolidColorBrush(HeaderColour(node));
+        var headBrush = node.Muted ? MutedHead : new SolidColorBrush(HeaderColour(node));
         headBrush.Freeze();
 
         dc.DrawRoundedRectangle(headBrush, null, head, radius, radius);
@@ -1302,15 +1303,32 @@ public sealed class NodeEditor : FrameworkElement
 
         if (selected) dc.DrawRoundedRectangle(null, Chosen, box, radius, radius);
 
+        // Unter den Anschluessen und ihren Namen, damit er sie nicht durchstreicht.
+        if (node.Muted) DrawPassThrough(dc, node);
+
         bool labels = Zoom >= 0.45;
 
         if (labels)
         {
             string title = Title?.Invoke(node) ?? node.GetType().Name;
-            if (node.Muted) title += " ⊘";
+
+            // Stumm steht als Schild im Kopf - ein Wort statt eines Zeichens, das niemand
+            // deuten muss.
+            double tag = 0;
+
+            if (node.Muted)
+            {
+                var word = Label(Translate?.Invoke("S_NodeMutedTag") ?? "stumm", 9.5 * Zoom, Text);
+                var pill = new Rect(box.Right - 30 * Zoom - word.Width - 10 * Zoom, box.Y + (Header * Zoom - word.Height - 4 * Zoom) / 2,
+                                    word.Width + 10 * Zoom, word.Height + 4 * Zoom);
+
+                dc.DrawRoundedRectangle(MutedTag, null, pill, pill.Height / 2, pill.Height / 2);
+                dc.DrawText(word, new Point(pill.X + 5 * Zoom, pill.Y + 2 * Zoom));
+                tag = pill.Width + 6 * Zoom;
+            }
 
             var text = Label(title, 12 * Zoom, Text);
-            text.MaxTextWidth = Math.Max(1, box.Width - 34 * Zoom);
+            text.MaxTextWidth = Math.Max(1, box.Width - 34 * Zoom - tag);
             text.MaxLineCount = 1;
             text.Trimming = TextTrimming.CharacterEllipsis;
 
@@ -1375,17 +1393,64 @@ public sealed class NodeEditor : FrameworkElement
     private static readonly Brush PreviewGround = Frozen(new SolidColorBrush(Color.FromRgb(0x18, 0x18, 0x1E)));
 
     /// <summary>Der Knopf fuer die Vorschau: ein Auge, offen, wenn sie gezeigt wird.</summary>
+    /// <summary>
+    /// Der Vorschauknopf im Kopf: ein kleines Bild - ein Rahmen mit einem Berg darin. An,
+    /// ist es hell und gefuellt; aus, nur ein blasser Umriss.
+    ///
+    /// Frueher war es ein Auge, bei ausgeschalteter Vorschau durchgestrichen - auf fast
+    /// jedem Knoten. Das las sich wie "ausgeblendet" und hiess doch nur "ohne Vorschau".
+    /// </summary>
     private void DrawEye(DrawingContext dc, Node node)
     {
         var eye = Eye(node);
         var centre = ToScreen(new Point(eye.X + eye.Width / 2, eye.Y + eye.Height / 2));
-        double rx = eye.Width / 2 * Zoom, ry = eye.Height / 2.6 * Zoom;
+        double w = 12 * Zoom, h = 9 * Zoom;
+        var frame = new Rect(centre.X - w / 2, centre.Y - h / 2, w, h);
 
-        var pen = node.Preview ? EyeOn : EyeOff;
-        dc.DrawEllipse(null, pen, centre, rx, ry);
+        if (node.Preview)
+        {
+            dc.DrawRoundedRectangle(PreviewOn, null, frame, 1.5 * Zoom, 1.5 * Zoom);
 
-        if (node.Preview) dc.DrawEllipse(pen.Brush, null, centre, ry * 0.7, ry * 0.7);
-        else dc.DrawLine(pen, new Point(centre.X - rx, centre.Y + ry), new Point(centre.X + rx, centre.Y - ry));
+            var hill = new StreamGeometry();
+            using (var g = hill.Open())
+            {
+                g.BeginFigure(new Point(frame.Left + 1.5 * Zoom, frame.Bottom - 1.5 * Zoom), true, true);
+                g.LineTo(new Point(frame.Left + 4.5 * Zoom, frame.Top + 3.5 * Zoom), true, false);
+                g.LineTo(new Point(frame.Left + 7 * Zoom, frame.Bottom - 3 * Zoom), true, false);
+                g.LineTo(new Point(frame.Left + 8.5 * Zoom, frame.Bottom - 4.5 * Zoom), true, false);
+                g.LineTo(new Point(frame.Right - 1.5 * Zoom, frame.Bottom - 1.5 * Zoom), true, false);
+            }
+
+            hill.Freeze();
+            dc.DrawGeometry(PreviewHill, null, hill);
+        }
+        else
+        {
+            dc.PushOpacity(0.45);
+            dc.DrawRoundedRectangle(null, EyeOff, frame, 1.5 * Zoom, 1.5 * Zoom);
+            dc.Pop();
+        }
+    }
+
+    private static readonly Brush PreviewOn = Frozen(new SolidColorBrush(Color.FromArgb(0xF0, 0xFF, 0xFF, 0xFF)));
+    private static readonly Brush PreviewHill = Frozen(new SolidColorBrush(Color.FromRgb(0x5A, 0x4A, 0x8A)));
+    private static readonly Brush MutedHead = Frozen(new SolidColorBrush(Color.FromRgb(0x4A, 0x4A, 0x52)));
+    private static readonly Brush MutedTag = Frozen(new SolidColorBrush(Color.FromArgb(0xC0, 0x1A, 0x1A, 0x20)));
+    private static readonly Pen PassThrough = Frozen(new Pen(new SolidColorBrush(Color.FromRgb(0xC8, 0x6A, 0x5A)), 2) { DashStyle = DashStyles.Dash });
+
+    /// <summary>
+    /// Bei einem stummen Knoten: der Weg, den das Bild an ihm vorbei nimmt - vom ersten
+    /// Bildeingang zum ersten Bildausgang, wie in Blender.
+    /// </summary>
+    private void DrawPassThrough(DrawingContext dc, Node node)
+    {
+        var (input, output) = NodeEdits.Through(node);
+        if (input is null || output is null) return;
+
+        int i = IndexOf(node.Inputs, input), o = IndexOf(node.Outputs, output);
+        if (i < 0 || o < 0) return;
+
+        dc.DrawLine(PassThrough, ToScreen(InputAt(node, i)), ToScreen(OutputAt(node, o)));
     }
 
     /// <summary>Das kleine Bild unter den Anschluessen - im Seitenverhaeltnis des Bildes, mittig.</summary>

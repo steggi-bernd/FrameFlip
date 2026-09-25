@@ -1,6 +1,7 @@
 using System.IO;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Input;
 using FrameFlip.Decoding.Exr;
 using FrameFlip.Imaging.Grading;
 using FrameFlip.Imaging.Nodes;
@@ -28,9 +29,28 @@ public partial class AtelierPage
 
     private void SetUpNodeEditing()
     {
+        // Strg+Z gilt auf der ganzen Seite - nicht nur, solange der Editor den Fokus hat.
+        // Nach einem Klick in die Ebenenliste, den Farbstreifen oder den Hub lag er
+        // woanders, und Strg+Z tat nichts.
+        Loaded += (_, _) =>
+        {
+            if (Window.GetWindow(this) is { } window && !ReferenceEquals(window, _keyWindow))
+            {
+                if (_keyWindow is not null) _keyWindow.PreviewKeyDown -= OnWindowKey;
+                _keyWindow = window;
+                window.PreviewKeyDown += OnWindowKey;
+            }
+        };
+
+        Unloaded += (_, _) =>
+        {
+            if (_keyWindow is not null) _keyWindow.PreviewKeyDown -= OnWindowKey;
+            _keyWindow = null;
+        };
+
         NodeView.Translate = key => Strings.T(key);
         NodeView.Editing += RememberNodes;
-        NodeView.MenuWanted += at => ShowNodeHub(at);
+        NodeView.MenuWanted += OnNodeMenuWanted;
         NodeView.SectionDropped += DropFromPalette;
         NodeView.ViewWanted += OnViewWanted;
         SetUpNodePreviews();
@@ -52,6 +72,55 @@ public partial class AtelierPage
         _redo.Clear();
     }
 
+    private Window? _keyWindow;
+
+    /// <summary>Strg+Z, Strg+Y und Strg+Umschalt+Z im Knotenmodus - ausser in einem Textfeld, das sein eigenes hat.</summary>
+    private void OnWindowKey(object sender, KeyEventArgs e)
+    {
+        if (IsVisible && HandleUndoKey(e.Key, Keyboard.Modifiers, e.OriginalSource)) e.Handled = true;
+    }
+
+    /// <summary>Strg+Z und Co. - getrennt vom Tastenereignis, damit die Probe es ohne Tastatur pruefen kann.</summary>
+    internal bool HandleUndoKey(Key key, ModifierKeys modifiers, object? source)
+    {
+        if (!InNodes || source is System.Windows.Controls.Primitives.TextBoxBase) return false;
+        if ((modifiers & ModifierKeys.Control) == 0) return false;
+
+        bool shift = (modifiers & ModifierKeys.Shift) != 0;
+
+        if (key == Key.Z) StepNodes(back: !shift);
+        else if (key == Key.Y) StepNodes(back: false);
+        else return false;
+
+        return true;
+    }
+
+    /// <summary>Ob gerade an einem Wert gezogen wird - der Stand davor liegt dann schon im Verlauf.</summary>
+    private bool _valueEditOpen;
+
+    /// <summary>
+    /// Vor einer Aenderung an einem Wert - Regler, Mischung, Pinselstrich, Verschieben: Der
+    /// zuletzt festgehaltene Stand kommt in den Verlauf, einmal je Zug. Der festgehaltene,
+    /// nicht der jetzige: Wenn die Meldung kommt, hat sich der Wert schon geaendert.
+    /// </summary>
+    private void RememberValueEdit()
+    {
+        if (_valueEditOpen || _graph is null || _settings.AtelierNodes is not { } before) return;
+
+        // Nichts geaendert - etwa ein Farbstreifen, der sich beim Waehlen eines Knotens
+        // fuellt und dabei meldet: kein Schritt im Verlauf.
+        if (_graph.Save() == before) return;
+
+        _valueEditOpen = true;
+
+        if (_undo.Count > 0 && _undo[^1] == before) return;
+
+        _undo.Add(before);
+        if (_undo.Count > HistoryDepth) _undo.RemoveAt(0);
+
+        _redo.Clear();
+    }
+
     /// <summary>Einen Schritt zurueck oder wieder vor.</summary>
     public void StepNodes(bool back)
     {
@@ -67,6 +136,7 @@ public partial class AtelierPage
 
         if (NodeGraph.Load(state) is not { } graph) return;
 
+        _valueEditOpen = false;
         to.Add(_graph.Save());
 
         _graph = graph;
@@ -87,7 +157,11 @@ public partial class AtelierPage
         ShowNodeLayers();
         ShowMissingLayers();
         KeepViewer();
-        FetchNodeSources();
+
+        // Erst grob, dann voll - wie beim Ziehen an einem Regler. Der Editor zeigt die
+        // Aenderung sofort, das Bild zieht im naechsten Bild nach, scharf nach einer Pause.
+        // Voll und sofort hielt jeder Klick die Seite an, bis das ganze Bild gerechnet war.
+        FetchNodeSources(soon: true);
     }
 
     /// <summary>Ein Hinweis im Editor, wenn der Graph kein Bild ergibt.</summary>

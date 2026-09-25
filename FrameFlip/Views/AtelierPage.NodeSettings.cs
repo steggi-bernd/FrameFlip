@@ -139,6 +139,8 @@ public partial class AtelierPage
     /// </summary>
     private void OnNodeSettingsChanged(bool interim)
     {
+        RememberValueEdit();
+
         if (_shownNode is LayerGradeNode grade)
         {
             grade.Adjustments = Tools.Adjustments;
@@ -163,7 +165,12 @@ public partial class AtelierPage
     /// </summary>
     private void KeepNodes()
     {
-        if (_graph is not null) _settings.AtelierNodes = _graph.Save();
+        if (_graph is null) return;
+
+        _settings.AtelierNodes = _graph.Save();
+
+        // Ein Zug an einem Wert ist zu Ende, wenn sein Stand festgehalten wird.
+        _valueEditOpen = false;
     }
 
     /// <summary>
@@ -298,6 +305,8 @@ public partial class AtelierPage
             default: return;
         }
 
+        RememberValueEdit();
+
         if (!interim)
         {
             StopDragFrames();
@@ -321,6 +330,8 @@ public partial class AtelierPage
     /// <summary>Es wurde gemalt - im Knotenmodus auf die Maske des Knotens.</summary>
     private void OnNodePainted(bool interim)
     {
+        RememberValueEdit();
+
         if (!interim)
         {
             StopDragFrames();

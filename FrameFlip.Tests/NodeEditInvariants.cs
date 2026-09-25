@@ -289,8 +289,76 @@ public static class NodeEditInvariants
             Check.That(ReferenceEquals(frame.MaskWanted!(), paint) && page.Graph.Nodes.Count == nodes + 3,
                        "ist die Ebene gewaehlt, malt der Pinsel auf ihre Maske");
 
+            // Ein Strich auf die Maske - und Strg+Z nimmt ihn zurueck, auch wenn der Editor
+            // gerade nicht den Fokus hat.
+            float Painted() => made!.Mask.PaintOn(0, 1, 1).Cover().Sum(b => (float)b);
+            float clean = Painted();
+
+            paint!.Stroke(paint.Width / 2f, paint.Height / 2f, 10f, 1f, 1f);
+            Call(page, "OnPainted", true);
+            paint.Keep();
+            Call(page, "OnPainted", false);
+            Settle();
+
+            var painted = page.Graph!.Nodes.OfType<MaskNode>().Single(m => m.Id == made!.Id);
+            Check.That(painted.Mask.PaintOn(0, 1, 1).Cover().Sum(b => (float)b) > clean, "ein Strich traegt auf");
+
+            var list2 = (NodeLayerList)page.FindName("NodeLayers");
+            Check.That(page.HandleUndoKey(System.Windows.Input.Key.Z, System.Windows.Input.ModifierKeys.Control, list2),
+                       "Strg+Z wirkt auch mit dem Fokus in der Ebenenliste");
+            Settle();
+
+            var back = page.Graph!.Nodes.OfType<MaskNode>().Single(m => m.Id == made!.Id);
+            Check.That(Math.Abs(back.Mask.PaintOn(0, 1, 1).Cover().Sum(b => (float)b) - clean) < 1e-3, "und nimmt den Strich zurueck");
+
+            Check.That(!page.HandleUndoKey(System.Windows.Input.Key.Z, System.Windows.Input.ModifierKeys.Control, new TextBox()),
+                       "in einem Textfeld bleibt Strg+Z beim Textfeld");
+
             ((ToolColumn)page.FindName("MouseTools")).Select(AtelierTool.Nodes, notify: true);
             Settle();
+
+            // Nach einem Bauschritt: erst grob, dann scharf.
+            var somewhere = page.Graph!.Nodes.OfType<MixNode>().First();
+            Call(page, "OnLayerMuted", somewhere);
+
+            Check.That((bool)Field(page, "_coarse")!, "nach einem Bauschritt rechnet die Seite zuerst grob - der Klick haelt nicht an");
+            Settle();
+            Check.That(!(bool)Field(page, "_coarse")!, "und kurz danach scharf");
+
+            Call(page, "OnLayerMuted", somewhere);
+            Settle();
+
+            // Rechtsklick auf einen Knoten: sein eigenes Menue. Auf die freie Flaeche: der Hub.
+            hubPopupClose(page);
+            var view = page.Graph!.Nodes.OfType<ViewNode>().First();
+            var onNode = editor.ScreenOf(view, "Bild", input: true) + new Vector(40, 0);
+
+            Call(page, "OnNodeMenuWanted", editor.ToGraph(onNode));
+
+            Check.That(page.NodeMenu is { IsOpen: true } && page.Hub is null && ReferenceEquals(editor.Selected, view),
+                       "Rechtsklick auf einen Knoten oeffnet sein Menue - nicht den Hub");
+            Check.That(new[] { "S_LayerMenuRename", "S_NodeMenuMuted", "S_NodeMenuPreview", "S_HubViewer", "S_NodeMenuInsertAfter",
+                               "S_HubDuplicate", "S_NodeMenuUnwire", "S_HubDelete" }.All(k => page.NodeMenu!.Items.Contains(T(k))),
+                       "mit dem, was sich mit ihm tun laesst", string.Join(", ", page.NodeMenu!.Items));
+
+            string readerOfView = page.Graph.Links.First(l => l.From == view.Id).To;
+            page.NodeMenu!.Invoke(T("S_NodeMenuInsertAfter"));
+
+            Check.That(page.Hub is not null, "Dahinter einfuegen oeffnet den Hub");
+
+            page.Hub!.Search("vignet");
+            page.Hub.ActivateHighlighted();
+            Settle();
+
+            var inserted = page.Graph!.Nodes.OfType<OpticsNode>().FirstOrDefault(n => n.Tool is VignetteTool);
+            Check.That(inserted is not null && page.Graph.Into(inserted.Id, "Bild")?.From == view.Id &&
+                       page.Graph.Links.Any(l => l.From == inserted.Id && l.To == readerOfView),
+                       "und das Gewaehlte kommt hinter den Knoten - das Bild laeuft durch es weiter");
+
+            page.NodeMenu.Close();
+            Call(page, "OnNodeMenuWanted", editor.ToGraph(new Point(5, 5)));
+            Check.That(page.Hub is not null, "auf der freien Flaeche oeffnet der Rechtsklick den Hub");
+            hubPopupClose(page);
         }
         finally
         {
@@ -948,7 +1016,9 @@ public static class NodeEditInvariants
 
             byte[] withLayer = Pixels(page);
             Call(page, "OnLayerMuted", top.Mix!);
-            Pump(TimeSpan.FromSeconds(3), () => !Pixels(page).AsSpan().SequenceEqual(withLayer));
+
+            // Nach einem Bauschritt kommt erst das grobe Bild, dann das scharfe.
+            Pump(TimeSpan.FromSeconds(3), () => Pixels(page).AsSpan().SequenceEqual(plain));
 
             Check.That(page.Graph!.Nodes.OfType<MixNode>().Any(m => m.Muted) && Pixels(page).AsSpan().SequenceEqual(plain),
                        "das Auge schaltet die Ebene stumm - das Bild ist wieder das ohne sie");
@@ -1100,6 +1170,17 @@ public static class NodeEditInvariants
 
             Check.That(Math.Abs(Mix(diffMix.Id).Opacity - 0.5f) < 1e-4 && !Pixels(page).AsSpan().SequenceEqual(screened),
                        "die Deckkraft ebenso");
+
+            // Deckkraft und Mischung sind eigene Schritte im Verlauf - Rueckgaengig nimmt
+            // erst sie zurueck, dann die Ebenen.
+            page.StepNodes(back: true);
+
+            Check.That(Math.Abs(Mix(diffMix.Id).Opacity - 1f) < 1e-4 && Mix(diffMix.Id).Mode == BlendMode.Screen,
+                       "Rueckgaengig nimmt zuerst die Deckkraft zurueck", $"{Mix(diffMix.Id).Opacity}, {Mix(diffMix.Id).Mode}");
+
+            page.StepNodes(back: true);
+
+            Check.That(Mix(diffMix.Id).Mode == BlendMode.Add, "dann die Mischung", $"{Mix(diffMix.Id).Mode}");
 
             page.StepNodes(back: true);
             page.StepNodes(back: true);
@@ -1346,12 +1427,21 @@ public static class NodeEditInvariants
             byte[] darker = Pixels(page);
             Check.That(!darker.AsSpan().SequenceEqual(plain), "die Karte wirkt auf den neuen Knoten");
 
+            // Der Zug am Regler ist ein eigener Schritt: Rueckgaengig nimmt erst ihn zurueck,
+            // dann den Knoten.
+            page.StepNodes(back: true);
+            Settle();
+
+            Check.That(page.Graph!.Nodes.OfType<OpticsNode>().SingleOrDefault()?.Tool is VignetteTool { Amount: > -0.9f },
+                       "Rueckgaengig nimmt erst den Zug am Regler zurueck");
+
             page.StepNodes(back: true);
             Settle();
 
             Check.That(!page.Graph!.Nodes.OfType<OpticsNode>().Any(), "Rueckgaengig nimmt ihn wieder heraus");
             Check.That(Pixels(page).AsSpan().SequenceEqual(plain), "und das Bild ist wieder das von vorher");
 
+            page.StepNodes(back: false);
             page.StepNodes(back: false);
             Settle();
 

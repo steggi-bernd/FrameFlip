@@ -25,11 +25,72 @@ public partial class AtelierPage
     /// <summary>Der offene Hub - fuer die Probe.</summary>
     internal NodeHub? Hub => _hubPopup is { IsOpen: true } popup ? popup.Child as NodeHub : null;
 
+    /// <summary>Das zuletzt geoeffnete Menue eines Knotens - fuer die Probe.</summary>
+    internal FlipMenu? NodeMenu { get; private set; }
+
+    /// <summary>
+    /// Rechtsklick im Editor: auf einem Knoten sein eigenes Menue, sonst der Hub. Die
+    /// Ausgabe hat nichts Eigenes - bei ihr kommt der Hub.
+    /// </summary>
+    private void OnNodeMenuWanted(Point at)
+    {
+        if (NodeView.NodeAt(NodeView.ToScreen(at)) is { } node and not OutputNode) ShowNodeMenu(node, at);
+        else ShowNodeHub(at);
+    }
+
+    /// <summary>
+    /// Das Menue eines Knotens: umbenennen, stumm, Betrachter, Vorschau, verdoppeln,
+    /// Kabel loesen, loeschen - und etwas dahinter einfuegen, ueber den Hub.
+    /// </summary>
+    internal void ShowNodeMenu(Node node, Point at)
+    {
+        if (_graph is null) return;
+
+        NodeView.Select(node);
+
+        var menu = new FlipMenu(NodeView)
+            .Rename(Strings.T("S_LayerMenuRename"), NodeTitles.For(node), name =>
+            {
+                RememberNodes();
+                node.Label = name.Length > 0 ? name : null;
+                NodeView.InvalidateVisual();
+                AfterNodeEdit();
+            })
+            .Toggle(Strings.T("S_NodeMenuMuted"), node.Muted, () =>
+            {
+                RememberNodes();
+                node.Muted = !node.Muted;
+                NodeView.InvalidateVisual();
+                OnGraphChanged();
+            })
+            .Toggle(Strings.T("S_NodeMenuPreview"), node.Preview, () => NodeView.TogglePreview(node))
+            .Item("◉", Strings.T("S_HubViewer"), () => OnViewWanted(node), "Strg+Umschalt+Klick", enabled: node.Outputs.Count > 0)
+            .Separator()
+            .Item("＋", Strings.T("S_NodeMenuInsertAfter"), () => ShowNodeHub(at, after: node), enabled: NodeEdits.Through(node).Output is not null)
+            .Item("❐", Strings.T("S_HubDuplicate"), () => NodeView.Duplicate(node), "Umschalt+D", enabled: node is not RenderNode)
+            .Item("⌁", Strings.T("S_NodeMenuUnwire"), () =>
+            {
+                RememberNodes();
+                _graph.Links.RemoveAll(l => l.From == node.Id || l.To == node.Id);
+                NodeView.InvalidateVisual();
+                AfterNodeEdit();
+            }, enabled: _graph.Links.Any(l => l.From == node.Id || l.To == node.Id))
+            .Item("✕", Strings.T("S_HubDelete"), () => NodeView.Remove(node), "Entf");
+
+        NodeMenu = menu;
+        menu.Open();
+    }
+
     /// <summary>
     /// Oeffnet den Hub an einer Stelle des Graphen. <paramref name="category"/> waehlt die
     /// Kategorie vor; <paramref name="anchor"/> heisst: neben diesem Element statt am Zeiger.
     /// </summary>
-    internal void ShowNodeHub(Point at, string? category = null, UIElement? anchor = null, Func<Node?>? target = null)
+    /// <param name="after">
+    /// Ein Knoten, hinter den das Neue gesetzt wird - "Dahinter einfuegen" aus seinem
+    /// Menue. Das Bild laeuft danach durch das Neue weiter.
+    /// </param>
+    internal void ShowNodeHub(Point at, string? category = null, UIElement? anchor = null, Func<Node?>? target = null,
+                              Node? after = null)
     {
         if (_graph is null) return;
 
@@ -40,13 +101,15 @@ public partial class AtelierPage
         var link = anchor is null && NodeView.NodeAt(screen) is null ? NodeView.LinkAt(screen) : null;
         target ??= LayerTarget;
 
-        string? note = link is not null && _graph.Find(link.From) is { } from && _graph.Find(link.To) is { } to
-            ? Strings.T("S_HubIntoWire", NodeTitles.For(from), NodeTitles.For(to))
-            : null;
+        string? note = after is not null
+            ? Strings.T("S_HubAfterNode", NodeTitles.For(after))
+            : link is not null && _graph.Find(link.From) is { } from && _graph.Find(link.To) is { } to
+                ? Strings.T("S_HubIntoWire", NodeTitles.For(from), NodeTitles.For(to))
+                : null;
 
         var chosen = NodeView.Selected is { } node and not OutputNode ? node : null;
 
-        var hub = new NodeHub(HubCategories(at, link, target), note,
+        var hub = new NodeHub(HubCategories(at, link, target, after), note,
                               chosen is null ? null : NodeTitles.For(chosen),
                               chosen is null ? Array.Empty<HubAction>() : NodeActions(chosen),
                               ViewActions());
@@ -96,7 +159,7 @@ public partial class AtelierPage
     }
 
     /// <summary>Was der Hub anbietet - Kategorie fuer Kategorie.</summary>
-    private List<HubCategory> HubCategories(Point at, NodeLink? link, Func<Node?> target)
+    private List<HubCategory> HubCategories(Point at, NodeLink? link, Func<Node?> target, Node? after = null)
     {
         var categories = new List<HubCategory>();
         var passes = NodePasses();
@@ -108,9 +171,17 @@ public partial class AtelierPage
             Alternate = entry.Alternate is { } other ? () => { Remember(entry.Title); other(); } : null,
         };
 
+        // Aus dem Menue eines Knotens: hinter ihn gesetzt. Sonst frei an die Stelle - oder
+        // ins Kabel, auf dem der Rechtsklick war.
+        void Add(Node node)
+        {
+            if (after is not null && NodeEdits.Through(node).Input is not null) InsertAfterNode(after, node);
+            else PlaceAt(node, at, link);
+        }
+
         HubEntry Kind(NodeKind kind) => Used(new HubEntry(Strings.T(kind.TitleKey),
                                                          kind.Section is { } s ? GradingPanel.GlyphOf(s) ?? "•" : "•",
-                                                         () => PlaceAt(kind.Create(), at, link))
+                                                         () => Add(kind.Create()))
         {
             Section = kind.Section,
             Words = Strings.T(kind.Group),
@@ -323,6 +394,27 @@ public partial class AtelierPage
         }
 
         if (layer.Switch is { } whole) DuplicateLayer(whole);
+    }
+
+    /// <summary>Setzt einen neuen Knoten hinter einen anderen - das Bild laeuft durch ihn weiter.</summary>
+    private void InsertAfterNode(Node after, Node node)
+    {
+        if (_graph is null) return;
+
+        RememberNodes();
+
+        _graph.Add(node);
+        node.X = after.X + NodeLayout.ColumnStep;
+        node.Y = after.Y;
+
+        NodeEdits.InsertAfter(_graph, after, node);
+        NodeEdits.MakeRoom(_graph, node, NodeLayout.ColumnStep);
+        NodeCatalog.WireData(_graph, node);
+
+        NodeView.Select(node);
+        NodeView.InvalidateVisual();
+
+        AfterNodeEdit();
     }
 
     /// <summary>Ein Pass als Maske - frei an der Stelle, mit seinem Kabel von der Datei.</summary>

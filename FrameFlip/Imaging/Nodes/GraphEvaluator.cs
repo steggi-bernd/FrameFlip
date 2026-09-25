@@ -412,8 +412,17 @@ public static class GraphEvaluator
 
         var display = DisplaySide(graph, order);
 
-        // Die Schluessel - nur mit Zwischenspeicher. Ohne ihn waeren sie Arbeit fuer nichts.
-        var shapes = cache is null ? null : Shapes(graph, units, unitOf, inputs, context, sixteen, display);
+        // Was hinter dem gewaehlten Knoten liegt, wird ohnehin neu gerechnet - nur davor
+        // kann etwas Gemerktes liegen. Ohne gewaehlten Knoten gibt es kein "davor": Dann
+        // wird nichts gemerkt und nichts nachgeschlagen.
+        var behind = cache is null ? null : Behind(graph, units, unitOf, inputs.Focus);
+        bool caching = behind is not null;
+
+        // Die Schluessel - nur fuer das, was vor dem gewaehlten Knoten liegt. Sie fuer
+        // jeden Knoten zu bilden hiess, jeden Knoten bei jedem Bild zu schreiben und zu
+        // hashen: Ein voller Durchgang dauerte damit fast doppelt so lange wie ohne
+        // Zwischenspeicher, auch wenn gar nichts gezogen wurde.
+        var shapes = caching ? Shapes(graph, units, unitOf, inputs, context, sixteen, display, behind!) : null;
 
         string Shape(int unit, string output) => shapes![unit] + "|" + output;
         string Key(int unit, string output) => step + "|" + Shape(unit, output);
@@ -435,7 +444,7 @@ public static class GraphEvaluator
                 if (graph.Into(first.Id, socket.Name) is not { } link || !unitOf.TryGetValue(link.From, out int from))
                     continue;
 
-                if (cache is not null && cache.TryGet(Key(from, link.Output), out var value))
+                if (caching && !behind![from] && cache!.TryGet(Key(from, link.Output), out var value))
                 {
                     remembered[(link.From, link.Output)] = value;
                     continue;
@@ -462,8 +471,8 @@ public static class GraphEvaluator
             readers[(link.From, link.Output)] = readers.GetValueOrDefault((link.From, link.Output)) + 1;
         }
 
-        var keep = cache is null ? null : Frontier(graph, units, unitOf, inputs.Focus, Shape);
-        var next = cache is null ? null : new Dictionary<string, GraphCache.Entry>(StringComparer.Ordinal);
+        var keep = caching ? Frontier(graph, units, unitOf, behind!, Shape) : null;
+        var next = caching ? new Dictionary<string, GraphCache.Entry>(StringComparer.Ordinal) : null;
 
         var results = new Dictionary<(string, string), object?>();
         GridImage? output = null;
@@ -555,7 +564,7 @@ public static class GraphEvaluator
                 {
                     var value = run.Outputs.GetValueOrDefault(socket.Name);
 
-                    if (keep is not null && keep.Contains(Shape(u, socket.Name)))
+                    if (keep is not null && !behind![u] && keep.Contains(Shape(u, socket.Name)))
                     {
                         // Gemerkt fuer die naechste Rechnung - und gehalten, solange es
                         // gemerkt ist: Seine Felder gehen nicht in den Vorrat zurueck.
@@ -583,7 +592,7 @@ public static class GraphEvaluator
             context.EndUnit();
         }
 
-        if (cache is not null)
+        if (cache is not null && caching)
         {
             // Was schon gemerkt war und weiter in den gewaehlten Knoten fliesst, bleibt -
             // auch fuer das andere Raster, damit das Loslassen nach dem Ziehen nicht
@@ -592,6 +601,11 @@ public static class GraphEvaluator
                 if (keep!.Contains(entry.Shape) && !next!.ContainsKey(key)) next[key] = entry;
 
             cache.Replace(next!);
+        }
+        else
+        {
+            // Ohne gewaehlten Knoten bliebe nichts gemerkt - wie bisher, nur ohne die Muehe.
+            cache?.Replace(new Dictionary<string, GraphCache.Entry>(StringComparer.Ordinal));
         }
 
         return (output, context);
@@ -688,11 +702,13 @@ public static class GraphEvaluator
     /// Was von ausserhalb in den gewaehlten Knoten und in alles hinter ihm fliesst - das,
     /// was beim naechsten Zug an diesem Knoten gleich bleibt. Ohne gewaehlten Knoten nichts.
     /// </summary>
-    private static HashSet<string> Frontier(NodeGraph graph, List<List<Node>> units, Dictionary<string, int> unitOf,
-                                            string? focus, Func<int, string, string> shape)
+    /// <summary>
+    /// Welche Einheiten hinter dem gewaehlten Knoten liegen - er selbst und alles, was von
+    /// ihm liest. Null, wenn keiner gewaehlt ist oder er nicht mitrechnet.
+    /// </summary>
+    private static bool[]? Behind(NodeGraph graph, List<List<Node>> units, Dictionary<string, int> unitOf, string? focus)
     {
-        var keep = new HashSet<string>(StringComparer.Ordinal);
-        if (focus is null || !unitOf.TryGetValue(focus, out int start)) return keep;
+        if (focus is null || !unitOf.TryGetValue(focus, out int start)) return null;
 
         // Die Einheiten stehen in Rechenreihenfolge - ein Gang nach vorn findet alles dahinter.
         var behind = new bool[units.Count];
@@ -711,6 +727,16 @@ public static class GraphEvaluator
                 }
             }
         }
+
+        return behind;
+    }
+
+    private static HashSet<string> Frontier(NodeGraph graph, List<List<Node>> units, Dictionary<string, int> unitOf,
+                                            bool[] behind, Func<int, string, string> shape)
+    {
+        var keep = new HashSet<string>(StringComparer.Ordinal);
+        int start = Array.IndexOf(behind, true);
+        if (start < 0) return keep;
 
         for (int u = start; u < units.Count; u++)
         {
@@ -739,7 +765,8 @@ public static class GraphEvaluator
     /// Objekt und bekommt eine andere Nummer, auch unter demselben Namen.
     /// </summary>
     private static string[] Shapes(NodeGraph graph, List<List<Node>> units, Dictionary<string, int> unitOf,
-                                   GraphInputs inputs, NodeContext context, bool sixteen, HashSet<string> display)
+                                   GraphInputs inputs, NodeContext context, bool sixteen, HashSet<string> display,
+                                   bool[] behind)
     {
         var world = new StringBuilder();
 
@@ -759,6 +786,14 @@ public static class GraphEvaluator
 
         for (int u = 0; u < units.Count; u++)
         {
+            // Hinter dem gewaehlten Knoten wird nichts nachgeschlagen - und was davor liegt,
+            // liest nie von dort.
+            if (behind[u])
+            {
+                shapes[u] = "";
+                continue;
+            }
+
             var text = new StringBuilder(common);
 
             foreach (var node in units[u]) text.Append('\n').Append(NodeGraph.Print(node, context.Number));

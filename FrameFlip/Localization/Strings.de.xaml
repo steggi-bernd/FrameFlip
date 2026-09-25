@@ -1060,6 +1060,12 @@
     <sys:String x:Key="S_HubArrange">Anordnen</sys:String>
     <sys:String x:Key="S_HubFrame">Alles zeigen</sys:String>
     <sys:String x:Key="S_HubRebuild">Neu aus Stapel</sys:String>
+    <sys:String x:Key="S_NodeMenuMuted">Stumm</sys:String>
+    <sys:String x:Key="S_NodeMenuPreview">Vorschau</sys:String>
+    <sys:String x:Key="S_NodeMenuInsertAfter">Dahinter einfügen …</sys:String>
+    <sys:String x:Key="S_NodeMenuUnwire">Alle Kabel lösen</sys:String>
+    <sys:String x:Key="S_HubAfterNode">Neue Knoten kommen hinter {0}</sys:String>
+    <sys:String x:Key="S_NodeMutedTag">stumm</sys:String>
     <sys:String x:Key="S_LayerMenuRename">Umbenennen</sys:String>
     <sys:String x:Key="S_LayerMenuVisible">Sichtbar</sys:String>
     <sys:String x:Key="S_LayerMenuShowInGraph">Im Graphen zeigen</sys:String>

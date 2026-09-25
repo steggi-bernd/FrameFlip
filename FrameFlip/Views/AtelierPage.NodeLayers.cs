@@ -201,6 +201,9 @@ public partial class AtelierPage
                 return;
         }
 
+        // Nach der Aenderung: Der Verlauf bekommt den festgehaltenen Stand davor.
+        RememberValueEdit();
+
         NodeView.InvalidateVisual();
         Refresh(interim: false, recompose: false);
         KeepNodes();
@@ -228,6 +231,8 @@ public partial class AtelierPage
             default:
                 return;
         }
+
+        RememberValueEdit();
 
         NodeView.InvalidateVisual();
         Refresh(interim, recompose: false);

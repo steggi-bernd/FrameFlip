@@ -484,3 +484,35 @@ Only the alpha channel of exports changes, and only in those cases.
     layer paint the same mask. The old test that demanded a dead brush now demands the
     opposite.
 
+12. **Undo everywhere, snappier edits, node menu, clearer marks** (feedback after 11).
+
+    *Done (2026-09-25).*
+    - **Ctrl+Z / Ctrl+Y / Ctrl+Shift+Z** act on the whole page in node mode, not only while
+      the editor has the keyboard focus (after a click in the layer list, the colour strip
+      or the hub it lay elsewhere). A text field keeps its own undo.
+    - **Value edits are steps too:** a slider in the colour strip, blend mode and opacity in
+      the layer list, a brush stroke, moving a Place. Each gesture is one step. What goes
+      into the history is the last kept state, because the change has already happened
+      when it is reported; a report without a change (a panel filling itself when a node
+      is chosen) leaves no step.
+    - **Snappier edits.** A build step did the full computation at once and held the page
+      until the whole picture was done (22 ms of 27 ms at 640x360, many times that at
+      1080p or 4K). It now takes the path of a slider: the editor shows the change at once,
+      the picture follows coarsely in the next frame and sharp after a pause (180 ms). A
+      build step now costs about 3 ms. The graph cache also forms its keys only for what
+      lies before the selected node, and none without a selection; forming them for every
+      node made a full pass almost twice as slow as without a cache.
+    - **Right-click on a node** opens its own menu: rename, muted, preview, viewer, insert
+      after (opens the hub; the chosen node goes behind this one), duplicate, disconnect
+      all wires, delete. Right-click on empty space or a wire opens the hub, as before.
+    - **Node marks.** The preview switch is a small picture (filled with a hill when on, a
+      faint frame when off) instead of an eye that was crossed out on almost every node. A
+      muted node gets a grey header, a "muted" tag instead of a sign after the title, and
+      a dashed line showing the path the picture takes past it, as in Blender.
+
+    Tests: a stroke on a painted mask is taken back by Ctrl+Z with the focus in the layer
+    list, a text field keeps Ctrl+Z; blend mode and opacity are separate steps before the
+    layers; a slider move is its own step before the node; after a build step the page
+    computes coarse first and sharp shortly after; right-click on a node opens its menu,
+    on empty space the hub; "insert after" places the vignette behind the node.
+

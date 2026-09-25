@@ -1060,6 +1060,12 @@
     <sys:String x:Key="S_HubArrange">Arrange</sys:String>
     <sys:String x:Key="S_HubFrame">Show all</sys:String>
     <sys:String x:Key="S_HubRebuild">Rebuild from stack</sys:String>
+    <sys:String x:Key="S_NodeMenuMuted">Muted</sys:String>
+    <sys:String x:Key="S_NodeMenuPreview">Preview</sys:String>
+    <sys:String x:Key="S_NodeMenuInsertAfter">Insert after …</sys:String>
+    <sys:String x:Key="S_NodeMenuUnwire">Disconnect all wires</sys:String>
+    <sys:String x:Key="S_HubAfterNode">New nodes go after {0}</sys:String>
+    <sys:String x:Key="S_NodeMutedTag">muted</sys:String>
     <sys:String x:Key="S_LayerMenuRename">Rename</sys:String>
     <sys:String x:Key="S_LayerMenuVisible">Visible</sys:String>
     <sys:String x:Key="S_LayerMenuShowInGraph">Show in the graph</sys:String>

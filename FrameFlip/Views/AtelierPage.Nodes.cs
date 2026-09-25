@@ -95,11 +95,12 @@ public partial class AtelierPage
     /// Holt nach, was der Graph lesen will und noch nicht im Vorrat liegt - Passe,
     /// Bilddateien, Renderdaten. Derselbe Lesevorrat wie im Stapel.
     /// </summary>
-    private void FetchNodeSources()
+    /// <param name="soon">Erst grob rechnen und voll nach einer Pause - nach einem Bauschritt.</param>
+    private void FetchNodeSources(bool soon = false)
     {
         if (_graph is null || _path is null || _base is null)
         {
-            Refresh(interim: false, recompose: true);
+            Refresh(interim: soon, recompose: true);
             return;
         }
 
@@ -127,7 +128,7 @@ public partial class AtelierPage
 
         if (missing.Count == 0 && dataMissing.Count == 0)
         {
-            Refresh(interim: false, recompose: true);
+            Refresh(interim: soon, recompose: true);
             return;
         }
 
