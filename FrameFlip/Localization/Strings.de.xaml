@@ -1079,6 +1079,7 @@
     <sys:String x:Key="D_MenuOpenInAtelier">Im Atelier öffnen</sys:String>
     <sys:String x:Key="D_MenuShowInExplorer">Im Explorer zeigen</sys:String>
     <sys:String x:Key="D_MenuCopyPath">Pfad kopieren</sys:String>
+    <sys:String x:Key="D_MenuForget">Aus der Liste nehmen</sys:String>
     <sys:String x:Key="S_LayerMenuRename">Umbenennen</sys:String>
     <sys:String x:Key="S_LayerMenuVisible">Sichtbar</sys:String>
     <sys:String x:Key="S_LayerMenuShowInGraph">Im Graphen zeigen</sys:String>

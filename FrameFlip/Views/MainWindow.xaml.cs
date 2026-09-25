@@ -1183,8 +1183,57 @@ public partial class MainWindow : Window
             .Item("⌕", Strings.T("D_MenuShowInExplorer"), () => ShowInExplorer(where), enabled: where.Length > 0)
             .Item("⧉", Strings.T("D_MenuCopyPath"), () => Clipboard.SetText(where), enabled: where.Length > 0);
 
+        // Ein geoeffneter Ordner laesst sich wieder aus der Liste nehmen - ein Blend-Projekt
+        // gehoert der Projektseite. Die Dateien bleiben, wo sie sind.
+        if (entry.Adhoc)
+            menu.Separator().Item("✕", Strings.T("D_MenuForget"), () => ForgetSequence(entry));
+
         DashboardMenu = menu;
         menu.Open();
+    }
+
+    /// <summary>Nimmt einen geoeffneten Ordner aus der Liste - nicht von der Platte.</summary>
+    internal void ForgetSequence(DashboardSequenceEntry entry)
+    {
+        bool shown = ReferenceEquals(entry, _current);
+
+        if (!_sequences.Forget(entry)) return;
+
+        LoadSequenceList(keepSelection: !shown);
+    }
+
+    /// <summary>
+    /// Ordner oder Bilder, auf die Sequenzliste gezogen: Jeder wird ein Eintrag, der erste
+    /// wird gezeigt. Ein Ordner zeigt sein erstes Bild - und damit die Folge darum.
+    /// </summary>
+    private void OnSequencesDropped(object sender, DragEventArgs e)
+    {
+        if (e.Data.GetData(DataFormats.FileDrop) is not string[] dropped) return;
+
+        e.Handled = true;
+        OpenDropped(dropped);
+    }
+
+    /// <summary>Was abgelegt wurde, als Eintraege - der erste gezeigt. Ohne Maus pruefbar.</summary>
+    internal void OpenDropped(IReadOnlyList<string> dropped)
+    {
+        var images = dropped
+            .Select(path => Directory.Exists(path) ? SequenceScanner.FindFirstImage(path, _decoders) : path)
+            .OfType<string>()
+            .Where(path => File.Exists(path) && _decoders.IsSupported(Path.GetExtension(path)))
+            .ToList();
+
+        // Rueckwaerts geoeffnet: Jeder neue Eintrag kommt nach oben, und der erste soll
+        // am Ende oben stehen und gezeigt sein.
+        for (int i = images.Count - 1; i >= 0; i--) OpenPath(images[i]);
+    }
+
+    private void OnSequencesDragOver(object sender, DragEventArgs e)
+    {
+        e.Effects = e.Data.GetData(DataFormats.FileDrop) is string[] { Length: > 0 }
+            ? DragDropEffects.Copy
+            : DragDropEffects.None;
+        e.Handled = true;
     }
 
     /// <summary>Ein Bild ins Atelier - der Reiter wechselt, und das Atelier oeffnet es.</summary>
