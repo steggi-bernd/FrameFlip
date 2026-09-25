@@ -637,6 +637,12 @@ public partial class MainWindow : Window
         button.Checked += (_, _) => Select(entry);
         button.Click += (_, _) => button.IsChecked = true;
 
+        button.MouseRightButtonUp += (_, e) =>
+        {
+            e.Handled = true;
+            ShowSequenceMenu(button, entry);
+        };
+
         Dress(entry, meta, tag);
         return button;
     }
@@ -1135,6 +1141,70 @@ public partial class MainWindow : Window
 
     // ================================================================ Filmstreifen
 
+    /// <summary>Das zuletzt geoeffnete Menue im Dashboard - fuer die Probe.</summary>
+    internal FlipMenu? DashboardMenu { get; private set; }
+
+    /// <summary>Der Pfad des Bildes mit dieser Nummer - oder keiner.</summary>
+    private string? FramePath(int number)
+    {
+        if (_sequence is not { Count: > 0 } sequence) return null;
+
+        int index = sequence.IndexNearestNumber(number);
+        return index >= 0 && index < sequence.Count ? sequence.Frames[index].Path : null;
+    }
+
+    /// <summary>Das Menue eines Bildes im Streifen.</summary>
+    internal void ShowFrameMenu(FrameworkElement target, string path)
+    {
+        var menu = new FlipMenu(target)
+            .Item("◧", Strings.T("D_MenuOpenInAtelier"), () => OpenInAtelier(path))
+            .Item("⌕", Strings.T("D_MenuShowInExplorer"), () => ShowInExplorer(path))
+            .Item("⧉", Strings.T("D_MenuCopyPath"), () => Clipboard.SetText(path));
+
+        DashboardMenu = menu;
+        menu.Open();
+    }
+
+    /// <summary>
+    /// Das Menue einer Sequenz in der Liste: ihr Ordner im Explorer und als Pfad - und,
+    /// wenn sie gerade gezeigt wird, ihr aktuelles Bild im Atelier.
+    /// </summary>
+    internal void ShowSequenceMenu(FrameworkElement target, DashboardSequenceEntry entry)
+    {
+        string where = entry.HasOutput ? entry.Folder : entry.BlendPath;
+        string? shown = ReferenceEquals(entry, _current) ? FramePath(_playback.Head) : null;
+
+        var menu = new FlipMenu(target)
+            .Item("◧", Strings.T("D_MenuOpenInAtelier"), () => OpenInAtelier(shown!), enabled: shown is not null)
+            .Item("⌕", Strings.T("D_MenuShowInExplorer"), () => ShowInExplorer(where), enabled: where.Length > 0)
+            .Item("⧉", Strings.T("D_MenuCopyPath"), () => Clipboard.SetText(where), enabled: where.Length > 0);
+
+        DashboardMenu = menu;
+        menu.Open();
+    }
+
+    /// <summary>Ein Bild ins Atelier - der Reiter wechselt, und das Atelier oeffnet es.</summary>
+    internal void OpenInAtelier(string path)
+    {
+        NavAtelier.IsChecked = true;
+        _atelierPage?.Open(path);
+    }
+
+    /// <summary>Der Explorer, mit der Datei markiert - oder im Ordner.</summary>
+    private static void ShowInExplorer(string path)
+    {
+        string arguments = File.Exists(path) ? $"/select,\"{path}\"" : $"\"{path}\"";
+
+        try
+        {
+            Process.Start(new ProcessStartInfo("explorer.exe", arguments) { UseShellExecute = true });
+        }
+        catch (System.ComponentModel.Win32Exception)
+        {
+            // Kein Explorer - dann eben nicht; das Menue hat nichts kaputtgemacht.
+        }
+    }
+
     /// <summary>
     /// Der Streifen bekommt genau so viele Zellen, wie nebeneinander sichtbar sind.
     /// Eine feste Zahl waere entweder zu kurz fuer ein breites Fenster oder zu lang
@@ -1163,6 +1233,15 @@ public partial class MainWindow : Window
                     Pause();
                     ShowFrame(number);
                 }
+            };
+
+            // Rechtsklick auf ein Bild des Streifens: ins Atelier, in den Explorer, der Pfad.
+            cell.MouseRightButtonUp += (s, e) =>
+            {
+                if (s is not ToggleButton { Tag: int number } button || FramePath(number) is not { } path) return;
+
+                e.Handled = true;
+                ShowFrameMenu(button, path);
             };
 
             FilmStrip.Children.Add(cell);

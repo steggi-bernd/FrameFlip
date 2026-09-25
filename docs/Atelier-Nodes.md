@@ -516,3 +516,30 @@ Only the alpha channel of exports changes, and only in those cases.
     computes coarse first and sharp shortly after; right-click on a node opens its menu,
     on empty space the hub; "insert after" places the vignette behind the node.
 
+
+13. **Right-click menus outside the editor** (the ideas from 10, now built).
+
+    *Done (2026-09-25).*
+    - **Picture in the Atelier:** pick the colour here (switches to the pick tool and reads
+      the point), one row per Cryptomatte of the file with "object here as mask", compare
+      with the original, 100 % / fit. The object mask is the same kind of layer the brush
+      makes on its first stroke: an adjustment layer whose Cryptomatte picks exactly that
+      object, named after it. In node mode it arrives as correction, Mix and mask node on
+      the factor; in stack mode as a mask layer in the strip. Compare shows the original
+      until the next click or key press; it is a glance, not a switch that stays on. 100 %
+      puts the clicked point in the middle. Not with the brush, where the right button
+      erases.
+    - **Layer lists** (from 10): rename, duplicate, delete, clip, into a group, show in the
+      graph.
+    - **Tool cards in the colour strip:** on/off (the values stay), reset, copy settings,
+      paste settings. Paste is offered only on a card of the same kind, once something has
+      been copied. What is copied is a copy: turning the card afterwards does not change it.
+    - **Dashboard:** a picture in the film strip offers open in the Atelier, show in
+      Explorer and copy path. The shown sequence offers the same for its current picture;
+      another sequence has no picture chosen yet and offers only Explorer and the path.
+
+    Tests: the picture menu offers pick, one object row per Cryptomatte, compare and 100 %;
+    the object mask in node mode and in the stack picks exactly the object under the
+    pointer and is named after it; compare returns on the next click; 100 % and back. The
+    card menu copies, pastes, switches off and on and resets; the dashboard menu opens the
+    picture in the Atelier. Explorer and the clipboard are not triggered by the tests.

@@ -268,31 +268,41 @@ public partial class AtelierPage
 
         if (PaintTarget() is { } known) return known.Mask.PaintOn(_number, _frame.Width, _frame.Height);
 
-        if (ListTarget() is not { } after || NodeEdits.Through(after).Output is not { } below) return null;
+        return AddNodeMaskLayer(new LayerMask { Kind = MaskKind.Painted }, Strings.T("S_MaskLayerName")) is { } made
+            ? made.Mask.PaintOn(_number, _frame.Width, _frame.Height)
+            : null;
+    }
+
+    /// <summary>
+    /// Eine Maskenebene im Graphen: eine Einstellungsebene, deren Mischen diese Maske im
+    /// Faktor hat - ueber der gewaehlten Ebene oder oben auf den Ebenen. Gewaehlt ist danach
+    /// die Maske. Fuer den ersten Pinselstrich und fuer "Objekt hier als Maske".
+    /// </summary>
+    private MaskNode? AddNodeMaskLayer(LayerMask mask, string label)
+    {
+        if (_graph is null || ListTarget() is not { } after || NodeEdits.Through(after).Output is not { } below) return null;
 
         RememberNodes();
 
         if (LayerEdits.AddAdjustment(_graph, after) is not var (grade, mix)) return null;
 
-        mix.Label = Strings.T("S_MaskLayerName");
+        mix.Label = label;
 
-        var mask = _graph.Add(new MaskNode { Mask = new LayerMask { Kind = MaskKind.Painted }, Preview = true });
+        var node = _graph.Add(new MaskNode { Mask = mask, Preview = true });
 
-        _graph.Connect(grade, "Bild", mask, "Ebene");
-        _graph.Connect(after, below, mask, "Untergrund");
-        _graph.Connect(mask, "Maske", mix, "Faktor");
+        _graph.Connect(grade, "Bild", node, "Ebene");
+        _graph.Connect(after, below, node, "Untergrund");
+        _graph.Connect(node, "Maske", mix, "Faktor");
 
         ArrangeLayer(after, after, grade, mix);
-        mask.X = grade.X;
-        mask.Y = grade.Y - NodeLayout.Height(mask) - NodeLayout.Gap;
+        node.X = grade.X;
+        node.Y = grade.Y - NodeLayout.Height(node) - NodeLayout.Gap;
 
-        var paint = mask.Mask.PaintOn(_number, _frame.Width, _frame.Height);
-
-        NodeView.Select(mask);
+        NodeView.Select(node);
         NodeView.InvalidateVisual();
         AfterNodeEdit();
 
-        return paint;
+        return node;
     }
 
     /// <summary>Am Rahmen wurde gezogen - im Knotenmodus bekommt der Knoten die neue Lage.</summary>

@@ -359,6 +359,64 @@ public static class NodeEditInvariants
             Call(page, "OnNodeMenuWanted", editor.ToGraph(new Point(5, 5)));
             Check.That(page.Hub is not null, "auf der freien Flaeche oeffnet der Rechtsklick den Hub");
             hubPopupClose(page);
+
+            // Rechtsklick auf das Bild - bei verborgenem Graphen.
+            ((ToolColumn)page.FindName("MouseTools")).Select(AtelierTool.Move, notify: true);
+            Settle();
+
+            var sets = (IReadOnlyList<Decoding.Exr.CryptomatteSet>)Field(page, "_cryptomattes")!;
+            var shownFrame = (FloatFrame)Field(page, "_frame")!;
+
+            page.ShowPictureMenu(1, 1);
+
+            Check.That(new[] { T("S_PicMenuPick"), T("S_PicMenuCompare"), T("S_PicMenuFull") }.All(page.PictureMenu!.Items.Contains) &&
+                       sets.All(s => page.PictureMenu.Items.Contains(Localization.Strings.T("S_PicMenuObjectMask", s.ShortName))),
+                       "das Menue des Bildes: Farbe aufnehmen, je Kryptomatte das Objekt als Maske, Original, 100 %",
+                       string.Join(", ", page.PictureMenu.Items));
+
+            int maskNodes = page.Graph!.Nodes.OfType<MaskNode>().Count(m => m.Mask.Kind == MaskKind.Cryptomatte);
+            bool madeObject = false;
+
+            for (int y = 0; y < shownFrame.Height && !madeObject; y += 3)
+                for (int x = 0; x < shownFrame.Width && !madeObject; x += 3)
+                    madeObject = page.MaskObjectAt(sets[0], x, y);
+
+            Settle();
+
+            var objectMask = page.Graph!.Nodes.OfType<MaskNode>().LastOrDefault(m => m.Mask.Kind == MaskKind.Cryptomatte);
+            var objectMix = objectMask is null ? null : page.Graph.Links.Where(l => l.From == objectMask.Id && l.Input == "Faktor")
+                                                            .Select(l => page.Graph.Find(l.To)).OfType<MixNode>().FirstOrDefault();
+
+            Check.That(madeObject && page.Graph.Nodes.OfType<MaskNode>().Count(m => m.Mask.Kind == MaskKind.Cryptomatte) == maskNodes + 1 &&
+                       objectMask!.Mask.Picks.Count == 1 && objectMix is not null && objectMix.Label == objectMask.Mask.Picks[0].Name,
+                       "Objekt hier als Maske legt eine Maskenebene an, die genau dieses Objekt waehlt - benannt nach ihm",
+                       objectMix?.Label);
+
+            page.ShowPictureMenu(1, 1);
+            page.PictureMenu!.Invoke(T("S_PicMenuCompare"));
+
+            Check.That(page.ShowingOriginal, "Vergleichen zeigt das Original");
+
+            page.RaiseEvent(new System.Windows.Input.MouseButtonEventArgs(System.Windows.Input.Mouse.PrimaryDevice, 0,
+                                                                            System.Windows.Input.MouseButton.Left)
+            {
+                RoutedEvent = UIElement.PreviewMouseDownEvent,
+            });
+
+            Check.That(!page.ShowingOriginal, "bis zum naechsten Klick - dann wieder das bearbeitete Bild");
+
+            page.ShowPictureMenu(1, 1);
+            page.PictureMenu!.Invoke(T("S_PicMenuFull"));
+            Check.That(Math.Abs(page.ZoomLevel - 1) < 1e-9, "100 % zoomt hinein");
+
+            page.ShowPictureMenu(1, 1);
+            Check.That(page.PictureMenu!.Items.Contains(T("S_PicMenuFit")), "und dann heisst der Eintrag Einpassen");
+            page.PictureMenu.Invoke(T("S_PicMenuFit"));
+            Check.That(page.ZoomLevel == 0, "der wieder einpasst");
+
+            page.ShowPictureMenu(1, 1);
+            page.PictureMenu!.Invoke(T("S_PicMenuPick"));
+            Check.That(((ToolColumn)page.FindName("MouseTools")).Tool == AtelierTool.Pick, "Farbe aufnehmen nimmt die Pipette");
         }
         finally
         {
