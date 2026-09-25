@@ -543,3 +543,21 @@ Only the alpha channel of exports changes, and only in those cases.
     pointer and is named after it; compare returns on the next click; 100 % and back. The
     card menu copies, pastes, switches off and on and resets; the dashboard menu opens the
     picture in the Atelier. Explorer and the clipboard are not triggered by the tests.
+
+14. **Painting recomputes only what the brush touched** (from the plan in
+    [Projekte und Masken](Projekte-und-Masken.md), phase A).
+
+    *Done (2026-09-25).* A brush tick in node mode used to render the whole picture on the
+    coarse grid (4K: 33 ms, and blurred until release). `GraphEvaluator.RenderRegion` now
+    evaluates the same graph with the touched rectangle as its grid, at full resolution,
+    and writes it in place (4K, radius 80: 4.6 ms). What lies before the selected node comes
+    from the graph cache and is cut to the rectangle; only point-wise nodes are recomputed
+    (mix, mask, colour, place, light, tone, value nodes, and grading without local,
+    optics, geometry, data or frame tools). Anything spatial behind the mask, a missing
+    whole picture to paint on, or no selection makes it refuse, and the page renders as
+    before. The whole picture still follows on release, for the previews and the histogram.
+
+    Tests: the rectangle written into the old picture equals the new whole picture byte for
+    byte, with the mask, its mix or the output selected; a vignette or sharpening behind
+    the mask is refused and leaves the picture untouched; on the page, a brush tick
+    changes the picture without a coarse pass and matches a full pass afterwards.

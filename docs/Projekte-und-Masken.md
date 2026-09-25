@@ -258,6 +258,31 @@ aus dem Refactoring-Plan: Charakterisierung, Fixes, Auslagerung, Plan.
 | **D** | `MaskId`, Maskenmenü (3), Ausschneiden-Knoten und Extract (4), Darstellung (11), Maskenverlauf (10) | Der Verlauf braucht die Ablage aus C und die Strichrechnung im Modell. |
 | **E** | Einstellungen (12) nach gewähltem Entwurf | Unabhängig, aber nach dem Entwurf. |
 
+### Stand
+
+**Phase A ist umgesetzt** (25. September, `20e3ec2`, `cccf81c`, `85bff41`):
+
+- Das Mausrad zoomt beim Verschieben und beim Pinsel um den Zeiger, hält bei 100 % und
+  rastet beim Herauszoomen eingepasst ein. Die Stufen teilt das Atelier mit dem
+  Vorschaufenster (`ZoomSteps`).
+- Pinselabstand 5–400 % des Radius, per Strg + Rad und als Regler. Die Tupfer setzt
+  jetzt `PaintStroke` im Modell, im Abstand entlang des Weges. Ein Zug lässt sich Byte für
+  Byte nachspielen, womit die Voraussetzung für den Maskenverlauf (3.5) erfüllt ist.
+- Pass-Rollen beim Anlegen (`PassRoles`, `ImageProbe`), nur beim Anlegen.
+- Beim Malen im Knotenmodus wird nur der Ausschnitt unter dem Pinsel voll aufgelöst neu
+  gerechnet (`GraphEvaluator.RenderRegion`): bei 4K und Radius 80 4,6 ms statt 33 ms für
+  das ganze Bild grob. Räumliche Knoten hinter der Maske schalten auf den bisherigen Weg
+  zurück.
+
+Offen aus Phase A:
+
+- Nach dem Loslassen rechnet die Seite einmal das ganze Bild (bei 4K rund 200 ms), damit
+  Vorschauen und Histogramm stimmen. Das gehört zur Vorschauplanung aus S4 (Rechnen
+  außerhalb des Oberflächenfadens).
+- Die Bereichsrechnung gibt es nur im Knotenmodus, im Stapel noch nicht.
+- Befund, nicht geändert: Im Knotenmodus landet eine Bilddatei, die bei ausgeblendetem
+  Graphen aufs Bild gezogen wird, im Ebenenstapel statt im Graphen.
+
 ## 6. Entscheidungen
 
 Getroffen am 25. September 2026:
