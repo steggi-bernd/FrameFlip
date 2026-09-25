@@ -272,13 +272,17 @@ aus dem Refactoring-Plan: Charakterisierung, Fixes, Auslagerung, Plan.
 - Beim Malen im Knotenmodus wird nur der Ausschnitt unter dem Pinsel voll aufgelöst neu
   gerechnet (`GraphEvaluator.RenderRegion`): bei 4K und Radius 80 4,6 ms statt 33 ms für
   das ganze Bild grob. Räumliche Knoten hinter der Maske schalten auf den bisherigen Weg
-  zurück.
+  zurück, Optik (Vignette, Korn, Dither) rechnet mit.
+- Nachbesserung nach „ruckelt immer wieder mal“: kein Undo-Vergleich mehr je Mausmeldung,
+  kein ganzes Bild direkt nach dem Loslassen (es folgt, wenn der Pinsel 0,7 s ruht), ein
+  eigener Feldvorrat für die Ausschnitte. Bei 4K mit sechs Masken: 0,013 ms je
+  Mausmeldung, 3,1 ms je Takt, 1,1 ms beim Loslassen.
 
 Offen aus Phase A:
 
-- Nach dem Loslassen rechnet die Seite einmal das ganze Bild (bei 4K rund 200 ms), damit
-  Vorschauen und Histogramm stimmen. Das gehört zur Vorschauplanung aus S4 (Rechnen
-  außerhalb des Oberflächenfadens).
+- Das ganze Bild nach dem Malen (bei 4K rund 170 ms) läuft noch auf dem
+  Oberflächenfaden. Setzt man genau dann wieder an, stockt der Anfang des Strichs. Das
+  gehört zur Vorschauplanung aus S4 (Rechnen außerhalb des Oberflächenfadens).
 - Die Bereichsrechnung gibt es nur im Knotenmodus, im Stapel noch nicht.
 - Befund, nicht geändert: Im Knotenmodus landet eine Bilddatei, die bei ausgeblendetem
   Graphen aufs Bild gezogen wird, im Ebenenstapel statt im Graphen.

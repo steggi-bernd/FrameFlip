@@ -155,6 +155,12 @@ public partial class AtelierPage
     /// <summary>Die Felder der Zwischenbilder - von einer Rechnung zur naechsten wiederverwendet.</summary>
     private readonly GridPool _pool = new();
 
+    /// <summary>
+    /// Die Felder der Ausschnitte beim Malen - ein eigener Vorrat, damit ihre wechselnden
+    /// Groessen nicht die Felder des ganzen Bildes verdraengen.
+    /// </summary>
+    private readonly GridPool _regionPool = new(sizes: 16);
+
     /// <summary>Was vor dem gewaehlten Knoten gerechnet wurde - beim naechsten Zug an ihm gilt es noch.</summary>
     private readonly GraphCache _cache = new();
 
@@ -184,6 +190,7 @@ public partial class AtelierPage
             // Hier wird er benannt, und was halb gerechnet war, wird verworfen.
             _cache.Clear();
             _pool.Clear();
+            _regionPool.Clear();
             _renderFailed = true;
 
             NodeView.Warning = Strings.T("S_NodeWarnFailed", (e as AggregateException)?.InnerException?.Message ?? e.Message);
@@ -204,14 +211,14 @@ public partial class AtelierPage
     }
 
     /// <summary>Was der Graph fuer eine Rechnung dieser Seite bekommt - fuer das ganze Bild und fuer einen Ausschnitt.</summary>
-    private GraphInputs NodeInputs(FloatFrame canvas, int step) => new()
+    private GraphInputs NodeInputs(FloatFrame canvas, int step, GridPool? pool = null) => new()
     {
         Sources = _sources,
         Data = NodeData(),
         View = ViewFor(canvas),
         Step = step,
         Number = _number,
-        Pool = _pool,
+        Pool = pool ?? _pool,
         Cache = _cache,
         Focus = NodeView.Selected?.Id,
         Previews = _previews,
@@ -243,17 +250,21 @@ public partial class AtelierPage
 
         // Zwei Maskenpunkte Rand: Die Maske wird zwischen ihren Punkten weich gelesen, ein
         // geaenderter Punkt wirkt also bis zu einem Maskenpunkt weit ins Bild daneben.
-        var region = GraphRegion.Around(touched.X0, touched.Y0, touched.X1, touched.Y1, 2 * PaintedMask.Coarse);
+        //
+        // Auf 32 Bildpunkte nach aussen gerundet: ein paar Punkte mehr zu rechnen kostet
+        // weniger, als fuer jede neue Groesse neue Felder anzulegen.
+        var region = GraphRegion.Around(touched.X0, touched.Y0, touched.X1, touched.Y1, 2 * PaintedMask.Coarse).Snapped(32);
         if (region.Within(_surface.PixelWidth, _surface.PixelHeight) is not { } inside) return true;
 
         _surface.Lock();
 
         try
         {
-            if (!GraphEvaluator.RenderRegion(_graph, NodeInputs(_base, 1), inside, _surface.BackBuffer, _surface.BackBufferStride))
+            if (!GraphEvaluator.RenderRegion(_graph, NodeInputs(_base, 1, _regionPool), inside, _surface.BackBuffer, _surface.BackBufferStride))
                 return false;
 
             _surface.AddDirtyRect(new Int32Rect(inside.X0, inside.Y0, inside.Width, inside.Height));
+            _regionPainted = true;
             return true;
         }
         catch (Exception e) when (e is not OutOfMemoryException)

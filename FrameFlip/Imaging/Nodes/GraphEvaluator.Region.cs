@@ -22,6 +22,16 @@ public readonly record struct GraphRegion(int X0, int Y0, int X1, int Y1)
         => new((int)MathF.Floor(x0) - margin, (int)MathF.Floor(y0) - margin,
                (int)MathF.Ceiling(x1) + margin + 1, (int)MathF.Ceiling(y1) + margin + 1);
 
+    /// <summary>
+    /// Nach aussen auf ein Raster gerundet. Ein Pinsel liefert Rechtecke jeder Groesse;
+    /// gerundet haben sie wenige, und ihre Felder finden sich im Vorrat wieder.
+    /// </summary>
+    public GraphRegion Snapped(int grid)
+        => grid <= 1 ? this
+            : new(FloorTo(X0, grid), FloorTo(Y0, grid), -FloorTo(-X1, grid), -FloorTo(-Y1, grid));
+
+    private static int FloorTo(int value, int grid) => (int)Math.Floor(value / (double)grid) * grid;
+
     internal int[] Columns() => Enumerable.Range(X0, Width).ToArray();
 
     internal int[] Rows() => Enumerable.Range(Y0, Height).ToArray();
@@ -74,14 +84,17 @@ public static partial class GraphEvaluator
     /// </summary>
     internal static bool RegionSafe(Node node) => node.Muted || node switch
     {
-        // Eine Einstellungsebene mit oertlichen, optischen, geometrischen oder Daten-
-        // Werkzeugen oder Durchgaengen ueber das fertige Bild liest Nachbarn.
+        // Eine Einstellungsebene mit oertlichen, geometrischen oder Daten-Werkzeugen oder
+        // Durchgaengen ueber das fertige Bild liest Nachbarn. Die optischen - Vignette,
+        // Korn, Dither - brauchen nur den Ort des Bildpunkts, keine Nachbarn.
         LayerGradeNode grade => grade.Tools is not { } tools ||
-                                tools.Local.Count == 0 && tools.Optics.Count == 0 && tools.Frame.Count == 0 &&
+                                tools.Local.Count == 0 && tools.Frame.Count == 0 &&
                                 tools.Geometry.Count == 0 && tools.Data.Count == 0,
 
+        // OpticsNode: siehe IOpticsTool - dieselbe Rechnung an jedem Punkt, nur mit seinem
+        // Ort und der Bildnummer.
         RenderNode or PictureNode or BlackNode or PlaceNode or ExposureTintNode or MaskNode or RestrictNode
-            or MixNode or FallbackNode or LightNode or PointToolNode or ViewNode or ToneNode
+            or MixNode or FallbackNode or LightNode or PointToolNode or OpticsNode or ViewNode or ToneNode
             or MaskMathNode or MapRangeNode or ColorRampNode or OutputNode => true,
 
         // Unschaerfe, Glare, Verzerrung, Tiefe, Sortieren, Formen einer Maske ...
@@ -93,10 +106,14 @@ public static partial class GraphEvaluator
     /// Ausschnitt. False, wenn es nicht die volle Aufloesung hat - dann passt es nicht.
     /// Was kein Gitter ist (ein gelesenes Bild am Kabel, nichts), bleibt, wie es ist.
     /// </summary>
-    private static bool Cut(object? value, int width, int height, GraphRegion box, out object? cut)
+    private static bool Cut(object? value, int width, int height, GraphRegion box, NodeContext context, out object? cut)
     {
         int count = width * height;
         int w = box.Width, h = box.Height;
+
+        // Aus dem Vorrat des Ausschnitts: Neu angelegt waeren das je Takt einige Felder
+        // auf dem grossen Stapel der Speicherbereinigung.
+        float[] Take(int length) => context.Pool?.Take(length) ?? new float[length];
 
         switch (value)
         {
@@ -108,8 +125,8 @@ public static partial class GraphEvaluator
                     return false;
                 }
 
-                var rgb = new float[w * h * 3];
-                var a = new float[w * h];
+                var rgb = Take(w * h * 3);
+                var a = Take(w * h);
 
                 for (int y = 0; y < h; y++)
                 {
@@ -130,7 +147,7 @@ public static partial class GraphEvaluator
                     return false;
                 }
 
-                var v = new float[w * h];
+                var v = Take(w * h);
 
                 for (int y = 0; y < h; y++)
                     Array.Copy(grid.V, (box.Y0 + y) * width + box.X0, v, y * w, w);

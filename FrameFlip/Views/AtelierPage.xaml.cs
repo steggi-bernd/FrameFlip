@@ -256,6 +256,7 @@ public sealed partial class AtelierPage : UserControl
         _sources.Clear();
         _unreadable.Clear();
         _pool.Clear();
+        _regionPool.Clear();
         _cache.Clear();
         _sourceThumbs.Clear();
         _composed = null;

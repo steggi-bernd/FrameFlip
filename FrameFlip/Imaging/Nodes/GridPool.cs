@@ -18,12 +18,17 @@ namespace FrameFlip.Imaging.Nodes;
 /// </summary>
 public sealed class GridPool
 {
-    /// <summary>
-    /// Wie viele Feldgroessen er haelt: Farbe und Deckung, im vollen und im groben
-    /// Durchgang. Mehr kommt nur vor, wenn sich die Leinwand aendert - dann ist das
-    /// Alte nichts mehr wert.
-    /// </summary>
-    private const int Sizes = 4;
+    /// <summary>Wie viele Feldgroessen er haelt - was laenger nicht gebraucht wurde, geht.</summary>
+    private readonly int _sizes;
+
+    /// <param name="sizes">
+    /// Vier fuer das ganze Bild: Farbe und Deckung, im vollen und im groben Durchgang. Mehr
+    /// kommt dort nur vor, wenn sich die Leinwand aendert - dann ist das Alte nichts mehr
+    /// wert. Der Pinsel rechnet Ausschnitte, deren Groesse mit jedem Strich wechselt; die
+    /// bekommen einen eigenen Vorrat mit mehr Groessen, sonst verdraengten sie die Felder
+    /// des ganzen Bildes, und das naechste ganze Bild legte alles neu an.
+    /// </param>
+    public GridPool(int sizes = 4) => _sizes = Math.Max(1, sizes);
 
     private readonly Dictionary<int, Stack<float[]>> _free = new();
     private readonly HashSet<float[]> _resting = new(ReferenceEqualityComparer.Instance);
@@ -95,7 +100,7 @@ public sealed class GridPool
 
         if (!_free.ContainsKey(length)) _free[length] = new Stack<float[]>();
 
-        while (_recent.Count > Sizes)
+        while (_recent.Count > _sizes)
         {
             if (_free.Remove(_recent[0], out var gone))
                 foreach (var array in gone) _resting.Remove(array);

@@ -1,5 +1,6 @@
 using System.Windows.Input;
 using System.Windows.Media;
+using System.Windows.Threading;
 using FrameFlip.Decoding.Exr;
 using FrameFlip.Imaging;
 using FrameFlip.Imaging.Grading;
@@ -337,19 +338,48 @@ public partial class AtelierPage
         CompositionTarget.Rendering += OnDragFrame;
     }
 
-    /// <summary>Es wurde gemalt - im Knotenmodus auf die Maske des Knotens.</summary>
+    /// <summary>
+    /// Es wurde gemalt - im Knotenmodus auf die Maske des Knotens.
+    ///
+    /// Waehrend des Strichs nur das Noetigste: den Takt anmelden. Frueher fragte hier
+    /// jede Mausmeldung den Verlauf, ob schon ein Schritt faellig sei - und schrieb dafuer
+    /// den ganzen Graphen samt aller gemalten Masken als Text. Bei einer Maus, die
+    /// tausendmal in der Sekunde meldet, und ein paar Masken im Bild war das ein Ruckeln,
+    /// das man dem Pinsel zuschrieb. Der Schritt ist der ganze Strich; gemerkt wird er
+    /// einmal, an seinem Ende.
+    /// </summary>
     private void OnNodePainted(bool interim)
     {
-        RememberValueEdit();
-
         if (!interim)
         {
-            StopDragFrames();
-            Refresh(interim: false, recompose: false);
-            KeepNodes();
+            // Was seit dem letzten Takt dazukam, noch zeigen - der Strich endet sonst
+            // einen Takt zu frueh. Blieb jeder Takt ein genauer Ausschnitt, stimmt das Bild
+            // danach schon voll aufgeloest.
+            //
+            // Nur wenn dieser Strich ueberhaupt als Ausschnitt ins Bild kam: Eine Aenderung
+            // an der Maske, die der Pinsel nicht gemeldet hat, stuende sonst erst nach der
+            // Ruhepause im Bild.
+            bool exact = !_regionFailed && PaintRegion() && _regionPainted;
 
+            StopDragFrames();
+            _regionFailed = false;
+            _regionPainted = false;
+
+            RememberValueEdit();
+
+            // Das ganze Bild - fuer die Vorschauen der Knoten und das Histogramm - erst,
+            // wenn der Pinsel ruht. Gleich nach jedem Strich hiesse bei 4K eine Fuenftel-
+            // sekunde Stillstand zwischen zwei Strichen, und genau dort setzt man wieder an.
+            // Fiel ein Takt auf das grobe Bild zurueck, muss das scharfe dagegen sofort her.
+            if (exact) SettleAfterPainting();
+            else Refresh(interim: false, recompose: false);
+
+            KeepNodes();
             return;
         }
+
+        // Ein neuer Strich: Das ganze Bild wartet, bis auch er zu Ende ist.
+        _calm?.Stop();
 
         _pendingPaint = true;
 
@@ -358,4 +388,39 @@ public partial class AtelierPage
         _dragHooked = true;
         CompositionTarget.Rendering += OnDragFrame;
     }
+
+    /// <summary>Ob in diesem Strich ein Takt keinen Ausschnitt rechnen konnte - dann ist das Bild grob.</summary>
+    private bool _regionFailed;
+
+    /// <summary>Ob in diesem Strich ein Ausschnitt ins Bild geschrieben wurde.</summary>
+    private bool _regionPainted;
+
+    /// <summary>Wartet nach dem letzten Strich, bevor das ganze Bild gerechnet wird.</summary>
+    private DispatcherTimer? _calm;
+
+    /// <summary>Wie lange der Pinsel ruhen muss - kuerzer, als man auf das Histogramm schaut.</summary>
+    private static readonly TimeSpan PaintingCalm = TimeSpan.FromMilliseconds(700);
+
+    private void SettleAfterPainting()
+    {
+        if (_calm is null)
+        {
+            _calm = new DispatcherTimer(DispatcherPriority.Background) { Interval = PaintingCalm };
+            _calm.Tick += (_, _) =>
+            {
+                _calm.Stop();
+
+                // Malt gerade jemand, kommt das ganze Bild nach seinem Strich.
+                if (_dragHooked || !InNodes) return;
+
+                Refresh(interim: false, recompose: false);
+            };
+        }
+
+        _calm.Stop();
+        _calm.Start();
+    }
+
+    /// <summary>Ob das ganze Bild nach dem Malen noch aussteht - fuer die Probe.</summary>
+    internal bool SettlingAfterPainting => _calm?.IsEnabled == true;
 }

@@ -552,12 +552,35 @@ Only the alpha channel of exports changes, and only in those cases.
     evaluates the same graph with the touched rectangle as its grid, at full resolution,
     and writes it in place (4K, radius 80: 4.6 ms). What lies before the selected node comes
     from the graph cache and is cut to the rectangle; only point-wise nodes are recomputed
-    (mix, mask, colour, place, light, tone, value nodes, and grading without local,
-    optics, geometry, data or frame tools). Anything spatial behind the mask, a missing
-    whole picture to paint on, or no selection makes it refuse, and the page renders as
-    before. The whole picture still follows on release, for the previews and the histogram.
+    (mix, mask, colour, place, light, tone, optics, value nodes, and grading without local,
+    geometry, data or frame tools). Optics (vignette, grain, dither) need the position of a
+    pixel but no neighbours, so they count as point-wise. Anything spatial behind the mask,
+    a missing whole picture to paint on, or no selection makes it refuse, and the page
+    renders as before.
+
+    *Smoother still (same day, after "still stutters now and then").* Three costs that hit
+    every stroke, independent of the rectangle:
+    - Every mouse report asked the undo history whether a step was due, and wrote the
+      whole graph with all painted masks as text to find out (0.4 ms with six masks, many
+      times per frame with a fast mouse). The step is the whole stroke; it is remembered
+      once, on release.
+    - Release rendered the whole picture at once, a fifth of a second at 4K between two
+      strokes. Now release only writes what the last ticks left, and the whole picture (for
+      previews and histogram) follows once the brush has rested for 0.7 s. If a tick fell
+      back to the coarse whole picture, release renders sharp at once, as before.
+    - The rectangles came from the page's pool, which holds four sizes; their changing
+      sizes pushed out the whole-picture grids. They now use their own pool, and the
+      rectangle is snapped outward to 32 pixels so its sizes repeat.
+
+    Measured at 4K with six painted masks: 0.013 ms per mouse report, 3.1 ms per tick
+    with vignette and grain behind the mask, 1.1 ms on release (the whole picture, 171 ms,
+    follows at rest).
 
     Tests: the rectangle written into the old picture equals the new whole picture byte for
-    byte, with the mask, its mix or the output selected; a vignette or sharpening behind
-    the mask is refused and leaves the picture untouched; on the page, a brush tick
-    changes the picture without a coarse pass and matches a full pass afterwards.
+    byte, with the mask, its mix or the output selected, with vignette and grain in the
+    mask layer and at the end, and with pooled grids that still hold an older rectangle;
+    sharpening behind the mask is refused and leaves the picture untouched; on the page,
+    a brush tick changes the picture without a coarse pass and matches a full pass
+    afterwards, a stroke of many reports adds exactly one undo step on release, the picture
+    at release already holds the stroke's last piece, and the whole picture follows at
+    rest - at once after a coarse tick.

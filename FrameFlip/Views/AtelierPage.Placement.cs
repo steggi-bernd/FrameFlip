@@ -345,6 +345,10 @@ public partial class AtelierPage
         {
             if (!placing && PaintRegion()) return;
 
+            // Einmal grob gerechnet, ist das Bild dieses Strichs grob - am Ende muss das
+            // scharfe sofort nachkommen.
+            if (!placing) _regionFailed = true;
+
             Refresh(interim: true, recompose: false);
         }
         else

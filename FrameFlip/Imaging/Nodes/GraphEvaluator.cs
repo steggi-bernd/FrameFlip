@@ -463,9 +463,6 @@ public static partial class GraphEvaluator
 
                 if (caching && !behind![from] && cache!.TryGet(Key(from, link.Output), out var value))
                 {
-                    // Im Ausschnitt nur das Stueck des gemerkten Bildes, das er braucht.
-                    if (box is { } cut && !Cut(value, width, height, cut, out value)) torn = true;
-
                     remembered[(link.From, link.Output)] = value;
                     continue;
                 }
@@ -480,11 +477,31 @@ public static partial class GraphEvaluator
 
         Need(units.Count - 1);
 
-        // Ein Ausschnitt geht nur, wo jeder Bildpunkt allein aus demselben Bildpunkt davor
-        // folgt - eine Unschaerfe am Rand des Rechtecks laese Punkte, die ausserhalb liegen.
-        // Und nur, wenn alles Gemerkte volle Aufloesung hatte.
-        if (box is not null && (torn || Enumerable.Range(0, units.Count).Any(u => needed[u] && !units[u].All(RegionSafe))))
-            return (null, null);
+        if (box is { } region0)
+        {
+            // Ein Ausschnitt geht nur, wo jeder Bildpunkt allein aus demselben Bildpunkt
+            // davor folgt - eine Unschaerfe am Rand des Rechtecks laese Punkte, die
+            // ausserhalb liegen. Gefragt, bevor etwas zugeschnitten wird: Wer ablehnt,
+            // soll dabei nicht schon Felder gefuellt haben.
+            if (Enumerable.Range(0, units.Count).Any(u => needed[u] && !units[u].All(RegionSafe))) return (null, null);
+
+            // Aus dem Gemerkten nur das Stueck, das der Ausschnitt braucht. Die Stuecke
+            // kommen aus dem Vorrat und gehen am Ende dorthin zurueck.
+            foreach (var key in remembered.Keys.ToList())
+            {
+                if (!Cut(remembered[key], width, height, region0, context, out var piece)) torn = true;
+
+                context.Adopt(piece);
+                remembered[key] = piece;
+            }
+
+            // Nur, wenn alles Gemerkte volle Aufloesung hatte.
+            if (torn)
+            {
+                foreach (var piece in remembered.Values) context.Drop(piece);
+                return (null, null);
+            }
+        }
 
         // Wie oft jeder Ausgang noch gelesen wird. Faellt die Zahl auf null, wird er
         // losgelassen - so haelt der Speicher die breiteste Stelle des Graphen, nicht
@@ -628,7 +645,9 @@ public static partial class GraphEvaluator
         if (box is not null)
         {
             // Der Zwischenspeicher bleibt, wie er war - der naechste Ausschnitt baut
-            // wieder auf ihn.
+            // wieder auf ihn. Die zugeschnittenen Stuecke gehen in den Vorrat zurueck,
+            // ausser das Ergebnis haelt eines noch (eine Deckung, die durchgereicht wurde).
+            foreach (var piece in remembered.Values) context.Drop(piece);
         }
         else if (cache is not null && caching)
         {

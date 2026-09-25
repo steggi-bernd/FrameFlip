@@ -145,6 +145,49 @@ public static class RegionRenderInvariants
 
             typeof(Views.AtelierPage).GetMethod("StopDragFrames", flags)!.Invoke(page, null);
 
+            // Ein ganzer Strich bis zum Loslassen: viele Mausmeldungen, ein Schritt im
+            // Verlauf - und der letzte Teil, fuer den kein Takt mehr kam, steht beim
+            // Loslassen trotzdem scharf im Bild. Das ganze Bild wartet, bis der Pinsel ruht.
+            var undo = (System.Collections.IList)typeof(Views.AtelierPage).GetField("_undo", flags)!.GetValue(page)!;
+            int steps = undo.Count;
+
+            var last = new PaintStroke { Radius = 40, Flow = 0.9f };
+            touched.Invoke(adorner, new object[] { last.Begin(mask, W / 3f, H / 2f) });
+
+            for (int i = 1; i <= 20; i++)
+            {
+                touched.Invoke(adorner, new object[] { last.To(mask, W / 3f + i * 12, H / 2f + i * 3) });
+                painted.Invoke(page, new object[] { true });
+                if (i % 5 == 0) dragFrame.Invoke(page, new object?[] { null, EventArgs.Empty });
+            }
+
+            Check.That(undo.Count == steps, "waehrend des Strichs entsteht kein Schritt im Verlauf", $"{steps} -> {undo.Count}");
+
+            touched.Invoke(adorner, new object[] { last.To(mask, W / 3f + 300, H / 2f + 90) });
+            mask.Keep();
+            painted.Invoke(page, new object[] { false });
+
+            Check.That(undo.Count == steps + 1, "beim Loslassen genau einer", $"{steps} -> {undo.Count}");
+            Check.That(page.SettlingAfterPainting && !(bool)coarse.GetValue(page)!,
+                       "das ganze Bild wartet, bis der Pinsel ruht - kein Stillstand zwischen zwei Strichen");
+
+            byte[] released = Shown();
+            typeof(Views.AtelierPage).GetMethod("Refresh", flags, new[] { typeof(bool), typeof(bool) })!.Invoke(page, new object[] { false, false });
+
+            Check.That(released.AsSpan().SequenceEqual(Shown()),
+                       "und das Bild beim Loslassen ist schon das ganze, mit dem letzten Stueck des Strichs");
+
+            Pump(1.0);
+            Check.That(!page.SettlingAfterPainting, "ruht der Pinsel, kommt das ganze Bild nach");
+
+            // Fiel ein Takt auf das grobe Bild zurueck, kommt das scharfe gleich beim Loslassen.
+            typeof(Views.AtelierPage).GetField("_regionFailed", flags)!.SetValue(page, true);
+            painted.Invoke(page, new object[] { true });
+            painted.Invoke(page, new object[] { false });
+
+            Check.That(!page.SettlingAfterPainting && !(bool)coarse.GetValue(page)!,
+                       "nach einem groben Takt rechnet das Loslassen sofort scharf");
+
             Check.That(visible, "jeder Strich aendert das Bild schon waehrend des Malens");
             Check.That(regional, "ein Pinseltakt rechnet nur den Ausschnitt - kein grobes ganzes Bild");
             Check.That(same, "und das Bild danach ist Byte fuer Byte das eines ganzen, vollen Durchgangs");
@@ -164,10 +207,15 @@ public static class RegionRenderInvariants
         var random = new Random(11);
 
         // Gewaehlt ist die Maske, das Mischen, das sie begrenzt, oder die Ausgabe - von dort
-        // aus muss der Ausschnitt jeweils anderes selbst rechnen.
-        foreach (string chosen in new[] { "mask", "mix", "output" })
+        // aus muss der Ausschnitt jeweils anderes selbst rechnen. Und mit Vignette und Korn
+        // in der Maskenebene und am Ende: Sie brauchen den Ort, aber keine Nachbarn.
+        foreach (var (chosen, optics) in new[] { ("mask", false), ("mix", false), ("output", false), ("mask", true), ("output", true) })
         {
-            var graph = StackToGraph.Convert(Stack(), Adjust(), new GradingStack());
+            var picture = optics
+                ? new GradingStack { Optics = { new VignetteTool { Amount = -0.6f }, new GrainTool { Amount = 0.5f } } }
+                : new GradingStack();
+            var graph = StackToGraph.Convert(Stack(optics), Adjust(), picture);
+            string label = chosen + (optics ? " mit Vignette und Korn" : "");
             var maskNode = graph.Nodes.OfType<MaskNode>().Single(m => m.Mask.Kind == MaskKind.Painted);
             var mixNode = graph.Nodes.OfType<MixNode>().Single(m => graph.Into(m.Id, "Faktor")?.From == maskNode.Id);
             var paint = maskNode.Mask.PaintOn(0, Width, Height);
@@ -176,7 +224,8 @@ public static class RegionRenderInvariants
 
             var cache = new GraphCache();
             var pool = new GridPool();
-            GraphInputs Inputs() => new() { Sources = sources, View = View, Cache = cache, Pool = pool, Focus = focus };
+            var regionPool = new GridPool(sizes: 16);
+            GraphInputs Inputs(GridPool? from = null) => new() { Sources = sources, View = View, Cache = cache, Pool = from ?? pool, Focus = focus };
 
             Stroke(paint, random, out _);
             byte[] shown = Render(graph, Inputs());
@@ -187,9 +236,11 @@ public static class RegionRenderInvariants
             {
                 Stroke(paint, random, out var touched);
 
-                var region = GraphRegion.Around(touched.X0, touched.Y0, touched.X1, touched.Y1, 2 * PaintedMask.Coarse);
+                // Wie auf der Seite: gerundet, aus dem eigenen Vorrat - der dabei Felder
+                // wiederverwendet, in denen noch ein frueherer Ausschnitt steht.
+                var region = GraphRegion.Around(touched.X0, touched.Y0, touched.X1, touched.Y1, 2 * PaintedMask.Coarse).Snapped(32);
                 byte[] before = shown.ToArray();
-                bool done = RenderRegion(graph, Inputs(), region, shown);
+                bool done = RenderRegion(graph, Inputs(regionPool), region, shown);
                 changed |= !shown.AsSpan().SequenceEqual(before);
 
                 // Die Wahrheit ohne Zwischenspeicher: der volle Durchgang.
@@ -202,12 +253,12 @@ public static class RegionRenderInvariants
                 if (round % 3 == 2) shown = Render(graph, Inputs());
             }
 
-            Check.That(used && changed, $"gewaehlt: {chosen} - der Ausschnitt wird gerechnet und aendert das Bild");
-            Check.That(all, $"gewaehlt: {chosen} - Ausschnitt ins alte Bild geschrieben ist Byte fuer Byte das ganze neue");
+            Check.That(used && changed, $"gewaehlt: {label} - der Ausschnitt wird gerechnet und aendert das Bild");
+            Check.That(all, $"gewaehlt: {label} - Ausschnitt ins alte Bild geschrieben ist Byte fuer Byte das ganze neue");
 
             // Und der Zwischenspeicher hat unter den Ausschnitten nicht gelitten.
             Check.That(Render(graph, Inputs()).AsSpan().SequenceEqual(Render(graph, new GraphInputs { Sources = sources, View = View })),
-                       $"gewaehlt: {chosen} - danach rechnet der volle Durchgang mit demselben Zwischenspeicher richtig");
+                       $"gewaehlt: {label} - danach rechnet der volle Durchgang mit demselben Zwischenspeicher richtig");
         }
     }
 
@@ -222,7 +273,6 @@ public static class RegionRenderInvariants
 
         (string What, NodeGraph Graph)[] cases =
         {
-            ("eine Vignette hinter der Maske", With(new GradingStack { Optics = { new VignetteTool { Amount = -0.6f } } })),
             ("eine Schaerfe hinter der Maske", With(new GradingStack { Local = { new SharpenTool { Amount = 0.8f } } })),
         };
 
@@ -268,7 +318,7 @@ public static class RegionRenderInvariants
         for (int i = 0; i < 5; i++) touched = touched.Union(stroke.To(paint, random.Next(Width), random.Next(Height)));
     }
 
-    private static LayerStack Stack() => new()
+    private static LayerStack Stack(bool optics = false) => new()
     {
         Layers =
         {
@@ -279,7 +329,7 @@ public static class RegionRenderInvariants
                 Content = LayerContent.Adjustment,
                 Mode = BlendMode.Normal,
                 Adjustments = new ImageAdjustments { Exposure = -1.2, Saturation = 0.4 },
-                Tools = new GradingStack(),
+                Tools = optics ? new GradingStack { Optics = { new VignetteTool { Amount = 0.4f } } } : new GradingStack(),
                 Mask = new LayerMask { Kind = MaskKind.Painted },
             },
         },
