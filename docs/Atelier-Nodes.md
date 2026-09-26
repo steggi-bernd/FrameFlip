@@ -622,9 +622,14 @@ Only the alpha channel of exports changes, and only in those cases.
       with small pictures; a click restores one as a single undo step. What changed since
       the last state is kept as a state first. Recording costs 0.9 ms on release at 4K.
 
-    Not done: moving the cut-out layer on its own. `PlaceNode` places a file, not an image
-    from the graph, so a cut-out layer cannot be moved yet; that needs a transform for graph
-    images. Mask rasters still live in the project file (3.3 planned them by content in
+    - **Moving the cut-out** (same day): `CutoutNode` has a placement of its own. The mask
+      selects at the old spot, and what it selected moves; the original stays underneath.
+      With the cut-out layer (or its cutout node) selected, the placement frame of the move
+      tool drags the piece, one undo step. The piece is as large as the canvas and sampled
+      backwards, bilinear between grid points. Moved, the node reads outside a region, so
+      region rendering while painting refuses it and renders whole; unmoved it stays safe.
+
+    Not done: mask rasters still live in the project file (3.3 planned them by content in
     `.ffdata`); only the history is stored there.
 
     Tests: cutting out keeps the picture byte for byte under normal, screen and multiply,
@@ -637,4 +642,7 @@ Only the alpha channel of exports changes, and only in those cases.
     foreign changes and restores lead to snapshots, 27 states trim to 20 and stay correct,
     save and load in JSON and in the folder next to the project, recording under 10 ms at
     4K, and on the page: painting makes states, the menu shows them newest first, a click
-    restores one as an undo step and Ctrl+Z takes it back.
+    restores one as an undo step and Ctrl+Z takes it back. Moving: the piece lands byte for
+    byte 60 pixels to the right, the original stays, nothing else changes, region rendering
+    refuses a moved cutout, the placement survives saving; on the page the frame drags the
+    selected cut-out layer as one undo step.

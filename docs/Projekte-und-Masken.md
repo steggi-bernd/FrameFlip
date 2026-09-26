@@ -360,11 +360,15 @@ Entschieden beim Bauen, bitte prüfen:
 - **„→ n Ebenen“ zählt auch ausgeschnittene Ebenen** mit, „Maske lösen“ nimmt die Maske
   aber nur aus dem Faktor ihrer Ebenen. Die ausgeschnittene Ebene hängt weiter an ihr.
 
+- **Verschieben** (Abnahme aus Punkt 4, nachgereicht am selben Tag): Der
+  Ausschneiden-Knoten hat eine eigene Lage. Die Maske wählt an der alten Stelle aus, das
+  Gewählte wandert, und darunter bleibt das Original. Ist die ausgeschnittene Ebene
+  gewählt, zieht der Greifrahmen beim Verschieben ihr Stück, als ein Schritt im Verlauf.
+  Versetzt rechnet das Malen dahinter wieder voll, weil der Knoten dann außerhalb des
+  Ausschnitts liest.
+
 Offen aus Phase D:
 
-- **Verschieben der ausgeschnittenen Ebene** geht noch nicht. Der Platzknoten liest nur
-  Dateien. Dafür braucht es ein Verschieben für Bilder aus dem Graphen, also einen neuen
-  Knoten oder einen Platz im Ausschneiden-Knoten.
 - Die Maskenraster stehen weiter in der Projektdatei, nicht nach Inhalt in `.ffdata`
   (3.4). Nur der Verlauf liegt dort.
 - Befund, nicht geändert: Die UI-Testreihe merkt sich in ihren Testdaten die zuletzt
