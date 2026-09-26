@@ -153,6 +153,7 @@ public sealed partial class AtelierPage : UserControl
         Placement.MaskWanted = MakeMaskLayer;
         Properties.BrushChanged += UseBrushSettings;
         ToolBand.Chosen += UseTool;
+        ToolBand.FrameModeWanted += single => _ = UseFrameMode(single);
         Properties.BrushHistoryWanted += anchor =>
         {
             if (PaintTarget() is { } painted) ShowMaskHistory(painted, anchor);
@@ -385,6 +386,7 @@ public sealed partial class AtelierPage : UserControl
 
         UpdateSourceText();
         FindSequence(path);
+        ShowFrameMode();
         CompareButton.IsEnabled = true;
         ApplyZoom();
         Render();

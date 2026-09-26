@@ -17,7 +17,28 @@
             <WrapPanel x:Name="CategoryRow" Orientation="Horizontal" VerticalAlignment="Center" />
         </DockPanel>
 
-        <WrapPanel x:Name="ToolRow" Orientation="Horizontal" Margin="0,6,0,0" />
+        <DockPanel Margin="0,6,0,0" LastChildFill="True">
+            <!--
+                Ganze Folge oder nur dieses Bild (Entscheidung 7): unauffaellig am Ende der Zeile,
+                nur bei einer Folge oder einem daraus herausgeloesten Bild. Ein Filmstreifen und
+                ein Bild - kein Ebenen-Zeichen, das waere mit den Ebenen zu verwechseln.
+            -->
+            <StackPanel x:Name="FrameSwitch" DockPanel.Dock="Right" Orientation="Horizontal" VerticalAlignment="Top"
+                        Visibility="Collapsed">
+                <ToggleButton x:Name="FrameAll" Style="{StaticResource OverlayToggle}" Padding="6,3"
+                              ToolTip="{DynamicResource S_FrameAllHint}" Click="OnFrameAll">
+                    <Path Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=ToggleButton}}" StrokeThickness="1.2"
+                          Data="M1,1.5 H17 V12.5 H1 Z M5,1.5 V12.5 M13,1.5 V12.5 M2.3,3.5 H3.7 M2.3,6.5 H3.7 M2.3,9.5 H3.7 M14.3,3.5 H15.7 M14.3,6.5 H15.7 M14.3,9.5 H15.7" />
+                </ToggleButton>
+                <ToggleButton x:Name="FrameOne" Style="{StaticResource OverlayToggle}" Padding="6,3" Margin="3,0,0,0"
+                              ToolTip="{DynamicResource S_FrameOneHint}" Click="OnFrameOne">
+                    <Path Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=ToggleButton}}" StrokeThickness="1.2"
+                          Data="M1,1.5 H17 V12.5 H1 Z M3,11 L7,6 L10,9 L12,7 L15,11 M12.5,4.5 A1,1 0 1 1 12.49,4.5" />
+                </ToggleButton>
+            </StackPanel>
+
+            <WrapPanel x:Name="ToolRow" Orientation="Horizontal" />
+        </DockPanel>
 
         <Popup x:Name="SearchPopup" PlacementTarget="{Binding ElementName=SearchButton}" Placement="Bottom"
                StaysOpen="False" AllowsTransparency="True">

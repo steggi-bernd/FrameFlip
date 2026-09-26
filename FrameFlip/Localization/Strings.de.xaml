@@ -1217,6 +1217,10 @@
     <sys:String x:Key="S_BrushFlow">Stärke</sys:String>
     <sys:String x:Key="S_BrushOpacity">Deckkraft</sys:String>
     <sys:String x:Key="S_BrushSpacing">Abstand</sys:String>
+    <sys:String x:Key="S_FrameAllHint">Ganze Folge: Was du änderst, gilt für jedes Bild der Folge.</sys:String>
+    <sys:String x:Key="S_FrameOneHint">Nur dieses Bild: Das Bild wird zu einem eigenen Einzelbild – ein Ordner mit seinem Namen im Quellordner, darin eine Kopie des Originals, sein Projekt (beginnend mit dem Stand der Folge) und später seine Ausgabe. Die Folge bleibt, wie sie ist.</sys:String>
+    <sys:String x:Key="S_FrameOriginMissing">Das Bild der Folge, aus dem dieses kam, ist nicht mehr da.</sys:String>
+    <sys:String x:Key="S_FrameDetachFailed">Das Einzelbild ließ sich nicht anlegen: {0}</sys:String>
     <sys:String x:Key="S_ToolCatSelect">Auswahl</sys:String>
     <sys:String x:Key="S_ToolCatPaint">Malen</sys:String>
     <sys:String x:Key="S_ToolCatTone">Tonwert</sys:String>

@@ -99,6 +99,45 @@ public partial class ToolBand : UserControl
         }
     }
 
+    // ------------------------------------------------------------------ Folge oder Bild
+
+    private bool _single;
+
+    /// <summary>Umgeschaltet: true - nur dieses Bild, false - die ganze Folge.</summary>
+    public event Action<bool>? FrameModeWanted;
+
+    /// <summary>Ob der Umschalter zu sehen ist - fuer die Probe.</summary>
+    internal bool FrameSwitchShown => FrameSwitch.Visibility == Visibility.Visible;
+
+    /// <summary>Ob gerade "nur dieses Bild" gilt.</summary>
+    internal bool SingleFrame => _single;
+
+    /// <summary>
+    /// Zeigt den Umschalter - nur bei einer Folge oder einem daraus herausgeloesten Bild - und
+    /// welche Seite gilt. Bei einem gewoehnlichen Einzelbild gibt es nichts zu unterscheiden.
+    /// </summary>
+    public void ShowFrameSwitch(bool visible, bool single)
+    {
+        _single = single;
+        FrameSwitch.Visibility = visible ? Visibility.Visible : Visibility.Collapsed;
+        FrameAll.IsChecked = !single;
+        FrameOne.IsChecked = single;
+    }
+
+    // Die Knoepfe zeigen, was gilt, und melden nur den Wunsch: Umgeschaltet ist erst, wenn die
+    // Seite das andere Bild geoeffnet hat und ShowFrameSwitch ruft.
+    private void OnFrameAll(object sender, RoutedEventArgs e)
+    {
+        FrameAll.IsChecked = !_single;
+        if (_single) FrameModeWanted?.Invoke(false);
+    }
+
+    private void OnFrameOne(object sender, RoutedEventArgs e)
+    {
+        FrameOne.IsChecked = _single;
+        if (!_single) FrameModeWanted?.Invoke(true);
+    }
+
     // ------------------------------------------------------------------ Suche
 
     /// <summary>Oeffnet die Suche - mit Strg+K oder am Knopf.</summary>

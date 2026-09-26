@@ -71,6 +71,12 @@ internal sealed class AtelierProject
     /// <summary>Das Bild der Folge, das zuletzt im Atelier offen war - nur der Dateiname.</summary>
     public string? Frame { get; set; }
 
+    /// <summary>
+    /// Bei einem Einzelbild, das aus einer Folge herausgeloest wurde ("nur dieses Bild"): das
+    /// Bild der Folge, aus dem es kam, mit vollem Pfad. Der Weg zurueck in die Folge.
+    /// </summary>
+    public string? Origin { get; set; }
+
     public ImageAdjustments? Adjustments { get; set; }
 
     public GradingStack? Grading { get; set; }
@@ -335,6 +341,9 @@ internal sealed class ProjectRecipeStore : IAtelierRecipeStore
 
     public string? Nodes { get; set; }
 
+    /// <summary>Woher ein herausgeloestes Einzelbild kommt - siehe <see cref="AtelierProject.Origin"/>.</summary>
+    public string? Origin { get; set; }
+
     /// <summary>Aus einer gelesenen Projektdatei.</summary>
     public static ProjectRecipeStore From(AtelierProject project) => new()
     {
@@ -342,12 +351,14 @@ internal sealed class ProjectRecipeStore : IAtelierRecipeStore
         Grading = project.Grading,
         Layers = project.Layers,
         Nodes = project.Nodes?.ToJsonString(),
+        Origin = project.Origin,
     };
 
     /// <summary>Ein Abdruck zum Schreiben - eigene Kopien, damit weitergearbeitet werden kann, waehrend geschrieben wird.</summary>
     public AtelierProject ToProject(string? frame) => new()
     {
         Frame = frame,
+        Origin = Origin,
         Adjustments = Adjustments,
         Grading = Grading?.Clone(),
         Layers = Layers?.Clone(),
