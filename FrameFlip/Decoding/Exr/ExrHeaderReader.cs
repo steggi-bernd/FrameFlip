@@ -39,6 +39,9 @@ public static class ExrHeaderReader
     /// </summary>
     private const int MaxAttributeBytes = 64 * 1024 * 1024;
 
+    /// <summary>Obergrenze fuer die Zahl der Teile - gegen eine kaputte Datei, die nicht aufhoert.</summary>
+    private const int MaxParts = 4096;
+
     public static ExrHeader Read(Stream stream)
     {
         Span<byte> head = stackalloc byte[8];
@@ -51,22 +54,165 @@ public static class ExrHeaderReader
         int number = version & 0xFF;
         if (number != 2) throw new ExrFormatException($"EXR-Version {number} wird nicht gelesen.");
 
-        // Diese drei Varianten haben einen anderen Aufbau als eine einteilige
+        bool longNames = (version & FlagLongNames) != 0;
+
+        // Mehrteilig: Blender 5.2 schreibt so, sobald es mehr als das Bild ausgibt - jeder
+        // Pass ein eigener Teil. Das Deep-Bit heisst dort nur, dass IRGENDEIN Teil deep ist;
+        // die anderen lassen sich trotzdem lesen.
+        if ((version & FlagMultiPart) != 0) return ReadParts(stream, longNames);
+
+        // Diese beiden Varianten haben einen anderen Aufbau als eine einteilige
         // Scanline-Datei. Sie hier abzulehnen ist ehrlicher, als sie anzufangen und
         // mitten in der Offset-Tabelle aus dem Tritt zu geraten.
         if ((version & FlagTiled) != 0) throw new ExrFormatException("Gekachelte EXR wird nicht gelesen.");
         if ((version & FlagNonImage) != 0) throw new ExrFormatException("Deep-EXR wird nicht gelesen.");
-        if ((version & FlagMultiPart) != 0) throw new ExrFormatException("Mehrteilige EXR wird nicht gelesen.");
 
-        bool longNames = (version & FlagLongNames) != 0;
+        var single = ReadAttributes(stream, longNames);
 
-        ExrBox? dataWindow = null;
-        ExrBox? displayWindow = null;
-        ExrCompression? compression = null;
-        ExrLineOrder lineOrder = ExrLineOrder.IncreasingY;
-        IReadOnlyList<ExrChannel>? channels = null;
-        double aspect = 1.0;
+        if (single.DataWindow is null) throw new ExrFormatException("Kein dataWindow im Kopf.");
+        if (single.Channels is null || single.Channels.Count == 0) throw new ExrFormatException("Keine Kanaele im Kopf.");
+        if (single.Compression is null) throw new ExrFormatException("Keine Kompressionsangabe im Kopf.");
+        if (!single.DataWindow.Value.IsValid) throw new ExrFormatException("dataWindow ist leer.");
+
+        foreach (var channel in single.Channels)
+        {
+            if (!channel.IsFullResolution)
+                throw new ExrFormatException($"Kanal '{channel.Name}' ist unterabgetastet.");
+        }
+
+        return single.Build(stream.Position, single.Channels);
+    }
+
+    /// <summary>
+    /// Die Koepfe einer mehrteiligen Datei, bis zum leeren Kopf. Danach stehen die
+    /// Offset-Tabellen aller Teile hintereinander, jede so lang, wie ihr Kopf in
+    /// "chunkCount" sagt - auch die eines Teils, der hier nicht gelesen wird.
+    ///
+    /// Gelesen werden die Scanline-Teile mit derselben Bildgroesse wie der erste. Ihre Kanaele
+    /// kommen in eine gemeinsame Liste. Traegt ein spaeterer Teil einen Namen, den es schon
+    /// gibt - bei Stereo heissen "left" und "right" beide R, G, B -, bekommt er seinen
+    /// Teilnamen davor. Die Namen im Kopf eines Teils sind dieselben wie in der Liste; die
+    /// Daten eines Blocks haengen nur an Reihenfolge und Art der Kanaele, nicht an ihren Namen.
+    /// </summary>
+    private static ExrHeader ReadParts(Stream stream, bool longNames)
+    {
+        var heads = new List<PartHead>();
+
+        while (true)
+        {
+            int first = stream.ReadByte();
+            if (first < 0) throw new ExrFormatException("Datei endet in den Koepfen.");
+            if (first == 0) break;
+
+            stream.Position -= 1;
+            heads.Add(ReadAttributes(stream, longNames));
+
+            if (heads.Count > MaxParts) throw new ExrFormatException("Mehr Teile, als eine Datei haben kann.");
+        }
+
+        long table = stream.Position;
+        long at = table;
+
+        var parts = new List<ExrHeader>();
+        var taken = new HashSet<string>(StringComparer.Ordinal);
+        ExrBox? window = null;
+
+        for (int index = 0; index < heads.Count; index++)
+        {
+            var head = heads[index];
+
+            int chunks = head.ChunkCount
+                         ?? throw new ExrFormatException($"Teil {index} nennt keine Zahl von Bloecken.");
+
+            long offset = at;
+            at += 8L * chunks;
+
+            // Gekachelt oder deep: anders aufgebaut. Uebersprungen - aber seine Tabelle zaehlt mit.
+            if (head.Type is not (null or "scanlineimage")) continue;
+
+            if (head.DataWindow is not { IsValid: true } box || head.Channels is not { Count: > 0 } channels ||
+                head.Compression is null || channels.Any(c => !c.IsFullResolution))
+                continue;
+
+            window ??= box;
+            if (box != window) continue;
+
+            var named = new List<ExrChannel>(channels.Count);
+            foreach (var channel in channels)
+            {
+                string name = channel.Name;
+
+                if (!taken.Add(name))
+                {
+                    name = $"{head.Name ?? $"Teil{index}"}.{channel.Name}";
+                    for (int n = 2; !taken.Add(name); n++) name = $"{head.Name ?? $"Teil{index}"}#{n}.{channel.Name}";
+                }
+
+                named.Add(channel with { Name = name });
+            }
+
+            parts.Add(head.Build(offset, named, index, chunks));
+        }
+
+        if (parts.Count == 0) throw new ExrFormatException("Kein Teil der Datei ist ein lesbares Scanline-Bild.");
+
+        // Die Attribute aller Teile - das Manifest der Kryptomatten steht bei Blender im
+        // Kopf des ersten Teils, die Kanaele dazu in eigenen. Bei gleichem Namen gilt der erste.
         var raw = new Dictionary<string, byte[]>(StringComparer.Ordinal);
+        foreach (var head in heads)
+            foreach (var (name, value) in head.Raw)
+                raw.TryAdd(name, value);
+
+        var lead = parts[0];
+
+        return new ExrHeader
+        {
+            DataWindow = lead.DataWindow,
+            DisplayWindow = lead.DisplayWindow,
+            Compression = lead.Compression,
+            LineOrder = lead.LineOrder,
+            Channels = parts.SelectMany(p => p.Channels).ToList(),
+            PixelAspectRatio = lead.PixelAspectRatio,
+            TableOffset = table,
+            RawAttributes = raw,
+            Parts = parts,
+        };
+    }
+
+    /// <summary>Was ein Kopf sagt - bei einer mehrteiligen Datei einer je Teil.</summary>
+    private sealed class PartHead
+    {
+        public ExrBox? DataWindow;
+        public ExrBox? DisplayWindow;
+        public ExrCompression? Compression;
+        public ExrLineOrder LineOrder = ExrLineOrder.IncreasingY;
+        public IReadOnlyList<ExrChannel>? Channels;
+        public double Aspect = 1.0;
+        public string? Name;
+        public string? Type;
+        public int? ChunkCount;
+        public readonly Dictionary<string, byte[]> Raw = new(StringComparer.Ordinal);
+
+        public ExrHeader Build(long table, IReadOnlyList<ExrChannel> channels, int? index = null, int? chunks = null) => new()
+        {
+            DataWindow = DataWindow!.Value,
+            DisplayWindow = DisplayWindow ?? DataWindow.Value,
+            Compression = Compression!.Value,
+            LineOrder = LineOrder,
+            Channels = channels,
+            PixelAspectRatio = Aspect > 0 ? Aspect : 1.0,
+            TableOffset = table,
+            RawAttributes = Raw,
+            PartIndex = index,
+            PartName = Name,
+            ChunkCount = chunks,
+        };
+    }
+
+    /// <summary>Die Attribute eines Kopfes, bis zum leeren Namen.</summary>
+    private static PartHead ReadAttributes(Stream stream, bool longNames)
+    {
+        var head = new PartHead();
 
         while (true)
         {
@@ -85,57 +231,49 @@ public static class ExrHeaderReader
             switch (name)
             {
                 case "dataWindow" when type == "box2i":
-                    dataWindow = ReadBox(value);
+                    head.DataWindow = ReadBox(value);
                     break;
 
                 case "displayWindow" when type == "box2i":
-                    displayWindow = ReadBox(value);
+                    head.DisplayWindow = ReadBox(value);
                     break;
 
                 case "compression" when type == "compression" && size >= 1:
-                    compression = (ExrCompression)value[0];
+                    head.Compression = (ExrCompression)value[0];
                     break;
 
                 case "lineOrder" when type == "lineOrder" && size >= 1:
-                    lineOrder = (ExrLineOrder)value[0];
+                    head.LineOrder = (ExrLineOrder)value[0];
                     break;
 
                 case "channels" when type == "chlist":
-                    channels = ReadChannels(value);
+                    head.Channels = ReadChannels(value);
                     break;
 
                 case "pixelAspectRatio" when type == "float" && size >= 4:
-                    aspect = BinaryPrimitives.ReadSingleLittleEndian(value);
+                    head.Aspect = BinaryPrimitives.ReadSingleLittleEndian(value);
+                    break;
+
+                // Nur in mehrteiligen Dateien - wie der Teil heisst, was er ist, wie viele Bloecke er hat.
+                case "name" when type == "string":
+                    head.Name = Encoding.UTF8.GetString(value);
+                    break;
+
+                case "type" when type == "string":
+                    head.Type = Encoding.UTF8.GetString(value);
+                    break;
+
+                case "chunkCount" when type == "int" && size >= 4:
+                    head.ChunkCount = BinaryPrimitives.ReadInt32LittleEndian(value);
                     break;
 
                 default:
-                    raw[name] = value;
+                    head.Raw[name] = value;
                     break;
             }
         }
 
-        if (dataWindow is null) throw new ExrFormatException("Kein dataWindow im Kopf.");
-        if (channels is null || channels.Count == 0) throw new ExrFormatException("Keine Kanaele im Kopf.");
-        if (compression is null) throw new ExrFormatException("Keine Kompressionsangabe im Kopf.");
-        if (!dataWindow.Value.IsValid) throw new ExrFormatException("dataWindow ist leer.");
-
-        foreach (var channel in channels)
-        {
-            if (!channel.IsFullResolution)
-                throw new ExrFormatException($"Kanal '{channel.Name}' ist unterabgetastet.");
-        }
-
-        return new ExrHeader
-        {
-            DataWindow = dataWindow.Value,
-            DisplayWindow = displayWindow ?? dataWindow.Value,
-            Compression = compression.Value,
-            LineOrder = lineOrder,
-            Channels = channels,
-            PixelAspectRatio = aspect > 0 ? aspect : 1.0,
-            TableOffset = stream.Position,
-            RawAttributes = raw,
-        };
+        return head;
     }
 
     /// <summary>

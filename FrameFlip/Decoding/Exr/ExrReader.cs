@@ -58,7 +58,7 @@ public static class ExrReader
     /// </summary>
     public static ExrImage Read(Stream stream, ExrHeader header, IReadOnlyCollection<string>? wanted = null)
     {
-        if (!header.IsSupportedCompression)
+        if (header.Parts is null && !header.IsSupportedCompression)
             throw new ExrFormatException($"Kompression {header.Compression} wird nicht gelesen.");
 
         int width = header.DataWindow.Width;
@@ -74,12 +74,42 @@ public static class ExrReader
             if (take) targets[channel.Name] = new float[width * height];
         }
 
+        if (header.Parts is null)
+        {
+            ReadBlocks(stream, header, targets, width, height);
+        }
+        else
+        {
+            // Mehrteilig: nur die Teile, aus denen etwas gebraucht wird. Bei Blender ist jeder
+            // Pass ein Teil - wer das Bild will, liest die Tiefe nicht mit.
+            foreach (var part in header.Parts)
+            {
+                if (!part.Channels.Any(c => targets.ContainsKey(c.Name))) continue;
+
+                if (!part.IsSupportedCompression)
+                    throw new ExrFormatException($"Kompression {part.Compression} wird nicht gelesen (Teil '{part.PartName}').");
+
+                ReadBlocks(stream, part, targets, width, height);
+            }
+        }
+
+        return new ExrImage { Width = width, Height = height, Channels = targets };
+    }
+
+    /// <summary>
+    /// Die Bloecke eines Bildes oder eines Teils, ueber seine Offset-Tabelle. In einer
+    /// mehrteiligen Datei beginnt jeder Block mit der Nummer seines Teils - sie wird geprueft,
+    /// damit ein Versatz, der in einen fremden Teil zeigt, nicht still dessen Zeilen liefert.
+    /// </summary>
+    private static void ReadBlocks(Stream stream, ExrHeader header, Dictionary<string, float[]> targets,
+                                   int width, int height)
+    {
         int perBlock = header.ScanlinesPerBlock;
-        int blocks = header.BlockCount;
+        int blocks = header.ChunkCount ?? header.BlockCount;
         int blockBytes = header.BytesPerScanline * perBlock;
 
-        // Die Offset-Tabelle steht unmittelbar hinter dem Kopf: je Block ein
-        // 64-Bit-Versatz in die Datei.
+        // Die Offset-Tabelle steht unmittelbar hinter dem Kopf - bei mehreren Teilen hinter
+        // allen Koepfen, eine je Teil: je Block ein 64-Bit-Versatz in die Datei.
         stream.Position = header.TableOffset;
         var offsets = new long[blocks];
         for (int i = 0; i < blocks; i++) offsets[i] = ExrHeaderReader.ReadInt64(stream);
@@ -96,6 +126,9 @@ public static class ExrReader
                     throw new ExrFormatException("Offset-Tabelle zeigt aus der Datei heraus.");
 
                 stream.Position = offset;
+
+                if (header.PartIndex is int index && ExrHeaderReader.ReadInt32(stream) is var owner && owner != index)
+                    throw new ExrFormatException($"Block bei {offset} gehoert zu Teil {owner}, nicht zu Teil {index}.");
 
                 // Jeder Block nennt seine eigene erste Zeile. Deshalb spielt es keine
                 // Rolle, ob die Bloecke auf- oder absteigend in der Datei liegen -
@@ -126,8 +159,6 @@ public static class ExrReader
             pool.Return(packed);
             pool.Return(plain);
         }
-
-        return new ExrImage { Width = width, Height = height, Channels = targets };
     }
 
     /// <summary>
