@@ -342,7 +342,20 @@ public sealed partial class AtelierPage : UserControl
         // Der gespeicherte Stapel gilt nur, soweit diese Datei die Passe auch
         // fuehrt. Zwanzig ausgegraute Zeilen nach dem Wechsel auf ein PNG waeren
         // kein Hinweis, sondern ein Raetsel.
-        Layers.Load(passes, cryptomattes, Prune(_recipe.Layers, passes));
+        // Eine Datei ohne fertiges Bild - Blender 5.2 mit allen Paessen, aber ohne Combined -
+        // bekommt den Stapel, der es aus den Paessen wieder zusammensetzt: Licht, darauf
+        // seine Farbe, dazu Emission und Umgebung. Sonst zeigte sie nur ihren ersten Farbpass.
+        // Nur solange das Projekt noch keinen eigenen Stapel hat; und nie bei einer Datei MIT
+        // fertigem Bild - Blenders Combined ist entrauscht, die einzelnen Paesse sind es nicht.
+        var stack = Prune(_recipe.Layers, passes);
+
+        if (!InNodes && PassStack.IsBare(stack) && !PassStack.HasFinishedImage(passes) &&
+            PassStack.Rebuild(passes) is { Layers.Count: > 0 } rebuilt)
+        {
+            stack = rebuilt;
+        }
+
+        Layers.Load(passes, cryptomattes, stack);
 
         // Der Streifen gilt fuer jedes Bild, nicht nur fuer eine Multilayer-EXR.
         // Passe braucht das Format, Ebenen nicht: Dasselbe Bild ein zweites Mal und

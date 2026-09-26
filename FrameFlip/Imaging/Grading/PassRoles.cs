@@ -26,6 +26,14 @@ public static class PassRoles
         "dir", "ind",
     };
 
+    /// <summary>
+    /// Die ausgeschriebenen Paesse von Blender 5.2 - "Diffuse Direct", "Glossy Color". Nur in
+    /// Szenenlicht (EXR): Ein Bild, das zufaellig "color.png" heisst, ist kein Farbpass.
+    /// </summary>
+    private static readonly HashSet<string> AddingInPasses = new(StringComparer.OrdinalIgnoreCase) { "direct", "indirect" };
+
+    private static readonly HashSet<string> DarkeningInPasses = new(StringComparer.OrdinalIgnoreCase) { "color" };
+
     /// <summary>Was das Bild abdunkelt - Faktoren zwischen Schwarz und Weiss.</summary>
     private static readonly HashSet<string> Darkening = new(StringComparer.OrdinalIgnoreCase)
     {
@@ -49,6 +57,9 @@ public static class PassRoles
         {
             if (Adding.Contains(word)) return sceneLinear ? BlendMode.Add : BlendMode.Screen;
             if (Darkening.Contains(word)) return BlendMode.Multiply;
+
+            if (sceneLinear && AddingInPasses.Contains(word)) return BlendMode.Add;
+            if (sceneLinear && DarkeningInPasses.Contains(word)) return BlendMode.Multiply;
         }
 
         return null;
