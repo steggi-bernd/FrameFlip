@@ -250,7 +250,7 @@ Knotenmodus und die Einstellungen lesen alle aus derselben Liste.
 - Das Ergebnis hängt am Bild. Der Strich trägt es gepackt mit (`PaintStroke.Result`),
   der Maskenverlauf setzt es ein, statt neu zu rechnen.
 
-**Stempel (`feature/stempelpinsel`):**
+**Stempel (PR #46, gemergt):**
 
 - Der Knopf ✿ schaltet den Stempel ein, „Spitze …“ lädt ein Bild als Pinselspitze.
   - Weiß malt, Schwarz nicht. Hat die Datei Transparenz, zählt die Deckkraft.
@@ -267,6 +267,38 @@ Knotenmodus und die Einstellungen lesen alle aus derselben Liste.
 (Entscheidungen 6 und 7). Die Pinselleiste ist inzwischen voll: Form, Winkel, Karo, Druck,
 Bindung, Flächen, Stempel und Maske bearbeiten. U verteilt das auf die Werkzeugzeile
 der Kategorie „Malen“.
+
+## 4a. Phase U im Einzelnen
+
+In drei Schnitten:
+
+1. **U1 – Leiste und Katalog** (`feature/werkzeugleiste`): Kategorienband, Werkzeugzeile, Suche.
+2. **U2 – „nur dieses Bild“**: das Symbol am Ende der Werkzeugzeile und die Ausnahme je Bild
+   im Projekt der Folge (Entscheidung 7, Abschnitt 3.2).
+3. **U3 – Pinselleiste verschlanken**: Form, Winkel, Karo, Druck, Bindung, Flächen und Stempel
+   stehen heute alle in einer Zeile. Was ein eigenes Werkzeug ist, wandert in die
+   Werkzeugzeile; die Pinselleiste behält die Regler.
+
+**U1 (`feature/werkzeugleiste`):**
+
+- Unter der Kopfzeile stehen die Kategorien als Band: Auswahl, Malen, Tonwert, Farbe,
+  Details, Optik, Licht, Glitch. Darunter die Werkzeuge der gewählten, rechts die Suche
+  (Strg+K). Zeit und Retusche erscheinen, sobald sie etwas enthalten (W9, W4).
+- **Katalog** (`ToolCatalog`): ordnet die Arten des Knotenkatalogs den Kategorien zu und gibt
+  jedem sein Zeitverhalten mit. Es ist dieselbe Liste, aus der der Hub baut. Dazu kommen die
+  Pinselarten (Pinsel, Rechteck, Ellipse, Lasso, Stempel) und „Maske bearbeiten“. Die
+  Bausteine des Graphen (Mischen, Platzieren, Schwarz …) bleiben im Hub, sie tun dem Bild
+  nichts.
+- **Wirkung:**
+  - Im Stapel öffnet ein Werkzeug seine Karte im Farbstreifen.
+  - Im Knotenmodus entsteht ein Knoten, hinter dem gewählten oder in der Mitte der Ansicht.
+  - Beim Pinsel wird seine Art gewählt.
+  - Was nur im Knotenmodus Platz hat (Masken als Knoten, Effekte ohne Karte), steht im
+    Stapel gedämpft da, mit dem Hinweis, wie man umschaltet.
+- Die Leiste beginnt bei „Malen“, weil dort in jedem Modus etwas zu tun ist.
+- Beim Bauen gefunden: Ein doppelter Schlüssel im Wörterbuch ließ es im Testlauf still nicht
+  laden, alle Texte blieben Schlüssel. Die Probe prüft jetzt, dass jeder Name übersetzt
+  ankommt.
 
 ## 5. KI-Werkzeuge: Last, Größe, Lizenz
 
