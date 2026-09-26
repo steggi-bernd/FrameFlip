@@ -255,6 +255,125 @@ public sealed class PaintedMask
     }
 
     /// <summary>
+    /// Bearbeitet die ganze Maske auf einmal: fuellen, leeren, umkehren, weiche Kante,
+    /// ausweiten, schrumpfen. <paramref name="amount"/> ist die Weite in BILDpunkten, fuer
+    /// die ersten drei ohne Bedeutung.
+    ///
+    /// Gerechnet in ganzen Zahlen und immer in derselben Reihenfolge - der Maskenverlauf
+    /// spielt eine Bearbeitung nach wie einen Strich, und nachgespielt muss sie Byte fuer
+    /// Byte dasselbe ergeben.
+    /// </summary>
+    public PaintBounds Apply(PaintEdit edit, float amount)
+    {
+        var cover = Cover();
+
+        switch (edit)
+        {
+            case PaintEdit.Fill:
+                Array.Fill(cover, (byte)255);
+                break;
+
+            case PaintEdit.Clear:
+                Array.Clear(cover);
+                break;
+
+            case PaintEdit.Invert:
+                for (int i = 0; i < cover.Length; i++) cover[i] = (byte)(255 - cover[i]);
+                break;
+
+            case PaintEdit.Feather:
+                // Drei Durchgaenge eines Kastenfilters kommen einer Glocke nahe; der
+                // Uebergang wird so etwa doppelt so breit wie die Weite.
+                Feather(cover, Math.Max(1, (int)MathF.Round(amount / Coarse / 3f)));
+                break;
+
+            case PaintEdit.Grow:
+            case PaintEdit.Shrink:
+                Morph(cover, amount / Coarse, grow: edit == PaintEdit.Grow);
+                break;
+
+            default:
+                return PaintBounds.Empty;
+        }
+
+        Kept = false;
+        return new PaintBounds(0, 0, Width * Coarse, Height * Coarse);
+    }
+
+    private void Feather(byte[] cover, int radius)
+    {
+        var scratch = new byte[cover.Length];
+
+        for (int pass = 0; pass < 3; pass++)
+        {
+            Box(cover, scratch, radius, along: 1, count: Width, lines: Height, lineStep: Width);
+            Box(scratch, cover, radius, along: Width, count: Height, lines: Width, lineStep: 1);
+        }
+    }
+
+    /// <summary>
+    /// Ein Kastenfilter entlang von Zeilen oder Spalten. Am Rand wird der letzte Punkt
+    /// wiederholt - so laeuft eine volle Maske am Bildrand nicht aus.
+    /// </summary>
+    private static void Box(byte[] from, byte[] to, int radius, int along, int count, int lines, int lineStep)
+    {
+        int n = 2 * radius + 1;
+
+        Parallel.For(0, lines, line =>
+        {
+            int start = line * lineStep;
+            int sum = 0;
+
+            for (int k = -radius; k <= radius; k++) sum += from[start + Math.Clamp(k, 0, count - 1) * along];
+
+            for (int i = 0; i < count; i++)
+            {
+                to[start + i * along] = (byte)((sum + n / 2) / n);
+                sum += from[start + Math.Min(count - 1, i + radius + 1) * along] - from[start + Math.Max(0, i - radius) * along];
+            }
+        });
+    }
+
+    /// <summary>
+    /// Ausweiten oder schrumpfen um einen Kreis vom Radius <paramref name="radius"/>
+    /// Maskenpunkten: jeder Punkt nimmt den hellsten (dunkelsten) Wert in seiner Naehe. Ecken
+    /// werden beim Ausweiten rund. Ausserhalb des Bildes gibt es nichts - der Rand zaehlt
+    /// weder als voll noch als leer.
+    /// </summary>
+    private void Morph(byte[] cover, float radius, bool grow)
+    {
+        float r = MathF.Max(1f, radius);
+        int reach = (int)MathF.Floor(r);
+
+        var offsets = new List<(int X, int Y)>();
+        for (int dy = -reach; dy <= reach; dy++)
+            for (int dx = -reach; dx <= reach; dx++)
+                if (dx * dx + dy * dy <= r * r + 1e-3f) offsets.Add((dx, dy));
+
+        var source = (byte[])cover.Clone();
+        int width = Width, height = Height;
+
+        Parallel.For(0, height, y =>
+        {
+            for (int x = 0; x < width; x++)
+            {
+                byte best = source[y * width + x];
+
+                foreach (var (dx, dy) in offsets)
+                {
+                    int nx = x + dx, ny = y + dy;
+                    if (nx < 0 || ny < 0 || nx >= width || ny >= height) continue;
+
+                    byte value = source[ny * width + nx];
+                    best = grow ? Math.Max(best, value) : Math.Min(best, value);
+                }
+
+                cover[y * width + x] = best;
+            }
+        });
+    }
+
+    /// <summary>
     /// Fuellt ein Vieleck - Rechteck, Ellipse oder Lasso. <paramref name="path"/> sind die
     /// Ecken in BILDpunkten, abwechselnd x und y; das Vieleck ist geschlossen, und wo es sich
     /// selbst kreuzt, gilt gerade-ungerade: Eine Schleife im Lasso wird ein Loch.

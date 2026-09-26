@@ -33,9 +33,23 @@ public partial class PropertiesPanel : UserControl
     /// <summary>Der Verlauf der bemalten Maske soll aufgehen - am Knopf, der ihn will.</summary>
     public event Action<FrameworkElement>? BrushHistoryWanted;
 
-    /// <summary>Ob der Knopf fuer den Maskenverlauf zu sehen ist - nur, wenn es einen gibt.</summary>
+    /// <summary>Die bemalte Maske soll bearbeitet werden - fuellen, umkehren, ausweiten ...</summary>
+    public event Action<FrameworkElement>? BrushEditWanted;
+
+    /// <summary>
+    /// Ob die Knoepfe fuer Verlauf und Bearbeitung der Maske zu sehen sind - nur, wenn der
+    /// Pinsel auf einer gemalten Maske im Graphen liegt.
+    /// </summary>
     public void ShowBrushHistory(bool shown)
-        => BrushHistoryButton.Visibility = shown ? Visibility.Visible : Visibility.Collapsed;
+    {
+        BrushHistoryButton.Visibility = shown ? Visibility.Visible : Visibility.Collapsed;
+        BrushEditButton.Visibility = BrushHistoryButton.Visibility;
+    }
+
+    /// <summary>Der Knopf fuer die Bearbeitung der Maske - fuer die Probe.</summary>
+    internal Button EditButton => BrushEditButton;
+
+    private void OnBrushEdit(object sender, RoutedEventArgs e) => BrushEditWanted?.Invoke(BrushEditButton);
 
     /// <summary>Der Knopf fuer den Maskenverlauf - fuer die Probe.</summary>
     internal Button HistoryButton => BrushHistoryButton;

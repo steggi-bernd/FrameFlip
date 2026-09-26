@@ -35,7 +35,10 @@ public partial class AtelierPage
 
         // Der Verlauf gehoert zu dem, was gemalt wurde - die anderen Masken rechnen sich aus dem Bild.
         if (mask.Mask.Kind == MaskKind.Painted)
-            menu.Item("⟲", Strings.T("S_MaskMenuHistory"), () => ShowMaskHistory(mask, anchor));
+        {
+            menu.Item("⟲", Strings.T("S_MaskMenuHistory"), () => ShowMaskHistory(mask, anchor))
+                .Item("◑", Strings.T("S_MaskEdit"), () => ShowMaskEditMenu(mask, anchor));
+        }
     }
 
     /// <summary>
