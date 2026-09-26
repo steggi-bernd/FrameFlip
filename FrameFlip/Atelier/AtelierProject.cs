@@ -98,6 +98,9 @@ internal sealed class AtelierProjectStore
 
     public const string FileExtension = ".ffproj";
 
+    /// <summary>Der Ordner neben der Projektdatei fuer das, was nicht in sie gehoert - der Verlauf der Masken.</summary>
+    public const string DataExtension = ".ffdata";
+
     internal static readonly JsonSerializerOptions Options = new()
     {
         WriteIndented = true,
@@ -190,6 +193,75 @@ internal sealed class AtelierProjectStore
         }
 
         return null;
+    }
+
+    /// <summary>
+    /// Wo eine Beidatei des Projekts liegt: im Ordner neben der Projektdatei - am
+    /// Quellordner, sonst unter den Einstellungen. <paramref name="relative"/> ist der Weg
+    /// darin, etwa "verlauf/maske.json".
+    /// </summary>
+    public IEnumerable<string> SidePaths(SequenceKey key, string relative)
+        => new[] { PrimaryPath(key), FallbackPath(key) }
+            .Select(project => Path.Combine(Path.GetDirectoryName(project)!,
+                                            Path.GetFileNameWithoutExtension(project) + DataExtension, relative));
+
+    /// <summary>Liest eine Beidatei - oder null, wenn es keine gibt oder sie sich nicht lesen laesst.</summary>
+    public byte[]? LoadSide(SequenceKey key, string relative)
+    {
+        WaitForWrites(TimeSpan.FromSeconds(10));
+
+        foreach (string path in SidePaths(key, relative))
+        {
+            try
+            {
+                if (File.Exists(path)) return File.ReadAllBytes(path);
+            }
+            catch (Exception e) when (e is IOException or UnauthorizedAccessException)
+            {
+                SettingsStore.Trace("Beidatei nicht lesbar: " + path + " - " + e.Message);
+            }
+        }
+
+        return null;
+    }
+
+    /// <summary>Reiht das Schreiben einer Beidatei ein - der Reihe nach mit den Projekten.</summary>
+    internal Task EnqueueSide(SequenceKey key, string relative, byte[] data, Action<bool>? done = null)
+    {
+        lock (Gate)
+        {
+            s_pending = s_pending.ContinueWith(_ =>
+            {
+                bool written = SaveSide(key, relative, data);
+                done?.Invoke(written);
+            }, TaskScheduler.Default);
+
+            return s_pending;
+        }
+    }
+
+    /// <summary>Schreibt eine Beidatei - am Quellordner, sonst unter den Einstellungen. False, wenn beides nicht ging.</summary>
+    public bool SaveSide(SequenceKey key, string relative, byte[] data)
+    {
+        foreach (string path in SidePaths(key, relative))
+        {
+            try
+            {
+                Directory.CreateDirectory(Path.GetDirectoryName(path)!);
+
+                string temp = path + ".tmp";
+                File.WriteAllBytes(temp, data);
+                File.Move(temp, path, overwrite: true);
+
+                return true;
+            }
+            catch (Exception e) when (e is IOException or UnauthorizedAccessException)
+            {
+                SettingsStore.Trace("Beidatei nicht schreibbar: " + path + " - " + e.Message);
+            }
+        }
+
+        return false;
     }
 
     /// <summary>

@@ -314,6 +314,8 @@ public sealed partial class AtelierPage : UserControl
         // die sich nicht lesen laesst, wechselt kein Projekt.
         if (_projects.Enter(path)) ApplyProject();
 
+        _maskHistories.Enter(_projects.Current);
+
         // Erst jetzt gemerkt, nicht beim Oeffnen: Eine Datei, die sich nicht lesen
         // laesst, soll beim naechsten Start nicht wieder versucht werden.
         //

@@ -924,6 +924,15 @@
     <sys:String x:Key="S_NodeMaskShared">→ {0} Ebenen</sys:String>
     <sys:String x:Key="S_NodeLayerMasks">Masken</sys:String>
     <sys:String x:Key="S_NodeLayerMaskFree">frei – an keiner Ebene</sys:String>
+    <sys:String x:Key="S_MaskMenuHistory">Maskenverlauf …</sys:String>
+    <sys:String x:Key="S_MaskHistoryTitle">Maskenverlauf – {0}</sys:String>
+    <sys:String x:Key="S_MaskHistoryState">Stand {0}</sys:String>
+    <sys:String x:Key="S_MaskHistoryStart">Anfang</sys:String>
+    <sys:String x:Key="S_MaskHistoryChanged">{0} % geändert</sys:String>
+    <sys:String x:Key="S_MaskHistoryCurrent">aktuell</sys:String>
+    <sys:String x:Key="S_MaskHistoryPending">Seit dem letzten Stand {0} % geändert – das wird vor dem Wiederherstellen als eigener Stand gesichert.</sys:String>
+    <sys:String x:Key="S_MaskHistoryEmpty">Noch keine weiteren Stände. Ein neuer entsteht, sobald sich ein Zehntel der Fläche geändert hat.</sys:String>
+    <sys:String x:Key="S_MaskHistoryHint">Ein Klick stellt den Stand wieder her. Strg+Z nimmt das zurück.</sys:String>
     <sys:String x:Key="S_NodeMix">Mischen</sys:String>
     <sys:String x:Key="S_NodeMixClip">Anschneiden</sys:String>
     <sys:String x:Key="S_NodeFallback">Stapel oder Bild</sys:String>

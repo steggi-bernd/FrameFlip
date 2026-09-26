@@ -924,6 +924,15 @@
     <sys:String x:Key="S_NodeMaskShared">→ {0} layers</sys:String>
     <sys:String x:Key="S_NodeLayerMasks">Masks</sys:String>
     <sys:String x:Key="S_NodeLayerMaskFree">free – on no layer</sys:String>
+    <sys:String x:Key="S_MaskMenuHistory">Mask history …</sys:String>
+    <sys:String x:Key="S_MaskHistoryTitle">Mask history – {0}</sys:String>
+    <sys:String x:Key="S_MaskHistoryState">State {0}</sys:String>
+    <sys:String x:Key="S_MaskHistoryStart">Start</sys:String>
+    <sys:String x:Key="S_MaskHistoryChanged">{0} % changed</sys:String>
+    <sys:String x:Key="S_MaskHistoryCurrent">current</sys:String>
+    <sys:String x:Key="S_MaskHistoryPending">{0} % changed since the last state – kept as a state of its own before restoring.</sys:String>
+    <sys:String x:Key="S_MaskHistoryEmpty">No further states yet. A new one is made once a tenth of the area has changed.</sys:String>
+    <sys:String x:Key="S_MaskHistoryHint">A click restores the state. Ctrl+Z takes it back.</sys:String>
     <sys:String x:Key="S_NodeMix">Mix</sys:String>
     <sys:String x:Key="S_NodeMixClip">Clip</sys:String>
     <sys:String x:Key="S_NodeFallback">Stack or picture</sys:String>

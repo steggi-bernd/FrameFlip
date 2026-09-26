@@ -237,7 +237,10 @@ public partial class AtelierPage
             return;
         }
 
-        var mask = PaintTarget()?.Mask.PaintOn(_number, _frame.Width, _frame.Height);
+        var target = PaintTarget();
+        var mask = target?.Mask.PaintOn(_number, _frame.Width, _frame.Height);
+
+        if (target is not null && mask is not null) WatchMask(target, mask);
 
         Placement.Paint(mask, _frame.Width, _frame.Height, Display.Stretch == Stretch.Uniform);
         Display.Cursor = Cursors.None;
@@ -269,9 +272,12 @@ public partial class AtelierPage
 
         if (PaintTarget() is { } known) return known.Mask.PaintOn(_number, _frame.Width, _frame.Height);
 
-        return AddNodeMaskLayer(new LayerMask { Kind = MaskKind.Painted }, Strings.T("S_MaskLayerName")) is { } made
-            ? made.Mask.PaintOn(_number, _frame.Width, _frame.Height)
-            : null;
+        if (AddNodeMaskLayer(new LayerMask { Kind = MaskKind.Painted }, Strings.T("S_MaskLayerName")) is not { } made) return null;
+
+        var paint = made.Mask.PaintOn(_number, _frame.Width, _frame.Height);
+        WatchMask(made, paint);
+
+        return paint;
     }
 
     /// <summary>
@@ -366,6 +372,7 @@ public partial class AtelierPage
             _regionPainted = false;
 
             RememberValueEdit();
+            RecordMaskStroke();
 
             // Das ganze Bild - fuer die Vorschauen der Knoten und das Histogramm - erst,
             // wenn der Pinsel ruht. Gleich nach jedem Strich hiesse bei 4K eine Fuenftel-

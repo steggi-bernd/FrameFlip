@@ -32,6 +32,10 @@ public partial class AtelierPage
             .Item("⊘", Strings.T("S_MaskMenuDetach"), () => DetachMask(mask), enabled: users.Count > 0)
             .Item("❐", Strings.T("S_MaskMenuDuplicate"), () => DuplicateMask(mask))
             .Item("⤳", Strings.T("S_MaskMenuConnect"), () => ShowConnectMenu(mask, others, anchor), enabled: others.Count > 0);
+
+        // Der Verlauf gehoert zu dem, was gemalt wurde - die anderen Masken rechnen sich aus dem Bild.
+        if (mask.Mask.Kind == MaskKind.Painted)
+            menu.Item("⟲", Strings.T("S_MaskMenuHistory"), () => ShowMaskHistory(mask, anchor));
     }
 
     /// <summary>
