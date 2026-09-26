@@ -72,11 +72,38 @@ public partial class PropertiesPanel : UserControl
     /// <summary>Wie weit die eckige Spitze zum Karo gezogen ist, 0 bis 1.</summary>
     public float BrushSquish => (float)BrushSquishSlider.Value;
 
+    /// <summary>Der Strich bleibt auf der Flaeche, auf der er ansetzt - aus Tiefe und Normale.</summary>
+    public bool BrushEdge => BrushEdgeToggle.IsChecked == true;
+
+    /// <summary>Wie weit die Flaeche vom Ansatz abweichen darf, 0 bis 1.</summary>
+    public float BrushEdgeTolerance => (float)BrushEdgeSlider.Value;
+
+    /// <summary>Worauf der Druck eines Stifts wirkt - in der Reihenfolge der Auswahl: aus, Groesse, Staerke, beides.</summary>
+    public BrushPressure BrushPressureTo => BrushPressureBox.SelectedIndex switch
+    {
+        0 => BrushPressure.None,
+        2 => BrushPressure.Flow,
+        3 => BrushPressure.Size | BrushPressure.Flow,
+        _ => BrushPressure.Size,
+    };
+
+    private void OnBrushPressureChanged(object sender, SelectionChangedEventArgs e)
+    {
+        if (!IsLoaded) return;
+
+        BrushChanged?.Invoke();
+    }
+
     /// <summary>Der Strich bleibt auf dem Objekt, auf dem er beginnt.</summary>
     public bool BrushObject => BrushObjectToggle.IsChecked == true;
 
     private void OnBrushToggle(object sender, RoutedEventArgs e)
     {
+        // Objekt oder Flaeche - beides zugleich hiesse zwei Begrenzungen, und der Strich
+        // traegt nur eine.
+        if (ReferenceEquals(sender, BrushObjectToggle) && BrushObject) BrushEdgeToggle.IsChecked = false;
+        if (ReferenceEquals(sender, BrushEdgeToggle) && BrushEdge) BrushObjectToggle.IsChecked = false;
+
         if (!IsLoaded) return;
 
         BrushChanged?.Invoke();
@@ -126,6 +153,7 @@ public partial class PropertiesPanel : UserControl
         BrushAngleValue.Text = $"{BrushAngleSlider.Value:0}°";
         BrushAspectValue.Text = $"1:{BrushAspectSlider.Value:0.##}";
         BrushSquishValue.Text = $"{BrushSquishSlider.Value * 100:0} %";
+        BrushEdgeValue.Text = $"{BrushEdgeSlider.Value * 100:0} %";
     }
 
     private float? _depth;

@@ -1215,6 +1215,15 @@
     <sys:String x:Key="S_BrushFollowHint">The angle follows the stroke – a flat tip turns into every curve like a broad nib. The angle is then relative to the stroke: at 0° the tip lies along the path and paints thin, at 90° it lies across and paints wide. Small tremors of the hand don't turn the tip.</sys:String>
     <sys:String x:Key="S_BrushSquish">Diamond</sys:String>
     <sys:String x:Key="S_BrushSquishHint">Pulls two opposite corners of the square tip apart – the square becomes a diamond whose point reaches into narrow gaps. Aim it with the angle.</sys:String>
+    <sys:String x:Key="S_BrushEdgeHint">Paint only on the surface the stroke starts on – from the file's depth and normal passes. The stroke stops at a jump in depth or a crease.</sys:String>
+    <sys:String x:Key="S_BrushEdgeTolerance">Tolerance</sys:String>
+    <sys:String x:Key="S_BrushEdgeToleranceHint">How far the surface's depth and direction may differ from where the stroke started. Low stops at every curve, high flows over gentle bulges.</sys:String>
+    <sys:String x:Key="S_BrushPressure">Pressure</sys:String>
+    <sys:String x:Key="S_BrushPressureHint">What a graphics tablet's pen pressure changes. Nothing changes with a mouse.</sys:String>
+    <sys:String x:Key="S_BrushPressureOff">off</sys:String>
+    <sys:String x:Key="S_BrushPressureSize">size</sys:String>
+    <sys:String x:Key="S_BrushPressureFlow">flow</sys:String>
+    <sys:String x:Key="S_BrushPressureBoth">both</sys:String>
     <sys:String x:Key="S_BrushObjectHint">Paint only on the object the stroke starts on – from the file's Cryptomatte.</sys:String>
     <sys:String x:Key="S_BrushSpacingHint">How far apart the dabs of a stroke lie, measured against the radius. 25 % is a smooth stroke, at 200 % the dabs just touch, above that gaps appear. Ctrl and the mouse wheel over the picture set it too.</sys:String>
     <sys:String x:Key="S_BrushHint">Flow and opacity are not the same: one says how much a SINGLE stroke lays down, the other where even ten strokes stop. At opacity 0.3 the mask stays just under a third however often you go over it. Hold Alt to erase.</sys:String>

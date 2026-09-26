@@ -80,6 +80,25 @@ public sealed partial class PlacementAdorner
     /// <summary>Wie weit eine eckige Spitze zum Karo gezogen ist, 0 bis 1 - siehe <see cref="PaintStroke.Squish"/>.</summary>
     public float BrushSquish { get; set; }
 
+    /// <summary>Worauf der Druck eines Stifts wirkt. Die Maus hat keinen und merkt davon nichts.</summary>
+    public BrushPressure BrushPressureTo { get; set; } = BrushPressure.Size;
+
+    /// <summary>
+    /// Der Druck des Stifts bei dieser Meldung, 0 bis 1 - oder null bei der Maus, bei
+    /// Beruehrung mit dem Finger und bei einem Stift ohne Drucksensor. Windows meldet auch
+    /// einen Stift als Maus; der Druck steht dann an den Stiftpunkten der Meldung.
+    /// </summary>
+    internal static float? PenPressure(MouseEventArgs e, IInputElement relativeTo)
+    {
+        var pen = e.StylusDevice;
+        if (pen is null) return null;
+
+        var points = pen.GetStylusPoints(relativeTo);
+        if (points.Count == 0 || !points.Description.HasProperty(StylusPointProperties.NormalPressure)) return null;
+
+        return points[points.Count - 1].PressureFactor;
+    }
+
     /// <summary>
     /// Woran ein Strich gebunden wird, der an dieser Stelle des Bildes beginnt - die
     /// gepackte Deckung eines Objekts, oder null fuer ungebunden. Beim Ansetzen gefragt.
@@ -646,17 +665,21 @@ public sealed partial class PlacementAdorner
         // hat das ganze Bild danach schon gezeigt.
         _pendingTouched = PaintBounds.Empty;
 
-        _stroke = NewStroke(x, y);
+        float? pressure = PenPressure(e, this);
+        _stroke = NewStroke(x, y, pen: pressure is not null);
 
-        Touched(_stroke.Begin(_mask, x, y));
+        Touched(_stroke.Begin(_mask, x, y, pressure ?? 1f));
         Painted?.Invoke(true);
 
         e.Handled = true;
         CaptureMouse();
     }
 
-    /// <summary>Ein neuer Strich mit allem, was gerade eingestellt ist - und der heutigen Rechnung.</summary>
-    internal PaintStroke NewStroke(float x, float y) => new()
+    /// <summary>
+    /// Ein neuer Strich mit allem, was gerade eingestellt ist - und der heutigen Rechnung.
+    /// Mit einem Stift, dessen Druck auf etwas wirkt, zeichnet er den Druck je Punkt auf.
+    /// </summary>
+    internal PaintStroke NewStroke(float x, float y, bool pen = false) => new()
     {
         Radius = BrushRadius,
         Hardness = BrushHardness,
@@ -671,6 +694,8 @@ public sealed partial class PlacementAdorner
         Follow = BrushFollow,
         Limit = LimitWanted?.Invoke(x, y),
         Version = PaintStroke.CurrentVersion,
+        PressureTo = BrushPressureTo,
+        Pressure = pen && BrushPressureTo != BrushPressure.None ? new List<float>() : null,
     };
 
     /// <summary>Der Ring muss dem Zeiger folgen, auch wenn nicht gemalt wird.</summary>
@@ -688,7 +713,7 @@ public sealed partial class PlacementAdorner
         if (_mode == AdornerMode.Paint) InvalidateVisual();
     }
 
-    private void PaintMove(float x, float y)
+    private void PaintMove(float x, float y, float pressure = 1f)
     {
         // Groesse und Haerte werden gerade gezogen - dann wird nicht gemalt. Die Anzeige
         // des Abstands haelt einen Strich dagegen nicht auf.
@@ -704,7 +729,7 @@ public sealed partial class PlacementAdorner
         // Die Tupfer zwischen zwei Mausmeldungen setzt der Zug, im Abstand des Pinsels.
         // Liegt die Meldung naeher als ein Abstand, entsteht kein Tupfer - dann gibt
         // es auch nichts neu zu rechnen, nur der Ring folgt.
-        var touched = _stroke.To(_mask, x, y);
+        var touched = _stroke.To(_mask, x, y, pressure);
 
         if (touched.IsEmpty)
         {

@@ -173,9 +173,32 @@ Knotenmodus und die Einstellungen lesen alle aus derselben Liste.
   auseinander wie an einem Gelenkrahmen, die Seiten bleiben gleich lang. Voll gezogen ist
   das Karo sieben Mal so lang wie breit, für schmale Spalten.
 
+**Druck und Kante (`feature/pinsel-druck-kante`):**
+
+- **Druckstärke:** Der Druck eines Grafiktabletts wirkt wahlweise auf Größe, Stärke oder
+  beides. Die Grundstellung ist Größe.
+  - Der Strich zeichnet einen Druckwert je Wegpunkt auf, dazwischen wird gemittelt.
+  - Der Abstand der Tupfer folgt dem kleineren Radius, damit ein leichter Strich keine
+    Lücken bekommt.
+  - Druck wirkt nur, wenn er aufgezeichnet wird. Maus, Finger, Stift ohne Sensor oder
+    Druck „aus“ rechnen Schritt für Schritt wie vorher.
+- **Kantengebunden:** Aus Tiefen- und Normalpass wird eine Begrenzung in Maskengröße
+  gebaut, wie beim objektgebundenen Pinsel, und mit dem Strich gespeichert.
+  - Verglichen wird mit dem Ansatz, nicht mit dem Nachbarn.
+  - Die Tiefe zählt als Anteil der Entfernung, die Richtung als Winkel.
+  - Die Toleranz (Grundstellung 30 %) sagt, wie weit eine Rundung vom Ansatz abweichen darf.
+  - Wer auf dem Hintergrund ansetzt, malt nur auf ihm.
+  - Objekt und Fläche schließen sich aus.
+- Proben in `BrushShapeInvariants`:
+  - Voller Druck malt wie ohne Druck.
+  - Druck ohne Aufzeichnung wirkt nicht.
+  - Größe und Stärke folgen dem Druck.
+  - Druckwerte spielen aus Text genau nach.
+  - Sprung, Hintergrund, Knick, Wölbung und Toleranz an künstlichen Pässen.
+  - Der Tiefenpass der Blender-Probedatei auf der Seite.
+
 **Offen in W1:**
 
-- Kantengebunden (Pässe) und Druckstärke.
 - Gerade Linien, Rechteck, Ellipse und Lasso.
 - Maske bearbeiten.
 - Kanten verfeinern.

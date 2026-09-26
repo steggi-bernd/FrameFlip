@@ -132,6 +132,34 @@
                 <ToggleButton x:Name="BrushObjectToggle" Style="{StaticResource OverlayToggle}" Margin="6,0,0,0"
                               VerticalAlignment="Center" Content="⬢" ToolTip="{DynamicResource S_BrushObjectHint}"
                               Checked="OnBrushToggle" Unchecked="OnBrushToggle" />
+                <ToggleButton x:Name="BrushEdgeToggle" Style="{StaticResource OverlayToggle}" Margin="6,0,0,0"
+                              VerticalAlignment="Center" Content="◩" ToolTip="{DynamicResource S_BrushEdgeHint}"
+                              Checked="OnBrushToggle" Unchecked="OnBrushToggle" />
+
+                <!-- Wie weit die Flaeche vom Ansatz abweichen darf - nur mit der Kante. -->
+                <StackPanel x:Name="BrushEdgeRow" Orientation="Horizontal" VerticalAlignment="Center" Margin="10,0,0,0"
+                            IsEnabled="{Binding IsChecked, ElementName=BrushEdgeToggle}">
+                    <TextBlock Text="{DynamicResource S_BrushEdgeTolerance}" Style="{StaticResource PanelLabel}"
+                               VerticalAlignment="Center" Margin="0,0,6,0" ToolTip="{DynamicResource S_BrushEdgeToleranceHint}" />
+                    <Slider x:Name="BrushEdgeSlider" Style="{StaticResource PanelSlider}" Width="60"
+                            VerticalAlignment="Center" Minimum="0" Maximum="1" Value="0.3" SmallChange="0.05" LargeChange="0.2"
+                            ToolTip="{DynamicResource S_BrushEdgeToleranceHint}"
+                            ValueChanged="OnBrushChanged" MouseDoubleClick="OnBrushReset" Tag="0.3" />
+                    <TextBlock x:Name="BrushEdgeValue" Style="{StaticResource PanelValue}"
+                               VerticalAlignment="Center" Width="36" Margin="6,0,0,0" HorizontalAlignment="Left" />
+                </StackPanel>
+
+                <!-- Der Druck eines Stifts - die Maus hat keinen. -->
+                <TextBlock Text="{DynamicResource S_BrushPressure}" Style="{StaticResource PanelLabel}"
+                           VerticalAlignment="Center" Margin="14,0,6,0" ToolTip="{DynamicResource S_BrushPressureHint}" />
+                <ComboBox x:Name="BrushPressureBox" Style="{StaticResource OverlayCombo}" Width="96"
+                          VerticalAlignment="Center" SelectedIndex="1" ToolTip="{DynamicResource S_BrushPressureHint}"
+                          SelectionChanged="OnBrushPressureChanged">
+                    <ComboBoxItem Content="{DynamicResource S_BrushPressureOff}" />
+                    <ComboBoxItem Content="{DynamicResource S_BrushPressureSize}" />
+                    <ComboBoxItem Content="{DynamicResource S_BrushPressureFlow}" />
+                    <ComboBoxItem Content="{DynamicResource S_BrushPressureBoth}" />
+                </ComboBox>
 
                 <!-- Der Verlauf der Maske, auf die der Pinsel malt - nur im Knotenmodus,
                      nur dort wird er aufgezeichnet. -->
