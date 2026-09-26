@@ -60,6 +60,9 @@ public static class WatchCardInvariants
 
         try
         {
+            // Die Breite am Editor, nicht am Fenster: Auf einem kleinen Bildschirm - etwa dem
+            // der CI - wird ein Fenster nicht so breit, wie man es verlangt.
+            editor.Width = 1400;
             window.Show();
             Pump(0.3);
 
@@ -115,7 +118,7 @@ public static class WatchCardInvariants
             // Spalten nach Breite.
             var tiles = (System.Windows.Controls.Primitives.UniformGrid)editor.FindName("OverviewTiles");
             int wide = tiles.Columns;
-            window.Width = 820;
+            editor.Width = 820;
             Pump(0.3);
             int middle = tiles.Columns;
 
