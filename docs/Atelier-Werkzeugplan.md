@@ -232,7 +232,7 @@ Knotenmodus und die Einstellungen lesen alle aus derselben Liste.
   für Byte nach, und Strg+Z nimmt sie zurück. Was nichts ändern würde, ist kein Schritt.
 - In Phase U werden die Bearbeitungen eigene Befehle in der Kategorie „Malen“.
 
-**Kanten verfeinern (`feature/kanten-verfeinern`):**
+**Kanten verfeinern (PR #45, gemergt):**
 
 - Im Menü „Maske bearbeiten“, mit 4, 8, 16 oder 32 Bildpunkten Weite.
   - Ragt die Maske über eine Kante im Bild hinaus, zieht sie sich zurück.
@@ -250,8 +250,23 @@ Knotenmodus und die Einstellungen lesen alle aus derselben Liste.
 - Das Ergebnis hängt am Bild. Der Strich trägt es gepackt mit (`PaintStroke.Result`),
   der Maskenverlauf setzt es ein, statt neu zu rechnen.
 
-**Offen in W1:**
-- Stempelpinsel.
+**Stempel (`feature/stempelpinsel`):**
+
+- Der Knopf ✿ schaltet den Stempel ein, „Spitze …“ lädt ein Bild als Pinselspitze.
+  - Weiß malt, Schwarz nicht. Hat die Datei Transparenz, zählt die Deckkraft.
+  - Die Spitze wird auf höchstens 128 Punkte verkleinert und reist gepackt in jedem Strich
+    mit (`PaintStroke.Stamp`). Der Maskenverlauf braucht die Datei danach nicht mehr.
+- Je Tupfer dreht sich die Spitze zufällig („Zufall“) und landet neben dem Weg
+  („Streuung“).
+  - Der Zufall hängt nur an einer Saat je Strich und der Nummer des Tupfers. Gerechnet wird
+    mit SplitMix64, kein `Random`-Objekt, dessen Folge nicht zugesichert ist.
+- Winkel, Streckung, Druck und Begrenzung gelten wie bei den anderen Spitzen. Ohne Spitze
+  malt der Stempel rund.
+
+**W1 ist damit vollständig.** Als Nächstes folgt Phase U, die Oberfläche mit Werkzeugleiste
+(Entscheidungen 6 und 7). Die Pinselleiste ist inzwischen voll: Form, Winkel, Karo, Druck,
+Bindung, Flächen, Stempel und Maske bearbeiten. U verteilt das auf die Werkzeugzeile
+der Kategorie „Malen“.
 
 ## 5. KI-Werkzeuge: Last, Größe, Lizenz
 
