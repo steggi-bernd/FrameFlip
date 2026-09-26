@@ -41,8 +41,13 @@ public partial class AtelierPage
 
     private void SetUpProjects()
     {
-        _projects = new AtelierProjectKeeper(_recipe, new AtelierProjectStore(), _settings, Later,
+        var store = new AtelierProjectStore();
+
+        _projects = new AtelierProjectKeeper(_recipe, store, _settings, Later,
                                              action => Dispatcher.BeginInvoke(action));
+
+        // Die Verlaeufe der Masken liegen neben dem Projekt - dieselbe Ablage.
+        _maskHistories = new MaskHistoryKeeper(store);
 
         _projects.StateChanged += ShowSaveState;
 

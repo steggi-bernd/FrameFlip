@@ -1,3 +1,5 @@
+using System.Text.Json.Serialization;
+
 namespace FrameFlip.Imaging.Grading;
 
 /// <summary>
@@ -57,6 +59,7 @@ public sealed class PaintStroke
     private bool _started;
 
     /// <summary>Der Abstand zweier Tupfer in Bildpunkten.</summary>
+    [JsonIgnore]
     public float Step => MathF.Max(0.5f, Radius * Math.Clamp(Spacing, MinSpacing, MaxSpacing));
 
     /// <summary>Setzt an: ein Tupfer am ersten Punkt.</summary>

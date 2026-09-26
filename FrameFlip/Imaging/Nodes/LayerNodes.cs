@@ -454,6 +454,151 @@ public sealed class LayerGradeNode : Node
 }
 
 /// <summary>
+/// Schneidet ein Bild mit einer Maske aus: dieselben Farben, die Deckung ist die Maske
+/// (mal der eigenen). Das Ergebnis ist freigestellt - gemischt traegt es nur dort bei, wo
+/// die Maske es zulaesst.
+///
+/// Die Grundlage fuer "als Ebene ausschneiden" (docs/Projekte-und-Masken.md, Punkt 3 und 4):
+/// Was eine Maske zeigt, wird ein Bild fuer sich, das eine eigene Ebene werden und
+/// weiterbearbeitet werden kann. Er rechnet jeden Bildpunkt allein - auch im Ausschnitt
+/// beim Malen.
+///
+/// Mit einer Lage (<see cref="Place"/>) wird das ausgeschnittene Stueck versetzt: Die
+/// Maske waehlt an der alten Stelle aus, und was sie gewaehlt hat, wandert. Darunter
+/// bleibt das Original stehen - es ist ein ausgeschnittenes Stueck, kein Loch.
+/// </summary>
+public sealed class CutoutNode : Node
+{
+    public const string KindName = "cutout";
+
+    /// <summary>Wohin das ausgeschnittene Stueck wandert - neutral: bleibt, wo es war.</summary>
+    public LayerTransform Place { get; set; } = new();
+
+    public override IReadOnlyList<Socket> Inputs { get; } = new[]
+    {
+        new Socket("Bild", SocketType.Image),
+        new Socket("Maske", SocketType.Value),
+    };
+
+    public override IReadOnlyList<Socket> Outputs { get; } = new[] { new Socket("Bild", SocketType.Image) };
+
+    internal override string? Through => "Bild";
+
+    internal override void Run(NodeRun run)
+    {
+        var image = run.Image("Bild");
+        var mask = run.Value("Maske");
+
+        // Ohne Maske ist nichts auszuschneiden - das Bild bleibt ganz.
+        if (image is null || mask is null)
+        {
+            run.Set("Bild", image);
+            return;
+        }
+
+        var context = run.Context;
+        var a = context.Take(image.A.Length);
+        var own = image.A;
+        var cover = mask.V;
+
+        Parallel.For(0, context.GridHeight, NodeContext.Parallel, gy =>
+        {
+            int start = gy * context.GridWidth;
+            int end = start + context.GridWidth;
+
+            for (int at = start; at < end; at++)
+            {
+                // Wo das Bild gar nicht ist, bleibt es weg - Deckung null waere etwas anderes.
+                a[at] = own[at] < 0f
+                    ? GridImage.Absent
+                    : Math.Clamp(own[at], 0f, 1f) * Math.Clamp(cover[at], 0f, 1f);
+            }
+        });
+
+        if (Place.IsNeutral)
+        {
+            // Dieselben Farben - geteilt, nicht kopiert; die Deckung ist neu, und sie
+            // begrenzt beim Mischen, was beitraegt.
+            run.Set("Bild", new GridImage { Rgb = image.Rgb, A = a, Matte = true, Contributed = image.Contributed });
+            return;
+        }
+
+        // Die Deckung an der alten Stelle war nur ein Zwischenschritt - sie geht mit dem
+        // Ende des Knotens zurueck in den Vorrat.
+        run.Set("Bild", Moved(image.Rgb, a, image.Contributed, context));
+    }
+
+    /// <summary>
+    /// Das ausgeschnittene Stueck an seiner neuen Lage: fuer jeden Punkt der Leinwand
+    /// rueckwaerts gefragt, woher er kommt (<see cref="LayerPlacement"/>), dort zwischen den
+    /// vier naechsten Rasterpunkten gelesen. Das Stueck ist so gross wie die Leinwand.
+    /// </summary>
+    private GridImage Moved(float[] rgb, float[] a, bool contributed, NodeContext context)
+    {
+        var placement = LayerPlacement.Prepare(Place, context.Width, context.Height, context.Width, context.Height);
+
+        int gridWidth = context.GridWidth, gridHeight = context.GridHeight;
+        float step = Math.Max(1, context.Step);
+
+        var outRgb = context.Take(context.Count * 3);
+        var outA = context.Take(context.Count);
+        var columns = context.Columns;
+        var rows = context.Rows;
+
+        Parallel.For(0, gridHeight, NodeContext.Parallel, gy =>
+        {
+            int row = gy * gridWidth;
+
+            for (int gx = 0; gx < gridWidth; gx++)
+            {
+                int at = row + gx;
+                float covered = placement.Coverage(columns[gx], rows[gy], out float u, out float v);
+
+                if (covered <= 0f)
+                {
+                    outRgb[at * 3] = outRgb[at * 3 + 1] = outRgb[at * 3 + 2] = 0f;
+                    outA[at] = GridImage.Absent;
+                    continue;
+                }
+
+                // Rasterpunkt i liegt auf Bildpunkt i mal Schritt - dessen Mitte ist +0,5.
+                float fx = Math.Clamp((u - 0.5f) / step, 0f, gridWidth - 1);
+                float fy = Math.Clamp((v - 0.5f) / step, 0f, gridHeight - 1);
+
+                int x0 = (int)fx, y0 = (int)fy;
+                int x1 = Math.Min(x0 + 1, gridWidth - 1), y1 = Math.Min(y0 + 1, gridHeight - 1);
+                float tx = fx - x0, ty = fy - y0;
+
+                int p00 = y0 * gridWidth + x0, p10 = y0 * gridWidth + x1;
+                int p01 = y1 * gridWidth + x0, p11 = y1 * gridWidth + x1;
+
+                // Wo das Bild fehlt, deckt es nichts - gelesen als null, nicht als minus eins.
+                float w00 = (1 - tx) * (1 - ty), w10 = tx * (1 - ty), w01 = (1 - tx) * ty, w11 = tx * ty;
+                float cover = w00 * MathF.Max(0f, a[p00]) + w10 * MathF.Max(0f, a[p10]) +
+                              w01 * MathF.Max(0f, a[p01]) + w11 * MathF.Max(0f, a[p11]);
+
+                if (a[p00] < 0f && a[p10] < 0f && a[p01] < 0f && a[p11] < 0f)
+                {
+                    outRgb[at * 3] = outRgb[at * 3 + 1] = outRgb[at * 3 + 2] = 0f;
+                    outA[at] = GridImage.Absent;
+                    continue;
+                }
+
+                for (int c = 0; c < 3; c++)
+                {
+                    outRgb[at * 3 + c] = w00 * rgb[p00 * 3 + c] + w10 * rgb[p10 * 3 + c] +
+                                         w01 * rgb[p01 * 3 + c] + w11 * rgb[p11 * 3 + c];
+                }
+
+                outA[at] = cover * covered;
+            }
+        });
+
+        return new GridImage { Rgb = outRgb, A = outA, Matte = true, Contributed = contributed };
+    }
+}
+
+/// <summary>
 /// Blendet von "Vorher" nach "Nachher", so weit die Maske reicht - die Korrektur gilt
 /// nur dort. Das ist der Umfang "die Maske begrenzt die Farbe" aus dem Stapel, als
 /// eigener Knoten: innen die Korrektur, aussen das Bild, dazwischen weich.

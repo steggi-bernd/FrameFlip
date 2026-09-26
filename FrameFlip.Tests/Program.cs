@@ -91,6 +91,8 @@ static int RunAll()
     WheelAndSpacingInvariants.Run();
     PassRoleInvariants.Run();
     RegionRenderInvariants.Run();
+    MaskElementInvariants.Run();
+    MaskHistoryInvariants.Run();
     PersistedEnumInvariants.Run();
     ExportFrameNumberInvariants.Run();
     AtelierOpenRaceInvariants.Run();

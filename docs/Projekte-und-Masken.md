@@ -328,6 +328,54 @@ Entschieden beim Bauen, bitte prüfen:
 - Der normale Export verlangt weiter einen gewählten Zielordner; nur der Schnell-Export
   hat einen voreingestellten.
 
+**Phase D ist umgesetzt** (26. September, Zweig `feature/masken` auf Phase C,
+Einzelheiten in [Atelier-Nodes](Atelier-Nodes.md), Abschnitt 15):
+
+- **Maskenmenü** (3): Als Ebene ausschneiden, Maske lösen, Maske duplizieren (neue
+  Kennung, frei), Mit Ebene verbinden; bei gemalten Masken „Maskenverlauf …“. Im Bildmenü
+  im Knotenmodus „Objekt hier als Ebene“ je Kryptomatte. Jede Maske hat eine feste
+  Kennung (`LayerMask.Id`).
+- **Ausschneiden** (4): neuer Knoten „Ausschneiden“ (Bild × Maske → Bild mit Deckung),
+  darüber ein eigenes Mischen direkt über der ersten Ebene der Maske, bei einer freien
+  Maske oben auf den Ebenen. Die Originalebene behält ihre Maske. Das Bild bleibt Byte für
+  Byte gleich, auch an weichen Rändern und unter jeder Mischart.
+- **Darstellung** (11): Maskenkabel gestrichelt in eigener Farbe, ein Schild mit
+  Maskenbild und Namen über jedem Mischen mit Maske, „frei“ und „→ n Ebenen“ am
+  Maskenknoten, eine gewählte Maske hebt ihre Ebenen im Graphen und in der Liste hervor.
+  Freie Masken stehen in der Ebenenliste im Abschnitt „Masken“.
+- **Maskenverlauf** (10) wie in 3.5: 10 % eindeutig geänderte Fläche je Stand, höchstens
+  20 Stände, jeder fünfte ein Schnappschuss, dazwischen Striche. Gespeichert in
+  `FrameFlip\<name><endung>.ffdata\verlauf\`, je Maskenkennung (bei entsperrten Masken
+  je Bild). Wiederherstellen ist ein Schritt im globalen Rückgängig. Aufzeichnen kostet
+  beim Loslassen 0,9 ms bei 4K.
+
+Entschieden beim Bauen, bitte prüfen:
+
+- **Ausgeschnitten wird, was an der Stelle zu sehen ist**, nicht das Bild der Ebene
+  allein. Nur so ist das Bild vorher und nachher gleich (Abnahme aus Punkt 4). Die Ebene
+  selbst noch einmal darüberzulegen hätte sie an weichen Rändern verdoppelt, das Bild der
+  Datei hätte verloren, was die Ebenen darunter daraus gemacht haben.
+- **Die neue Ebene liegt direkt über der Ebene der Maske**, nicht ganz oben. Ebenen
+  darüber wirken weiter auf beide. Eine freie Maske kommt oben auf die Ebenen.
+- **„→ n Ebenen“ zählt auch ausgeschnittene Ebenen** mit, „Maske lösen“ nimmt die Maske
+  aber nur aus dem Faktor ihrer Ebenen. Die ausgeschnittene Ebene hängt weiter an ihr.
+
+- **Verschieben** (Abnahme aus Punkt 4, nachgereicht am selben Tag): Der
+  Ausschneiden-Knoten hat eine eigene Lage. Die Maske wählt an der alten Stelle aus, das
+  Gewählte wandert, und darunter bleibt das Original. Ist die ausgeschnittene Ebene
+  gewählt, zieht der Greifrahmen beim Verschieben ihr Stück, als ein Schritt im Verlauf.
+  Versetzt rechnet das Malen dahinter wieder voll, weil der Knoten dann außerhalb des
+  Ausschnitts liest.
+
+Offen aus Phase D:
+
+- Die Maskenraster stehen weiter in der Projektdatei, nicht nach Inhalt in `.ffdata`
+  (3.4). Nur der Verlauf liegt dort.
+- Befund, nicht geändert: Die UI-Testreihe merkt sich in ihren Testdaten die zuletzt
+  geöffnete Folge (`sequences.json`). Ein zweiter Lauf in denselben Ausgabeordner beginnt
+  deshalb mit geladener Folge und scheitert an „Playback controls wait for a loaded
+  sequence“. In einem frischen Ordner, wie in der CI, läuft sie durch.
+
 ## 6. Entscheidungen
 
 Getroffen am 25. September 2026:

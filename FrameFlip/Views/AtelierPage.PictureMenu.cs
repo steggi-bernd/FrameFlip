@@ -44,7 +44,13 @@ public partial class AtelierPage
 
         // Je Kryptomatte der Datei eine Zeile - meist Objekt und Material.
         foreach (var set in _cryptomattes)
+        {
             menu.Item("⬢", Strings.T("S_PicMenuObjectMask", set.ShortName), () => MaskObjectAt(set, x, y));
+
+            // Im Knotenmodus auch als eigene Ebene: das Objekt ausgeschnitten, obendrauf.
+            if (InNodes)
+                menu.Item("✂", Strings.T("S_PicMenuObjectLayer", set.ShortName), () => ObjectAsLayerAt(set, x, y));
+        }
 
         menu.Separator()
             .Item("◑", Strings.T("S_PicMenuCompare"), ShowOriginalBriefly)

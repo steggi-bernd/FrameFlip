@@ -67,6 +67,31 @@ public sealed class PaintedMask
         };
     }
 
+    /// <summary>Eine Maske aus einer fertigen Deckung - fuer den Verlauf, der Staende nachspielt.</summary>
+    public static PaintedMask FromCover(int width, int height, byte[] cover) => new()
+    {
+        Width = width,
+        Height = height,
+        _cover = cover.ToArray(),
+        Data = "",
+    };
+
+    /// <summary>
+    /// Setzt die ganze Deckung auf einmal - beim Wiederherstellen eines Standes. In dasselbe
+    /// Feld, damit wer es schon in der Hand hat, das Neue sieht. Passt die Groesse nicht,
+    /// bleibt alles, wie es ist.
+    /// </summary>
+    public bool Replace(byte[] cover)
+    {
+        var own = Cover();
+        if (cover.Length != own.Length) return false;
+
+        Buffer.BlockCopy(cover, 0, own, 0, own.Length);
+        Keep();
+
+        return true;
+    }
+
     /// <summary>
     /// Die Deckung als Feld - entpackt beim ersten Zugriff.
     ///

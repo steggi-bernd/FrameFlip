@@ -30,6 +30,7 @@ public partial class AtelierPage
 
         NodeLayers.AddWanted += ShowLayerAddMenu;
         NodeLayers.MenuWanted += ShowLayerMenu;
+        NodeLayers.MaskMenuWanted += ShowFreeMaskMenu;
         NodeLayers.ModeWanted += OnLayerMode;
         NodeLayers.OpacityWanted += OnLayerOpacity;
     }
