@@ -100,6 +100,21 @@ public sealed class LayerMask
     public MaskKind Kind { get; set; }
 
     /// <summary>
+    /// Die feste Kennung dieser Maske - an ihr haengen Verlauf und "geteilt mit" (siehe
+    /// docs/Projekte-und-Masken.md, Abschnitt 3.4). Leer bei Masken aus der Zeit davor; sie
+    /// bekommen eine, sobald jemand fragt (<see cref="EnsureId"/>). Eine Kopie fuer den
+    /// Export behaelt sie, ein Duplikat bekommt eine neue.
+    /// </summary>
+    public string Id { get; set; } = "";
+
+    /// <summary>Die Kennung - vergeben, falls noch keine da ist.</summary>
+    public string EnsureId()
+    {
+        if (Id.Length == 0) Id = Guid.NewGuid().ToString("N")[..12];
+        return Id;
+    }
+
+    /// <summary>
     /// Ob die gemalte Maske fuer die ganze Sequenz gilt.
     ///
     /// Gesperrt heisst: EIN Anstrich, fuer jedes Bild derselbe. Entsperrt heisst: je
@@ -262,6 +277,7 @@ public sealed class LayerMask
     public LayerMask Clone() => new()
     {
         Kind = Kind,
+        Id = Id,
         Invert = Invert,
         Scope = Scope,
         Low = Low,

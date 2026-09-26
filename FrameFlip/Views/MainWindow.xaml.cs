@@ -257,6 +257,7 @@ public partial class MainWindow : Window
         BuildRates();
         BuildRemoteActions();
         LoadSequences();
+        FollowAtelierAtStart();
 
         // Ein Takt fuer alles, was sich langsam aendert. Der Renderzustand kommt
         // ohnehin nur im Sekundenrhythmus herein.
@@ -282,6 +283,10 @@ public partial class MainWindow : Window
 
         Closed += (_, _) =>
         {
+            // Das Projekt des Ateliers geht mit dem Fenster - vorher wird es geschrieben.
+            // Das Programm laeuft danach im Tray weiter.
+            _atelierPage?.Flush();
+
             _frames.Dispose();
             _videos.Dispose();
             Strings.Changed -= OnLanguageChanged;
@@ -484,10 +489,77 @@ public partial class MainWindow : Window
         PageContent.Content = key switch
         {
             "projects" => new ProjectsPage(OpenFromProjects),
-            "atelier" => _atelierPage ??= new AtelierPage(_decoders, _getSettings(), next => _persist?.Invoke(next)),
+            "atelier" => Atelier(),
             _ => _settingsPage ??= CreateSettingsPage(),
         };
+
+        if (key == "atelier" && !_openingInAtelier) FollowDashboardIntoAtelier(_atelierPage!);
     }
+
+    private AtelierPage Atelier()
+    {
+        if (_atelierPage is not null) return _atelierPage;
+
+        _atelierPage = new AtelierPage(_decoders, _getSettings(), next => _persist?.Invoke(next));
+        _atelierPage.ImageShown += OnAtelierImageShown;
+        return _atelierPage;
+    }
+
+    // ================================================================ Arbeitsbereich
+
+    // Uebersicht und Atelier zeigen dieselbe Folge (docs/Projekte-und-Masken.md, Punkt 7):
+    // Die Auswahl hier bestimmt, woran das Atelier arbeitet, und was das Atelier oeffnet,
+    // wird hier gezeigt. Geladen wird im Atelier erst, wenn es angezeigt wird - eine
+    // 4K-Datei im Hintergrund zu lesen, waehrend jemand nur durch Sequenzen blaettert,
+    // kostet Speicher fuer nichts.
+
+    /// <summary>Waehrend "Im Atelier oeffnen" ein bestimmtes Bild oeffnet, folgt das Atelier nicht der Uebersicht.</summary>
+    private bool _openingInAtelier;
+
+    /// <summary>Beim Start: die Folge, an der das Atelier zuletzt gearbeitet hat.</summary>
+    private void FollowAtelierAtStart()
+    {
+        if (_getSettings().AtelierImage is not { Length: > 0 } last || !File.Exists(last)) return;
+        if (Path.GetDirectoryName(last) is not { } folder) return;
+        if (_current is { } shown && SameFolder(shown.Folder, folder)) return;
+
+        if (!SelectFolder(folder)) OpenPath(last);
+    }
+
+    /// <summary>
+    /// Ins Atelier: Zeigt die Uebersicht eine andere Folge, oeffnet das Atelier das Bild, auf
+    /// dem sie steht - samt dem Projekt dieser Folge. Bei derselben Folge behaelt das
+    /// Atelier sein eigenes Bild.
+    /// </summary>
+    private void FollowDashboardIntoAtelier(AtelierPage atelier)
+    {
+        if (_current is null || FramePath(_playback.Head) is not { } frame) return;
+        if (FrameFlip.Atelier.SequenceKey.Of(frame) is not { } key || key.Equals(atelier.ProjectKey)) return;
+
+        atelier.Open(frame);
+    }
+
+    /// <summary>Das Atelier zeigt ein Bild: die Uebersicht zeigt seine Folge - und merkt sie sich.</summary>
+    private void OnAtelierImageShown(string path)
+    {
+        if (Path.GetDirectoryName(path) is not { } folder) return;
+        if (_current is { } shown && SameFolder(shown.Folder, folder)) return;
+
+        if (!SelectFolder(folder)) OpenPath(path);
+    }
+
+    private bool SelectFolder(string folder)
+    {
+        var entry = _sequences.Entries.FirstOrDefault(e => SameFolder(e.Folder, folder));
+        if (entry is null) return false;
+
+        Select(entry);
+        return true;
+    }
+
+    private static bool SameFolder(string a, string b)
+        => a.Length > 0 && b.Length > 0 &&
+           string.Equals(Path.GetFullPath(a).TrimEnd('\\', '/'), Path.GetFullPath(b).TrimEnd('\\', '/'), StringComparison.OrdinalIgnoreCase);
 
     /// <summary>
     /// Die Einstellungsseite - mit der Karte der Zuschauerseite am selben Dienst, derselben
@@ -1196,14 +1268,68 @@ public partial class MainWindow : Window
             .Item("⌕", Strings.T("D_MenuShowInExplorer"), () => ShowInExplorer(where), enabled: where.Length > 0)
             .Item("⧉", Strings.T("D_MenuCopyPath"), () => Clipboard.SetText(where), enabled: where.Length > 0);
 
+        // Ein geoeffneter Ordner laesst sich wieder aus der Liste nehmen - ein Blend-Projekt
+        // gehoert der Projektseite. Die Dateien bleiben, wo sie sind.
+        if (entry.Adhoc)
+            menu.Separator().Item("✕", Strings.T("D_MenuForget"), () => ForgetSequence(entry));
+
         DashboardMenu = menu;
         menu.Open();
+    }
+
+    /// <summary>Nimmt einen geoeffneten Ordner aus der Liste - nicht von der Platte.</summary>
+    internal void ForgetSequence(DashboardSequenceEntry entry)
+    {
+        bool shown = ReferenceEquals(entry, _current);
+
+        if (!_sequences.Forget(entry)) return;
+
+        LoadSequenceList(keepSelection: !shown);
+    }
+
+    /// <summary>
+    /// Ordner oder Bilder, auf die Sequenzliste gezogen: Jeder wird ein Eintrag, der erste
+    /// wird gezeigt. Ein Ordner zeigt sein erstes Bild - und damit die Folge darum.
+    /// </summary>
+    private void OnSequencesDropped(object sender, DragEventArgs e)
+    {
+        if (e.Data.GetData(DataFormats.FileDrop) is not string[] dropped) return;
+
+        e.Handled = true;
+        OpenDropped(dropped);
+    }
+
+    /// <summary>Was abgelegt wurde, als Eintraege - der erste gezeigt. Ohne Maus pruefbar.</summary>
+    internal void OpenDropped(IReadOnlyList<string> dropped)
+    {
+        var images = dropped
+            .Select(path => Directory.Exists(path) ? SequenceScanner.FindFirstImage(path, _decoders) : path)
+            .OfType<string>()
+            .Where(path => File.Exists(path) && _decoders.IsSupported(Path.GetExtension(path)))
+            .ToList();
+
+        // Rueckwaerts geoeffnet: Jeder neue Eintrag kommt nach oben, und der erste soll
+        // am Ende oben stehen und gezeigt sein.
+        for (int i = images.Count - 1; i >= 0; i--) OpenPath(images[i]);
+    }
+
+    private void OnSequencesDragOver(object sender, DragEventArgs e)
+    {
+        e.Effects = e.Data.GetData(DataFormats.FileDrop) is string[] { Length: > 0 }
+            ? DragDropEffects.Copy
+            : DragDropEffects.None;
+        e.Handled = true;
     }
 
     /// <summary>Ein Bild ins Atelier - der Reiter wechselt, und das Atelier oeffnet es.</summary>
     internal void OpenInAtelier(string path)
     {
-        NavAtelier.IsChecked = true;
+        // Dieses Bild und nicht das, auf dem die Uebersicht steht.
+        _openingInAtelier = true;
+
+        try { NavAtelier.IsChecked = true; }
+        finally { _openingInAtelier = false; }
+
         _atelierPage?.Open(path);
     }
 

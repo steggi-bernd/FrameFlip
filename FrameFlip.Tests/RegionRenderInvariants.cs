@@ -58,10 +58,6 @@ public static class RegionRenderInvariants
         };
 
         var flags = System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic;
-        object? Call(object target, string name, params object?[] args)
-            => target.GetType().GetMethod(name, flags, args.Select(a => a?.GetType() ?? typeof(object)).ToArray())
-                     is { } method ? method.Invoke(target, args) : target.GetType().GetMethod(name, flags)!.Invoke(target, args);
-
         byte[] Shown()
         {
             var surface = (System.Windows.Media.Imaging.WriteableBitmap)typeof(Views.AtelierPage).GetField("_surface", flags)!.GetValue(page)!;

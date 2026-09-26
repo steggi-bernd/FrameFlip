@@ -41,6 +41,7 @@ public static class NodeCatalog
         new(Masks, "S_MaskPainted", () => new MaskNode { Mask = new LayerMask { Kind = MaskKind.Painted } }),
         new(Masks, "S_NodeMaskMath", () => new MaskMathNode()),
         new(Masks, "S_NodeMaskShape", () => new MaskShapeNode()),
+        new(Masks, "S_NodeCutout", () => new CutoutNode()),
 
         new(Convert, "S_NodeMapRange", () => new MapRangeNode()),
         new(Convert, "S_NodeColorRamp", () => new ColorRampNode()),

@@ -191,8 +191,11 @@
                             </Button>
                         </Grid>
 
-                        <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto"
-                                      HorizontalScrollBarVisibility="Disabled" Padding="8,0,8,10">
+                        <!-- Ordner und Bilder lassen sich hierher ziehen - sie werden Eintraege. -->
+                        <ScrollViewer x:Name="SequenceScroll" Grid.Row="1" VerticalScrollBarVisibility="Auto"
+                                      HorizontalScrollBarVisibility="Disabled" Padding="8,0,8,10"
+                                      Background="Transparent" AllowDrop="True"
+                                      Drop="OnSequencesDropped" DragOver="OnSequencesDragOver">
                             <StackPanel x:Name="SequenceList" />
                         </ScrollViewer>
 

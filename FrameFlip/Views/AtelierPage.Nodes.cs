@@ -34,7 +34,11 @@ public partial class AtelierPage
     /// </summary>
     private void RestoreNodes()
     {
-        if (_settings.AtelierNodes is not { Length: > 0 } json) return;
+        // Mit Projektdateien bringt das erste Bild sein Projekt und damit seinen Graphen
+        // mit. Der Graph in den Einstellungen ist dann nur noch die Sicherung von vorher.
+        if (_settings.AtelierRecipeMoved) return;
+
+        if (_recipe.Nodes is not { Length: > 0 } json) return;
 
         var graph = NodeGraph.Load(json);
         if (graph is null || graph.Problems().Count > 0) return;
@@ -53,8 +57,8 @@ public partial class AtelierPage
     {
         if (_graph is not null) return;
 
-        _graph = StackToGraph.Convert(Layers.Stack, _settings.Adjustments ?? ImageAdjustments.Neutral,
-                                      _settings.Grading ?? new GradingStack());
+        _graph = StackToGraph.Convert(Layers.Stack, _recipe.Adjustments ?? ImageAdjustments.Neutral,
+                                      _recipe.Grading ?? new GradingStack());
 
         SaveNodes();
         EnterNodes();
@@ -73,6 +77,7 @@ public partial class AtelierPage
 
         NodeView.Graph = _graph;
         NodeView.Title = NodeTitles.For;
+        NodeView.MaskTitle = NodeTitles.MaskName;
 
         ShowNodeMode();
         ShowNodeSettings();
@@ -87,7 +92,7 @@ public partial class AtelierPage
     {
         if (_graph is null) return;
 
-        _settings.AtelierNodes = _graph.Save();
+        _recipe.Nodes = _graph.Save();
         _persist(_settings);
     }
 

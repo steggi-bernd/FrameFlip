@@ -33,6 +33,12 @@ public sealed partial class AtelierPage : UserControl
     private readonly AppSettings _settings;
     private readonly Action<AppSettings> _persist;
 
+    /// <summary>
+    /// Das Rezept - Grundregler und Werkzeuge des Bildes, Stapel, Graph. Die Seite liest und
+    /// schreibt es nur hier. Siehe <see cref="Atelier.AtelierEditingSession"/>.
+    /// </summary>
+    private readonly Atelier.AtelierEditingSession _recipe;
+
     /// <summary>Das zusammengesetzte Bild - das, worauf alle Werkzeuge wirken.</summary>
     private FloatFrame? _frame;
 
@@ -119,7 +125,12 @@ public sealed partial class AtelierPage : UserControl
     {
         _decoders = decoders;
         _settings = settings;
+        _recipe = new Atelier.AtelierEditingSession(new Atelier.SettingsRecipeStore(settings));
         _persist = persist;
+
+        // Zugestellt wird wie bisher mit Invoke: Die Rueckgabe kommt vom Lesefaden und
+        // wartet, bis die Seite sie uebernommen hat.
+        _source = new Atelier.AtelierSourceSession(ReadSource, action => Dispatcher.Invoke(action));
 
         InitializeComponent();
 
@@ -168,6 +179,7 @@ public sealed partial class AtelierPage : UserControl
 
         SetUpBatch();
         SetUpView();
+        SetUpProjects();
 
         _settle.Tick += (_, _) =>
         {
@@ -214,6 +226,15 @@ public sealed partial class AtelierPage : UserControl
         Open(last);
     }
 
+    /// <summary>Wie eine Datei gelesen wird - fuer die Probe austauschbar, sonst <see cref="Load"/>.</summary>
+    internal Func<string, (FloatFrame? Frame, IReadOnlyList<ExrPass> Passes, IReadOnlyList<CryptomatteSet> Cryptomattes)>? Reader { get; set; }
+
+    /// <summary>
+    /// Das Oeffnen: laufende Anfrage, Lesen im Hintergrund, Zustellung nur dessen, was noch
+    /// gilt. Siehe <see cref="Atelier.AtelierSourceSession"/>.
+    /// </summary>
+    private readonly Atelier.AtelierSourceSession _source;
+
     /// <summary>Oeffnet ein Bild - der Weg, den auch die Projektseite nehmen kann.</summary>
     public void Open(string path)
     {
@@ -232,16 +253,14 @@ public sealed partial class AtelierPage : UserControl
         BusyBadge.Visibility = Visibility.Visible;
         EmptyHint.Visibility = Visibility.Collapsed;
 
-        // Lesen und Auspacken dauert bei 4K spuerbar lange; auf dem Oberflaechenfaden
-        // staende dabei das ganze Fenster.
-        Task.Run(() => Load(path)).ContinueWith(task =>
-        {
-            var loaded = task.IsCompletedSuccessfully
-                ? task.Result
-                : (null, Array.Empty<ExrPass>(), Array.Empty<CryptomatteSet>());
+        _source.Open(path, loaded => Show(loaded.Path, loaded.Frame, loaded.Passes, loaded.Cryptomattes));
+    }
 
-            Dispatcher.Invoke(() => Show(path, loaded.Frame, loaded.Passes, loaded.Cryptomattes));
-        });
+    /// <summary>Liest eine Datei fuer die Quellsitzung - ueber <see cref="Reader"/>, wenn die Probe einen setzt.</summary>
+    private Atelier.AtelierSource ReadSource(string path)
+    {
+        var (frame, passes, cryptomattes) = (Reader ?? Load)(path);
+        return new Atelier.AtelierSource(path, frame, passes, cryptomattes);
     }
 
     private void Show(string path, FloatFrame? loaded, IReadOnlyList<ExrPass> passes,
@@ -290,6 +309,13 @@ public sealed partial class AtelierPage : UserControl
         _base = loaded;
         _sources[""] = loaded;
 
+        // Eine andere Folge ist ein anderes Projekt - mit seinem eigenen Rezept. Das
+        // bisherige wird dabei geschrieben. Erst hier und nicht beim Oeffnen: Eine Datei,
+        // die sich nicht lesen laesst, wechselt kein Projekt.
+        if (_projects.Enter(path)) ApplyProject();
+
+        _maskHistories.Enter(_projects.Current);
+
         // Erst jetzt gemerkt, nicht beim Oeffnen: Eine Datei, die sich nicht lesen
         // laesst, soll beim naechsten Start nicht wieder versucht werden.
         //
@@ -304,14 +330,14 @@ public sealed partial class AtelierPage : UserControl
         // Der gespeicherte Stapel gilt nur, soweit diese Datei die Passe auch
         // fuehrt. Zwanzig ausgegraute Zeilen nach dem Wechsel auf ein PNG waeren
         // kein Hinweis, sondern ein Raetsel.
-        Layers.Load(passes, cryptomattes, Prune(_settings.Layers, passes));
+        Layers.Load(passes, cryptomattes, Prune(_recipe.Layers, passes));
 
         // Der Streifen gilt fuer jedes Bild, nicht nur fuer eine Multilayer-EXR.
         // Passe braucht das Format, Ebenen nicht: Dasselbe Bild ein zweites Mal und
         // auf Multiplizieren gestellt rechnet auf einem PNG genauso. Ob er
         // aufgeklappt beginnt, entscheidet der Streifen selbst.
         ShowLayers(true);
-        _settings.Layers = Layers.Stack;
+        _recipe.Layers = Layers.Stack;
 
         _frame = loaded;
 
@@ -325,6 +351,9 @@ public sealed partial class AtelierPage : UserControl
         // Erst jetzt steht der Stapel da - und damit, was einem alten Graphen an
         // ausgeblendeten Ebenen fehlt.
         if (InNodes) ShowMissingLayers();
+
+        // Die Uebersicht zeigt dieselbe Folge - siehe MainWindow, Arbeitsbereich.
+        ImageShown?.Invoke(path);
 
         // Braucht der Stapel Passe, die noch nicht gelesen sind, kommen sie
         // nachtraeglich - das Bild steht schon, waehrend sie eintreffen. Im
@@ -395,9 +424,9 @@ public sealed partial class AtelierPage : UserControl
 
         if (layer is null)
         {
-            Tools.Load(_settings.Adjustments, _settings.Grading);
-            _settings.Grading = Snapshot();
-            _settings.Adjustments = Tools.Adjustments;
+            Tools.Load(_recipe.Adjustments, _recipe.Grading);
+            _recipe.Grading = Snapshot();
+            _recipe.Adjustments = Tools.Adjustments;
 
             _finalAdjustments = Tools.Adjustments;
             _finalGrading = Tools.Prepared;
@@ -489,11 +518,11 @@ public sealed partial class AtelierPage : UserControl
             // Adjustments - das wurde geschrieben -, die anderen im Stapel.
             _editing.Tools = Snapshot();
 
-            _settings.Layers = Layers.Stack;
+            _recipe.Layers = Layers.Stack;
         }
         else
         {
-            _settings.Adjustments = Tools.Adjustments;
+            _recipe.Adjustments = Tools.Adjustments;
 
             // Und der Stapel dazu. Ihn hier zu vergessen war die zweite Haelfte eines
             // langen Fehlers: Die Aenderung kam im BILD an - _finalGrading steht ja
@@ -504,7 +533,7 @@ public sealed partial class AtelierPage : UserControl
             //
             // Im Fenster sah das aus, als taete der Regler nichts. Er tat etwas, und
             // der naechste Klick woanders nahm es ihm wieder ab.
-            _settings.Grading = Snapshot();
+            _recipe.Grading = Snapshot();
 
             _finalAdjustments = Tools.Adjustments;
             _finalGrading = Tools.Prepared;

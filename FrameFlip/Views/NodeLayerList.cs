@@ -15,6 +15,9 @@ using Point = System.Windows.Point;
 
 namespace FrameFlip.Views;
 
+/// <summary>Eine freie Maske im Abschnitt "Masken" der Ebenenliste.</summary>
+public sealed record FreeMask(MaskNode Mask, string Name, ImageSource? Thumb);
+
 /// <summary>Eine Ebene im Graphen: das Mischen, das sie auf das Bisherige legt, und woher ihr Bild kommt.</summary>
 /// <param name="Mix">Das Mischen - bei der Grundlage keines: Sie wird auf nichts gelegt.</param>
 /// <param name="Source">Der Knoten, der in "Oben" fliesst - seine Vorschau ist die Miniatur der Ebene.</param>
@@ -69,6 +72,9 @@ public sealed record NodeLayer(MixNode? Mix, Node? Source, string Name, string D
 public sealed class NodeLayerList : Border
 {
     private readonly StackPanel _rows = new();
+
+    /// <summary>Der Abschnitt "Masken": die freien Masken, unter den Ebenen.</summary>
+    private readonly StackPanel _masks = new() { Margin = new Thickness(0, 10, 0, 0) };
     private readonly TextBlock _empty;
 
     /// <summary>Eine Ebene wurde angeklickt - ihr Mischen, bei der Grundlage ihr Knoten.</summary>
@@ -92,6 +98,9 @@ public sealed class NodeLayerList : Border
 
     /// <summary>Rechtsklick auf eine Zeile - wer das Menue kennt, zeigt es.</summary>
     public event Action<NodeLayer>? MenuWanted;
+
+    /// <summary>Rechtsklick auf eine freie Maske im Abschnitt "Masken".</summary>
+    public event Action<MaskNode>? MaskMenuWanted;
 
     /// <summary>Der Knopf zum Hinzufuegen - wer das Menue kennt, klappt es an ihm auf.</summary>
     public event Action<FrameworkElement>? AddWanted;
@@ -203,6 +212,7 @@ public sealed class NodeLayerList : Border
         var body = new StackPanel();
         body.Children.Add(rowsArea);
         body.Children.Add(_empty);
+        body.Children.Add(_masks);
 
         var scroller = _scroller = new ScrollViewer
         {
@@ -398,23 +408,121 @@ public sealed class NodeLayerList : Border
         _missing.Visibility = Visibility.Visible;
     }
 
+    /// <summary>Die freien Masken im Abschnitt "Masken" - fuer die Probe.</summary>
+    internal IReadOnlyList<FreeMask> ShownMasks { get; private set; } = Array.Empty<FreeMask>();
+
+    /// <summary>Die Ebenen, die hervorgehoben sind, weil sie die gewaehlte Maske benutzen - fuer die Probe.</summary>
+    internal IReadOnlyList<NodeLayer> MarkedRows { get; private set; } = Array.Empty<NodeLayer>();
+
     /// <summary>
     /// Zeigt die Ebenen eines Graphen. <paramref name="picture"/> liefert die Miniatur einer
-    /// Ebene, <paramref name="mask"/> die ihrer Maske.
+    /// Ebene, <paramref name="mask"/> die ihrer Maske. <paramref name="marked"/> sind die
+    /// Mischen, die hervorgehoben werden - die Ebenen einer gewaehlten Maske -, und
+    /// <paramref name="free"/> die Masken, die an keiner Ebene stecken.
     /// </summary>
     public void Show(IReadOnlyList<NodeLayer> layers, Node? selected,
-                     Func<NodeLayer, ImageSource?> picture, Func<NodeLayer, ImageSource?> mask)
+                     Func<NodeLayer, ImageSource?> picture, Func<NodeLayer, ImageSource?> mask,
+                     IReadOnlySet<Node>? marked = null, IReadOnlyList<FreeMask>? free = null)
     {
         Shown = layers;
         _chosen = layers.FirstOrDefault(l => selected is not null && ReferenceEquals(selected, l.Target));
         _rows.Children.Clear();
         _empty.Visibility = layers.Count == 0 ? Visibility.Visible : Visibility.Collapsed;
 
+        MarkedRows = marked is null ? Array.Empty<NodeLayer>() : layers.Where(l => l.Switch is { } s && marked.Contains(s)).ToList();
+
         foreach (var layer in layers)
             _rows.Children.Add(Row(layer, ReferenceEquals(layer, _chosen), picture(layer),
-                                   layer.MaskSource is null ? null : mask(layer)));
+                                   layer.MaskSource is null ? null : mask(layer), MarkedRows.Contains(layer)));
 
+        ShowMasks(free ?? Array.Empty<FreeMask>(), selected);
         ShowTools();
+    }
+
+    private static readonly Brush MaskMark = new SolidColorBrush(Color.FromRgb(0xD0, 0x8C, 0xE0));
+
+    /// <summary>
+    /// Der Abschnitt "Masken": jede freie Maske eine Zeile mit ihrem Bild. Ein Klick waehlt
+    /// sie im Graphen, ein Rechtsklick oeffnet ihr Menue. Ohne freie Masken kein Abschnitt.
+    /// </summary>
+    private void ShowMasks(IReadOnlyList<FreeMask> free, Node? selected)
+    {
+        ShownMasks = free;
+        _masks.Children.Clear();
+        _masks.Visibility = free.Count == 0 ? Visibility.Collapsed : Visibility.Visible;
+
+        if (free.Count == 0) return;
+
+        _masks.Children.Add(new TextBlock
+        {
+            Text = Strings.T("S_NodeLayerMasks"),
+            Foreground = new SolidColorBrush(Color.FromRgb(0xA8, 0xA8, 0xB4)),
+            FontSize = 11,
+            FontWeight = FontWeights.SemiBold,
+            Margin = new Thickness(2, 0, 2, 4),
+        });
+
+        foreach (var item in free)
+        {
+            var grid = new Grid();
+            grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(26) });
+            grid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+            grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+
+            var picture = new Border
+            {
+                Width = 36,
+                Height = 36,
+                Background = new SolidColorBrush(Color.FromRgb(0x18, 0x18, 0x1E)),
+                BorderBrush = MaskMark,
+                BorderThickness = new Thickness(1),
+                Margin = new Thickness(0, 0, 6, 0),
+                Child = new Image { Source = item.Thumb, Stretch = Stretch.UniformToFill },
+            };
+
+            Grid.SetColumn(picture, 1);
+            grid.Children.Add(picture);
+
+            var text = new StackPanel { VerticalAlignment = VerticalAlignment.Center };
+            text.Children.Add(new TextBlock
+            {
+                Text = item.Name,
+                Foreground = Brushes.White,
+                FontSize = 12,
+                TextTrimming = TextTrimming.CharacterEllipsis,
+            });
+            text.Children.Add(new TextBlock
+            {
+                Text = Strings.T("S_NodeLayerMaskFree"),
+                Foreground = new SolidColorBrush(Color.FromRgb(0xA8, 0xA8, 0xB4)),
+                FontSize = 10.5,
+                TextTrimming = TextTrimming.CharacterEllipsis,
+            });
+
+            Grid.SetColumn(text, 2);
+            grid.Children.Add(text);
+
+            var row = new Border
+            {
+                Child = grid,
+                Background = ReferenceEquals(selected, item.Mask) ? ChosenBack : RowBack,
+                CornerRadius = new CornerRadius(3),
+                Padding = new Thickness(4, 3, 4, 3),
+                Margin = new Thickness(0, 0, 0, 3),
+                Cursor = Cursors.Hand,
+                Tag = item,
+            };
+
+            row.MouseLeftButtonUp += (_, _) => Chosen?.Invoke(item.Mask);
+            row.MouseRightButtonUp += (_, e) =>
+            {
+                e.Handled = true;
+                Chosen?.Invoke(item.Mask);
+                MaskMenuWanted?.Invoke(item.Mask);
+            };
+
+            _masks.Children.Add(row);
+        }
     }
 
     private static readonly Brush ChosenBack = new SolidColorBrush(Color.FromArgb(0x55, 0xA4, 0x7B, 0xF0));
@@ -423,7 +531,7 @@ public sealed class NodeLayerList : Border
     /// <summary>Wie weit eine Zeile eingerueckt ist - eine Gruppe tiefer, angeschnitten noch einmal.</summary>
     private static double Indent(NodeLayer layer) => 16 * layer.Depth + (layer.Clipped ? 16 : 0);
 
-    private UIElement Row(NodeLayer layer, bool chosen, ImageSource? thumb, ImageSource? maskThumb)
+    private UIElement Row(NodeLayer layer, bool chosen, ImageSource? thumb, ImageSource? maskThumb, bool marked)
     {
         var grid = new Grid();
         grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(26) });
@@ -508,12 +616,15 @@ public sealed class NodeLayerList : Border
         Grid.SetColumn(text, 3);
         grid.Children.Add(text);
 
+        // Eine Ebene der gewaehlten Maske: umrandet in der Farbe der Maskenkabel im Graphen.
         var row = new Border
         {
             Child = grid,
             Background = chosen ? ChosenBack : RowBack,
+            BorderBrush = marked ? MaskMark : null,
+            BorderThickness = new Thickness(marked ? 1.5 : 0),
             CornerRadius = new CornerRadius(3),
-            Padding = new Thickness(4, 3, 4, 3),
+            Padding = new Thickness(marked ? 2.5 : 4, marked ? 1.5 : 3, marked ? 2.5 : 4, marked ? 1.5 : 3),
             Margin = new Thickness(Indent(layer), 0, 0, 3),
             Cursor = Cursors.Hand,
             Tag = layer,

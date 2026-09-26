@@ -31,16 +31,20 @@ public static class AtelierLayerInvariants
 
         try
         {
-            TheStripAppears(path);
-            TheSharedLoaderRebuilds(path);
-            APlainImageLayersToo(folder);
-            EachLayerKeepsItsOwnTools(path);
-            TheFrameOnlyGrabsWhenItShould(path);
-            TheToolDecidesWhatTheMouseDoes(path);
-            TheDockRemembersHowItStood(path);
-            ShowingALayerShowsItAtOnce(folder);
-            TheReportedSessionComesBack(folder);
-            RasterReachesTheAtelier(folder);
+            // Jede Probe beginnt ohne Projekt: Die Datei ist dieselbe, und ihr Projekt
+            // brachte sonst das Rezept der vorigen Probe mit.
+            void Fresh() => Forget(folder);
+
+            Fresh(); TheStripAppears(path);
+            Fresh(); TheSharedLoaderRebuilds(path);
+            Fresh(); APlainImageLayersToo(folder);
+            Fresh(); EachLayerKeepsItsOwnTools(path);
+            Fresh(); TheFrameOnlyGrabsWhenItShould(path);
+            Fresh(); TheToolDecidesWhatTheMouseDoes(path);
+            Fresh(); TheDockRemembersHowItStood(path);
+            Fresh(); ShowingALayerShowsItAtOnce(folder);
+            Fresh(); TheReportedSessionComesBack(folder);
+            Fresh(); RasterReachesTheAtelier(folder);
         }
         finally
         {
@@ -113,8 +117,11 @@ public static class AtelierLayerInvariants
 
             Check.That(strip.Stack.Layers.Count == 16, "der Passestapel steht",
                        $"{strip.Stack.Layers.Count}");
-            Check.That(settings.Layers is not null && settings.Layers.Layers.Count == 16,
-                       "und wird fuer das naechste Mal gemerkt");
+            // Gemerkt wird im Projekt der Folge, nicht mehr in den Einstellungen.
+            page.Flush();
+            var remembered = page.Projects.Current is { } key ? page.Projects.Store.Load(key)?.Layers : null;
+            Check.That(remembered is not null && remembered.Layers.Count == 16,
+                       "und wird fuer das naechste Mal gemerkt - im Projekt der Folge");
         }
         finally
         {
@@ -452,8 +459,8 @@ public static class AtelierLayerInvariants
 
             exposure.Value = 0.75;
 
-            Check.That(settings.Adjustments is not null, "der Regler gehoert wieder dem Bild");
-            Check.Near(settings.Adjustments!.Exposure, 0.75, 0.001, "und landet dort");
+            Check.That(page.Recipe.Adjustments is not null, "der Regler gehoert wieder dem Bild");
+            Check.Near(page.Recipe.Adjustments!.Exposure, 0.75, 0.001, "und landet dort - im Rezept des Projekts");
             Check.Near(first.Adjustments!.Exposure, -2.0, 0.001,
                        "die Ebenen bleiben davon unberuehrt");
             Check.Near(second.Adjustments!.Exposure, 1.5, 0.001, "beide");
@@ -1582,6 +1589,21 @@ public static class AtelierLayerInvariants
     }
 
     /// <summary>Waehlt eine Ebene so aus, wie ein Klick in die Liste es taete.</summary>
+    /// <summary>Vergisst die Projekte im Ordner - mit dem Ordner FrameFlip, in dem sie liegen.</summary>
+    private static void Forget(string folder)
+    {
+        // Eine Seite, die gerade geschlossen wurde, schreibt ihr Projekt erst, wenn der
+        // Dispatcher ihr Unloaded zustellt - erst das abwarten, dann das Schreiben.
+        for (int i = 0; i < 5; i++)
+            System.Windows.Threading.Dispatcher.CurrentDispatcher.Invoke(() => { }, System.Windows.Threading.DispatcherPriority.ContextIdle);
+
+        Atelier.AtelierProjectStore.WaitForWrites(TimeSpan.FromSeconds(10));
+
+        string projects = Path.Combine(folder, Atelier.AtelierProjectStore.FolderName);
+        try { if (Directory.Exists(projects)) Directory.Delete(projects, recursive: true); }
+        catch (IOException) { /* ein liegengebliebener Rest faellt beim naechsten Lauf auf */ }
+    }
+
     private static void Select(LayerPanel strip, ImageLayer layer)
     {
         var list = (System.Windows.Controls.ListBox)strip.FindName("LayerList");
