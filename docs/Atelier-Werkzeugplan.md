@@ -152,6 +152,27 @@ Knotenmodus und die Einstellungen lesen alle aus derselben Liste.
   - 40 zufällige Striche spielen nach, auch aus Text gelesen und im Maskenverlauf.
   - Die Seite bindet an ein Objekt der Kryptomatte-Probedatei.
 
+**Nach dem ersten Test (`feature/pinsel-karo`):**
+
+- **Ruhige Richtung:** Bei „folgt dem Strich“ kam die Richtung jedes Tupfers aus dem
+  letzten Mausschritt. Bei langsamem Malen ist der 1–2 Bildpunkte lang und auf 0, 45 oder
+  90 Grad gerastert, ein zittriger Strich sprang zwischen schräg, hochkant und quer.
+  - Jetzt hängt ein Anker an einer Schnur von etwa einem Radius hinter dem Stift. Die
+    Richtung ist die vom Anker zum Stift.
+  - Die Richtungen der einzelnen Schritte zu mitteln reicht nicht: Ein Zickzack aus 45 und
+    135 Grad mittelt sich zu nichts, obwohl der Weg senkrecht geht.
+  - Eine Umkehr dreht die Spitze nicht. Der erste Tupfer wartet auf eine halbe Schnur Weg.
+  - Striche tragen eine **Fassung** (`PaintStroke.Version`). Alte Striche spielen im
+    Maskenverlauf mit der Rechnung nach, mit der sie gemalt wurden.
+- **Ring und Vorschau:** Der Ring zeigt beim Malen den Winkel, in dem gerade gemalt wird.
+  Die Vorschau beim Ziehen von Größe, Härte und Abstand zeigt die Form der Spitze statt
+  immer eines Kreises.
+- **Winkel beim Folgen:** Er gilt zur Strichrichtung. Bei 0° liegt die Spitze längs und
+  malt schmal, bei 90° quer und malt breit. So steht es auch im Tooltip.
+- **Karo** (Wunsch aus dem Test): Zwei gegenüberliegende Ecken der eckigen Spitze gehen
+  auseinander wie an einem Gelenkrahmen, die Seiten bleiben gleich lang. Voll gezogen ist
+  das Karo sieben Mal so lang wie breit, für schmale Spalten.
+
 **Offen in W1:**
 
 - Kantengebunden (Pässe) und Druckstärke.

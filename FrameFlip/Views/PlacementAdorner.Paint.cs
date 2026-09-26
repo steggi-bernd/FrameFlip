@@ -77,6 +77,9 @@ public sealed partial class PlacementAdorner
     /// <summary>Der Winkel folgt dem Strich.</summary>
     public bool BrushFollow { get; set; }
 
+    /// <summary>Wie weit eine eckige Spitze zum Karo gezogen ist, 0 bis 1 - siehe <see cref="PaintStroke.Squish"/>.</summary>
+    public float BrushSquish { get; set; }
+
     /// <summary>
     /// Woran ein Strich gebunden wird, der an dieser Stelle des Bildes beginnt - die
     /// gepackte Deckung eines Objekts, oder null fuer ungebunden. Beim Ansetzen gefragt.
@@ -387,15 +390,44 @@ public sealed partial class PlacementAdorner
         }
 
         // Eckig oder gestreckt: der Umriss der Spitze, gedreht - so, wie sie auftraegt.
-        double halfW = radius, halfH = Math.Max(0.5, radius / Math.Max(1f, BrushAspect));
-        Geometry tip = BrushShape == BrushShape.Square
-            ? new RectangleGeometry(new Rect(at.X - halfW, at.Y - halfH, halfW * 2, halfH * 2))
-            : new EllipseGeometry(at, halfW, halfH);
-
-        tip.Transform = new RotateTransform(BrushAngle, at.X, at.Y);
+        // Waehrend eines Strichs, dessen Winkel dem Weg folgt, im Winkel des naechsten
+        // Tupfers und nicht im eingestellten - sonst zeigt der Ring hochkant, was quer malt.
+        float angle = _painting && _stroke is { Follow: true } stroke ? stroke.TipAngle : BrushAngle;
+        var tip = TipOutline(at, radius, angle);
 
         context.DrawGeometry(null, Shadow, tip);
         context.DrawGeometry(null, new Pen(Ring, 1), tip);
+    }
+
+    /// <summary>
+    /// Der Umriss der eingestellten Spitze um <paramref name="at"/>, in Schirmpunkten und
+    /// gedreht: Kreis, Ellipse, Rechteck oder Karo. <paramref name="scale"/> verkleinert ihn
+    /// um die Mitte - fuer die harte Kante.
+    /// </summary>
+    internal Geometry TipOutline(Point at, double radius, float angle, double scale = 1)
+    {
+        double halfW = radius * scale;
+        double halfH = Math.Max(0.5, radius / Math.Max(1f, BrushAspect)) * scale;
+
+        Geometry tip;
+
+        if (BrushShape == BrushShape.Square)
+        {
+            var corners = new BrushTip(BrushShape, BrushAspect, angle, BrushSquish).Corners(halfW, halfH);
+            var figure = new PathFigure { StartPoint = new Point(at.X + corners[0].X, at.Y + corners[0].Y), IsClosed = true };
+
+            for (int i = 1; i < corners.Length; i++)
+                figure.Segments.Add(new LineSegment(new Point(at.X + corners[i].X, at.Y + corners[i].Y), true));
+
+            tip = new PathGeometry(new[] { figure });
+        }
+        else
+        {
+            tip = new EllipseGeometry(at, halfW, halfH);
+        }
+
+        tip.Transform = new RotateTransform(angle, at.X, at.Y);
+        return tip;
     }
 
     /// <summary>
@@ -420,14 +452,33 @@ public sealed partial class PlacementAdorner
         };
         fill.Freeze();
 
-        context.DrawEllipse(fill, null, at, radius, radius);
-        context.DrawEllipse(null, Shadow, at, radius + 1, radius + 1);
-        context.DrawEllipse(null, new Pen(Ring, 1.5), at, radius, radius);
-
         // Die harte Kante als eigener, gestrichelter Ring.
         var dashed = new Pen(Ring, 1) { DashStyle = DashStyles.Dash };
         dashed.Freeze();
-        context.DrawEllipse(null, dashed, at, radius * hard, radius * hard);
+
+        bool round = BrushShape == BrushShape.Round && BrushAspect <= 1f;
+
+        if (round)
+        {
+            context.DrawEllipse(fill, null, at, radius, radius);
+            context.DrawEllipse(null, Shadow, at, radius + 1, radius + 1);
+            context.DrawEllipse(null, new Pen(Ring, 1.5), at, radius, radius);
+            context.DrawEllipse(null, dashed, at, radius * hard, radius * hard);
+        }
+        else
+        {
+            // Eckig oder gestreckt: derselbe Umriss wie am Zeiger. Ein Verlauf laesst sich
+            // nicht in ein Rechteck biegen - der Abfall steht als zwei Stufen da, deckend
+            // bis zur harten Kante, blasser bis zum Rand.
+            var outer = TipOutline(at, radius, BrushAngle);
+            var inner = TipOutline(at, radius, BrushAngle, hard);
+
+            context.DrawGeometry(SoftFill, null, outer);
+            context.DrawGeometry(HardFill, null, inner);
+            context.DrawGeometry(null, Shadow, outer);
+            context.DrawGeometry(null, new Pen(Ring, 1.5), outer);
+            context.DrawGeometry(null, dashed, inner);
+        }
 
         // Beim Abstand: die Tupfer eines waagrechten Strichs durch den Ring, so dicht,
         // wie er sie setzen wird. Unter drei Schirmpunkten Abstand verschwimmen sie
@@ -443,7 +494,11 @@ public sealed partial class PlacementAdorner
                 for (int k = -reach; k <= reach; k++)
                 {
                     if (k == 0) continue;
-                    context.DrawEllipse(null, Ghost, new Point(at.X + k * step, at.Y), radius, radius);
+
+                    var ghost = new Point(at.X + k * step, at.Y);
+
+                    if (round) context.DrawEllipse(null, Ghost, ghost, radius, radius);
+                    else context.DrawGeometry(null, Ghost, TipOutline(ghost, radius, BrushAngle));
                 }
             }
         }
@@ -486,6 +541,16 @@ public sealed partial class PlacementAdorner
     }
 
     private static readonly Pen Ghost = FrozenPen(Color.FromArgb(0x90, 0xFF, 0xFF, 0xFF), 1);
+
+    private static readonly Brush SoftFill = FrozenBrush(Color.FromArgb(0x30, 0xFF, 0xFF, 0xFF));
+    private static readonly Brush HardFill = FrozenBrush(Color.FromArgb(0x48, 0xFF, 0xFF, 0xFF));
+
+    private static Brush FrozenBrush(Color colour)
+    {
+        var brush = new SolidColorBrush(colour);
+        brush.Freeze();
+        return brush;
+    }
 
     private static Pen FrozenPen(Color color, double thickness)
     {
@@ -581,20 +646,7 @@ public sealed partial class PlacementAdorner
         // hat das ganze Bild danach schon gezeigt.
         _pendingTouched = PaintBounds.Empty;
 
-        _stroke = new PaintStroke
-        {
-            Radius = BrushRadius,
-            Hardness = BrushHardness,
-            Flow = BrushFlow,
-            Opacity = BrushOpacity,
-            Spacing = BrushSpacing,
-            Erase = _erasing,
-            Shape = BrushShape,
-            Aspect = BrushAspect,
-            Angle = BrushAngle,
-            Follow = BrushFollow,
-            Limit = LimitWanted?.Invoke(x, y),
-        };
+        _stroke = NewStroke(x, y);
 
         Touched(_stroke.Begin(_mask, x, y));
         Painted?.Invoke(true);
@@ -602,6 +654,24 @@ public sealed partial class PlacementAdorner
         e.Handled = true;
         CaptureMouse();
     }
+
+    /// <summary>Ein neuer Strich mit allem, was gerade eingestellt ist - und der heutigen Rechnung.</summary>
+    internal PaintStroke NewStroke(float x, float y) => new()
+    {
+        Radius = BrushRadius,
+        Hardness = BrushHardness,
+        Flow = BrushFlow,
+        Opacity = BrushOpacity,
+        Spacing = BrushSpacing,
+        Erase = _erasing,
+        Shape = BrushShape,
+        Aspect = BrushAspect,
+        Angle = BrushAngle,
+        Squish = BrushShape == BrushShape.Square ? BrushSquish : 0f,
+        Follow = BrushFollow,
+        Limit = LimitWanted?.Invoke(x, y),
+        Version = PaintStroke.CurrentVersion,
+    };
 
     /// <summary>Der Ring muss dem Zeiger folgen, auch wenn nicht gemalt wird.</summary>
     protected override void OnMouseEnter(MouseEventArgs e)

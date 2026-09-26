@@ -291,8 +291,14 @@ public sealed class PaintedMask
         float halfW = radius;
         float halfH = MathF.Max(0.5f, radius / aspect);
 
-        // Ein gedrehtes Rechteck passt immer in den Kreis um seine Ecke.
+        // Ein gedrehtes Rechteck passt immer in den Kreis um seine Ecke. Beim Karo
+        // reicht die lange Diagonale weiter hinaus.
+        float squish = tip.Shape == BrushShape.Square ? BrushTip.SquishOf(tip.Squish) : 0f;
+        float along = 1f + squish;
+        float across = MathF.Sqrt(MathF.Max(0.0001f, 2f - along * along));
+
         float reach = MathF.Sqrt(halfW * halfW + halfH * halfH);
+        if (squish > 0f) reach *= along;
 
         int x0 = Math.Max(0, (int)MathF.Floor(cx - reach));
         int x1 = Math.Min(Width - 1, (int)MathF.Ceiling(cx + reach));
@@ -318,6 +324,16 @@ public sealed class PaintedMask
 
                 float nu = MathF.Abs(u) / halfW;
                 float nv = MathF.Abs(v) / halfH;
+
+                if (squish > 0f)
+                {
+                    // Zurueck ins Quadrat: die lange Diagonale gestaucht, die kurze gestreckt.
+                    float su = u / halfW, sv = v / halfH;
+                    float c1 = (su + sv) * 0.5f / along;
+                    float c2 = (su - sv) * 0.5f / across;
+                    nu = MathF.Abs(c1 + c2);
+                    nv = MathF.Abs(c1 - c2);
+                }
 
                 float away = (tip.Shape == BrushShape.Square ? MathF.Max(nu, nv) : MathF.Sqrt(nu * nu + nv * nv)) * radius;
 

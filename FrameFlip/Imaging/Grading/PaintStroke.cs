@@ -54,6 +54,27 @@ public sealed class PaintStroke
     public float Angle { get; init; }
 
     /// <summary>
+    /// Wie weit zwei gegenueberliegende Ecken einer eckigen Spitze auseinandergezogen sind,
+    /// 0 bis 1. Aus dem Quadrat wird ein Karo, das in schmale Spalten kommt. Siehe
+    /// <see cref="BrushTip.SquishOf"/>.
+    /// </summary>
+    public float Squish { get; init; }
+
+    /// <summary>
+    /// Mit welcher Rechnung der Strich gemalt wurde. Fehlt es, ist es 0 - die Fassung, mit
+    /// der er aufgezeichnet wurde, und so spielt er auch nach. Neue Striche bekommen
+    /// <see cref="CurrentVersion"/>.
+    ///
+    /// 1: Folgt der Winkel dem Strich, wird die Richtung geglaettet. In Fassung 0 kam sie
+    /// aus dem letzten Mausschritt, und der ist bei langsamem Malen ein, zwei Bildpunkte
+    /// lang - auf 0, 45 oder 90 Grad gerastert. Ein leicht zittriger Strich sprang so
+    /// zwischen schraeg, hochkant und quer.
+    /// </summary>
+    public int Version { get; init; }
+
+    public const int CurrentVersion = 1;
+
+    /// <summary>
     /// Der Winkel folgt dem Strich: Zum eingestellten kommt die Richtung des Weges. Ein
     /// flacher Pinsel legt sich dann wie eine Breitfeder in jede Kurve.
     /// </summary>
@@ -71,6 +92,20 @@ public sealed class PaintStroke
 
     /// <summary>Die Richtung des Weges beim letzten Stueck, in Grad.</summary>
     private float _heading;
+
+    /// <summary>
+    /// Der Anker fuer die Richtung (Fassung 1): ein Punkt, der dem Weg an einer Schnur der
+    /// Laenge <see cref="TurnDistance"/> nachgezogen wird. Die Richtung ist die vom Anker zum
+    /// Stift - also die des Weges ueber gut einen Radius, nicht die des letzten Mausschritts.
+    ///
+    /// Die Richtungen der einzelnen Schritte zu mitteln taugt nicht: Ein langsamer Strich
+    /// nach unten kommt als Zickzack aus 45 und 135 Grad, und deren Mittel ist nicht
+    /// "senkrecht", sondern gar nichts. Der Weg selbst geht senkrecht.
+    /// </summary>
+    private float _anchorX, _anchorY;
+
+    /// <summary>Ob der Weg schon lang genug fuer eine Richtung war (Fassung 1).</summary>
+    private bool _headed;
 
     /// <summary>
     /// Der Weg in Bildpunkten, abwechselnd x und y - so, wie er gemeldet wurde, und
@@ -93,13 +128,24 @@ public sealed class PaintStroke
     private bool _firstPending;
 
     /// <summary>Die Spitze eines Tupfers - mit der Richtung des Weges, wenn der Winkel ihr folgt.</summary>
-    private BrushTip Tip => new(Shape, Aspect, Follow ? Angle + _heading : Angle);
+    private BrushTip Tip => new(Shape, Aspect, Follow ? Angle + _heading : Angle, Squish);
+
+    /// <summary>Der Winkel, in dem der naechste Tupfer liegt - fuer den Ring waehrend des Malens.</summary>
+    [JsonIgnore]
+    public float TipAngle => Tip.Angle;
 
     /// <summary>Wie weit ein Tupfer hoechstens reicht, in Bildpunkten - fuer das, was ein Zug beruehrt.</summary>
     [JsonIgnore]
     public float Reach => Shape == BrushShape.Round && Aspect <= 1f
         ? Radius
-        : Radius * MathF.Sqrt(1f + 1f / (MathF.Max(1f, Aspect) * MathF.Max(1f, Aspect)));
+        : Radius * MathF.Sqrt(1f + 1f / (MathF.Max(1f, Aspect) * MathF.Max(1f, Aspect)))
+                 * (Shape == BrushShape.Square ? 1f + BrushTip.SquishOf(Squish) : 1f);
+
+    /// <summary>
+    /// Die Laenge der Schnur, an der der Anker haengt (Fassung 1) - etwa ein Radius. Eine
+    /// Richtung gibt es erst ab der halben Laenge: Ein Mausschritt allein ist zu kurz dafuer.
+    /// </summary>
+    private float TurnDistance => Math.Clamp(Radius, 6f, 32f);
 
     /// <summary>Der Abstand zweier Tupfer in Bildpunkten.</summary>
     [JsonIgnore]
@@ -112,6 +158,8 @@ public sealed class PaintStroke
         _x = x;
         _y = y;
         _walked = 0;
+        _anchorX = x;
+        _anchorY = y;
 
         Path.Add(x);
         Path.Add(y);
@@ -156,8 +204,19 @@ public sealed class PaintStroke
         var bounds = PaintBounds.Empty;
         if (length <= 0f) return bounds;
 
-        // Die Richtung dieses Stuecks - aus dem Weg, also beim Nachspielen dieselbe.
-        _heading = MathF.Atan2(dy, dx) * 180f / MathF.PI;
+        if (Follow && Version >= 1)
+        {
+            Steer(x, y);
+
+            // Der erste Tupfer wartet, bis der Weg lang genug fuer eine Richtung ist. Bis
+            // dahin bleibt der Ansatz stehen, und das Stueck bis hierher zaehlt als eines.
+            if (_firstPending && !_headed) return bounds;
+        }
+        else
+        {
+            // Die Richtung dieses Stuecks - aus dem Weg, also beim Nachspielen dieselbe.
+            _heading = MathF.Atan2(dy, dx) * 180f / MathF.PI;
+        }
 
         // Jetzt hat der Weg eine Richtung - der wartende erste Tupfer kommt in ihr.
         if (_firstPending)
@@ -184,6 +243,32 @@ public sealed class PaintStroke
     }
 
     /// <summary>
+    /// Zieht den Anker nach (siehe <see cref="_anchorX"/>) und nimmt die Richtung vom Anker
+    /// zum Stift - sobald sie mindestens eine halbe Schnur lang ist. Kuerzer, etwa wenn der
+    /// Strich umkehrt und am Anker vorbeikommt, bleibt die alte Richtung stehen. Hin und
+    /// zurueck sind fuer jede Spitze dasselbe, denn alle sind punktsymmetrisch.
+    /// </summary>
+    private void Steer(float x, float y)
+    {
+        float reach = TurnDistance;
+        float ax = x - _anchorX;
+        float ay = y - _anchorY;
+        float distance = MathF.Sqrt(ax * ax + ay * ay);
+
+        if (distance > reach)
+        {
+            _anchorX = x - ax / distance * reach;
+            _anchorY = y - ay / distance * reach;
+        }
+
+        if (distance >= reach * 0.5f)
+        {
+            _heading = MathF.Atan2(ay, ax) * 180f / MathF.PI;
+            _headed = true;
+        }
+    }
+
+    /// <summary>
     /// Spielt den Zug auf einer Maske nach - mit denselben Einstellungen und demselben
     /// Weg, also mit denselben Tupfern in derselben Reihenfolge.
     /// </summary>
@@ -200,8 +285,10 @@ public sealed class PaintStroke
             Shape = Shape,
             Aspect = Aspect,
             Angle = Angle,
+            Squish = Squish,
             Follow = Follow,
             Limit = Limit,
+            Version = Version,
         };
 
         var bounds = PaintBounds.Empty;
@@ -234,13 +321,48 @@ public enum BrushShape
     Square,
 }
 
-/// <summary>Eine Pinselspitze: Form, Breite zu Hoehe und Winkel in Grad.</summary>
-public readonly record struct BrushTip(BrushShape Shape, float Aspect, float Angle)
+/// <summary>
+/// Eine Pinselspitze: Form, Breite zu Hoehe, Winkel in Grad und - nur eckig - wie weit sie
+/// zum Karo gezogen ist.
+/// </summary>
+public readonly record struct BrushTip(BrushShape Shape, float Aspect, float Angle, float Squish = 0f)
 {
     public static BrushTip Round { get; } = new(BrushShape.Round, 1f, 0f);
 
     /// <summary>Der alte, runde Pinsel - er nimmt den alten Rechenweg.</summary>
     public bool IsPlainRound => Shape == BrushShape.Round && Aspect <= 1f;
+
+    /// <summary>
+    /// Wie weit die lange Diagonale eines Karos ueber die des Quadrats hinausreicht, aus dem
+    /// Regler (0 bis 1). Gezogen wird wie an einem Gelenkrahmen: Die Seiten bleiben gleich
+    /// lang, zwei Ecken gehen auseinander, die anderen beiden aufeinander zu. Bei gut 0,41
+    /// (Wurzel 2 minus 1) waere die kurze Diagonale null. Der Regler geht bis 0,4 - dann ist
+    /// das Karo sieben Mal so lang wie breit.
+    /// </summary>
+    public static float SquishOf(float slider) => Math.Clamp(slider, 0f, 1f) * 0.4f;
+
+    /// <summary>
+    /// Die vier Ecken einer eckigen Spitze mit halber Breite und Hoehe, im Rahmen der Spitze
+    /// (vor der Drehung) - fuer den Ring am Zeiger, damit er zeigt, was aufgetragen wird.
+    /// </summary>
+    public (double X, double Y)[] Corners(double halfW, double halfH)
+    {
+        double along = 1 + SquishOf(Squish);
+        double across = Math.Sqrt(Math.Max(0.0001, 2 - along * along));
+
+        var corners = new (double X, double Y)[4];
+        var unit = new (double A, double B)[] { (1, 1), (-1, 1), (-1, -1), (1, -1) };
+
+        for (int i = 0; i < 4; i++)
+        {
+            // Zerlegt in die beiden Diagonalen, jede fuer sich gezogen.
+            double c1 = (unit[i].A + unit[i].B) * 0.5 * along;
+            double c2 = (unit[i].A - unit[i].B) * 0.5 * across;
+            corners[i] = ((c1 + c2) * halfW, (c1 - c2) * halfH);
+        }
+
+        return corners;
+    }
 }
 
 /// <summary>Was ein Zug beruehrt hat, in Bildpunkten der Leinwand. Leer: nichts.</summary>
