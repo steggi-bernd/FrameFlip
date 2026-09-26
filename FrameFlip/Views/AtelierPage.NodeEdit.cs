@@ -106,7 +106,7 @@ public partial class AtelierPage
     /// </summary>
     private void RememberValueEdit()
     {
-        if (_valueEditOpen || _graph is null || _settings.AtelierNodes is not { } before) return;
+        if (_valueEditOpen || _graph is null || _recipe.Nodes is not { } before) return;
 
         // Nichts geaendert - etwa ein Farbstreifen, der sich beim Waehlen eines Knotens
         // fuellt und dabei meldet: kein Schritt im Verlauf.

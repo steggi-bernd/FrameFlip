@@ -215,6 +215,33 @@ Datei-/Sequenzbezüge und pro Bild gespeicherte Anstriche. Die Auswahl allein
 ändert weder Bild noch Histogramm. Ein konsistenter Änderungsweg kann später
 Undo tragen; Undo selbst gehört nicht in diesen Refactoring-PR.
 
+### Stand S2, erster Teil (25. September 2026)
+
+Auf `refactor/studio-s2-editing`, aufgebaut auf `refactor/studio-s1-open`, **implementiert
+und geprüft**, noch nicht gemergt: Rezept und Speichern.
+
+- `FrameFlip/Atelier/AtelierEditingSession` besitzt das Rezept: Grundregler und
+  Werkzeuge des fertigen Bildes, Ebenenstapel, Graph. Die Seite las und schrieb diese
+  Felder an rund zwanzig Stellen direkt in `AppSettings`. Jetzt läuft jeder Zugriff über
+  die Sitzung. Sie meldet jede Änderung und weiß, ob seit dem letzten festgehaltenen
+  Stand etwas dazukam (`Dirty`, `Revision`, `MarkKept`).
+- `IAtelierRecipeStore` ist der schmale Adapter. `SettingsRecipeStore` schreibt in
+  dieselben Felder wie bisher, `config.json` bleibt unverändert. Die Projektablage je
+  Sequenz ([Projekte und Masken](Projekte-und-Masken.md), Phase C) wird eine zweite
+  Ablage hinter derselben Schnittstelle.
+- Beobachtet, nicht geändert: Die Grundregler des fertigen Bildes teilt sich das Atelier
+  mit dem Vorschaufenster (`AppSettings.Adjustments`). Ob sie je Projekt gelten sollen,
+  entscheidet die Projektablage.
+- Charakterisierung vorher (`AtelierRecipeInvariants`): wo das Rezept nach Öffnen, Regler
+  am Bild, Einstellungsebene, Rückwechsel und Umwandeln in Knoten steht und wann
+  geschrieben wird. Sie lief vor und nach dem Umbau unverändert grün, ebenso
+  `AtelierLayerInvariants`. `AtelierEditingSessionInvariants` prüft die Sitzung ohne
+  Fenster.
+
+Abnahme: **4.578 Zusicherungen** in `FrameFlip.Tests` (Release). Offen für den zweiten
+Teil: Bild und Ebene als ausdrückliche Bearbeitungsziele, unabhängige Export-Snapshots
+aus der Sitzung, die Abnahmefälle oben zu allen sechs Werkzeuglisten und den Anstrichen.
+
 ## S3: Exportauftrag und Frame-Kontext vereinheitlichen
 
 **Nach S2, auf dem gesicherten S0-Ausgabeverhalten.** `GradeBatch` und

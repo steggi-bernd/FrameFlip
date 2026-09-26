@@ -200,7 +200,7 @@ public partial class AtelierPage
     /// werden, ohne dass sich die Ausgabe auf halber Strecke aendert.
     /// </summary>
     private GradingStack FinalGrading()
-        => (_settings.Grading ?? new GradingStack()).Clone();
+        => (_recipe.Grading ?? new GradingStack()).Clone();
 
     private Task<GradeBatchResult> RunImages(IReadOnlyList<string> frames, GradeOutputFormat format,
                                              IProgress<GradeProgress> progress, CancellationToken token)

@@ -33,6 +33,12 @@ public sealed partial class AtelierPage : UserControl
     private readonly AppSettings _settings;
     private readonly Action<AppSettings> _persist;
 
+    /// <summary>
+    /// Das Rezept - Grundregler und Werkzeuge des Bildes, Stapel, Graph. Die Seite liest und
+    /// schreibt es nur hier. Siehe <see cref="Atelier.AtelierEditingSession"/>.
+    /// </summary>
+    private readonly Atelier.AtelierEditingSession _recipe;
+
     /// <summary>Das zusammengesetzte Bild - das, worauf alle Werkzeuge wirken.</summary>
     private FloatFrame? _frame;
 
@@ -119,6 +125,7 @@ public sealed partial class AtelierPage : UserControl
     {
         _decoders = decoders;
         _settings = settings;
+        _recipe = new Atelier.AtelierEditingSession(new Atelier.SettingsRecipeStore(settings));
         _persist = persist;
 
         // Zugestellt wird wie bisher mit Invoke: Die Rueckgabe kommt vom Lesefaden und
@@ -315,14 +322,14 @@ public sealed partial class AtelierPage : UserControl
         // Der gespeicherte Stapel gilt nur, soweit diese Datei die Passe auch
         // fuehrt. Zwanzig ausgegraute Zeilen nach dem Wechsel auf ein PNG waeren
         // kein Hinweis, sondern ein Raetsel.
-        Layers.Load(passes, cryptomattes, Prune(_settings.Layers, passes));
+        Layers.Load(passes, cryptomattes, Prune(_recipe.Layers, passes));
 
         // Der Streifen gilt fuer jedes Bild, nicht nur fuer eine Multilayer-EXR.
         // Passe braucht das Format, Ebenen nicht: Dasselbe Bild ein zweites Mal und
         // auf Multiplizieren gestellt rechnet auf einem PNG genauso. Ob er
         // aufgeklappt beginnt, entscheidet der Streifen selbst.
         ShowLayers(true);
-        _settings.Layers = Layers.Stack;
+        _recipe.Layers = Layers.Stack;
 
         _frame = loaded;
 
@@ -406,9 +413,9 @@ public sealed partial class AtelierPage : UserControl
 
         if (layer is null)
         {
-            Tools.Load(_settings.Adjustments, _settings.Grading);
-            _settings.Grading = Snapshot();
-            _settings.Adjustments = Tools.Adjustments;
+            Tools.Load(_recipe.Adjustments, _recipe.Grading);
+            _recipe.Grading = Snapshot();
+            _recipe.Adjustments = Tools.Adjustments;
 
             _finalAdjustments = Tools.Adjustments;
             _finalGrading = Tools.Prepared;
@@ -500,11 +507,11 @@ public sealed partial class AtelierPage : UserControl
             // Adjustments - das wurde geschrieben -, die anderen im Stapel.
             _editing.Tools = Snapshot();
 
-            _settings.Layers = Layers.Stack;
+            _recipe.Layers = Layers.Stack;
         }
         else
         {
-            _settings.Adjustments = Tools.Adjustments;
+            _recipe.Adjustments = Tools.Adjustments;
 
             // Und der Stapel dazu. Ihn hier zu vergessen war die zweite Haelfte eines
             // langen Fehlers: Die Aenderung kam im BILD an - _finalGrading steht ja
@@ -515,7 +522,7 @@ public sealed partial class AtelierPage : UserControl
             //
             // Im Fenster sah das aus, als taete der Regler nichts. Er tat etwas, und
             // der naechste Klick woanders nahm es ihm wieder ab.
-            _settings.Grading = Snapshot();
+            _recipe.Grading = Snapshot();
 
             _finalAdjustments = Tools.Adjustments;
             _finalGrading = Tools.Prepared;
