@@ -1803,6 +1803,14 @@ public partial class MainWindow : Window
             }
             return;
         }
+        // Strg+K: die Suche der Werkzeugleiste im Atelier.
+        if (_page == "atelier" && Keyboard.Modifiers == ModifierKeys.Control && e.Key == Key.K && _atelierPage is { } searching)
+        {
+            searching.OpenToolSearch();
+            e.Handled = true;
+            return;
+        }
+
         // Die Werkzeugspalte des Ateliers hoert auf V, W, C, H, I - dieselben
         // Buchstaben wie anderswo, damit niemand sie neu lernen muss. Tastendruecke
         // kommen im Fenster an und nicht auf der Seite, deshalb der Umweg hierher.

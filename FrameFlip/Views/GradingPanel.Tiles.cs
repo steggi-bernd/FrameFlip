@@ -276,6 +276,9 @@ public partial class GradingPanel
     /// zeigen, wenn sie ihr eine Entfernung gibt - und weil die Probe denselben Weg
     /// gehen soll wie die Maus.
     /// </summary>
+    /// <summary>Ob die Karte eines Effekts im Farbstreifen steht - fuer die Probe.</summary>
+    internal bool IsShown(string prefix) => _added.Contains(prefix);
+
     public void Show(string prefix)
     {
         if (!_cards.TryGetValue(prefix, out var card)) return;

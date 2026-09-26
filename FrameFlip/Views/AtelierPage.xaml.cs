@@ -152,6 +152,7 @@ public sealed partial class AtelierPage : UserControl
         Placement.Painted += OnPainted;
         Placement.MaskWanted = MakeMaskLayer;
         Properties.BrushChanged += UseBrushSettings;
+        ToolBand.Chosen += UseTool;
         Properties.BrushHistoryWanted += anchor =>
         {
             if (PaintTarget() is { } painted) ShowMaskHistory(painted, anchor);

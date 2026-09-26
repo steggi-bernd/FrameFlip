@@ -6,6 +6,7 @@
     <Grid>
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
             <RowDefinition Height="*" />
             <RowDefinition Height="Auto" />
         </Grid.RowDefinitions>
@@ -76,6 +77,9 @@
             </StackPanel>
         </Grid>
 
+        <!-- Die Werkzeugleiste: Kategorien als Band, darunter ihre Werkzeuge (Entwurf B). -->
+        <local:ToolBand x:Name="ToolBand" Grid.Row="1" Grid.ColumnSpan="2" Margin="0,0,0,10" />
+
         <!--
             Die Werkzeugspalte: was die Maus im Bild tut.
 
@@ -84,7 +88,7 @@
             das Bild besteht, liegt. Das ist keine Anordnung aus Gewohnheit, sondern
             die Leserichtung des Vorgangs: Werkzeug, Bild, Aufbau.
         -->
-        <local:ToolColumn x:Name="MouseTools" Grid.Row="1" Grid.Column="0"
+        <local:ToolColumn x:Name="MouseTools" Grid.Row="2" Grid.Column="0"
                           Margin="0,0,10,0" />
 
         <!-- Das Bild -->
@@ -97,7 +101,7 @@
             Anordnung beim Laden; ihre Namen und Handler bleiben dieselben, gleich wo
             sie gerade haengen.
         -->
-        <local:DockHost x:Name="Dock" Grid.Row="1" Grid.Column="1">
+        <local:DockHost x:Name="Dock" Grid.Row="2" Grid.Column="1">
             <local:DockHost.Center>
                 <!--
                     Das Bild, und darueber die Leiste des gewaehlten Werkzeugs.
@@ -236,7 +240,7 @@
         </local:DockHost>
 
         <!-- Die Sequenz ausgeben -->
-        <Border x:Name="ExportBar" Grid.Row="2" Grid.ColumnSpan="2" Margin="0,12,0,0"
+        <Border x:Name="ExportBar" Grid.Row="3" Grid.ColumnSpan="2" Margin="0,12,0,0"
                 Background="{StaticResource PanelBackground}"
                 BorderBrush="{StaticResource PanelBorder}" BorderThickness="1" CornerRadius="4"
                 Padding="12,10" Visibility="Collapsed">
