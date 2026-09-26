@@ -26,6 +26,14 @@ Getroffen am 26. September 2026:
 5. **Die Oberfläche wird umgebaut**, damit viele Werkzeuge auffindbar bleiben: eine
    Werkzeugleiste und ein Kontext, der ausblendet, was für eine Folge nicht taugt
    (Abschnitt 3).
+6. **Werkzeugleiste: Entwurf B.** Die Kategorien stehen als Band neben „Bild öffnen“.
+   Darunter steht eine Zeile mit den Werkzeugen der gewählten Kategorie (Abschnitt 3.1).
+7. **Kein Schalter Folge/Einzelbild im Band.** Ob eine Folge oder ein Einzelbild offen
+   ist, erkennt das Atelier selbst. Nur bei einer Folge steht am Ende der Werkzeugzeile
+   ein unauffälliges Symbol: Filmstreifen für die ganze Folge, ein Bild für „nur dieses
+   Bild“. Ein Ebenen-Symbol wird bewusst nicht verwendet, es wäre mit den Ebenen zu
+   verwechseln. Auf „nur dieses Bild“ umgestellt, wirken Änderungen nur auf das aktuelle
+   Bild der Folge (Abschnitt 3.2).
 
 ## 2. Reihenfolge
 
@@ -57,8 +65,9 @@ Neben „Bild öffnen“ steht eine waagerechte Leiste mit den Kategorien:
 
 - Auswahl, Malen, Tonwert, Farbe, Details, Optik, Licht, Glitch, Zeit, Retusche.
 
-Ein Klick öffnet ein Fach mit den Werkzeugen dieser Kategorie, jedes mit Zeichen, Namen
-und einem Satz. Die Einstellungen des gewählten Werkzeugs stehen rechts, wo heute der
+Die Kategorien stehen als Band (Entscheidung 6). Darunter zeigt eine zweite Zeile die
+Werkzeuge der gewählten Kategorie, jedes mit Zeichen und Namen. Der erklärende Satz steht
+im Tooltip. Die Einstellungen des gewählten Werkzeugs stehen rechts, wo heute der
 Farbstreifen steht. Eine Suche mit Strg+K findet jedes Werkzeug beim Namen, so wie der
 Hub im Knotenmodus.
 
@@ -77,11 +86,34 @@ Jedes Werkzeug trägt ein **Zeitverhalten**. Es entscheidet, wo das Werkzeug ers
 | **je Bild von Hand** | Gilt nur für das Bild, auf dem es entstand. | entsperrte gemalte Maske, Stempel, Reparatur, inhaltsbasiertes Füllen, KI-Segmentierung per Klick |
 | **über die Folge getragen** | Entsteht auf einem Bild und wird mit dem Bewegungspass oder Schlüsselbildern weitergegeben. | Maske über die Folge tragen, Schlüsselbilder |
 
+Ob eine Folge oder ein Einzelbild offen ist, erkennt das Atelier selbst. Einen Schalter
+dafür gibt es nicht (Entscheidung 7).
+
 Ist eine **Folge** offen, zeigt die Leiste zuerst, was sich anpasst. Werkzeuge der Art
-„je Bild von Hand“ stehen gedämpft in einem eigenen Abschnitt „Einzelbild“, mit dem
-Hinweis, dass sie nur dieses Bild ändern. Sie bleiben erreichbar, weil ein Fehler in
-einem einzelnen Bild der Folge genau so ein Werkzeug braucht. Ist ein **Einzelbild**
-offen, gibt es keine Unterscheidung.
+„je Bild von Hand“ stehen gestrichelt am Ende der Zeile, mit dem Hinweis, dass sie nur
+dieses Bild ändern. Sie bleiben erreichbar, weil ein Fehler in einem einzelnen Bild der
+Folge genau so ein Werkzeug braucht.
+
+Ganz rechts in der Werkzeugzeile steht dann ein kleines Symbol:
+
+- **Filmstreifen** (Grundstellung): Änderungen wirken auf die ganze Folge.
+- **Bild**: Änderungen wirken nur auf das aktuelle Bild. Die Werkzeuge „je Bild von Hand“
+  rücken nach vorn und sind nicht mehr gedämpft.
+
+Ist ein **Einzelbild** offen, fehlt das Symbol, denn es gibt nichts zu unterscheiden.
+
+„Nur dieses Bild“ heißt im Datenmodell: Die Änderung wird eine **Ausnahme für dieses
+Bild** im Projekt der Folge.
+
+- Für gemalte Masken gibt es das schon: Eine entsperrte Maske hält ihre Deckung je Bild
+  (`LayerMask.PaintFrames`).
+- Für alle anderen Einstellungen ist es neu. Es liegt nahe an den Schlüsselbildern aus
+  W9: Eine Ausnahme ist ein Schlüsselbild, das nur auf seinem eigenen Bild gilt, ohne
+  Übergang zu den Nachbarn.
+- Beides sollte deshalb **ein Modell** teilen. Die Ausnahme kommt mit Phase U, die
+  Übergänge mit W9.
+- Eine Ausnahme muss sichtbar sein: Ein Bild mit Ausnahmen trägt in der Folgeleiste eine
+  Marke, und die betroffenen Regler zeigen, dass sie hier vom Rest der Folge abweichen.
 
 Dafür bekommt jedes Werkzeug eine Beschreibung als Daten: Kategorie, Art im
 Knotensystem, Zeitverhalten, Zeichen und Suchwörter. Die Leiste, die Suche, der Hub im
@@ -101,7 +133,7 @@ Knotenmodus und die Einstellungen lesen alle aus derselben Liste.
 
 ### 4.1 Stand
 
-**Erster Schnitt (`feature/pinsel`):** Form, Winkel, „folgt dem Strich“ und objektgebunden.
+**Erster Schnitt (PR #37, gemergt):** Form, Winkel, „folgt dem Strich“ und objektgebunden.
 
 - Rund und gestreckt ergibt eine Ellipse, eckig und gestreckt ein Rechteck (bis 1:8).
   Eine schlichte runde Spitze nimmt weiter den alten Rechenweg.
