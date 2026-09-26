@@ -366,6 +366,10 @@ Der Rahmen nach Entscheidung 9, in vier Schnitten:
     Feldern, teilt es sich die Höhe wie gewohnt.
 - Die Proben kennen das neue Feld: Andocken, Einklappen, Grundanordnung, dazu die volle
   Höhe der Ausgabe, unabhängig vom Gewicht.
+- Beim Bauen gefunden, Fehler aus U3: Die Gruppen der Pinselleiste waren falsch
+  geschachtelt. Größe, Härte und Stärke lagen in der unsichtbaren Gruppe der Arten und
+  waren nie zu sehen. Die Probe prüfte nur den Schalter der Gruppe, jetzt prüft sie, ob
+  die Regler wirklich zu sehen sind.
 
 Danach R2 bis R4, dann laut Reihenfolge W2 Tonwert.
 
