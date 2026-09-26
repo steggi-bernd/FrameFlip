@@ -920,6 +920,10 @@
     <sys:String x:Key="S_MaskMenuConnect">Mit Ebene verbinden</sys:String>
     <sys:String x:Key="S_MaskMenuConnectTo">Verbinden mit {0}</sys:String>
     <sys:String x:Key="S_PicMenuObjectLayer">{0}: Objekt hier als Ebene</sys:String>
+    <sys:String x:Key="S_NodeMaskFree">frei</sys:String>
+    <sys:String x:Key="S_NodeMaskShared">→ {0} Ebenen</sys:String>
+    <sys:String x:Key="S_NodeLayerMasks">Masken</sys:String>
+    <sys:String x:Key="S_NodeLayerMaskFree">frei – an keiner Ebene</sys:String>
     <sys:String x:Key="S_NodeMix">Mischen</sys:String>
     <sys:String x:Key="S_NodeMixClip">Anschneiden</sys:String>
     <sys:String x:Key="S_NodeFallback">Stapel oder Bild</sys:String>

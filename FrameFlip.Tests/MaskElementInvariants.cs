@@ -35,7 +35,52 @@ public static class MaskElementInvariants
         TheCutoutIsALayerOfItsOwn();
         TheCutoutPaintsInRegions();
         MasksKeepTheirId();
+        TheGraphShowsMasks();
         ThePageHandlesMasks();
+    }
+
+    /// <summary>
+    /// Masken im Graphen (Punkt 11): Maskenkabel erkennbar, ein Schild am Mischen mit Maske,
+    /// "frei" und "-> n Ebenen" am Maskenknoten, und eine gewaehlte Maske hebt ihre Ebenen hervor.
+    /// </summary>
+    private static void TheGraphShowsMasks()
+    {
+        Check.Group("Masken: im Graphen sichtbar");
+
+        string T(string key) => Localization.Strings.T(key);
+
+        var graph = Graph(BlendMode.Normal);
+        var mask = graph.Nodes.OfType<MaskNode>().Single(m => m.Mask.Kind == MaskKind.Painted);
+        var layer = LayerOf(graph, mask);
+        var editor = new NodeEditor { Graph = graph, Translate = T, Title = NodeTitles.For, MaskTitle = NodeTitles.MaskName };
+
+        var faktor = graph.Links.Single(l => l.From == mask.Id && l.Input == "Faktor");
+        var image = graph.Into(layer.Id, "Oben")!;
+
+        Check.That(MaskUse.CarriesMask(graph, faktor) && !MaskUse.CarriesMask(graph, image) &&
+                   graph.Links.Where(l => l.To == mask.Id).All(l => !MaskUse.CarriesMask(graph, l)),
+                   "das Kabel in den Faktor traegt eine Maske - das Bild der Ebene und was in die Maske fliesst nicht");
+
+        Check.That(editor.ChipOf(layer) is var (source, name) && source == mask && name == T("S_MaskPainted"),
+                   "das Mischen zeigt ein Schild mit seiner Maske und ihrem Namen", editor.ChipOf(layer)?.Name);
+        Check.That(editor.ChipOf(graph.Nodes.OfType<MixNode>().First(m => m != layer)) is null, "ein Mischen ohne Maske keines");
+
+        Check.That(editor.TagOf(mask) is null, "eine Maske an genau einer Ebene braucht kein Schild");
+
+        var (_, cutMix) = LayerEdits.AddCutout(graph, layer, layer, "Bild", mask, "Maske")!.Value;
+        Check.That(editor.TagOf(mask) == string.Format(T("S_NodeMaskShared"), 2),
+                   "begrenzt sie eine Ebene und schneidet eine zweite aus: zwei Ebenen", editor.TagOf(mask));
+
+        var marked = editor.MarkedBy(mask);
+        Check.That(marked.Count == 2 && marked.Contains(layer) && marked.Contains(cutMix) && editor.MarkedBy(layer).Count == 0,
+                   "gewaehlt hebt sie beide hervor - ein gewaehltes Mischen hebt nichts hervor");
+
+        var copy = (MaskNode)NodeEdits.Duplicate(graph, mask)!;
+        Check.That(editor.TagOf(copy) == T("S_NodeMaskFree") && MaskUse.FreeMasks(graph).SequenceEqual(new[] { copy }),
+                   "eine Maske, die nirgends steckt, ist frei", editor.TagOf(copy));
+
+        mask.Label = "Himmel";
+        Check.That(editor.ChipOf(layer)?.Name == "Himmel", "hat die Maske einen Namen, steht er im Schild");
     }
 
     /// <summary>
@@ -304,6 +349,24 @@ public static class MaskElementInvariants
             Check.That(copy is not null && copy.Mask.Id.Length > 0 && copy.Mask.Id != id && page.LayersOf(copy).Count == 0 &&
                        page.LayersOf(mask).Single() == layer,
                        "Duplizieren: eine Kopie mit eigener Kennung, frei - die Ebene behaelt das Original");
+
+            // Die Liste: die freie Kopie im Abschnitt "Masken", die Ebene der gewaehlten Maske hervorgehoben.
+            var list = (NodeLayerList)page.FindName("NodeLayers");
+            var editor = (NodeEditor)page.FindName("NodeView");
+            editor.Select(mask);
+            Pump(TimeSpan.FromSeconds(0.2), () => false);
+
+            Check.That(list.ShownMasks.Count == 1 && list.ShownMasks[0].Mask == copy,
+                       "die Ebenenliste zeigt die freie Kopie im Abschnitt Masken", string.Join(", ", list.ShownMasks.Select(m => m.Name)));
+            Check.That(list.MarkedRows.Count == 1 && list.MarkedRows[0].Mix == layer,
+                       "und hebt die Ebene der gewaehlten Maske hervor");
+
+            typeof(AtelierPage).GetMethod("ShowFreeMaskMenu", flags)!.Invoke(page, new object[] { copy! });
+            Check.That(new[] { "S_LayerMenuShowInGraph", "S_MaskMenuExtract", "S_MaskMenuDuplicate", "S_HubDelete" }
+                           .All(k => page.LayerMenu!.Items.Contains(T(k))) && !page.LayerMenu!.Items.Contains(T("S_MaskMenuDetach")),
+                       "das Menue einer freien Maske in der Liste: zeigen, ausschneiden, duplizieren, loeschen - loesen nicht",
+                       string.Join(", ", page.LayerMenu!.Items));
+            page.LayerMenu.Close();
 
             // Verbinden: die Kopie an eine zweite Ebene.
             page.MaskObjectAt(sets[0], spot!.Value.X, spot.Value.Y);

@@ -103,6 +103,9 @@ public partial class AtelierPage
             if (layer.MaskSource is { } mask) _previews.Wanted.Add(mask.Id);
         }
 
+        // Die freien Masken haben ihr Bild im Abschnitt "Masken" der Liste.
+        foreach (var free in MaskUse.FreeMasks(_graph)) _previews.Wanted.Add(free.Id);
+
         _previews.Keep(_graph.Nodes.Select(n => n.Id));
     }
 
@@ -152,7 +155,9 @@ public partial class AtelierPage
         if (_graph is null) return;
 
         NodeLayers.Show(NodeLayerList.Of(_graph), NodeView.Selected, LayerThumb,
-                        layer => layer.MaskSource is { } mask ? PreviewImage(mask) : null);
+                        layer => layer.MaskSource is { } mask ? PreviewImage(mask) : null,
+                        NodeView.MarkedBy(NodeView.Selected),
+                        MaskUse.FreeMasks(_graph).Select(m => new FreeMask(m, NodeTitles.MaskName(m), PreviewImage(m))).ToList());
         ShowLayerCount();
     }
 

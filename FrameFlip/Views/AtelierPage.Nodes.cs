@@ -77,6 +77,7 @@ public partial class AtelierPage
 
         NodeView.Graph = _graph;
         NodeView.Title = NodeTitles.For;
+        NodeView.MaskTitle = NodeTitles.MaskName;
 
         ShowNodeMode();
         ShowNodeSettings();

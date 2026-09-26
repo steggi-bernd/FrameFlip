@@ -18,20 +18,11 @@ namespace FrameFlip.Views;
 public partial class AtelierPage
 {
     /// <summary>Die Ebenen, die diese Maske begrenzt - die Mischen, in deren Faktor sie steckt.</summary>
-    internal List<MixNode> LayersOf(Node mask)
-    {
-        if (_graph is null) return new List<MixNode>();
-
-        return _graph.Links
-            .Where(l => l.From == mask.Id && l.Input == "Faktor")
-            .Select(l => _graph.Find(l.To))
-            .OfType<MixNode>()
-            .Distinct()
-            .ToList();
-    }
+    internal List<MixNode> LayersOf(Node mask) => _graph is null ? new List<MixNode>() : MaskUse.Limited(_graph, mask);
 
     /// <summary>Die Eintraege fuer eine Maske im Menue ihres Knotens.</summary>
-    private void AddMaskItems(FlipMenu menu, MaskNode mask)
+    /// <param name="anchor">Woran das zweite Menue fuer "Verbinden" haengt - der Graph oder die Liste.</param>
+    private void AddMaskItems(FlipMenu menu, MaskNode mask, FrameworkElement anchor)
     {
         var users = LayersOf(mask);
         var others = NodeLayers.Shown.Select(l => l.Mix).OfType<MixNode>().Where(m => !users.Contains(m)).ToList();
@@ -40,18 +31,40 @@ public partial class AtelierPage
             .Item("✂", Strings.T("S_MaskMenuExtract"), () => ExtractLayer(mask))
             .Item("⊘", Strings.T("S_MaskMenuDetach"), () => DetachMask(mask), enabled: users.Count > 0)
             .Item("❐", Strings.T("S_MaskMenuDuplicate"), () => DuplicateMask(mask))
-            .Item("⤳", Strings.T("S_MaskMenuConnect"), () => ShowConnectMenu(mask, others), enabled: others.Count > 0);
+            .Item("⤳", Strings.T("S_MaskMenuConnect"), () => ShowConnectMenu(mask, others, anchor), enabled: others.Count > 0);
+    }
+
+    /// <summary>
+    /// Rechtsklick auf eine freie Maske in der Ebenenliste: sie im Graphen zeigen, dieselben
+    /// Handgriffe wie am Knoten, und loeschen.
+    /// </summary>
+    private void ShowFreeMaskMenu(MaskNode mask)
+    {
+        if (_graph is null) return;
+
+        var menu = new FlipMenu(NodeLayers)
+            .Item("⌖", Strings.T("S_LayerMenuShowInGraph"), () => OnLayerChosen(mask));
+
+        AddMaskItems(menu, mask, NodeLayers);
+
+        menu.Separator()
+            .Item("✕", Strings.T("S_HubDelete"), () => NodeView.Remove(mask));
+
+        LayerMenu = menu;
+        menu.Open();
     }
 
     /// <summary>Die Ebenen, mit denen sich eine Maske zusaetzlich verbinden laesst - ein zweites Menue.</summary>
-    private void ShowConnectMenu(MaskNode mask, IReadOnlyList<MixNode> layers)
+    private void ShowConnectMenu(MaskNode mask, IReadOnlyList<MixNode> layers, FrameworkElement anchor)
     {
-        var menu = new FlipMenu(NodeView);
+        var menu = new FlipMenu(anchor);
 
         foreach (var layer in layers)
             menu.Item("▭", Strings.T("S_MaskMenuConnectTo", NodeTitles.For(layer)), () => ConnectMask(mask, layer));
 
-        NodeMenu = menu;
+        if (ReferenceEquals(anchor, NodeLayers)) LayerMenu = menu;
+        else NodeMenu = menu;
+
         menu.Open();
     }
 

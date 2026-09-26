@@ -90,6 +90,18 @@ public static class NodeTitles
     };
 
     /// <summary>
+    /// Der kurze Name einer Maske - fuer das Schild an ihren Ebenen und die Ebenenliste: ihr
+    /// eigener Name, sonst die gewaehlten Objekte einer Kryptomatte, sonst ihre Art.
+    /// </summary>
+    public static string MaskName(Node node) => node switch
+    {
+        { Label: { Length: > 0 } label } => label,
+        MaskNode { Mask: { Kind: MaskKind.Cryptomatte, Picks.Count: > 0 } mask } => string.Join(", ", mask.Picks.Select(p => p.Name)),
+        MaskNode mask => Strings.T(MaskKey(mask.Mask.Kind)),
+        _ => For(node),
+    };
+
+    /// <summary>
     /// Wie ein Anschluss heisst. Die Namen im Modell sind Kennungen und bleiben es; in
     /// der Oberflaeche stehen sie in der Sprache des Programms. Ein Pass heisst, wie er
     /// in der Datei heisst.

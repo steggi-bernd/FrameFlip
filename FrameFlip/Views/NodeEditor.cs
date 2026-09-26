@@ -88,6 +88,9 @@ public sealed class NodeEditor : FrameworkElement
     /// <summary>Das kleine Bild eines Knotens mit Vorschau - oder keines, solange noch nichts gerechnet ist.</summary>
     public Func<Node, ImageSource?>? PreviewOf { get; set; }
 
+    /// <summary>Der kurze Name einer Maske - fuer das Schild an den Ebenen, die sie begrenzt.</summary>
+    public Func<Node, string>? MaskTitle { get; set; }
+
     /// <summary>Am Knopf im Kopf eines Knotens wurde die Vorschau ein- oder ausgeschaltet.</summary>
     public event Action<Node>? PreviewToggled;
 
@@ -1123,6 +1126,8 @@ public sealed class NodeEditor : FrameworkElement
 
         if (_graph is null) return;
 
+        _marked = MarkedBy(Selected);
+
         foreach (var link in _graph.Links)
             if (!ReferenceEquals(link, _lifted)) DrawLink(dc, link);
 
@@ -1251,17 +1256,25 @@ public sealed class NodeEditor : FrameworkElement
         // Das Kabel, in das ein Knoten gleich faellt, leuchtet - wie in Blender.
         bool landing = ReferenceEquals(link, _landing);
 
+        // Ein Maskenkabel hat seine eigene Farbe und ist gestrichelt - es traegt kein Bild und
+        // keinen beliebigen Wert, sondern bestimmt, wo etwas wirkt. Die Kabel der gewaehlten
+        // Maske stehen kraeftiger da.
+        bool mask = MaskUse.CarriesMask(_graph, link);
+        bool lit = mask && Selected is MaskNode chosen && link.From == chosen.Id;
+        double thickness = Math.Max(1.2, 2 * Math.Min(1, Zoom)) * (lit ? 1.6 : 1);
+
         var pen = landing
             ? new Pen(Brushes.White, Math.Max(2.5, 3.5 * Math.Min(1, Zoom)))
-            : new Pen(SocketBrush(from.Outputs[IndexOf(from.Outputs, link.Output)].Type),
-                      Math.Max(1.2, 2 * Math.Min(1, Zoom)));
+            : mask
+                ? new Pen(MaskWire, thickness) { DashStyle = MaskDash }
+                : new Pen(SocketBrush(from.Outputs[IndexOf(from.Outputs, link.Output)].Type), thickness);
         pen.Freeze();
 
         var path = Path(a, b);
         var halo = new Pen(Halo, pen.Thickness + 3);
         halo.Freeze();
 
-        dc.PushOpacity(landing ? 1 : from.Muted || to.Muted ? 0.35 : 0.85);
+        dc.PushOpacity(landing || lit ? 1 : from.Muted || to.Muted ? 0.35 : 0.85);
         dc.DrawGeometry(null, halo, path);
         dc.DrawGeometry(null, pen, path);
         dc.Pop();
@@ -1303,6 +1316,14 @@ public sealed class NodeEditor : FrameworkElement
 
         if (selected) dc.DrawRoundedRectangle(null, Chosen, box, radius, radius);
 
+        // Eine Ebene der gewaehlten Maske: in der Farbe der Maskenkabel umrandet.
+        if (_marked.Contains(node))
+        {
+            var mark = box;
+            mark.Inflate(3, 3);
+            dc.DrawRoundedRectangle(null, MaskMark, mark, radius + 2, radius + 2);
+        }
+
         // Unter den Anschluessen und ihren Namen, damit er sie nicht durchstreicht.
         if (node.Muted) DrawPassThrough(dc, node);
 
@@ -1313,18 +1334,18 @@ public sealed class NodeEditor : FrameworkElement
             string title = Title?.Invoke(node) ?? node.GetType().Name;
 
             // Stumm steht als Schild im Kopf - ein Wort statt eines Zeichens, das niemand
-            // deuten muss.
+            // deuten muss. Eine Maske sagt dort, ob sie frei ist oder geteilt.
             double tag = 0;
 
-            if (node.Muted)
+            foreach (var (words, back) in Tags(node))
             {
-                var word = Label(Translate?.Invoke("S_NodeMutedTag") ?? "stumm", 9.5 * Zoom, Text);
-                var pill = new Rect(box.Right - 30 * Zoom - word.Width - 10 * Zoom, box.Y + (Header * Zoom - word.Height - 4 * Zoom) / 2,
+                var word = Label(words, 9.5 * Zoom, Text);
+                var pill = new Rect(box.Right - 30 * Zoom - tag - word.Width - 10 * Zoom, box.Y + (Header * Zoom - word.Height - 4 * Zoom) / 2,
                                     word.Width + 10 * Zoom, word.Height + 4 * Zoom);
 
-                dc.DrawRoundedRectangle(MutedTag, null, pill, pill.Height / 2, pill.Height / 2);
+                dc.DrawRoundedRectangle(back, null, pill, pill.Height / 2, pill.Height / 2);
                 dc.DrawText(word, new Point(pill.X + 5 * Zoom, pill.Y + 2 * Zoom));
-                tag = pill.Width + 6 * Zoom;
+                tag += pill.Width + 6 * Zoom;
             }
 
             var text = Label(title, 12 * Zoom, Text);
@@ -1363,9 +1384,93 @@ public sealed class NodeEditor : FrameworkElement
 
         if (_viewed is var (shown, output) && ReferenceEquals(shown, node)) DrawViewed(dc, box, output, radius);
 
+        if (labels && ChipOf(node) is var (maskSource, maskName)) DrawChip(dc, box, maskSource, maskName);
+
         if (node.Preview) DrawPreview(dc, node);
 
         dc.Pop();
+    }
+
+    // ------------------------------------------------------------ Masken
+
+    private static readonly Brush MaskWire = Frozen(new SolidColorBrush(Color.FromRgb(0xD0, 0x8C, 0xE0)));
+    private static readonly DashStyle MaskDash = Frozen(new DashStyle(new[] { 3.0, 2.0 }, 0));
+    private static readonly Pen MaskMark = Frozen(new Pen(MaskWire, 2));
+    private static readonly Brush MaskTag = Frozen(new SolidColorBrush(Color.FromArgb(0xD0, 0x3E, 0x2C, 0x5C)));
+    private static readonly Brush ChipBack = Frozen(new SolidColorBrush(Color.FromArgb(0xF0, 0x2C, 0x22, 0x3A)));
+    private static readonly Pen ChipEdge = Frozen(new Pen(new SolidColorBrush(Color.FromArgb(0xB0, 0xD0, 0x8C, 0xE0)), 1));
+
+    private IReadOnlySet<Node> _marked = new HashSet<Node>();
+
+    /// <summary>Die Ebenen, die eine gewaehlte Maske benutzen - sie werden im Graphen und in der Liste hervorgehoben.</summary>
+    internal IReadOnlySet<Node> MarkedBy(Node? selected)
+        => _graph is not null && selected is MaskNode mask ? MaskUse.Users(_graph, mask).ToHashSet<Node>() : new HashSet<Node>();
+
+    /// <summary>Die Schilder im Kopf eines Knotens - stumm, und bei einer Maske frei oder geteilt.</summary>
+    private IEnumerable<(string Words, Brush Back)> Tags(Node node)
+    {
+        if (node.Muted) yield return (Translate?.Invoke("S_NodeMutedTag") ?? "stumm", MutedTag);
+        if (TagOf(node) is { } words) yield return (words, MaskTag);
+    }
+
+    /// <summary>
+    /// Das Schild eines Maskenknotens: "frei", wenn er nirgends steckt, "-> n Ebenen", wenn
+    /// mehrere Ebenen ihn benutzen. Eine Maske an genau einer Ebene braucht keines.
+    /// </summary>
+    internal string? TagOf(Node node)
+    {
+        if (_graph is null || node is not MaskNode mask) return null;
+
+        if (MaskUse.Free(_graph, mask)) return Translate?.Invoke("S_NodeMaskFree") ?? "frei";
+
+        int users = MaskUse.Users(_graph, mask).Count;
+        return users >= 2 ? string.Format(Translate?.Invoke("S_NodeMaskShared") ?? "→ {0}", users) : null;
+    }
+
+    /// <summary>Das Maskenschild eines Mischens: was in seinem Faktor steckt, und wie es heisst.</summary>
+    internal (Node Mask, string Name)? ChipOf(Node node)
+    {
+        if (_graph is null || node is not MixNode mix || _graph.Into(mix.Id, "Faktor") is not { } link ||
+            _graph.Find(link.From) is not { } source)
+        {
+            return null;
+        }
+
+        return (source, MaskTitle?.Invoke(source) ?? Title?.Invoke(source) ?? source.GetType().Name);
+    }
+
+    /// <summary>
+    /// Das Maskenschild ueber dem Kopf eines Mischens, rechts: ein kleines Bild der Maske und
+    /// ihr Name - wie die Maske neben einer Ebene im Stapel. Ueber dem Kopf und nicht in ihm,
+    /// damit der Name der Ebene nicht noch kuerzer wird.
+    /// </summary>
+    private void DrawChip(DrawingContext dc, Rect box, Node mask, string name)
+    {
+        double h = 16 * Zoom;
+        double picture = 20 * Zoom;
+
+        var text = Label(name, 10 * Zoom, Text);
+        text.MaxTextWidth = Math.Max(1, 96 * Zoom);
+        text.MaxLineCount = 1;
+        text.Trimming = TextTrimming.CharacterEllipsis;
+
+        double width = 3 * Zoom + picture + 5 * Zoom + Math.Min(text.Width, 96 * Zoom) + 6 * Zoom;
+        var chip = new Rect(box.Right - width, box.Y - h - 3 * Zoom, width, h);
+
+        dc.DrawRoundedRectangle(ChipBack, ChipEdge, chip, 3 * Zoom, 3 * Zoom);
+
+        var frame = new Rect(chip.X + 3 * Zoom, chip.Y + 2 * Zoom, picture, h - 4 * Zoom);
+        dc.DrawRectangle(PreviewGround, null, frame);
+
+        if (PreviewOf?.Invoke(mask) is { Width: > 0, Height: > 0 } image)
+        {
+            double scale = Math.Min(frame.Width / image.Width, frame.Height / image.Height);
+            double w = image.Width * scale, ih = image.Height * scale;
+
+            dc.DrawImage(image, new Rect(frame.X + (frame.Width - w) / 2, frame.Y + (frame.Height - ih) / 2, w, ih));
+        }
+
+        dc.DrawText(text, new Point(frame.Right + 5 * Zoom, chip.Y + (h - text.Height) / 2));
     }
 
     private static readonly Pen Viewing = Frozen(new Pen(new SolidColorBrush(Color.FromRgb(0xE8, 0x9A, 0x3C)), 2));
