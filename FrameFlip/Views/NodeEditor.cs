@@ -1092,7 +1092,7 @@ public sealed class NodeEditor : FrameworkElement
     public static Color HeaderColour(Node node) => node switch
     {
         RenderNode or PictureNode or BlackNode => Color.FromRgb(0x4B, 0x50, 0x5E),
-        MaskNode => Color.FromRgb(0x68, 0x4E, 0x94),
+        MaskNode or CutoutNode => Color.FromRgb(0x68, 0x4E, 0x94),
         PlaceNode or ExposureTintNode or LayerGradeNode or RestrictNode or MixNode or FallbackNode
             => Color.FromRgb(0x2E, 0x6B, 0x60),
         ViewNode => Color.FromRgb(0x86, 0x66, 0x2A),

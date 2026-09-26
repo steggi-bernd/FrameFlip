@@ -454,6 +454,67 @@ public sealed class LayerGradeNode : Node
 }
 
 /// <summary>
+/// Schneidet ein Bild mit einer Maske aus: dieselben Farben, die Deckung ist die Maske
+/// (mal der eigenen). Das Ergebnis ist freigestellt - gemischt traegt es nur dort bei, wo
+/// die Maske es zulaesst.
+///
+/// Die Grundlage fuer "als Ebene ausschneiden" (docs/Projekte-und-Masken.md, Punkt 3 und 4):
+/// Was eine Maske zeigt, wird ein Bild fuer sich, das eine eigene Ebene werden und
+/// weiterbearbeitet werden kann. Er rechnet jeden Bildpunkt allein - auch im Ausschnitt
+/// beim Malen.
+/// </summary>
+public sealed class CutoutNode : Node
+{
+    public const string KindName = "cutout";
+
+    public override IReadOnlyList<Socket> Inputs { get; } = new[]
+    {
+        new Socket("Bild", SocketType.Image),
+        new Socket("Maske", SocketType.Value),
+    };
+
+    public override IReadOnlyList<Socket> Outputs { get; } = new[] { new Socket("Bild", SocketType.Image) };
+
+    internal override string? Through => "Bild";
+
+    internal override void Run(NodeRun run)
+    {
+        var image = run.Image("Bild");
+        var mask = run.Value("Maske");
+
+        // Ohne Maske ist nichts auszuschneiden - das Bild bleibt ganz.
+        if (image is null || mask is null)
+        {
+            run.Set("Bild", image);
+            return;
+        }
+
+        var context = run.Context;
+        var a = context.Take(image.A.Length);
+        var own = image.A;
+        var cover = mask.V;
+
+        Parallel.For(0, context.GridHeight, NodeContext.Parallel, gy =>
+        {
+            int start = gy * context.GridWidth;
+            int end = start + context.GridWidth;
+
+            for (int at = start; at < end; at++)
+            {
+                // Wo das Bild gar nicht ist, bleibt es weg - Deckung null waere etwas anderes.
+                a[at] = own[at] < 0f
+                    ? GridImage.Absent
+                    : Math.Clamp(own[at], 0f, 1f) * Math.Clamp(cover[at], 0f, 1f);
+            }
+        });
+
+        // Dieselben Farben - geteilt, nicht kopiert; die Deckung ist neu, und sie begrenzt
+        // beim Mischen, was beitraegt.
+        run.Set("Bild", new GridImage { Rgb = image.Rgb, A = a, Matte = true, Contributed = image.Contributed });
+    }
+}
+
+/// <summary>
 /// Blendet von "Vorher" nach "Nachher", so weit die Maske reicht - die Korrektur gilt
 /// nur dort. Das ist der Umfang "die Maske begrenzt die Farbe" aus dem Stapel, als
 /// eigener Knoten: innen die Korrektur, aussen das Bild, dazwischen weich.

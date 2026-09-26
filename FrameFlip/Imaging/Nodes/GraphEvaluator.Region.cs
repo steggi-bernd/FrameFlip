@@ -93,7 +93,7 @@ public static partial class GraphEvaluator
 
         // OpticsNode: siehe IOpticsTool - dieselbe Rechnung an jedem Punkt, nur mit seinem
         // Ort und der Bildnummer.
-        RenderNode or PictureNode or BlackNode or PlaceNode or ExposureTintNode or MaskNode or RestrictNode
+        RenderNode or PictureNode or BlackNode or PlaceNode or ExposureTintNode or MaskNode or RestrictNode or CutoutNode
             or MixNode or FallbackNode or LightNode or PointToolNode or OpticsNode or ViewNode or ToneNode
             or MaskMathNode or MapRangeNode or ColorRampNode or OutputNode => true,
 

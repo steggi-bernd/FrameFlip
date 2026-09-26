@@ -912,6 +912,14 @@
     <sys:String x:Key="S_NodeAdjustment">Einstellungsebene</sys:String>
     <sys:String x:Key="S_NodeLayerGrade">Ebenenkorrektur</sys:String>
     <sys:String x:Key="S_NodeRestrict">Begrenzen</sys:String>
+    <sys:String x:Key="S_NodeCutout">Ausschneiden</sys:String>
+    <sys:String x:Key="S_CutoutLayerName">Ausschnitt</sys:String>
+    <sys:String x:Key="S_MaskMenuExtract">Als Ebene ausschneiden</sys:String>
+    <sys:String x:Key="S_MaskMenuDetach">Maske lösen</sys:String>
+    <sys:String x:Key="S_MaskMenuDuplicate">Maske duplizieren</sys:String>
+    <sys:String x:Key="S_MaskMenuConnect">Mit Ebene verbinden</sys:String>
+    <sys:String x:Key="S_MaskMenuConnectTo">Verbinden mit {0}</sys:String>
+    <sys:String x:Key="S_PicMenuObjectLayer">{0}: Objekt hier als Ebene</sys:String>
     <sys:String x:Key="S_NodeMix">Mischen</sys:String>
     <sys:String x:Key="S_NodeMixClip">Anschneiden</sys:String>
     <sys:String x:Key="S_NodeFallback">Stapel oder Bild</sys:String>

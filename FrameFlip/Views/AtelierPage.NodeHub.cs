@@ -77,6 +77,8 @@ public partial class AtelierPage
             }, enabled: _graph.Links.Any(l => l.From == node.Id || l.To == node.Id))
             .Item("✕", Strings.T("S_HubDelete"), () => NodeView.Remove(node), "Entf");
 
+        if (node is MaskNode mask) AddMaskItems(menu, mask);
+
         NodeMenu = menu;
         menu.Open();
     }

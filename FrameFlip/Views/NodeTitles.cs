@@ -73,6 +73,7 @@ public static class NodeTitles
         MaskNode mask => Strings.T("S_NodeMask") + ": " + Strings.T(MaskKey(mask.Mask.Kind)),
         LayerGradeNode grade => Strings.T(grade.Adjustment ? "S_NodeAdjustment" : "S_NodeLayerGrade"),
         RestrictNode => Strings.T("S_NodeRestrict"),
+        CutoutNode => Strings.T("S_NodeCutout"),
         MixNode mix => Strings.T(mix.Clip ? "S_NodeMixClip" : "S_NodeMix") + ": " + Strings.T(BlendKey(mix.Mode)),
         FallbackNode => Strings.T("S_NodeFallback"),
         LightNode => Strings.T("S_NodeLight"),
