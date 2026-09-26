@@ -19,6 +19,19 @@ public static class StackToGraph
     /// <summary>Wie tief Gruppen stehen duerfen - dieselbe Grenze wie im Composer.</summary>
     private const int MaxDepth = 8;
 
+    /// <summary>
+    /// Ob ein Graph nichts traegt als die Umwandlung eines leeren Stapels: die Datei, die
+    /// Ansicht, die Ausgabe und dazwischen Licht und Tonwert in Grundstellung. Wer umgewandelt
+    /// und dann nichts getan hat, verliert nichts, wenn er neu umgewandelt wird - etwa aus dem
+    /// Stapel, den die Paesse einer Datei ohne fertiges Bild ergeben.
+    /// </summary>
+    public static bool IsPlain(NodeGraph graph)
+        => graph.Nodes.Count(n => n is RenderNode) == 1 &&
+           graph.Nodes.Count(n => n is OutputNode) == 1 &&
+           graph.Nodes.All(n => n is RenderNode or OutputNode or ViewNode ||
+                                n is LightNode { Idle: true } ||
+                                n is ToneNode { Idle: true });
+
     public static NodeGraph Convert(LayerStack? layers, ImageAdjustments? adjustments, GradingStack? picture)
     {
         var graph = new NodeGraph();
