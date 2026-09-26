@@ -48,10 +48,10 @@
                 <ToggleButton x:Name="BrushModeLasso" Style="{StaticResource OverlayToggle}" Margin="4,0,14,0"
                               VerticalAlignment="Center" Content="➰" ToolTip="{DynamicResource S_BrushModeLassoHint}"
                               Checked="OnBrushMode" Unchecked="OnBrushMode" />
-
-                <StackPanel x:Name="BrushTipRow" Orientation="Horizontal" VerticalAlignment="Center">
                 </StackPanel>
 
+                <!-- Die Spitze: Groesse, Haerte, Staerke - nur beim Zug, nicht beim Fuellen. -->
+                <StackPanel x:Name="BrushTipRow" Orientation="Horizontal" VerticalAlignment="Center">
                 <TextBlock Text="{DynamicResource S_BrushSize}" Style="{StaticResource PanelLabel}"
                            VerticalAlignment="Center" Margin="0,0,6,0" />
                 <Slider x:Name="BrushSizeSlider" Style="{StaticResource PanelSlider}" Width="110"
@@ -112,11 +112,10 @@
                 <TextBlock x:Name="BrushSpacingValue" Style="{StaticResource PanelValue}"
                            VerticalAlignment="Center" Width="40" Margin="6,0,0,0"
                            HorizontalAlignment="Left" />
-
-                <StackPanel x:Name="BrushShapeRow" Orientation="Horizontal" VerticalAlignment="Center">
                 </StackPanel>
 
                 <!-- Die Spitze: eckig oder rund, gedreht, gestreckt - und woran sie sich haelt. -->
+                <StackPanel x:Name="BrushShapeRow" Orientation="Horizontal" VerticalAlignment="Center">
                 <ToggleButton x:Name="BrushSquareToggle" Style="{StaticResource OverlayToggle}" Margin="14,0,0,0"
                               VerticalAlignment="Center" Content="▢" ToolTip="{DynamicResource S_BrushSquareHint}"
                               Checked="OnBrushToggle" Unchecked="OnBrushToggle" />
