@@ -34,6 +34,7 @@ public static class BrushShapeInvariants
         TheDiamondReachesFurther();
         PressureShapesTheStroke();
         TheSurfaceHoldsTheStroke();
+        AreasFillWhatTheyEnclose();
         ALimitKeepsTheStrokeOut();
         EveryStrokeReplaysExactly();
         ThePageBindsToTheObject();
@@ -51,6 +52,7 @@ public static class BrushShapeInvariants
         Check.That(old.Shape == BrushShape.Round && old.Aspect == 1f && old.Angle == 0f && !old.Follow && old.Limit is null && old.Reach == old.Radius,
                    "ohne die neuen Felder: rund, ungestreckt, ungedreht, ungebunden");
         Check.That(old.Version == 0 && old.Squish == 0f, "und in der Rechnung, mit der er gemalt wurde - Fassung 0, ohne Karo");
+        Check.That(old.Area == PaintArea.None && old.Pressure is null, "ein Zug, keine Flaeche, ohne Druck");
 
         // Derselbe Weg mit dem alten Tupfer von Hand gesetzt ergibt dasselbe Raster.
         var replayed = PaintedMask.For(ImageWidth, ImageHeight);
@@ -311,6 +313,98 @@ public static class BrushShapeInvariants
         Check.That(recorded.Pressure!.Count * 2 == recorded.Path.Count && read.PressureTo == recorded.PressureTo &&
                    again.Cover().AsSpan().SequenceEqual(live.Cover()),
                    "ein Druckwert je Punkt, aus Text gelesen genau nachgespielt");
+    }
+
+    /// <summary>
+    /// Rechteck, Ellipse und Lasso fuellen, was sie umschliessen - mit geglaetteter Kante, bis
+    /// zur Deckkraft, auf Wunsch begrenzt - und spielen im Verlauf nach wie jeder Zug.
+    /// </summary>
+    private static void AreasFillWhatTheyEnclose()
+    {
+        Check.Group("Pinsel: Rechteck, Ellipse, Lasso");
+
+        byte At(PaintedMask m, int col, int row) => m.Cover()[row * Cols + col];
+
+        PaintedMask Filled(PaintArea area, List<float> path, float opacity = 1f, bool erase = false, PaintedMask? onto = null, string? limit = null)
+        {
+            var mask = onto ?? PaintedMask.For(ImageWidth, ImageHeight);
+            new PaintStroke { Area = area, Path = path, Opacity = opacity, Erase = erase, Limit = limit }.Fill(mask);
+            return mask;
+        }
+
+        // Ein Rechteck von (41, 40) bis (120, 100) - links nicht auf der Rasterkante.
+        var box = Filled(PaintArea.Rectangle, PaintStroke.RectanglePath(41, 40, 120, 100));
+        Check.That(At(box, 20, 17) == 255 && At(box, 5, 5) == 0 && At(box, 31, 17) == 0,
+                   "das Rechteck: innen voll, aussen nichts");
+        Check.That(At(box, 10, 17) is > 150 and < 230, "die angeschnittene Kante zum Teil - geglaettet", $"{At(box, 10, 17)}");
+
+        Check.That(Math.Abs(At(Filled(PaintArea.Rectangle, PaintStroke.RectanglePath(41, 40, 120, 100), opacity: 0.5f), 20, 17) - 128) <= 1,
+                   "bis zur Deckkraft");
+
+        Filled(PaintArea.Rectangle, PaintStroke.RectanglePath(60, 50, 100, 90), erase: true, onto: box);
+        Check.That(At(box, 20, 17) == 0 && At(box, 12, 12) == 255, "mit der rechten Taste nimmt es weg");
+
+        // Die Ellipse im selben Rahmen laesst die Ecken frei.
+        var round = Filled(PaintArea.Ellipse, PaintStroke.EllipsePath(80, 70, 40, 30));
+        Check.That(At(round, 20, 17) == 255 && At(round, 10, 10) == 0 && At(round, 29, 17) > 0,
+                   "die Ellipse: die Mitte voll, die Ecken ihres Rahmens frei");
+
+        // Ein Stern aus einem Zug: Wo sich das Lasso selbst kreuzt, entsteht ein Loch.
+        var star = new List<float>();
+        for (int k = 0; k < 5; k++)
+        {
+            float a = (-90f + 144f * k) * MathF.PI / 180f;
+            star.Add(120f + 60f * MathF.Cos(a));
+            star.Add(80f + 60f * MathF.Sin(a));
+        }
+
+        var lasso = Filled(PaintArea.Lasso, star);
+        Check.That(At(lasso, 30, 20) == 0 && At(lasso, 30, 8) > 200, "das Lasso kreuzt sich selbst: die Mitte bleibt frei, die Zacken voll",
+                   $"{At(lasso, 30, 20)} / {At(lasso, 30, 8)}");
+
+        // Auf ein Objekt begrenzt: nur die linke Haelfte.
+        var half = new byte[Cols * Rows];
+        for (int i = 0; i < half.Length; i++) half[i] = (byte)(i % Cols < 20 ? 255 : 0);
+        var bound = Filled(PaintArea.Rectangle, PaintStroke.RectanglePath(40, 40, 120, 100), limit: PaintedMask.Pack(half));
+        Check.That(At(bound, 15, 17) == 255 && At(bound, 25, 17) == 0, "auf ein Objekt begrenzt fuellt es nur das Objekt");
+
+        // Aufgezeichnet, aus Text gelesen und im Maskenverlauf nachgespielt.
+        var paint = PaintedMask.For(ImageWidth, ImageHeight);
+        var history = MaskHistory.Start(paint);
+        var states = new List<byte[]> { paint.Cover().ToArray() };
+
+        foreach (var (area, path) in new[]
+                 {
+                     (PaintArea.Rectangle, PaintStroke.RectanglePath(10, 10, 200, 150)),
+                     (PaintArea.Ellipse, PaintStroke.EllipsePath(100, 80, 50, 40)),
+                     (PaintArea.Lasso, star),
+                 })
+        {
+            var stroke = new PaintStroke { Area = area, Path = path, Opacity = 0.8f, Erase = area == PaintArea.Ellipse };
+            var read = JsonSerializer.Deserialize<PaintStroke>(JsonSerializer.Serialize(stroke, AtelierProjectStore.Options), AtelierProjectStore.Options)!;
+
+            read.Replay(paint);
+            paint.Keep();
+            if (history.Record(paint, stroke)) states.Add(paint.Cover().ToArray());
+        }
+
+        bool exact = true;
+        for (int i = 0; i < history.States.Count; i++)
+            exact &= history.CoverOf(i).AsSpan().SequenceEqual(states[states.Count - history.States.Count + i]);
+
+        Check.That(exact && history.States.Count == 4, "aus Text gelesen und im Maskenverlauf: jeder Stand genau", $"{history.States.Count} Staende");
+
+        // Was die Maus aufzieht: Umschalt macht Quadrat und Kreis, zu klein ist nichts.
+        var drawn = new List<float> { 100, 100 };
+        var square = PlacementAdorner.AreaCorners(PaintArea.Rectangle, drawn, 140, 120, even: true)!;
+        var circle = PlacementAdorner.AreaCorners(PaintArea.Ellipse, drawn, 60, 130, even: true)!;
+        Check.That(square.SequenceEqual(new float[] { 100, 100, 140, 100, 140, 140, 100, 140 }) &&
+                   Math.Abs(circle.Where((_, i) => i % 2 == 0).Max() - circle.Where((_, i) => i % 2 == 0).Min() - 40) < 0.5 &&
+                   Math.Abs(circle.Where((_, i) => i % 2 == 1).Max() - circle.Where((_, i) => i % 2 == 1).Min() - 40) < 0.5,
+                   "Umschalt: aus dem Rechteck ein Quadrat, aus der Ellipse ein Kreis - in Richtung der Maus");
+        Check.That(PlacementAdorner.AreaCorners(PaintArea.Rectangle, drawn, 100.5f, 140, even: false) is null &&
+                   PlacementAdorner.AreaCorners(PaintArea.Lasso, new List<float> { 10, 10, 20, 20 }, 30, 30, even: false) is null,
+                   "ein Klick ohne Ziehen oder ein Lasso ohne Flaeche fuellt nichts");
     }
 
     /// <summary>
@@ -617,6 +711,19 @@ public static class BrushShapeInvariants
             objectToggle.IsChecked = true;
             Check.That(edgeToggle.IsChecked == false && !edgeSlider.IsEnabled, "und umgekehrt");
             objectToggle.IsChecked = false;
+
+            // Womit gemalt wird: genau eine Art, und sie kommt beim Pinsel an.
+            var modes = new[] { "BrushModeStroke", "BrushModeRectangle", "BrushModeEllipse", "BrushModeLasso" }
+                .Select(name => (ToggleButton)properties.FindName(name)).ToArray();
+
+            modes[2].IsChecked = true;
+            bool one = modes.Count(m => m.IsChecked == true) == 1 && placement.BrushArea == PaintArea.Ellipse;
+            modes[2].IsChecked = false;
+            bool stays = modes[2].IsChecked == true;
+            modes[0].IsChecked = true;
+
+            Check.That(one && stays && placement.BrushArea == PaintArea.None,
+                       "Zug, Rechteck, Ellipse, Lasso: genau eine Art an, die gewaehlte bleibt beim zweiten Klick");
 
             // Der Druck: nur mit Stift, und nur, wenn er auf etwas wirkt.
             var pressureBox = (ComboBox)properties.FindName("BrushPressureBox");

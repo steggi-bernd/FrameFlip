@@ -170,6 +170,7 @@ public partial class AtelierPage
         Placement.BrushFollow = Properties.BrushFollow;
         Placement.BrushSquish = Properties.BrushSquish;
         Placement.BrushPressureTo = Properties.BrushPressureTo;
+        Placement.BrushArea = Properties.BrushArea;
 
         float tolerance = Properties.BrushEdgeTolerance;
         Placement.LimitWanted = Properties.BrushObject ? ObjectLimitAt

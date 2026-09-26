@@ -83,6 +83,82 @@ public sealed partial class PlacementAdorner
     /// <summary>Worauf der Druck eines Stifts wirkt. Die Maus hat keinen und merkt davon nichts.</summary>
     public BrushPressure BrushPressureTo { get; set; } = BrushPressure.Size;
 
+    /// <summary>Malt der Pinsel Zuege oder zieht er Flaechen auf - Rechteck, Ellipse, Lasso.</summary>
+    public PaintArea BrushArea { get; set; }
+
+    /// <summary>
+    /// Die Flaeche, die gerade aufgezogen wird: beim Lasso der Weg, sonst nur der Ansatz -
+    /// oder null, wenn keine aufgezogen wird.
+    /// </summary>
+    private List<float>? _area;
+
+    /// <summary>Wo die Maus beim Aufziehen gerade steht, in Bildpunkten.</summary>
+    private float _areaX, _areaY;
+
+    /// <summary>
+    /// Das Ende des letzten Zugs und die Maske, auf der er lag: Von hier aus zieht Umschalt
+    /// und Klick eine gerade Linie.
+    /// </summary>
+    private (float X, float Y)? _lineFrom;
+    private PaintedMask? _lineMask;
+
+    /// <summary>
+    /// Die Ecken der Flaeche, die gerade aufgezogen wird - oder null, solange sie zu klein
+    /// ist. Umschalt macht aus dem Rechteck ein Quadrat und aus der Ellipse einen Kreis.
+    /// </summary>
+    internal List<float>? AreaPath(bool even)
+        => _area is null ? null : AreaCorners(BrushArea, _area, _areaX, _areaY, even);
+
+    /// <summary>
+    /// Die Ecken einer Flaeche aus dem, was die Maus bisher getan hat: <paramref name="drawn"/>
+    /// beginnt mit dem Ansatz, beim Lasso folgt der Weg; (<paramref name="x"/>, <paramref name="y"/>)
+    /// ist, wo sie jetzt steht. Null, solange die Flaeche zu klein ist.
+    /// </summary>
+    internal static List<float>? AreaCorners(PaintArea area, IReadOnlyList<float> drawn, float x, float y, bool even)
+    {
+        if (area == PaintArea.None || drawn.Count < 2) return null;
+
+        float x0 = drawn[0], y0 = drawn[1];
+
+        if (area == PaintArea.Lasso)
+        {
+            var lasso = new List<float>(drawn);
+            if (lasso[^2] != x || lasso[^1] != y) { lasso.Add(x); lasso.Add(y); }
+
+            return lasso.Count >= 6 && MathF.Abs(Shoelace(lasso)) >= 4f ? lasso : null;
+        }
+
+        float dx = x - x0, dy = y - y0;
+
+        if (even)
+        {
+            float side = MathF.Max(MathF.Abs(dx), MathF.Abs(dy));
+            dx = dx < 0 ? -side : side;
+            dy = dy < 0 ? -side : side;
+        }
+
+        if (MathF.Abs(dx) < 1f || MathF.Abs(dy) < 1f) return null;
+
+        float left = MathF.Min(x0, x0 + dx), top = MathF.Min(y0, y0 + dy);
+        float right = MathF.Max(x0, x0 + dx), bottom = MathF.Max(y0, y0 + dy);
+
+        return area == PaintArea.Rectangle
+            ? PaintStroke.RectanglePath(left, top, right, bottom)
+            : PaintStroke.EllipsePath((left + right) / 2f, (top + bottom) / 2f, (right - left) / 2f, (bottom - top) / 2f);
+    }
+
+    /// <summary>Die doppelte Flaeche eines Vielecks - fuer "ist das Lasso mehr als ein Strich".</summary>
+    private static float Shoelace(IReadOnlyList<float> path)
+    {
+        float sum = 0f;
+        int n = path.Count / 2;
+
+        for (int i = 0, j = n - 1; i < n; j = i++)
+            sum += path[2 * j] * path[2 * i + 1] - path[2 * i] * path[2 * j + 1];
+
+        return sum;
+    }
+
     /// <summary>
     /// Der Druck des Stifts bei dieser Meldung, 0 bis 1 - oder null bei der Maus, bei
     /// Beruehrung mit dem Finger und bei einem Stift ohne Drucksensor. Windows meldet auch
@@ -396,10 +472,36 @@ public sealed partial class PlacementAdorner
             return;
         }
 
+        // Beim Aufziehen einer Flaeche: ihr Umriss statt des Rings.
+        if (_painting && _area is not null)
+        {
+            if (AreaPath((Keyboard.Modifiers & ModifierKeys.Shift) != 0) is { } corners)
+            {
+                var figure = new PathFigure { StartPoint = Screen(corners[0], corners[1]), IsClosed = true };
+
+                for (int i = 2; i + 1 < corners.Count; i += 2)
+                    figure.Segments.Add(new LineSegment(Screen(corners[i], corners[i + 1]), true));
+
+                var outline = new PathGeometry(new[] { figure });
+                context.DrawGeometry(null, Shadow, outline);
+                context.DrawGeometry(null, new Pen(Ring, 1), outline);
+            }
+
+            return;
+        }
+
         if (!IsMouseOver) return;
 
         var at = Mouse.GetPosition(this);
         double radius = BrushRadius * ReachOnScreen;
+
+        // Mit Umschalt: gestrichelt, wohin eine gerade Linie ginge.
+        if (BrushArea == PaintArea.None && !_painting && (Keyboard.Modifiers & ModifierKeys.Shift) != 0 &&
+            _lineFrom is { } from && ReferenceEquals(_lineMask, _mask))
+        {
+            var dashed = new Pen(Ring, 1) { DashStyle = DashStyles.Dash };
+            context.DrawLine(dashed, Screen(from.X, from.Y), at);
+        }
 
         if (BrushShape == BrushShape.Round && BrushAspect <= 1f)
         {
@@ -665,10 +767,33 @@ public sealed partial class PlacementAdorner
         // hat das ganze Bild danach schon gezeigt.
         _pendingTouched = PaintBounds.Empty;
 
-        float? pressure = PenPressure(e, this);
-        _stroke = NewStroke(x, y, pen: pressure is not null);
+        // Eine Flaeche wird erst beim Loslassen gefuellt - bis dahin steht nur ihr Umriss da.
+        if (BrushArea != PaintArea.None)
+        {
+            _area = new List<float> { x, y };
+            _areaX = x;
+            _areaY = y;
 
-        Touched(_stroke.Begin(_mask, x, y, pressure ?? 1f));
+            e.Handled = true;
+            CaptureMouse();
+            InvalidateVisual();
+            return;
+        }
+
+        float? pressure = PenPressure(e, this);
+
+        // Umschalt und Klick: eine gerade Linie vom Ende des letzten Zugs auf derselben Maske.
+        if ((Keyboard.Modifiers & ModifierKeys.Shift) != 0 && _lineFrom is { } from && ReferenceEquals(_lineMask, _mask))
+        {
+            _stroke = NewStroke(from.X, from.Y, pen: pressure is not null);
+            Touched(_stroke.Begin(_mask, from.X, from.Y, pressure ?? 1f));
+            Touched(_stroke.To(_mask, x, y, pressure ?? 1f));
+        }
+        else
+        {
+            _stroke = NewStroke(x, y, pen: pressure is not null);
+            Touched(_stroke.Begin(_mask, x, y, pressure ?? 1f));
+        }
         Painted?.Invoke(true);
 
         e.Handled = true;
@@ -676,11 +801,41 @@ public sealed partial class PlacementAdorner
     }
 
     /// <summary>
+    /// Die Flaeche ist aufgezogen: gefuellt, festgehalten und als Strich gemerkt, damit der
+    /// Maskenverlauf sie nachspielt wie jeden Zug. Zu klein - ein Klick ohne Ziehen - fuellt
+    /// sie nichts.
+    /// </summary>
+    private void AreaUp(MouseButtonEventArgs e)
+    {
+        var corners = AreaPath((Keyboard.Modifiers & ModifierKeys.Shift) != 0);
+        float x = _area![0], y = _area[1];
+        _area = null;
+
+        LastStroke = null;
+
+        if (_mask is not null && corners is not null)
+        {
+            var stroke = NewStroke(x, y, area: BrushArea, path: corners);
+            Touched(stroke.Fill(_mask));
+            Painted?.Invoke(true);
+
+            LastStroke = stroke;
+            _mask.Keep();
+            Painted?.Invoke(false);
+        }
+
+        e.Handled = true;
+        InvalidateVisual();
+    }
+
+    /// <summary>
     /// Ein neuer Strich mit allem, was gerade eingestellt ist - und der heutigen Rechnung.
     /// Mit einem Stift, dessen Druck auf etwas wirkt, zeichnet er den Druck je Punkt auf.
     /// </summary>
-    internal PaintStroke NewStroke(float x, float y, bool pen = false) => new()
+    internal PaintStroke NewStroke(float x, float y, bool pen = false, PaintArea area = PaintArea.None, List<float>? path = null) => new()
     {
+        Area = area,
+        Path = path ?? new List<float>(),
         Radius = BrushRadius,
         Hardness = BrushHardness,
         Flow = BrushFlow,
@@ -719,6 +874,21 @@ public sealed partial class PlacementAdorner
         // des Abstands haelt einen Strich dagegen nicht auf.
         if (_knob is BrushKnob.Size or BrushKnob.Hardness) return;
 
+        // Eine Flaeche wird aufgezogen: nur der Umriss folgt, beim Lasso sammelt sich der Weg.
+        if (_painting && _area is not null)
+        {
+            if (BrushArea == PaintArea.Lasso)
+            {
+                float lx = _area[^2], ly = _area[^1];
+                if ((x - lx) * (x - lx) + (y - ly) * (y - ly) >= 2.25f) { _area.Add(x); _area.Add(y); }
+            }
+
+            _areaX = x;
+            _areaY = y;
+            InvalidateVisual();
+            return;
+        }
+
         if (!_painting || _mask is null || _stroke is null)
         {
             // Der Kreis folgt dem Zeiger, auch wenn nicht gemalt wird.
@@ -748,6 +918,12 @@ public sealed partial class PlacementAdorner
         _painting = false;
         ReleaseMouseCapture();
 
+        if (_area is not null)
+        {
+            AreaUp(e);
+            return;
+        }
+
         // Ein Klick ohne Bewegung mit einem Winkel, der dem Strich folgt: Sein Tupfer kommt jetzt.
         if (_mask is not null && _stroke?.Finish(_mask) is { IsEmpty: false } last)
         {
@@ -757,6 +933,12 @@ public sealed partial class PlacementAdorner
 
         LastStroke = _stroke;
         _stroke = null;
+
+        if (LastStroke is { Path.Count: >= 2 } done)
+        {
+            _lineFrom = (done.Path[^2], done.Path[^1]);
+            _lineMask = _mask;
+        }
 
         // Beim Loslassen einmal endgueltig: Das ist das Zeichen, voll zu rechnen und
         // den Anstrich festzuhalten.

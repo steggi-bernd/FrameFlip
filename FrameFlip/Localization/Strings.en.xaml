@@ -1215,6 +1215,10 @@
     <sys:String x:Key="S_BrushFollowHint">The angle follows the stroke – a flat tip turns into every curve like a broad nib. The angle is then relative to the stroke: at 0° the tip lies along the path and paints thin, at 90° it lies across and paints wide. Small tremors of the hand don't turn the tip.</sys:String>
     <sys:String x:Key="S_BrushSquish">Diamond</sys:String>
     <sys:String x:Key="S_BrushSquishHint">Pulls two opposite corners of the square tip apart – the square becomes a diamond whose point reaches into narrow gaps. Aim it with the angle.</sys:String>
+    <sys:String x:Key="S_BrushModeStrokeHint">Brush: paint strokes. Shift-click draws a straight line from the end of the last stroke.</sys:String>
+    <sys:String x:Key="S_BrushModeRectangleHint">Drag out a rectangle and fill it – Shift makes a square. Right button or Alt removes. Opacity applies, and optionally only the object or the surface.</sys:String>
+    <sys:String x:Key="S_BrushModeEllipseHint">Drag out an ellipse and fill it – Shift makes a circle. Right button or Alt removes.</sys:String>
+    <sys:String x:Key="S_BrushModeLassoHint">Lasso: trace a shape freely and fill it. It closes when you let go. Right button or Alt removes.</sys:String>
     <sys:String x:Key="S_BrushEdgeHint">Paint only on the surface the stroke starts on – from the file's depth and normal passes. The stroke stops at a jump in depth or a crease.</sys:String>
     <sys:String x:Key="S_BrushEdgeTolerance">Tolerance</sys:String>
     <sys:String x:Key="S_BrushEdgeToleranceHint">How far the surface's depth and direction may differ from where the stroke started. Low stops at every curve, high flows over gentle bulges.</sys:String>

@@ -152,7 +152,7 @@ Knotenmodus und die Einstellungen lesen alle aus derselben Liste.
   - 40 zufällige Striche spielen nach, auch aus Text gelesen und im Maskenverlauf.
   - Die Seite bindet an ein Objekt der Kryptomatte-Probedatei.
 
-**Nach dem ersten Test (`feature/pinsel-karo`):**
+**Nach dem ersten Test (PR #39, gemergt):**
 
 - **Ruhige Richtung:** Bei „folgt dem Strich“ kam die Richtung jedes Tupfers aus dem
   letzten Mausschritt. Bei langsamem Malen ist der 1–2 Bildpunkte lang und auf 0, 45 oder
@@ -173,7 +173,7 @@ Knotenmodus und die Einstellungen lesen alle aus derselben Liste.
   auseinander wie an einem Gelenkrahmen, die Seiten bleiben gleich lang. Voll gezogen ist
   das Karo sieben Mal so lang wie breit, für schmale Spalten.
 
-**Druck und Kante (`feature/pinsel-druck-kante`):**
+**Druck und Kante (PR #40, gemergt):**
 
 - **Druckstärke:** Der Druck eines Grafiktabletts wirkt wahlweise auf Größe, Stärke oder
   beides. Die Grundstellung ist Größe.
@@ -197,9 +197,28 @@ Knotenmodus und die Einstellungen lesen alle aus derselben Liste.
   - Sprung, Hintergrund, Knick, Wölbung und Toleranz an künstlichen Pässen.
   - Der Tiefenpass der Blender-Probedatei auf der Seite.
 
+**Linien und Flächen (`feature/pinsel-formen`):**
+
+- **Gerade Linie:** Umschalt + Klick zieht eine Linie vom Ende des letzten Zugs auf
+  derselben Maske. Solange Umschalt gehalten wird, zeigt eine gestrichelte Linie, wohin
+  sie ginge.
+- **Rechteck, Ellipse, Lasso:** vier Knöpfe am Anfang der Pinselleiste (✎ ▭ ◯ ➰), genau
+  einer ist an.
+  - Rechteck und Ellipse werden aufgezogen. Umschalt macht Quadrat und Kreis.
+  - Das Lasso umfährt eine Form frei und schließt sich beim Loslassen. Kreuzt es sich
+    selbst, entsteht ein Loch (gerade-ungerade).
+  - Gefüllt wird mit geglätteter Kante (4 × 4 Abtastungen je Maskenpunkt) bis zur
+    Deckkraft. Rechte Taste oder Alt nimmt weg. Objekt- und Flächenbindung gelten auch hier.
+- **Im Modell** ist eine Fläche ein `PaintStroke` mit `Area` und den Ecken als `Path`. Der
+  Maskenverlauf spielt sie ohne Umbau nach.
+- Beim Bauen gefunden: Ein Knopf mit `IsChecked="True"` im XAML löst `Checked` aus, bevor
+  die anderen Knöpfe zugewiesen sind. Die Seite wäre beim Öffnen abgestürzt. Die
+  Seitenprobe hat das gefangen.
+- Die Flächen stehen vorerst in der Pinselleiste. Mit Phase U wandern sie als eigene
+  Werkzeuge in die Kategorie „Malen“ der Werkzeugzeile.
+
 **Offen in W1:**
 
-- Gerade Linien, Rechteck, Ellipse und Lasso.
 - Maske bearbeiten.
 - Kanten verfeinern.
 - Stempelpinsel.

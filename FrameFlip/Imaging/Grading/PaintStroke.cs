@@ -75,6 +75,13 @@ public sealed class PaintStroke
     public const int CurrentVersion = 1;
 
     /// <summary>
+    /// Kein Pinselzug, sondern eine gefuellte Flaeche: Rechteck, Ellipse oder Lasso. Dann
+    /// sind die Punkte in <see cref="Path"/> die Ecken eines geschlossenen Vielecks, und von
+    /// den Einstellungen zaehlen nur Deckkraft, Wegnehmen und die Begrenzung.
+    /// </summary>
+    public PaintArea Area { get; init; }
+
+    /// <summary>
     /// Worauf der Druck eines Stifts wirkt: auf die Groesse, die Staerke oder beides. Ohne
     /// Druckwerte im Strich (<see cref="Pressure"/>) wirkt er auf nichts.
     /// </summary>
@@ -318,11 +325,51 @@ public sealed class PaintStroke
     }
 
     /// <summary>
+    /// Fuellt die Flaeche (siehe <see cref="Area"/>) auf der Maske - auf einen Schlag, denn
+    /// ein Vieleck hat keinen Weg, dem entlang es aufgetragen wuerde.
+    /// </summary>
+    public PaintBounds Fill(PaintedMask mask)
+    {
+        if (!_limitRead)
+        {
+            _limitRead = true;
+            _limit = Limit is { Length: > 0 } packed ? PaintedMask.Unpack(packed, mask.Width * mask.Height) : null;
+        }
+
+        return mask.Fill(Path, Erase ? 0f : 1f, Opacity, _limit);
+    }
+
+    /// <summary>Die Ecken eines Rechtecks in Bildpunkten, fuer <see cref="Path"/>.</summary>
+    public static List<float> RectanglePath(float x0, float y0, float x1, float y1)
+        => new() { x0, y0, x1, y0, x1, y1, x0, y1 };
+
+    /// <summary>
+    /// Eine Ellipse als Vieleck, fuer <see cref="Path"/>: so viele Ecken, dass keine Kante
+    /// laenger als etwa drei Bildpunkte wird - mindestens 24, hoechstens 256.
+    /// </summary>
+    public static List<float> EllipsePath(float cx, float cy, float rx, float ry)
+    {
+        int corners = Math.Clamp((int)(MathF.PI * (rx + ry) / 3f), 24, 256);
+        var path = new List<float>(corners * 2);
+
+        for (int i = 0; i < corners; i++)
+        {
+            float a = 2f * MathF.PI * i / corners;
+            path.Add(cx + rx * MathF.Cos(a));
+            path.Add(cy + ry * MathF.Sin(a));
+        }
+
+        return path;
+    }
+
+    /// <summary>
     /// Spielt den Zug auf einer Maske nach - mit denselben Einstellungen und demselben
     /// Weg, also mit denselben Tupfern in derselben Reihenfolge.
     /// </summary>
     public PaintBounds Replay(PaintedMask mask)
     {
+        if (Area != PaintArea.None) return Fill(mask);
+
         var again = new PaintStroke
         {
             Radius = Radius,
@@ -372,6 +419,15 @@ public sealed class PaintStroke
         mask.Stamp(x, y, RadiusAt(pressure), Erase ? 0f : 1f, FlowAt(pressure), Hardness, Opacity, Tip, _limit);
         return PaintBounds.Around(x, y, Reach);
     }
+}
+
+/// <summary>Womit der Pinsel malt: als Zug oder als Flaeche.</summary>
+public enum PaintArea
+{
+    None,
+    Rectangle,
+    Ellipse,
+    Lasso,
 }
 
 /// <summary>Worauf der Druck eines Stifts wirkt.</summary>
