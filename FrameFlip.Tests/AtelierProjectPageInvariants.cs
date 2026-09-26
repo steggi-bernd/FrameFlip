@@ -24,8 +24,9 @@ public static class AtelierProjectPageInvariants
         string first = Path.Combine(root, "eins", "render_0001.png");
         string firstNext = Path.Combine(root, "eins", "render_0002.png");
         string second = Path.Combine(root, "zwei", "shot_0001.png");
+        string third = Path.Combine(root, "drei", "neu_0001.png");
 
-        foreach (string file in new[] { first, firstNext, second })
+        foreach (string file in new[] { first, firstNext, second, third })
         {
             Directory.CreateDirectory(Path.GetDirectoryName(file)!);
             WritePng(file);
@@ -98,6 +99,28 @@ public static class AtelierProjectPageInvariants
             var files = Directory.GetFiles(Path.Combine(root, "eins", "FrameFlip"));
             Check.That(files.Length == 1 && Path.GetFileName(files[0]) == "render.png.ffproj",
                        "jede Folge hat genau eine Projektdatei neben ihren Bildern", string.Join(", ", files.Select(Path.GetFileName)));
+
+            // Ein Bild aus einem dritten Ordner, das noch kein Projekt hat. Die Anzeige
+            // spricht von DIESEM Projekt - nicht von der Datei, die zuletzt irgendwo
+            // geschrieben wurde, und nicht mit deren Uhrzeit. Vorher stand hier "Gespeichert"
+            // mit der Zeit und im Tooltip mit der Datei der Folge davor: Das neue Bild sah
+            // aus, als laege es in einem fremden Projekt.
+            string savedPrefix = Localization.Strings.T("S_ProjectSavedAt", "")[..4];
+
+            Show(third);
+            var thirdKey = page.Projects.Current!;
+            Check.That(saved.ToolTip as string == AtelierProjectStore.PrimaryPath(thirdKey),
+                       "ein neues Projekt: der Tooltip nennt seine Datei im eigenen Ordner", saved.ToolTip as string);
+            Check.That(!saved.Text.StartsWith(savedPrefix, StringComparison.Ordinal) && page.Projects.SavedAt is null,
+                       "und behauptet nicht, gespeichert zu sein", saved.Text);
+
+            // Zurueck zur zweiten: ihre Datei, und die Zeit, zu der sie geschrieben wurde.
+            var secondSaved = new AtelierProjectStore().Load(key)!.SavedUtc.ToLocalTime();
+
+            Show(second);
+            Check.That(saved.ToolTip as string == AtelierProjectStore.PrimaryPath(key) &&
+                       page.Projects.SavedAt is { } at && Math.Abs((at - secondSaved).TotalSeconds) < 1,
+                       "zurueck zur zweiten Folge: ihre Datei und ihre Zeit", $"{page.Projects.SavedAt} | {saved.ToolTip}");
         }
         finally
         {
