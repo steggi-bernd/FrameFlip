@@ -245,6 +245,32 @@ Karten nebeneinander. Die Seite liegt in `SettingsEditor.xaml` mit `SettingGroup
 Die zwei QR-Codes sind die App-Kopplung (heute in den Einstellungen) und die
 Zuschauerseite (heute nur im Dashboard). Vor dem Umbau `ui/shell-overhaul` abgleichen.
 
+*Umgesetzt (26. September, Phase E):*
+
+- **Abgleich mit `ui/shell-overhaul`:** Der Zweig ist weitgehend überholt.
+  Titelleiste, Bedienskalierung und ziehbare Aufteilung kamen über „Das Dashboard wird
+  die Hauptoberfläche“ schon in `feature/atelier`. Die Einstellungen berührt er nur mit
+  einer Stilzeile für die Fensterschale. Übrig ist allein der Fensterstil für Dialoge,
+  und der hat mit dieser Seite nichts zu tun.
+- **Vorbereitung (`refactor/watch-card`):** Die Logik der Zuschauerkarte zog aus dem
+  Hauptfenster in `WatchCard`, mit Charakterisierung vorher. So zeigen Dashboard und
+  Einstellungen dieselbe Karte ohne zweite Kopie.
+- **Seite (`feature/einstellungen`):**
+  - Die Abschnitte stehen als Leiste links, der Inhalt steht mittig daneben, höchstens
+    760 Punkte breit, mit Titel und Untertitel. Bei schmaler Seite rückt die Leiste
+    nach oben.
+  - „Fernsteuerung“ heißt jetzt „Verbindungen“. Oben stehen zwei gleichwertige Karten,
+    App koppeln und Zuschauerseite, nebeneinander oder bei wenig Platz untereinander.
+    Darunter folgen Relay-Server, Fernsteuerung und Bibliothek.
+  - Der Schalter der Zuschauerseite wirkt sofort, wie im Dashboard, und fragt vorher
+    nach der Zustimmung. „Übernehmen“ geht vom neuesten Stand aus und dreht ihn nicht
+    zurück.
+  - Gruppenüberschriften, die nur den Seitentitel wiederholten, sind entfallen.
+
+Offen: Die Seite „Arbeitsbereich“ hat ihre eigene Einleitung und eine Gruppe gleichen
+Namens. Sie bleibt, wie sie war, weil das Panel nur hier hängt und sein Umbau ein
+eigener Schritt wäre.
+
 ## 5. Reihenfolge
 
 Jede Phase besteht aus eigenen Zweigen und PRs. Für die Strukturteile gelten die Regeln
