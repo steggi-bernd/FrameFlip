@@ -950,13 +950,14 @@
     <sys:String x:Key="S_NodeLayerMaskFree">free – on no layer</sys:String>
     <sys:String x:Key="S_MaskEdit">Edit mask …</sys:String>
     <sys:String x:Key="S_MaskEditButton">Mask ▾</sys:String>
-    <sys:String x:Key="S_MaskEditHint">Edit the whole mask at once: invert, fill, clear, feather, grow, shrink. Every step is in the mask history and can be undone with Ctrl+Z.</sys:String>
+    <sys:String x:Key="S_MaskEditHint">Edit the whole mask at once: invert, fill, clear, feather, grow, shrink, refine edges – the mask then snaps to the edges of the image. Every step is in the mask history and can be undone with Ctrl+Z.</sys:String>
     <sys:String x:Key="S_MaskEditInvert">Invert</sys:String>
     <sys:String x:Key="S_MaskEditFill">Fill</sys:String>
     <sys:String x:Key="S_MaskEditClear">Clear</sys:String>
     <sys:String x:Key="S_MaskEditFeather">Feather …</sys:String>
     <sys:String x:Key="S_MaskEditGrow">Grow …</sys:String>
     <sys:String x:Key="S_MaskEditShrink">Shrink …</sys:String>
+    <sys:String x:Key="S_MaskEditRefine">Refine edges …</sys:String>
     <sys:String x:Key="S_MaskMenuHistory">Mask history …</sys:String>
     <sys:String x:Key="S_MaskHistoryTitle">Mask history – {0}</sys:String>
     <sys:String x:Key="S_MaskHistoryState">State {0}</sys:String>

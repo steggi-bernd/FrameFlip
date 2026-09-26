@@ -92,6 +92,13 @@ public sealed class PaintStroke
     public float Amount { get; init; }
 
     /// <summary>
+    /// Das Ergebnis einer Bearbeitung, die am Bild haengt - Kanten verfeinern -, gepackt wie
+    /// <see cref="PaintedMask.Data"/>. Nachgespielt wird es eingesetzt statt neu gerechnet:
+    /// Der Maskenverlauf kennt das Bild nicht, und er soll genau das zeigen, was es war.
+    /// </summary>
+    public string? Result { get; init; }
+
+    /// <summary>
     /// Worauf der Druck eines Stifts wirkt: auf die Groesse, die Staerke oder beides. Ohne
     /// Druckwerte im Strich (<see cref="Pressure"/>) wirkt er auf nichts.
     /// </summary>
@@ -378,6 +385,16 @@ public sealed class PaintStroke
     /// </summary>
     public PaintBounds Replay(PaintedMask mask)
     {
+        if (Edit == PaintEdit.Refine)
+        {
+            // Ohne gespeichertes Ergebnis oder in fremder Groesse: nichts, statt zu raten.
+            if (Result is not { Length: > 0 } packed || PaintedMask.Unpack(packed, mask.Width * mask.Height) is not { } cover)
+                return PaintBounds.Empty;
+
+            mask.Replace(cover);
+            return new PaintBounds(0, 0, mask.Width * PaintedMask.Coarse, mask.Height * PaintedMask.Coarse);
+        }
+
         if (Edit != PaintEdit.None) return mask.Apply(Edit, Amount);
         if (Area != PaintArea.None) return Fill(mask);
 
@@ -442,6 +459,9 @@ public enum PaintEdit
     Feather,
     Grow,
     Shrink,
+
+    /// <summary>An die Kanten des Bildes legen - siehe <see cref="MaskRefine"/>. Traegt sein Ergebnis mit.</summary>
+    Refine,
 }
 
 /// <summary>Womit der Pinsel malt: als Zug oder als Flaeche.</summary>
