@@ -112,7 +112,10 @@ public static class NodeModeInvariants
             Settle();
 
             Check.That(page.InNodes && page.Graph is not null, "umgewandelt ist das Atelier im Knotenmodus");
-            Check.That(settings.AtelierNodes is { Length: > 0 }, "und der Graph steht in den Einstellungen");
+            // Mit Projektdateien steht der Graph im Projekt der Folge, nicht in den Einstellungen.
+            page.Flush();
+            var project = page.Projects.Current is { } key ? page.Projects.Store.Load(key) : null;
+            Check.That(project?.Nodes is not null, "und der Graph steht im Projekt der Folge");
             Check.That(nodes.Visibility == Visibility.Visible && offer.Visibility != Visibility.Visible,
                        "der Graph liegt ueber dem Bild");
             var layerList = (NodeLayerList)page.FindName("NodeLayers");

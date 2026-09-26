@@ -72,9 +72,23 @@ internal sealed class SettingsRecipeStore(AppSettings settings) : IAtelierRecipe
 /// </summary>
 internal sealed class AtelierEditingSession
 {
-    private readonly IAtelierRecipeStore _store;
+    private IAtelierRecipeStore _store;
 
     internal AtelierEditingSession(IAtelierRecipeStore store) => _store = store;
+
+    /// <summary>Die Ablage, hinter der das Rezept gerade liegt.</summary>
+    internal IAtelierRecipeStore Store => _store;
+
+    /// <summary>
+    /// Tauscht die Ablage - ein anderes Projekt. Was die alte hielt, muss vorher
+    /// festgehalten sein; die neue gilt als festgehalten, so wie sie gelesen wurde.
+    /// </summary>
+    public void Switch(IAtelierRecipeStore store)
+    {
+        _store = store;
+        Revision++;
+        Dirty = false;
+    }
 
     /// <summary>Die Grundregler des fertigen Bildes.</summary>
     public ImageAdjustments? Adjustments
@@ -115,6 +129,10 @@ internal sealed class AtelierEditingSession
         get => _store.Nodes;
         set
         {
+            // Derselbe Text ist keine Aenderung - der Graph wird nach jedem Zug festgehalten,
+            // auch wenn der Zug nichts bewegt hat, und ungespeichert soll nur heissen, was es ist.
+            if (string.Equals(_store.Nodes, value, StringComparison.Ordinal)) return;
+
             _store.Nodes = value;
             Touch();
         }

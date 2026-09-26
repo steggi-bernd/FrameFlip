@@ -67,6 +67,12 @@ public sealed record GradeBatchRequest
     /// ein zweites Mal gerechnet.
     /// </summary>
     public Nodes.NodeGraph? Graph { get; init; }
+
+    /// <summary>
+    /// Der Name einer Ausgabe ohne Endung - null: der Name der Quelle. Der Schnell-Export
+    /// gibt einem Einzelbild so seinen eindeutigen Namen, "render_FrameFlip_001".
+    /// </summary>
+    public Func<string, string>? NameFor { get; init; }
 }
 
 /// <summary>Wie weit der Durchlauf ist.</summary>
@@ -213,7 +219,7 @@ public static class GradeBatch
     /// </summary>
     public static string TargetFor(string source, GradeBatchRequest request)
         => Path.Combine(request.OutputDirectory,
-                        Path.GetFileNameWithoutExtension(source) + Extension(request.Format));
+                        (request.NameFor?.Invoke(source) ?? Path.GetFileNameWithoutExtension(source)) + Extension(request.Format));
 
     public static string Extension(GradeOutputFormat format) => format switch
     {

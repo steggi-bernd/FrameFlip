@@ -179,6 +179,7 @@ public sealed partial class AtelierPage : UserControl
 
         SetUpBatch();
         SetUpView();
+        SetUpProjects();
 
         _settle.Tick += (_, _) =>
         {
@@ -308,6 +309,11 @@ public sealed partial class AtelierPage : UserControl
         _base = loaded;
         _sources[""] = loaded;
 
+        // Eine andere Folge ist ein anderes Projekt - mit seinem eigenen Rezept. Das
+        // bisherige wird dabei geschrieben. Erst hier und nicht beim Oeffnen: Eine Datei,
+        // die sich nicht lesen laesst, wechselt kein Projekt.
+        if (_projects.Enter(path)) ApplyProject();
+
         // Erst jetzt gemerkt, nicht beim Oeffnen: Eine Datei, die sich nicht lesen
         // laesst, soll beim naechsten Start nicht wieder versucht werden.
         //
@@ -343,6 +349,9 @@ public sealed partial class AtelierPage : UserControl
         // Erst jetzt steht der Stapel da - und damit, was einem alten Graphen an
         // ausgeblendeten Ebenen fehlt.
         if (InNodes) ShowMissingLayers();
+
+        // Die Uebersicht zeigt dieselbe Folge - siehe MainWindow, Arbeitsbereich.
+        ImageShown?.Invoke(path);
 
         // Braucht der Stapel Passe, die noch nicht gelesen sind, kommen sie
         // nachtraeglich - das Bild steht schon, waehrend sie eintreffen. Im
