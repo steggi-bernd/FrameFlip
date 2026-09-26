@@ -88,6 +88,13 @@
                 <TextBlock x:Name="BrushSpacingValue" Style="{StaticResource PanelValue}"
                            VerticalAlignment="Center" Width="40" Margin="6,0,0,0"
                            HorizontalAlignment="Left" />
+
+                <!-- Der Verlauf der Maske, auf die der Pinsel malt - nur im Knotenmodus,
+                     nur dort wird er aufgezeichnet. -->
+                <Button x:Name="BrushHistoryButton" Style="{StaticResource OverlayButton}"
+                        VerticalAlignment="Center" Margin="16,0,0,0" Visibility="Collapsed"
+                        Content="{DynamicResource S_MaskMenuHistory}" Click="OnBrushHistory"
+                        ToolTip="{DynamicResource S_MaskHistoryButtonHint}" />
             </StackPanel>
 
             <!-- Was die Pipette gelesen hat - ebenfalls in einer Zeile. -->

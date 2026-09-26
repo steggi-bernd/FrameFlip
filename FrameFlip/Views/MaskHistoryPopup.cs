@@ -153,5 +153,13 @@ internal sealed class MaskHistoryPopup
         Margin = new Thickness(4, 4, 4, 6),
     };
 
-    private static string Percent(float share) => Math.Max(1, (int)Math.Round(share * 100)).ToString();
+    /// <summary>Ein Anteil in Prozent - unter einem Prozent mit einer Stelle, sonst ganz.</summary>
+    private static string Percent(float share)
+    {
+        double percent = share * 100;
+
+        return percent < 1
+            ? Math.Max(0.1, Math.Round(percent, 1)).ToString("0.#", System.Globalization.CultureInfo.CurrentCulture)
+            : Math.Round(percent).ToString(System.Globalization.CultureInfo.CurrentCulture);
+    }
 }

@@ -938,7 +938,8 @@
     <sys:String x:Key="S_MaskHistoryChanged">{0} % geändert</sys:String>
     <sys:String x:Key="S_MaskHistoryCurrent">aktuell</sys:String>
     <sys:String x:Key="S_MaskHistoryPending">Seit dem letzten Stand {0} % geändert – das wird vor dem Wiederherstellen als eigener Stand gesichert.</sys:String>
-    <sys:String x:Key="S_MaskHistoryEmpty">Noch keine weiteren Stände. Ein neuer entsteht, sobald sich ein Zehntel der Fläche geändert hat.</sys:String>
+    <sys:String x:Key="S_MaskHistoryEmpty">Noch keine weiteren Stände. Ein neuer entsteht, sobald sich 1 % der Fläche geändert hat.</sys:String>
+    <sys:String x:Key="S_MaskHistoryButtonHint">Die gespeicherten Stände dieser Maske – ein neuer je 1 % geänderter Fläche.</sys:String>
     <sys:String x:Key="S_MaskHistoryHint">Ein Klick stellt den Stand wieder her. Strg+Z nimmt das zurück.</sys:String>
     <sys:String x:Key="S_NodeMix">Mischen</sys:String>
     <sys:String x:Key="S_NodeMixClip">Anschneiden</sys:String>

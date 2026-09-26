@@ -52,6 +52,12 @@ public sealed class PaintedMask
     [JsonIgnore]
     private byte[]? _cover;
 
+    /// <summary>
+    /// Ob <see cref="Data"/> genau die Deckung traegt - nach dem Packen, bis zum naechsten
+    /// Strich. Der Verlauf nimmt dann das Gepackte, statt ein zweites Mal zu packen.
+    /// </summary>
+    internal bool Kept { get; private set; }
+
     /// <summary>Legt eine leere Maske in der Groesse eines Bildes an.</summary>
     public static PaintedMask For(int imageWidth, int imageHeight)
     {
@@ -125,6 +131,7 @@ public sealed class PaintedMask
             var bytes = output.ToArray();
 
             _cover = bytes.Length == count ? bytes : new byte[count];
+            Kept = bytes.Length == count;
         }
         catch (Exception e) when (e is FormatException or InvalidDataException)
         {
@@ -158,6 +165,7 @@ public sealed class PaintedMask
         }
 
         Data = Convert.ToBase64String(output.ToArray());
+        Kept = true;
     }
 
     /// <summary>
@@ -180,6 +188,7 @@ public sealed class PaintedMask
                        float hardness = 0.5f, float opacity = 1f)
     {
         var cover = Cover();
+        Kept = false;
 
         float cx = imageX / Coarse;
         float cy = imageY / Coarse;
