@@ -393,10 +393,14 @@ Entschieden beim Bauen, bitte prüfen:
   Versetzt rechnet das Malen dahinter wieder voll, weil der Knoten dann außerhalb des
   Ausschnitts liest.
 
+**Gemergt am 26. September:** Die Phasen B bis E sind in `feature/atelier`, noch nicht in
+`main`. Dazu gehören Studio S0–S2 (#26–#28), Projekte (#29), Masken (#30), `WatchCard`
+(#31) und die Einstellungen (#32). Phase A war schon vorher dort.
+
 Offen aus Phase D:
 
 - Die Maskenraster stehen weiter in der Projektdatei, nicht nach Inhalt in `.ffdata`
-  (3.4). Nur der Verlauf liegt dort.
+  (3.4). Nur der Verlauf liegt dort. **Ans Ende der Liste gestellt** (Entscheidung 7).
 - Befund, nicht geändert: Die UI-Testreihe merkt sich in ihren Testdaten die zuletzt
   geöffnete Folge (`sequences.json`). Ein zweiter Lauf in denselben Ausgabeordner beginnt
   deshalb mit geladener Folge und scheitert an „Playback controls wait for a loaded
@@ -416,3 +420,12 @@ Getroffen am 25. September 2026:
    behält ihre Maske. Damit fällt es mit Extract aus Punkt 4 zusammen.
 5. Masken-Funktionen **nur im Knotenmodus** (Empfehlung, ohne Widerspruch).
 6. **Einstellungen: Entwurf A** (Seitenleiste, zentrierter Inhalt, QR-Karten nebeneinander).
+
+Getroffen am 26. September 2026:
+
+7. **Das Auslagern der Maskenraster (3.4) kommt ans Ende der Liste.** Der Nutzen ist bei
+   den heutigen Größen klein. Das Risiko, dass Projekt und Raster auseinanderlaufen, ist
+   dagegen ein Datenverlust. Neu bewerten, wenn entsperrte Masken je Bild über lange
+   Folgen die Projektdateien groß machen.
+8. **`main` erst nach dem Ausprobieren.** Die Phasen gehen zuerst nach `feature/atelier`.
+   #25 (nach `main`) folgt, wenn der vereinte Stand an echten Projekten erprobt ist.

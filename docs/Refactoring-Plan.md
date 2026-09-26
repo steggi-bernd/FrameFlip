@@ -404,6 +404,17 @@ sofort koppeln, ohne zusätzliche Schritte.
 
 ## Nächster Startpunkt
 
+**Stand 26. September, nach den Merges:** In `feature/atelier` gemergt, noch nicht in
+`main`:
+- die vorgezogenen Studio-Schnitte S0 (#26), S1 erster Teil (#27) und S2 erster Teil (#28);
+- der Zwischenschnitt `WatchCard` (#31);
+- die darauf gebauten Featurestände: Projekte (#29), Masken (#30) und die Einstellungen
+  nach Entwurf A (#32).
+
+Jeder Schnitt steht als eigener Merge-Commit in der Geschichte. Offen aus dem Studio-Teil
+sind die übrigen Teile von S1 und S2 sowie S3–S6, siehe
+[Refactoring-Studio](Refactoring-Studio.md).
+
 **D1 ist mit dem Playback-Schnitt abgeschlossen.** D2 und D1a–D1d sind in
 `feature/atelier` gemergt, noch nicht in `main`. Danach folgen die übrigen
 offenen Schritte in der oben festgelegten Reihenfolge: Android-`RemoteHub`,

@@ -120,8 +120,9 @@ Desktop-Prüfreihen. Keine historische Zusicherungszahl als aktuellen Nachweis
 
 ### Stand S0 (25. September 2026)
 
-Auf `refactor/studio-s0`, aufgebaut auf `feature/atelier` bei `bbe0e49`, **implementiert
-und geprüft**, noch nicht gemergt:
+Auf `refactor/studio-s0`, aufgebaut auf `feature/atelier` bei `bbe0e49`, **implementiert,
+geprüft und am 26. September in `feature/atelier` gemergt** (#26, `94645dc`), noch nicht
+in `main`:
 
 1. **Maskenkennungen:** Die Zählung vom 18. bis 20. September (5 = Cryptomatte,
    6 = Painted) hat `main` nie erreicht. Das Atelier kam erst am 24. September mit
@@ -175,8 +176,9 @@ Ressourcenpolitik beim Verbergen und Exportbesitz werden in S3/S4 vervollständi
 
 ### Stand S1, erster Teil (25. September 2026)
 
-Auf `refactor/studio-s1-open`, aufgebaut auf `refactor/studio-s0`, **implementiert und
-geprüft**, noch nicht gemergt: die Hauptbild-Öffnung.
+Auf `refactor/studio-s1-open`, aufgebaut auf `refactor/studio-s0`, **implementiert,
+geprüft und am 26. September in `feature/atelier` gemergt** (#27, `799edfa`), noch nicht
+in `main`: die Hauptbild-Öffnung.
 
 - `FrameFlip/Atelier/AtelierSourceSession` besitzt die laufende Anfrage, ihre Nummer,
   das Lesen im Hintergrund und die Zustellung auf den Oberflächenfaden. Zugestellt wird
@@ -217,8 +219,9 @@ Undo tragen; Undo selbst gehört nicht in diesen Refactoring-PR.
 
 ### Stand S2, erster Teil (25. September 2026)
 
-Auf `refactor/studio-s2-editing`, aufgebaut auf `refactor/studio-s1-open`, **implementiert
-und geprüft**, noch nicht gemergt: Rezept und Speichern.
+Auf `refactor/studio-s2-editing`, aufgebaut auf `refactor/studio-s1-open`, **implementiert,
+geprüft und am 26. September in `feature/atelier` gemergt** (#28, `7245027`), noch nicht
+in `main`: Rezept und Speichern.
 
 - `FrameFlip/Atelier/AtelierEditingSession` besitzt das Rezept: Grundregler und
   Werkzeuge des fertigen Bildes, Ebenenstapel, Graph. Die Seite las und schrieb diese
