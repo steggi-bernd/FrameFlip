@@ -227,12 +227,19 @@ internal sealed class AtelierProjectStore
 
     /// <summary>Reiht das Schreiben einer Beidatei ein - der Reihe nach mit den Projekten.</summary>
     internal Task EnqueueSide(SequenceKey key, string relative, byte[] data, Action<bool>? done = null)
+        => EnqueueSide(key, relative, () => data, done);
+
+    /// <summary>
+    /// Wie oben, aber der Inhalt entsteht erst im Hintergrund - fuer einen Abdruck, dessen
+    /// Umwandlung in Text den Oberflaechenfaden nicht aufhalten soll.
+    /// </summary>
+    internal Task EnqueueSide(SequenceKey key, string relative, Func<byte[]> data, Action<bool>? done = null)
     {
         lock (Gate)
         {
             s_pending = s_pending.ContinueWith(_ =>
             {
-                bool written = SaveSide(key, relative, data);
+                bool written = SaveSide(key, relative, data());
                 done?.Invoke(written);
             }, TaskScheduler.Default);
 

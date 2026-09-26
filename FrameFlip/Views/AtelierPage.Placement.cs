@@ -107,6 +107,9 @@ public partial class AtelierPage
             return;
         }
 
+        // Im Stapel wird kein Verlauf aufgezeichnet - also auch kein Knopf dafuer.
+        Properties.ShowBrushHistory(false);
+
         // Im Stapel legt der erste Strich eine Maskenebene an, wenn es noch keine gibt.
         Placement.MaskWanted = MakeMaskLayer;
 

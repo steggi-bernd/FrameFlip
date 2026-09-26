@@ -83,8 +83,12 @@ internal sealed class MaskHistoryKeeper
     {
         if (_key is not { } key) return;
 
-        byte[] json = JsonSerializer.SerializeToUtf8Bytes(history, AtelierProjectStore.Options);
-        _store.EnqueueSide(key, Path.Combine(Folder, name + ".json"), json);
+        // Bei einem Stand je Hundertstel der Flaeche kommt fast jeder Strich hierher. Der
+        // Abdruck ist eine Liste unveraenderlicher Staende; in Text gefasst wird er erst im
+        // Hintergrund, damit das Loslassen des Pinsels nicht darauf wartet.
+        var copy = history.ForSaving();
+        _store.EnqueueSide(key, Path.Combine(Folder, name + ".json"),
+                           () => JsonSerializer.SerializeToUtf8Bytes(copy, AtelierProjectStore.Options));
     }
 
     private MaskHistory? Load(string name)

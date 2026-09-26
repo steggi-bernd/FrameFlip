@@ -256,6 +256,9 @@ public partial class AtelierPage
 
         if (target is not null && mask is not null) WatchMask(target, mask);
 
+        // Den Verlauf gibt es, sobald der Pinsel auf einer gemalten Maske liegt.
+        Properties.ShowBrushHistory(target is not null);
+
         Placement.Paint(mask, _frame.Width, _frame.Height, Display.Stretch == Stretch.Uniform);
         Display.Cursor = Cursors.None;
 
@@ -290,6 +293,7 @@ public partial class AtelierPage
 
         var paint = made.Mask.PaintOn(_number, _frame.Width, _frame.Height);
         WatchMask(made, paint);
+        Properties.ShowBrushHistory(true);
 
         return paint;
     }
