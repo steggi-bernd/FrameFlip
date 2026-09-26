@@ -1218,6 +1218,14 @@
     <sys:String x:Key="S_BrushOpacity">Opacity</sys:String>
     <sys:String x:Key="S_BrushSpacing">Spacing</sys:String>
     <sys:String x:Key="S_BrushSquareHint">Square tip instead of round – gets cleanly into corners and along straight edges.</sys:String>
+    <sys:String x:Key="S_BrushStampHint">Stamp: a tip made from an image – leaves, scratches, splatter. White paints, black doesn't; if the file has transparency, its opacity counts.</sys:String>
+    <sys:String x:Key="S_BrushTipLoad">Tip …</sys:String>
+    <sys:String x:Key="S_BrushTipHint">Load an image as the tip. It is scaled to at most 128 points and saved with every stroke – the mask history doesn't need the file afterwards.</sys:String>
+    <sys:String x:Key="S_BrushTipUnreadable">The file can't be read as a tip – or it's empty.</sys:String>
+    <sys:String x:Key="S_BrushJitter">Random</sys:String>
+    <sys:String x:Key="S_BrushJitterHint">How far the tip turns at random with each dab. All the way right: any direction.</sys:String>
+    <sys:String x:Key="S_BrushScatter">Scatter</sys:String>
+    <sys:String x:Key="S_BrushScatterHint">How far the dabs land beside the path at random – all the way right: up to the radius.</sys:String>
     <sys:String x:Key="S_BrushAngle">Angle</sys:String>
     <sys:String x:Key="S_BrushAngleHint">Rotation of the tip – on the picture also with Shift and the mouse wheel.</sys:String>
     <sys:String x:Key="S_BrushAspect">Stretch</sys:String>

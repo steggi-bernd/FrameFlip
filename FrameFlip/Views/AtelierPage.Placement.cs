@@ -171,6 +171,9 @@ public partial class AtelierPage
         Placement.BrushSquish = Properties.BrushSquish;
         Placement.BrushPressureTo = Properties.BrushPressureTo;
         Placement.BrushArea = Properties.BrushArea;
+        Placement.BrushStamp = Properties.BrushStamp;
+        Placement.BrushJitter = Properties.BrushJitter;
+        Placement.BrushScatter = Properties.BrushScatter;
 
         float tolerance = Properties.BrushEdgeTolerance;
         Placement.LimitWanted = Properties.BrushObject ? ObjectLimitAt

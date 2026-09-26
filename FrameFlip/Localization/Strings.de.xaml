@@ -1218,6 +1218,14 @@
     <sys:String x:Key="S_BrushOpacity">Deckkraft</sys:String>
     <sys:String x:Key="S_BrushSpacing">Abstand</sys:String>
     <sys:String x:Key="S_BrushSquareHint">Eckige Spitze statt runder – kommt sauber in Ecken und an gerade Kanten.</sys:String>
+    <sys:String x:Key="S_BrushStampHint">Stempel: eine Spitze aus einem Bild – Laub, Kratzer, Spritzer. Weiß malt, Schwarz nicht; hat die Datei Transparenz, zählt die Deckkraft.</sys:String>
+    <sys:String x:Key="S_BrushTipLoad">Spitze …</sys:String>
+    <sys:String x:Key="S_BrushTipHint">Ein Bild als Spitze laden. Es wird auf höchstens 128 Punkte verkleinert und mit jedem Strich gespeichert – der Maskenverlauf braucht die Datei danach nicht mehr.</sys:String>
+    <sys:String x:Key="S_BrushTipUnreadable">Die Datei lässt sich nicht als Spitze lesen – oder sie ist leer.</sys:String>
+    <sys:String x:Key="S_BrushJitter">Zufall</sys:String>
+    <sys:String x:Key="S_BrushJitterHint">Wie weit sich die Spitze bei jedem Tupfer zufällig dreht. Ganz rechts in jede Richtung.</sys:String>
+    <sys:String x:Key="S_BrushScatter">Streuung</sys:String>
+    <sys:String x:Key="S_BrushScatterHint">Wie weit die Tupfer zufällig neben dem Weg landen – ganz rechts bis zum Radius.</sys:String>
     <sys:String x:Key="S_BrushAngle">Winkel</sys:String>
     <sys:String x:Key="S_BrushAngleHint">Drehung der Spitze – am Bild auch mit Umschalt und Mausrad.</sys:String>
     <sys:String x:Key="S_BrushAspect">Streckung</sys:String>
