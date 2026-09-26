@@ -287,6 +287,95 @@ Offen aus Phase A:
 - Befund, nicht geändert: Im Knotenmodus landet eine Bilddatei, die bei ausgeblendetem
   Graphen aufs Bild gezogen wird, im Ebenenstapel statt im Graphen.
 
+**Phase B** (Studio S0, S1 erster Teil, S2 erster Teil) steht in
+[Refactoring-Studio](Refactoring-Studio.md).
+
+**Phase C ist umgesetzt** (26. September, Zweig `feature/projekte` auf S2):
+
+- **Projektdatei je Sequenz** (9): `<Quellordner>\FrameFlip\<name><endung>.ffproj`, bei
+  nicht beschreibbarem Ordner unter den Einstellungen in `projects\`. Autosave 2 s nach
+  der letzten Änderung, beim Wechsel der Folge, wenn die Seite geht und beim Ende; dazu
+  „Speichern“ in der Kopfzeile und Strg+S, daneben der Stand. Geschrieben wird im
+  Hintergrund, prozessweit der Reihe nach; Lesen wartet darauf. Aufzählungen stehen
+  als Namen in der Datei.
+- **Einmalige Übernahme:** Das erste Projekt ohne Datei bekommt das bisherige Rezept aus
+  `config.json` (`AtelierRecipeMoved`). Die Felder dort bleiben als Sicherung stehen.
+- **Knotenmodus je Projekt:** Er richtet sich nach dem Projekt; es gibt einen Weg zurück
+  in den Stapel für eine Folge ohne Graphen. Rückgängig gilt je Projekt.
+- **Sequenzliste** (8): Früher geöffnete Ordner stehen nach den Blend-Projekten in der
+  Liste, auch nach einem Neustart. Ordner und Bilder lassen sich auf die Liste ziehen;
+  „Aus der Liste nehmen“ im Rechtsklick. Erweitert den vorhandenen
+  `DashboardSequenceController` um zwei Quellen.
+- **Arbeitsbereich** (7): Beim Start wählt die Übersicht die Folge des Ateliers. Beim
+  Wechsel ins Atelier öffnet es das Bild der Übersicht, wenn diese eine andere Folge zeigt;
+  bei derselben Folge behält es sein Bild. Ein im Atelier geöffnetes Bild wählt seine
+  Folge in der Übersicht und bleibt in der Liste.
+- **Schnell-Export** (6): ohne Dialog in den Ordner `FrameFlip` oder den gewählten
+  Zielordner, nächste freie Nummer, nie überschreibend. Einzelbild als Datei, Sequenz als
+  Ordner, Video als Datei.
+
+Entschieden beim Bauen, bitte prüfen:
+
+- **Eine neue Folge beginnt frisch**, nicht mit dem Rezept der vorigen. Ein Rezept von
+  einer Folge auf die nächste zu übernehmen wäre ein eigener Befehl („Rezept übernehmen
+  von …“), noch nicht gebaut.
+- **Die Grundregler des Ateliers gelten je Projekt.** Das Vorschaufenster behält seine
+  eigenen in `config.json`; bisher teilten sich beide dasselbe Feld.
+- **Maskenraster stehen vorerst in der Projektdatei selbst**, nicht getrennt nach Inhalt
+  wie in 3.3 geplant. Eine Maske sind bei 4K 25–100 KB, das Schreiben läuft im
+  Hintergrund. Die Trennung kommt mit dem Maskenverlauf in Phase D, der denselben Ordner
+  braucht.
+- Der normale Export verlangt weiter einen gewählten Zielordner; nur der Schnell-Export
+  hat einen voreingestellten.
+
+**Phase D ist umgesetzt** (26. September, Zweig `feature/masken` auf Phase C,
+Einzelheiten in [Atelier-Nodes](Atelier-Nodes.md), Abschnitt 15):
+
+- **Maskenmenü** (3): Als Ebene ausschneiden, Maske lösen, Maske duplizieren (neue
+  Kennung, frei), Mit Ebene verbinden; bei gemalten Masken „Maskenverlauf …“. Im Bildmenü
+  im Knotenmodus „Objekt hier als Ebene“ je Kryptomatte. Jede Maske hat eine feste
+  Kennung (`LayerMask.Id`).
+- **Ausschneiden** (4): neuer Knoten „Ausschneiden“ (Bild × Maske → Bild mit Deckung),
+  darüber ein eigenes Mischen direkt über der ersten Ebene der Maske, bei einer freien
+  Maske oben auf den Ebenen. Die Originalebene behält ihre Maske. Das Bild bleibt Byte für
+  Byte gleich, auch an weichen Rändern und unter jeder Mischart.
+- **Darstellung** (11): Maskenkabel gestrichelt in eigener Farbe, ein Schild mit
+  Maskenbild und Namen über jedem Mischen mit Maske, „frei“ und „→ n Ebenen“ am
+  Maskenknoten, eine gewählte Maske hebt ihre Ebenen im Graphen und in der Liste hervor.
+  Freie Masken stehen in der Ebenenliste im Abschnitt „Masken“.
+- **Maskenverlauf** (10) wie in 3.5: 10 % eindeutig geänderte Fläche je Stand, höchstens
+  20 Stände, jeder fünfte ein Schnappschuss, dazwischen Striche. Gespeichert in
+  `FrameFlip\<name><endung>.ffdata\verlauf\`, je Maskenkennung (bei entsperrten Masken
+  je Bild). Wiederherstellen ist ein Schritt im globalen Rückgängig. Aufzeichnen kostet
+  beim Loslassen 0,9 ms bei 4K.
+
+Entschieden beim Bauen, bitte prüfen:
+
+- **Ausgeschnitten wird, was an der Stelle zu sehen ist**, nicht das Bild der Ebene
+  allein. Nur so ist das Bild vorher und nachher gleich (Abnahme aus Punkt 4). Die Ebene
+  selbst noch einmal darüberzulegen hätte sie an weichen Rändern verdoppelt, das Bild der
+  Datei hätte verloren, was die Ebenen darunter daraus gemacht haben.
+- **Die neue Ebene liegt direkt über der Ebene der Maske**, nicht ganz oben. Ebenen
+  darüber wirken weiter auf beide. Eine freie Maske kommt oben auf die Ebenen.
+- **„→ n Ebenen“ zählt auch ausgeschnittene Ebenen** mit, „Maske lösen“ nimmt die Maske
+  aber nur aus dem Faktor ihrer Ebenen. Die ausgeschnittene Ebene hängt weiter an ihr.
+
+- **Verschieben** (Abnahme aus Punkt 4, nachgereicht am selben Tag): Der
+  Ausschneiden-Knoten hat eine eigene Lage. Die Maske wählt an der alten Stelle aus, das
+  Gewählte wandert, und darunter bleibt das Original. Ist die ausgeschnittene Ebene
+  gewählt, zieht der Greifrahmen beim Verschieben ihr Stück, als ein Schritt im Verlauf.
+  Versetzt rechnet das Malen dahinter wieder voll, weil der Knoten dann außerhalb des
+  Ausschnitts liest.
+
+Offen aus Phase D:
+
+- Die Maskenraster stehen weiter in der Projektdatei, nicht nach Inhalt in `.ffdata`
+  (3.4). Nur der Verlauf liegt dort.
+- Befund, nicht geändert: Die UI-Testreihe merkt sich in ihren Testdaten die zuletzt
+  geöffnete Folge (`sequences.json`). Ein zweiter Lauf in denselben Ausgabeordner beginnt
+  deshalb mit geladener Folge und scheitert an „Playback controls wait for a loaded
+  sequence“. In einem frischen Ordner, wie in der CI, läuft sie durch.
+
 ## 6. Entscheidungen
 
 Getroffen am 25. September 2026:

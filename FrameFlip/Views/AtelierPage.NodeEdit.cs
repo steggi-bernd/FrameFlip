@@ -78,7 +78,18 @@ public partial class AtelierPage
     /// <summary>Strg+Z, Strg+Y und Strg+Umschalt+Z im Knotenmodus - ausser in einem Textfeld, das sein eigenes hat.</summary>
     private void OnWindowKey(object sender, KeyEventArgs e)
     {
-        if (IsVisible && HandleUndoKey(e.Key, Keyboard.Modifiers, e.OriginalSource)) e.Handled = true;
+        if (!IsVisible) return;
+
+        // Strg+S speichert das Projekt - in beiden Modi, nicht nur bei den Knoten.
+        if (e.Key == Key.S && (Keyboard.Modifiers & ModifierKeys.Control) != 0 &&
+            e.OriginalSource is not System.Windows.Controls.Primitives.TextBoxBase)
+        {
+            SaveProject();
+            e.Handled = true;
+            return;
+        }
+
+        if (HandleUndoKey(e.Key, Keyboard.Modifiers, e.OriginalSource)) e.Handled = true;
     }
 
     /// <summary>Strg+Z und Co. - getrennt vom Tastenereignis, damit die Probe es ohne Tastatur pruefen kann.</summary>
@@ -106,7 +117,7 @@ public partial class AtelierPage
     /// </summary>
     private void RememberValueEdit()
     {
-        if (_valueEditOpen || _graph is null || _settings.AtelierNodes is not { } before) return;
+        if (_valueEditOpen || _graph is null || _recipe.Nodes is not { } before) return;
 
         // Nichts geaendert - etwa ein Farbstreifen, der sich beim Waehlen eines Knotens
         // fuellt und dabei meldet: kein Schritt im Verlauf.

@@ -168,7 +168,7 @@ public partial class AtelierPage
     {
         if (_graph is null) return;
 
-        _settings.AtelierNodes = _graph.Save();
+        _recipe.Nodes = _graph.Save();
 
         // Ein Zug an einem Wert ist zu Ende, wenn sein Stand festgehalten wird.
         _valueEditOpen = false;
@@ -193,11 +193,25 @@ public partial class AtelierPage
     }
 
     /// <summary>Wo der gewaehlte Knoten platziert - oder null, wenn er nichts platziert.</summary>
-    private (LayerTransform Place, FloatFrame Source)? NodePlacement(Node? node) => node switch
+    private (LayerTransform Place, FloatFrame Source)? NodePlacement(Node? node) => Placed(node) switch
     {
         PlaceNode place when SourceInto(place, "Bild") is { } source => (place.Place, source),
         OverlayNode overlay when SourceInto(overlay, "Ebene") is { } source => (overlay.Place, source),
+
+        // Ein ausgeschnittenes Stueck ist so gross wie die Leinwand.
+        CutoutNode cutout when _frame is not null => (cutout.Place, _frame),
         _ => null,
+    };
+
+    /// <summary>
+    /// Der Knoten, den der Rahmen bewegt: der gewaehlte selbst - oder bei einer
+    /// ausgeschnittenen Ebene, deren Mischen gewaehlt ist, ihr Ausschneiden. Wer eine
+    /// Ebene waehlt und zieht, will sie verschieben, nicht erst ihren Knoten suchen.
+    /// </summary>
+    private Node? Placed(Node? node) => node switch
+    {
+        MixNode mix when _graph?.Into(mix.Id, "Oben") is { } over && _graph.Find(over.From) is CutoutNode cutout => cutout,
+        _ => node,
     };
 
     /// <summary>Der Greifrahmen im Knotenmodus - am gewaehlten Platzieren- oder Obenauf-Knoten.</summary>
@@ -237,7 +251,10 @@ public partial class AtelierPage
             return;
         }
 
-        var mask = PaintTarget()?.Mask.PaintOn(_number, _frame.Width, _frame.Height);
+        var target = PaintTarget();
+        var mask = target?.Mask.PaintOn(_number, _frame.Width, _frame.Height);
+
+        if (target is not null && mask is not null) WatchMask(target, mask);
 
         Placement.Paint(mask, _frame.Width, _frame.Height, Display.Stretch == Stretch.Uniform);
         Display.Cursor = Cursors.None;
@@ -269,9 +286,12 @@ public partial class AtelierPage
 
         if (PaintTarget() is { } known) return known.Mask.PaintOn(_number, _frame.Width, _frame.Height);
 
-        return AddNodeMaskLayer(new LayerMask { Kind = MaskKind.Painted }, Strings.T("S_MaskLayerName")) is { } made
-            ? made.Mask.PaintOn(_number, _frame.Width, _frame.Height)
-            : null;
+        if (AddNodeMaskLayer(new LayerMask { Kind = MaskKind.Painted }, Strings.T("S_MaskLayerName")) is not { } made) return null;
+
+        var paint = made.Mask.PaintOn(_number, _frame.Width, _frame.Height);
+        WatchMask(made, paint);
+
+        return paint;
     }
 
     /// <summary>
@@ -309,10 +329,11 @@ public partial class AtelierPage
     /// <summary>Am Rahmen wurde gezogen - im Knotenmodus bekommt der Knoten die neue Lage.</summary>
     private void OnNodePlacementDragged(LayerTransform place, bool interim)
     {
-        switch (_placingNode ?? NodeView.Selected)
+        switch (Placed(_placingNode ?? NodeView.Selected))
         {
             case PlaceNode node: node.Place = place; break;
             case OverlayNode node: node.Place = place; break;
+            case CutoutNode node: node.Place = place; break;
             default: return;
         }
 
@@ -366,6 +387,7 @@ public partial class AtelierPage
             _regionPainted = false;
 
             RememberValueEdit();
+            RecordMaskStroke();
 
             // Das ganze Bild - fuer die Vorschauen der Knoten und das Histogramm - erst,
             // wenn der Pinsel ruht. Gleich nach jedem Strich hiesse bei 4K eine Fuenftel-

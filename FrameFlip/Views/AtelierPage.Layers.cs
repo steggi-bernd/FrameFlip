@@ -101,7 +101,7 @@ public partial class AtelierPage
     /// </summary>
     private void OnLayersChanged(bool interim)
     {
-        _settings.Layers = Layers.Stack;
+        _recipe.Layers = Layers.Stack;
 
         ShowLayerCount();
 
@@ -177,6 +177,8 @@ public partial class AtelierPage
     {
         BusyBadge.Visibility = Visibility.Visible;
 
+        long opened = _source.Opened;
+
         Task.Run(() =>
         {
             var found = new Dictionary<string, FloatFrame>(StringComparer.Ordinal);
@@ -207,8 +209,8 @@ public partial class AtelierPage
 
                 // Waehrend gelesen wurde, kann eine andere Datei geoeffnet worden
                 // sein. Die Passe gehoeren dann zu einem Bild, das nicht mehr auf
-                // dem Schirm steht.
-                if (!string.Equals(path, _path, StringComparison.Ordinal)) return;
+                // dem Schirm steht - auch wenn es dieselbe Datei ist, neu geoeffnet.
+                if (!_source.IsCurrent(opened) || !string.Equals(path, _path, StringComparison.Ordinal)) return;
 
                 foreach (var (name, frame) in read) _sources[name] = frame;
 
