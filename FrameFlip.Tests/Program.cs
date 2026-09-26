@@ -93,6 +93,7 @@ static int RunAll()
     RegionRenderInvariants.Run();
     MaskElementInvariants.Run();
     MaskHistoryInvariants.Run();
+    BrushShapeInvariants.Run();
     PersistedEnumInvariants.Run();
     ExportFrameNumberInvariants.Run();
     AtelierOpenRaceInvariants.Run();

@@ -125,6 +125,14 @@ public partial class AtelierPage
             return;
         }
 
+        // Umschalt und Rad beim Pinsel: die Spitze drehen.
+        if (_tool == AtelierTool.Brush &&
+            (System.Windows.Input.Keyboard.Modifiers & System.Windows.Input.ModifierKeys.Shift) != 0)
+        {
+            Placement.StepAngle(e.Delta / 120.0);
+            return;
+        }
+
         WheelZoom(e.GetPosition(Display), e.GetPosition(ImageScroll), e.Delta / 120.0);
     }
 

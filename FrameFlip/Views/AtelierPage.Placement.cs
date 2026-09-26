@@ -164,6 +164,11 @@ public partial class AtelierPage
         Placement.BrushFlow = Properties.BrushFlow;
         Placement.BrushOpacity = Properties.BrushOpacity;
         Placement.BrushSpacing = Properties.BrushSpacing;
+        Placement.BrushShape = Properties.BrushShape;
+        Placement.BrushAspect = Properties.BrushAspect;
+        Placement.BrushAngle = Properties.BrushAngle;
+        Placement.BrushFollow = Properties.BrushFollow;
+        Placement.LimitWanted = Properties.BrushObject ? ObjectLimitAt : null;
 
         Placement.InvalidateVisual();
     }

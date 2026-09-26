@@ -1,6 +1,7 @@
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Controls.Primitives;
+using FrameFlip.Imaging.Grading;
 using FrameFlip.Localization;
 
 namespace FrameFlip.Views;
@@ -56,6 +57,32 @@ public partial class PropertiesPanel : UserControl
     /// <summary>Der Abstand der Tupfer als Anteil des Radius.</summary>
     public float BrushSpacing => (float)BrushSpacingSlider.Value;
 
+    /// <summary>Eckige Spitze statt runder.</summary>
+    public BrushShape BrushShape => BrushSquareToggle.IsChecked == true ? BrushShape.Square : BrushShape.Round;
+
+    /// <summary>Der Winkel der Spitze in Grad.</summary>
+    public float BrushAngle => (float)BrushAngleSlider.Value;
+
+    /// <summary>Breite zu Hoehe der Spitze.</summary>
+    public float BrushAspect => (float)BrushAspectSlider.Value;
+
+    /// <summary>Der Winkel folgt dem Strich.</summary>
+    public bool BrushFollow => BrushFollowToggle.IsChecked == true;
+
+    /// <summary>Der Strich bleibt auf dem Objekt, auf dem er beginnt.</summary>
+    public bool BrushObject => BrushObjectToggle.IsChecked == true;
+
+    private void OnBrushToggle(object sender, RoutedEventArgs e)
+    {
+        if (!IsLoaded) return;
+
+        BrushChanged?.Invoke();
+    }
+
+    /// <summary>Die Spitze von aussen - wenn am Bild mit Umschalt und Rad gedreht wurde.</summary>
+    public void SetBrushAngle(float angle)
+        => BrushAngleSlider.Value = Math.Clamp(angle, BrushAngleSlider.Minimum, BrushAngleSlider.Maximum);
+
     private void OnBrushChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
     {
         if (!IsLoaded) return;
@@ -93,6 +120,8 @@ public partial class PropertiesPanel : UserControl
         BrushFlowValue.Text = $"{BrushFlowSlider.Value:0.00}";
         BrushOpacityValue.Text = $"{BrushOpacitySlider.Value:0.00}";
         BrushSpacingValue.Text = $"{BrushSpacingSlider.Value * 100:0} %";
+        BrushAngleValue.Text = $"{BrushAngleSlider.Value:0}°";
+        BrushAspectValue.Text = $"1:{BrushAspectSlider.Value:0.##}";
     }
 
     private float? _depth;

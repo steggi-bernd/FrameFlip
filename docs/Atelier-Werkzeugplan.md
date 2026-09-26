@@ -95,9 +95,38 @@ Knotenmodus und die Einstellungen lesen alle aus derselben Liste.
   Der Winkel jedes Tupfers ergibt sich aus der Richtung des Weges.
 - **Objektgebunden:** Beim Ansetzen wird die Kryptomatte-Kennung unter dem Pinsel gelesen.
   Jeder Tupfer wirkt nur, so weit das Objekt deckt.
-- **Nachspielbar:** Form, Winkel, Seitenverhältnis, Winkelmodus, Objektkennung und
+- **Nachspielbar:** Form, Winkel, Seitenverhältnis, Winkelmodus, Begrenzung und
   Druck stehen im `PaintStroke`. Alte Striche lesen sich als rund und ungebunden. Die
   Probe „Nachspielen ist Malen“ muss für jede Form und jeden Modus Byte für Byte halten.
+
+### 4.1 Stand
+
+**Erster Schnitt (`feature/pinsel`):** Form, Winkel, „folgt dem Strich“ und objektgebunden.
+
+- Rund und gestreckt ergibt eine Ellipse, eckig und gestreckt ein Rechteck (bis 1:8).
+  Eine schlichte runde Spitze nimmt weiter den alten Rechenweg.
+- Der Winkel dreht mit Umschalt + Mausrad in Schritten von 15 Grad, der Regler zieht nach.
+- Mit „folgt dem Strich“ wartet der erste Tupfer auf die Richtung des Weges. Ein Klick
+  ohne Bewegung setzt ihn beim Loslassen.
+- Abweichung vom Entwurf oben: Der Strich speichert nicht die Kryptomatte-Kennung,
+  sondern die **gepackte Deckung** des Objekts in Maskengröße. Nur so spielt er im
+  Maskenverlauf genau nach, auch ohne die Datei, und ein Bild später mit anderen
+  Objekten an derselben Stelle ändert nichts an einem alten Strich.
+- Proben: `BrushShapeInvariants`.
+  - Alte Striche bleiben unverändert.
+  - Jede Form deckt, was sie soll.
+  - „Folgt dem Strich“ legt die Spitze in die Richtung des Weges.
+  - Die Begrenzung hält den Strich draußen.
+  - 40 zufällige Striche spielen nach, auch aus Text gelesen und im Maskenverlauf.
+  - Die Seite bindet an ein Objekt der Kryptomatte-Probedatei.
+
+**Offen in W1:**
+
+- Kantengebunden (Pässe) und Druckstärke.
+- Gerade Linien, Rechteck, Ellipse und Lasso.
+- Maske bearbeiten.
+- Kanten verfeinern.
+- Stempelpinsel.
 
 ## 5. KI-Werkzeuge: Last, Größe, Lizenz
 

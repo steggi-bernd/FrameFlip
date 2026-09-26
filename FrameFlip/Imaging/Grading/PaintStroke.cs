@@ -44,6 +44,34 @@ public sealed class PaintStroke
     /// <summary>Wegnehmen statt Auftragen.</summary>
     public bool Erase { get; init; }
 
+    /// <summary>Rund oder eckig. Fehlt es in einem alten Strich, ist er rund.</summary>
+    public BrushShape Shape { get; init; } = BrushShape.Round;
+
+    /// <summary>Breite zu Hoehe der Spitze, ab 1. Rund und 1 ist der alte Pinsel, rund und mehr eine Ellipse.</summary>
+    public float Aspect { get; init; } = 1f;
+
+    /// <summary>Der Winkel der Spitze in Grad.</summary>
+    public float Angle { get; init; }
+
+    /// <summary>
+    /// Der Winkel folgt dem Strich: Zum eingestellten kommt die Richtung des Weges. Ein
+    /// flacher Pinsel legt sich dann wie eine Breitfeder in jede Kurve.
+    /// </summary>
+    public bool Follow { get; init; }
+
+    /// <summary>
+    /// Worauf der Strich begrenzt ist - die gepackte Deckung eines Objekts in der Groesse
+    /// der Maske, oder null. Sie gehoert zum Strich, damit er ueberall genau so nachspielt,
+    /// auch ohne die Datei, aus der sie kam.
+    /// </summary>
+    public string? Limit { get; init; }
+
+    private byte[]? _limit;
+    private bool _limitRead;
+
+    /// <summary>Die Richtung des Weges beim letzten Stueck, in Grad.</summary>
+    private float _heading;
+
     /// <summary>
     /// Der Weg in Bildpunkten, abwechselnd x und y - so, wie er gemeldet wurde, und
     /// nicht die gesetzten Tupfer. Aus ihm und den Einstellungen folgen die Tupfer
@@ -57,6 +85,21 @@ public sealed class PaintStroke
     private float _walked;
 
     private bool _started;
+
+    /// <summary>
+    /// Folgt der Winkel dem Strich, wartet der erste Tupfer, bis der Weg eine Richtung hat
+    /// - sonst laege er quer zu allem, was folgt. Kommt keine, setzt <see cref="Finish"/> ihn.
+    /// </summary>
+    private bool _firstPending;
+
+    /// <summary>Die Spitze eines Tupfers - mit der Richtung des Weges, wenn der Winkel ihr folgt.</summary>
+    private BrushTip Tip => new(Shape, Aspect, Follow ? Angle + _heading : Angle);
+
+    /// <summary>Wie weit ein Tupfer hoechstens reicht, in Bildpunkten - fuer das, was ein Zug beruehrt.</summary>
+    [JsonIgnore]
+    public float Reach => Shape == BrushShape.Round && Aspect <= 1f
+        ? Radius
+        : Radius * MathF.Sqrt(1f + 1f / (MathF.Max(1f, Aspect) * MathF.Max(1f, Aspect)));
 
     /// <summary>Der Abstand zweier Tupfer in Bildpunkten.</summary>
     [JsonIgnore]
@@ -73,7 +116,25 @@ public sealed class PaintStroke
         Path.Add(x);
         Path.Add(y);
 
+        if (Follow)
+        {
+            _firstPending = true;
+            return PaintBounds.Empty;
+        }
+
         return Dab(mask, x, y);
+    }
+
+    /// <summary>
+    /// Der Zug ist zu Ende. Hat er sich nie bewegt und wartet der erste Tupfer noch, wird er
+    /// jetzt gesetzt - im eingestellten Winkel. Ein Klick malt also auch hier.
+    /// </summary>
+    public PaintBounds Finish(PaintedMask mask)
+    {
+        if (!_firstPending) return PaintBounds.Empty;
+
+        _firstPending = false;
+        return Dab(mask, _x, _y);
     }
 
     /// <summary>
@@ -94,6 +155,16 @@ public sealed class PaintStroke
 
         var bounds = PaintBounds.Empty;
         if (length <= 0f) return bounds;
+
+        // Die Richtung dieses Stuecks - aus dem Weg, also beim Nachspielen dieselbe.
+        _heading = MathF.Atan2(dy, dx) * 180f / MathF.PI;
+
+        // Jetzt hat der Weg eine Richtung - der wartende erste Tupfer kommt in ihr.
+        if (_firstPending)
+        {
+            _firstPending = false;
+            bounds = Dab(mask, _x, _y);
+        }
 
         float step = Step;
         float at = step - _walked;
@@ -126,6 +197,11 @@ public sealed class PaintStroke
             Opacity = Opacity,
             Spacing = Spacing,
             Erase = Erase,
+            Shape = Shape,
+            Aspect = Aspect,
+            Angle = Angle,
+            Follow = Follow,
+            Limit = Limit,
         };
 
         var bounds = PaintBounds.Empty;
@@ -133,14 +209,38 @@ public sealed class PaintStroke
         for (int i = 0; i + 1 < Path.Count; i += 2)
             bounds = bounds.Union(i == 0 ? again.Begin(mask, Path[0], Path[1]) : again.To(mask, Path[i], Path[i + 1]));
 
+        bounds = bounds.Union(again.Finish(mask));
+
         return bounds;
     }
 
     private PaintBounds Dab(PaintedMask mask, float x, float y)
     {
-        mask.Stroke(x, y, Radius, Erase ? 0f : 1f, Flow, Hardness, Opacity);
-        return PaintBounds.Around(x, y, Radius);
+        if (!_limitRead)
+        {
+            _limitRead = true;
+            _limit = Limit is { Length: > 0 } packed ? PaintedMask.Unpack(packed, mask.Width * mask.Height) : null;
+        }
+
+        mask.Stamp(x, y, Radius, Erase ? 0f : 1f, Flow, Hardness, Opacity, Tip, _limit);
+        return PaintBounds.Around(x, y, Reach);
     }
+}
+
+/// <summary>Die Form einer Pinselspitze.</summary>
+public enum BrushShape
+{
+    Round,
+    Square,
+}
+
+/// <summary>Eine Pinselspitze: Form, Breite zu Hoehe und Winkel in Grad.</summary>
+public readonly record struct BrushTip(BrushShape Shape, float Aspect, float Angle)
+{
+    public static BrushTip Round { get; } = new(BrushShape.Round, 1f, 0f);
+
+    /// <summary>Der alte, runde Pinsel - er nimmt den alten Rechenweg.</summary>
+    public bool IsPlainRound => Shape == BrushShape.Round && Aspect <= 1f;
 }
 
 /// <summary>Was ein Zug beruehrt hat, in Bildpunkten der Leinwand. Leer: nichts.</summary>

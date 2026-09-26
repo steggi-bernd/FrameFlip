@@ -1207,6 +1207,13 @@
     <sys:String x:Key="S_BrushFlow">Stärke</sys:String>
     <sys:String x:Key="S_BrushOpacity">Deckkraft</sys:String>
     <sys:String x:Key="S_BrushSpacing">Abstand</sys:String>
+    <sys:String x:Key="S_BrushSquareHint">Eckige Spitze statt runder – kommt sauber in Ecken und an gerade Kanten.</sys:String>
+    <sys:String x:Key="S_BrushAngle">Winkel</sys:String>
+    <sys:String x:Key="S_BrushAngleHint">Drehung der Spitze – am Bild auch mit Umschalt und Mausrad.</sys:String>
+    <sys:String x:Key="S_BrushAspect">Streckung</sys:String>
+    <sys:String x:Key="S_BrushAspectHint">Breite zu Höhe der Spitze. Rund und gestreckt ist eine Ellipse, eckig und gestreckt ein Rechteck.</sys:String>
+    <sys:String x:Key="S_BrushFollowHint">Der Winkel folgt dem Strich – eine flache Spitze legt sich wie eine Breitfeder in jede Kurve.</sys:String>
+    <sys:String x:Key="S_BrushObjectHint">Nur auf das Objekt malen, auf dem der Strich beginnt – aus der Kryptomatte der Datei.</sys:String>
     <sys:String x:Key="S_BrushSpacingHint">Wie weit die Tupfer eines Strichs auseinander liegen, gemessen am Radius. 25 % ist ein glatter Strich, bei 200 % berühren sich die Tupfer gerade noch, darüber entstehen Lücken. Strg und Mausrad über dem Bild stellen ihn ebenfalls ein.</sys:String>
     <sys:String x:Key="S_BrushHint">Stärke und Deckkraft sind nicht dasselbe: Die eine sagt, wieviel EIN Strich aufträgt, die andere, wo auch zehn Striche aufhören. Bei Deckkraft 0,3 bleibt die Maske knapp bei einem Drittel, so oft man auch darübergeht. Alt gedrückt halten nimmt weg.</sys:String>
     <sys:String x:Key="S_ProjectSave">Speichern</sys:String>
