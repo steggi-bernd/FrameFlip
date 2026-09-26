@@ -29,6 +29,18 @@ public partial class PropertiesPanel : UserControl
     /// <summary>Eine Pinseleinstellung hat sich geaendert.</summary>
     public event Action? BrushChanged;
 
+    /// <summary>Der Verlauf der bemalten Maske soll aufgehen - am Knopf, der ihn will.</summary>
+    public event Action<FrameworkElement>? BrushHistoryWanted;
+
+    /// <summary>Ob der Knopf fuer den Maskenverlauf zu sehen ist - nur, wenn es einen gibt.</summary>
+    public void ShowBrushHistory(bool shown)
+        => BrushHistoryButton.Visibility = shown ? Visibility.Visible : Visibility.Collapsed;
+
+    /// <summary>Der Knopf fuer den Maskenverlauf - fuer die Probe.</summary>
+    internal Button HistoryButton => BrushHistoryButton;
+
+    private void OnBrushHistory(object sender, RoutedEventArgs e) => BrushHistoryWanted?.Invoke(BrushHistoryButton);
+
     /// <summary>Der Pinselradius in Bildpunkten.</summary>
     public float BrushRadius => (float)BrushSizeSlider.Value / 2f;
 

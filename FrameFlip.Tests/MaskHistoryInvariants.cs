@@ -64,7 +64,7 @@ public static class MaskHistoryInvariants
     /// </summary>
     private static void StatesComeWithArea()
     {
-        Check.Group("Maskenverlauf: ein Stand je Zehntel der Flaeche");
+        Check.Group("Maskenverlauf: ein Stand je Hundertstel der Flaeche");
 
         var paint = PaintedMask.For(ImageWidth, ImageHeight);
         var history = MaskHistory.Start(paint);
@@ -74,9 +74,9 @@ public static class MaskHistoryInvariants
 
         for (int i = 0; i < 12; i++)
         {
-            var dab = new PaintStroke { Radius = 20, Flow = 0.3f, Hardness = 0.5f };
+            var dab = new PaintStroke { Radius = 12, Flow = 0.3f, Hardness = 0.5f };
             dab.Begin(paint, 100, 100);
-            dab.To(paint, 120, 104);
+            dab.To(paint, 108, 102);
             paint.Keep();
 
             made |= history.Record(paint, dab);
@@ -102,7 +102,7 @@ public static class MaskHistoryInvariants
         var state = history.States[^1];
 
         Check.That(made && history.States.Count == 2 && state.Changed >= MaskHistory.Threshold && history.Pending == 0,
-                   "breite Striche: ein neuer Stand, sobald ein Zehntel der Flaeche anders ist - danach zaehlt es von vorn",
+                   "breite Striche: ein neuer Stand, sobald ein Hundertstel der Flaeche anders ist - danach zaehlt es von vorn",
                    $"{strokes} Striche, {state.Changed:P1}");
         Check.That(state.Snapshot is null && state.Strokes!.Count == 12 + strokes,
                    "der Stand haelt nur die Striche fest, nicht die Maske");
@@ -327,6 +327,9 @@ public static class MaskHistoryInvariants
             var fresh = MaskHistory.Start(PaintedMask.FromCover(blank.Width, blank.Height, blank.Cover()));
             var painted = PaintedMask.FromCover(blank.Width, blank.Height, blank.Cover());
             stroke.Replay(painted);
+
+            // Wie beim Loslassen: Der Pinsel hat die Maske gerade gepackt.
+            painted.Keep();
             prepared.Enqueue((fresh, painted));
         }
 
@@ -425,7 +428,21 @@ public static class MaskHistoryInvariants
                 if (rows.Count > truth.Count) truth.Add(paint.Cover().ToArray());
             }
 
-            Check.That(truth.Count == 3, "Malen legt Staende an - je Zehntel der Flaeche einen", $"{truth.Count - 1} neue");
+            Check.That(truth.Count == 3, "Malen legt Staende an - je Hundertstel der Flaeche einen", $"{truth.Count - 1} neue");
+
+            // Der Verlauf ist auch von der Ebene aus zu erreichen - und vom Pinsel.
+            var list = (NodeLayerList)page.FindName("NodeLayers");
+            var row = list.Shown.Single(l => ReferenceEquals(l.MaskSource, mask));
+            typeof(AtelierPage).GetMethod("ShowLayerMenu", flags)!.Invoke(page, new object[] { row });
+            Check.That(page.LayerMenu!.Items.Contains(T("S_MaskMenuHistory")) && page.LayerMenu.Items.Contains(T("S_MaskMenuExtract")),
+                       "im Rechtsklick der Ebene in der Liste: die Handgriffe ihrer Maske samt Verlauf", string.Join(", ", page.LayerMenu.Items));
+            page.LayerMenu.Close();
+
+            var historyButton = ((PropertiesPanel)page.FindName("Properties")).HistoryButton;
+            Check.That(historyButton.Visibility == Visibility.Visible, "beim Pinsel auf einer gemalten Maske: der Knopf Maskenverlauf");
+            historyButton.RaiseEvent(new RoutedEventArgs(System.Windows.Controls.Primitives.ButtonBase.ClickEvent));
+            Check.That(page.MaskHistoryMenu is { } fromBrush && fromBrush.Numbers.Count == 3, "er oeffnet den Verlauf dieser Maske");
+            page.MaskHistoryMenu!.Close();
 
             page.ShowNodeMenu(mask, new Point(10, 10));
             Check.That(page.NodeMenu!.Items.Contains(T("S_MaskMenuHistory")), "im Menue einer gemalten Maske: Maskenverlauf",

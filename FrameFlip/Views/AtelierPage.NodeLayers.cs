@@ -148,6 +148,10 @@ public partial class AtelierPage
             }
         }
 
+        // Die Maske der Ebene: dieselben Handgriffe wie an ihrem Knoten - samt Verlauf. Wer
+        // mit Masken arbeitet, klickt die Ebene in der Liste an und nicht den Knoten im Graphen.
+        if (layer.MaskSource is MaskNode mask) AddMaskItems(menu, mask, NodeLayers);
+
         LayerMenu = menu;
         menu.Open();
     }

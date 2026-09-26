@@ -24,8 +24,8 @@ public sealed class MaskState
 /// Der Verlauf einer gemalten Maske (docs/Projekte-und-Masken.md, Abschnitt 3.5): Stände,
 /// zu denen man zurueckkehren kann, unabhaengig vom Strg+Z der Seite.
 ///
-/// Ein neuer Stand entsteht, sobald sich seit dem letzten ein Zehntel der Flaeche
-/// geaendert hat. Gezaehlt werden Maskenpunkte, nicht Striche: Zehnmal ueber dieselbe
+/// Ein neuer Stand entsteht, sobald sich seit dem letzten ein Hundertstel der Flaeche
+/// geaendert hat (anfangs ein Zehntel - auf Wunsch feiner, 26. September). Gezaehlt werden Maskenpunkte, nicht Striche: Zehnmal ueber dieselbe
 /// Stelle zaehlt einmal. So haelt der Verlauf fest, was sich lohnt, und nicht jeden
 /// Tupfer.
 ///
@@ -42,7 +42,7 @@ public sealed class MaskHistory
     public const int Depth = 20;
 
     /// <summary>Ab diesem Anteil geaenderter Flaeche ein neuer Stand.</summary>
-    public const float Threshold = 0.10f;
+    public const float Threshold = 0.01f;
 
     /// <summary>Jeder wievielte Stand ein Schnappschuss ist.</summary>
     public const int SnapshotEvery = 5;
@@ -82,7 +82,7 @@ public sealed class MaskHistory
     {
         var history = new MaskHistory { Width = paint.Width, Height = paint.Height };
 
-        paint.Keep();
+        if (!paint.Kept) paint.Keep();
         history.States.Add(new MaskState { Number = history.NextNumber++, SavedUtc = DateTime.UtcNow, Snapshot = paint.Data });
         history.Follow(paint);
 
@@ -216,7 +216,8 @@ public sealed class MaskHistory
         int lastSnapshot = States.FindLastIndex(s => s.Snapshot is not null);
         bool snapshot = _foreign || States.Count - lastSnapshot >= SnapshotEvery;
 
-        if (snapshot) paint.Keep();
+        // Beim Loslassen hat der Pinsel die Maske gerade gepackt - dann gilt das Gepackte.
+        if (snapshot && !paint.Kept) paint.Keep();
 
         States.Add(new MaskState
         {
@@ -241,6 +242,9 @@ public sealed class MaskHistory
     /// <summary>
     /// Der aelteste Stand faellt weg, wenn es zu viele sind. Steht hinter ihm einer aus
     /// Strichen, wird der zum Schnappschuss - ihm fehlte sonst sein Anfang.
+    ///
+    /// Ersetzt, nicht umgeschrieben: Ein Stand aendert sich nach seiner Entstehung nie,
+    /// sonst koennte das Speichern im Hintergrund einen halb geaenderten lesen.
     /// </summary>
     private void Trim()
     {
@@ -251,13 +255,25 @@ public sealed class MaskHistory
                 var kept = FromCover(CoverOf(1));
                 kept.Keep();
 
-                States[1].Snapshot = kept.Data;
-                States[1].Strokes = null;
+                var old = States[1];
+                States[1] = new MaskState { Number = old.Number, SavedUtc = old.SavedUtc, Changed = old.Changed, Snapshot = kept.Data };
             }
 
             States.RemoveAt(0);
         }
     }
+
+    /// <summary>
+    /// Ein Abdruck zum Speichern: dieselben Staende in einer eigenen Liste. Staende aendern
+    /// sich nie, also darf er im Hintergrund geschrieben werden, waehrend hier weitergemalt wird.
+    /// </summary>
+    public MaskHistory ForSaving() => new()
+    {
+        Width = Width,
+        Height = Height,
+        NextNumber = NextNumber,
+        States = States.ToList(),
+    };
 
     /// <summary>Markiert, was sich in diesem Rechteck gegenueber dem letzten Stand geaendert hat.</summary>
     private void Mark(byte[] cover, int x0, int y0, int x1, int y1)

@@ -113,8 +113,8 @@ bleibt, wie er ist: eine Maske je Ebene.
   Bildnummer. Dazu ein Bitfeld in Maskenauflösung (bei 4K 960 × 540 Zellen = 64 KB), das
   jede Zelle markiert, deren Wert sich seit dem letzten Stand geändert hat. Gezählt
   werden **markierte Zellen**. Zehnmal über dieselbe Stelle zählt einmal.
-- **Neuer Stand bei ≥ 10 %** eindeutig geänderter Fläche. Danach beginnt die Zählung
-  bei 0.
+- **Neuer Stand bei ≥ 1 %** eindeutig geänderter Fläche (geplant waren 10 %, auf
+  Wunsch feiner, Entscheidung 9). Danach beginnt die Zählung bei 0.
 - **Speicherung hybrid:** Jeder fünfte Stand (und jeder nach einer Operation, die kein
   Strich ist: Füllen, Umkehren, Leeren, Wiederherstellen, globales Undo) ist ein
   vollständiger, gepackter Schnappschuss. Dazwischen stehen nur die Striche. Das
@@ -397,7 +397,7 @@ Einzelheiten in [Atelier-Nodes](Atelier-Nodes.md), Abschnitt 15):
   Maskenbild und Namen über jedem Mischen mit Maske, „frei“ und „→ n Ebenen“ am
   Maskenknoten, eine gewählte Maske hebt ihre Ebenen im Graphen und in der Liste hervor.
   Freie Masken stehen in der Ebenenliste im Abschnitt „Masken“.
-- **Maskenverlauf** (10) wie in 3.5: 10 % eindeutig geänderte Fläche je Stand, höchstens
+- **Maskenverlauf** (10) wie in 3.5: 1 % eindeutig geänderte Fläche je Stand, höchstens
   20 Stände, jeder fünfte ein Schnappschuss, dazwischen Striche. Gespeichert in
   `FrameFlip\<name><endung>.ffdata\verlauf\`, je Maskenkennung (bei entsperrten Masken
   je Bild). Wiederherstellen ist ein Schritt im globalen Rückgängig. Aufzeichnen kostet
@@ -457,7 +457,11 @@ Getroffen am 26. September 2026:
    Folgen die Projektdateien groß machen.
 8. **`main` erst nach dem Ausprobieren.** Die Phasen gehen zuerst nach `feature/atelier`.
    #25 (nach `main`) folgt, wenn der vereinte Stand an echten Projekten erprobt ist.
-9. **Maskenverlauf ab 1 %** geänderter Fläche und von Ebene und Pinsel aus erreichbar
-   (#33).
+9. **Maskenverlauf feiner und sichtbarer.** Ein neuer Stand entsteht schon ab 1 %
+   geänderter Fläche. Die höchstens 20 Stände reichen damit weniger weit zurück, jeder
+   Schritt ist aber feiner. Der Verlauf ist auch aus dem Rechtsklick einer Ebene in der
+   Ebenenliste zu erreichen, zusammen mit den übrigen Handgriffen ihrer Maske, und über
+   einen Knopf im Pinselbereich. Das Speichern des Verlaufs läuft vollständig im
+   Hintergrund, weil nun fast jeder Strich einen Stand ergibt.
 10. **Einstellungen: Entwurf 2**, eine Übersicht mit Zustandsfeldern und Kacheln, dazu
     die Skalierung nach Bildschirm.
