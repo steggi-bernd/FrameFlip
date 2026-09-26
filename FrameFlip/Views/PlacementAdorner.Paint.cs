@@ -83,6 +83,15 @@ public sealed partial class PlacementAdorner
     /// <summary>Worauf der Druck eines Stifts wirkt. Die Maus hat keinen und merkt davon nichts.</summary>
     public BrushPressure BrushPressureTo { get; set; } = BrushPressure.Size;
 
+    /// <summary>Die Spitze des Stempelpinsels - null, solange keine geladen ist.</summary>
+    public StampTip? BrushStamp { get; set; }
+
+    /// <summary>Zufaellige Drehung je Stempeltupfer, 0 bis 1.</summary>
+    public float BrushJitter { get; set; }
+
+    /// <summary>Streuung der Stempeltupfer neben dem Weg, 0 bis 1.</summary>
+    public float BrushScatter { get; set; }
+
     /// <summary>Malt der Pinsel Zuege oder zieht er Flaechen auf - Rechteck, Ellipse, Lasso.</summary>
     public PaintArea BrushArea { get; set; }
 
@@ -532,9 +541,18 @@ public sealed partial class PlacementAdorner
 
         Geometry tip;
 
-        if (BrushShape == BrushShape.Square)
+        // Der Stempel zeigt den Rahmen seiner Spitze - lange Seite gleich Durchmesser.
+        if (BrushShape == BrushShape.Stamp && BrushStamp is { } stamp)
         {
-            var corners = new BrushTip(BrushShape, BrushAspect, angle, BrushSquish).Corners(halfW, halfH);
+            float longest = Math.Max(stamp.Width, stamp.Height);
+            halfW *= stamp.Width / longest;
+            halfH = Math.Max(0.5, radius * scale * stamp.Height / longest / Math.Max(1f, BrushAspect));
+        }
+
+        if (BrushShape is BrushShape.Square or BrushShape.Stamp)
+        {
+            var corners = new BrushTip(BrushShape.Square, BrushAspect, angle, BrushShape == BrushShape.Square ? BrushSquish : 0f)
+                .Corners(halfW, halfH);
             var figure = new PathFigure { StartPoint = new Point(at.X + corners[0].X, at.Y + corners[0].Y), IsClosed = true };
 
             for (int i = 1; i < corners.Length; i++)
@@ -849,6 +867,10 @@ public sealed partial class PlacementAdorner
         Follow = BrushFollow,
         Limit = LimitWanted?.Invoke(x, y),
         Version = PaintStroke.CurrentVersion,
+        Stamp = BrushShape == BrushShape.Stamp ? BrushStamp : null,
+        Jitter = BrushShape == BrushShape.Stamp ? BrushJitter : 0f,
+        Scatter = BrushShape == BrushShape.Stamp ? BrushScatter : 0f,
+        Seed = BrushShape == BrushShape.Stamp ? Random.Shared.Next() : 0,
         PressureTo = BrushPressureTo,
         Pressure = pen && BrushPressureTo != BrushPressure.None ? new List<float>() : null,
     };

@@ -71,8 +71,45 @@ public partial class PropertiesPanel : UserControl
     /// <summary>Der Abstand der Tupfer als Anteil des Radius.</summary>
     public float BrushSpacing => (float)BrushSpacingSlider.Value;
 
-    /// <summary>Eckige Spitze statt runder.</summary>
-    public BrushShape BrushShape => BrushSquareToggle.IsChecked == true ? BrushShape.Square : BrushShape.Round;
+    /// <summary>Eckig, Stempel oder rund.</summary>
+    public BrushShape BrushShape
+        => BrushStampToggle.IsChecked == true ? BrushShape.Stamp
+         : BrushSquareToggle.IsChecked == true ? BrushShape.Square
+         : BrushShape.Round;
+
+    /// <summary>Die geladene Stempelspitze - null, solange keine gewaehlt ist.</summary>
+    public StampTip? BrushStamp { get; private set; }
+
+    /// <summary>Zufaellige Drehung je Stempeltupfer, 0 bis 1.</summary>
+    public float BrushJitter => (float)BrushJitterSlider.Value;
+
+    /// <summary>Streuung der Stempeltupfer, 0 bis 1.</summary>
+    public float BrushScatter => (float)BrushScatterSlider.Value;
+
+    /// <summary>Eine Spitze fuer den Stempel - aus der Datei oder fuer die Probe. Schaltet den Stempel ein.</summary>
+    internal void UseStamp(StampTip tip, string? name = null)
+    {
+        BrushStamp = tip;
+        BrushTipButton.ToolTip = name is null ? Strings.T("S_BrushTipHint") : $"{name} – {tip.Width} × {tip.Height}";
+        BrushStampToggle.IsChecked = true;
+
+        if (IsLoaded) BrushChanged?.Invoke();
+    }
+
+    private void OnBrushTipClicked(object sender, RoutedEventArgs e)
+    {
+        var dialog = new Microsoft.Win32.OpenFileDialog
+        {
+            Title = Strings.T("S_BrushTipLoad"),
+            Filter = "Bilder|*.png;*.tif;*.tiff;*.bmp;*.jpg;*.jpeg;*.webp|Alle Dateien|*.*",
+            CheckFileExists = true,
+        };
+
+        if (dialog.ShowDialog(Window.GetWindow(this)) != true) return;
+
+        if (StampTip.Load(dialog.FileName) is { } tip) UseStamp(tip, System.IO.Path.GetFileName(dialog.FileName));
+        else Told(Strings.T("S_BrushTipUnreadable"));
+    }
 
     /// <summary>Der Winkel der Spitze in Grad.</summary>
     public float BrushAngle => (float)BrushAngleSlider.Value;
@@ -139,6 +176,10 @@ public partial class PropertiesPanel : UserControl
 
     private void OnBrushToggle(object sender, RoutedEventArgs e)
     {
+        // Eckig oder Stempel - eine Spitze hat nur eine Form.
+        if (ReferenceEquals(sender, BrushSquareToggle) && BrushSquareToggle.IsChecked == true) BrushStampToggle.IsChecked = false;
+        if (ReferenceEquals(sender, BrushStampToggle) && BrushStampToggle.IsChecked == true) BrushSquareToggle.IsChecked = false;
+
         // Objekt oder Flaeche - beides zugleich hiesse zwei Begrenzungen, und der Strich
         // traegt nur eine.
         if (ReferenceEquals(sender, BrushObjectToggle) && BrushObject) BrushEdgeToggle.IsChecked = false;

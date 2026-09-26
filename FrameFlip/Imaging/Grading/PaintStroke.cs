@@ -61,6 +61,27 @@ public sealed class PaintStroke
     public float Squish { get; init; }
 
     /// <summary>
+    /// Die Spitze des Stempelpinsels, wenn <see cref="Shape"/> ein Stempel ist - sie reist im
+    /// Strich mit, damit er ohne die PNG nachspielt. Fehlt sie, malt der Stempel rund.
+    /// </summary>
+    public StampTip? Stamp { get; init; }
+
+    /// <summary>Wie weit sich die Stempelspitze je Tupfer zufaellig dreht, 0 bis 1 - bei 1 in jede Richtung.</summary>
+    public float Jitter { get; init; }
+
+    /// <summary>Wie weit ein Stempeltupfer zufaellig neben dem Weg landet, 0 bis 1 - bei 1 bis zum Radius.</summary>
+    public float Scatter { get; init; }
+
+    /// <summary>
+    /// Die Saat des Zufalls fuer Drehung und Streuung. Jeder Strich bekommt eine eigene, damit
+    /// nicht zwei gleich aussehen - und behaelt sie, damit er genau so nachspielt.
+    /// </summary>
+    public int Seed { get; init; }
+
+    /// <summary>Der wievielte Tupfer - fuer den Zufall des Stempels.</summary>
+    private int _dabs;
+
+    /// <summary>
     /// Mit welcher Rechnung der Strich gemalt wurde. Fehlt es, ist es 0 - die Fassung, mit
     /// der er aufgezeichnet wurde, und so spielt er auch nach. Neue Striche bekommen
     /// <see cref="CurrentVersion"/>.
@@ -181,7 +202,8 @@ public sealed class PaintStroke
     public float Reach => Shape == BrushShape.Round && Aspect <= 1f
         ? Radius
         : Radius * MathF.Sqrt(1f + 1f / (MathF.Max(1f, Aspect) * MathF.Max(1f, Aspect)))
-                 * (Shape == BrushShape.Square ? 1f + BrushTip.SquishOf(Squish) : 1f);
+                 * (Shape == BrushShape.Square ? 1f + BrushTip.SquishOf(Squish) : 1f)
+                 + (Shape == BrushShape.Stamp ? Radius * Math.Clamp(Scatter, 0f, 1f) : 0f);
 
     /// <summary>
     /// Die Laenge der Schnur, an der der Anker haengt (Fassung 1) - etwa ein Radius. Eine
@@ -415,6 +437,10 @@ public sealed class PaintStroke
             Version = Version,
             PressureTo = PressureTo,
             Pressure = Pressure is null ? null : new List<float>(),
+            Stamp = Stamp,
+            Jitter = Jitter,
+            Scatter = Scatter,
+            Seed = Seed,
         };
 
         var bounds = PaintBounds.Empty;
@@ -444,8 +470,47 @@ public sealed class PaintStroke
             _limit = Limit is { Length: > 0 } packed ? PaintedMask.Unpack(packed, mask.Width * mask.Height) : null;
         }
 
-        mask.Stamp(x, y, RadiusAt(pressure), Erase ? 0f : 1f, FlowAt(pressure), Hardness, Opacity, Tip, _limit);
+        int dab = _dabs++;
+
+        if (Shape == BrushShape.Stamp && Stamp?.Values() is { } values)
+        {
+            float angle = Tip.Angle;
+            float radius = RadiusAt(pressure);
+
+            // Fester Zufall: aus Saat und Nummer des Tupfers, also beim Nachspielen derselbe.
+            if (Jitter > 0f) angle += (Chance(dab, 0) * 2f - 1f) * 180f * Math.Clamp(Jitter, 0f, 1f);
+
+            if (Scatter > 0f)
+            {
+                float turn = Chance(dab, 1) * 2f * MathF.PI;
+                float far = Chance(dab, 2) * radius * Math.Clamp(Scatter, 0f, 1f);
+                x += MathF.Cos(turn) * far;
+                y += MathF.Sin(turn) * far;
+            }
+
+            mask.StampTip(x, y, radius, Erase ? 0f : 1f, FlowAt(pressure), Opacity, Aspect, angle,
+                          values, Stamp.Width, Stamp.Height, _limit);
+            return PaintBounds.Around(x, y, Reach);
+        }
+
+        mask.Stamp(x, y, RadiusAt(pressure), Erase ? 0f : 1f, FlowAt(pressure), Hardness, Opacity,
+                   Shape == BrushShape.Stamp ? BrushTip.Round : Tip, _limit);
         return PaintBounds.Around(x, y, Reach);
+    }
+
+    /// <summary>
+    /// Eine Zahl von 0 bis unter 1, die nur an Saat, Tupfer und Zweck haengt - SplitMix64. Kein
+    /// Random-Objekt: dessen Folge ist nicht zugesichert, und ein Strich soll auch mit einer
+    /// kuenftigen .NET-Fassung so nachspielen, wie er gemalt wurde.
+    /// </summary>
+    private float Chance(int dab, int purpose)
+    {
+        ulong z = unchecked((ulong)(uint)Seed * 0x9E3779B97F4A7C15UL + (ulong)(uint)dab * 0xBF58476D1CE4E5B9UL + (ulong)purpose * 0x94D049BB133111EBUL);
+        z = (z ^ (z >> 30)) * 0xBF58476D1CE4E5B9UL;
+        z = (z ^ (z >> 27)) * 0x94D049BB133111EBUL;
+        z ^= z >> 31;
+
+        return (z >> 40) / (float)(1UL << 24);
     }
 }
 
@@ -487,6 +552,9 @@ public enum BrushShape
 {
     Round,
     Square,
+
+    /// <summary>Eine Spitze aus einem Bild - siehe <see cref="StampTip"/>.</summary>
+    Stamp,
 }
 
 /// <summary>

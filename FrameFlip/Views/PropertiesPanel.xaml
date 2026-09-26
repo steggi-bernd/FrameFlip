@@ -109,6 +109,29 @@
                               VerticalAlignment="Center" Content="▢" ToolTip="{DynamicResource S_BrushSquareHint}"
                               Checked="OnBrushToggle" Unchecked="OnBrushToggle" />
 
+                <!-- Der Stempel: eine Spitze aus einem Bild, je Tupfer zufaellig gedreht und gestreut. -->
+                <ToggleButton x:Name="BrushStampToggle" Style="{StaticResource OverlayToggle}" Margin="4,0,0,0"
+                              VerticalAlignment="Center" Content="✿" ToolTip="{DynamicResource S_BrushStampHint}"
+                              Checked="OnBrushToggle" Unchecked="OnBrushToggle" />
+                <StackPanel x:Name="BrushStampRow" Orientation="Horizontal" VerticalAlignment="Center" Margin="6,0,0,0"
+                            IsEnabled="{Binding IsChecked, ElementName=BrushStampToggle}">
+                    <Button x:Name="BrushTipButton" Style="{StaticResource OverlayButton}" VerticalAlignment="Center"
+                            Content="{DynamicResource S_BrushTipLoad}" ToolTip="{DynamicResource S_BrushTipHint}"
+                            Click="OnBrushTipClicked" />
+                    <TextBlock Text="{DynamicResource S_BrushJitter}" Style="{StaticResource PanelLabel}"
+                               VerticalAlignment="Center" Margin="10,0,6,0" ToolTip="{DynamicResource S_BrushJitterHint}" />
+                    <Slider x:Name="BrushJitterSlider" Style="{StaticResource PanelSlider}" Width="50"
+                            VerticalAlignment="Center" Minimum="0" Maximum="1" Value="0.5" SmallChange="0.05" LargeChange="0.25"
+                            ToolTip="{DynamicResource S_BrushJitterHint}"
+                            ValueChanged="OnBrushChanged" MouseDoubleClick="OnBrushReset" Tag="0.5" />
+                    <TextBlock Text="{DynamicResource S_BrushScatter}" Style="{StaticResource PanelLabel}"
+                               VerticalAlignment="Center" Margin="10,0,6,0" ToolTip="{DynamicResource S_BrushScatterHint}" />
+                    <Slider x:Name="BrushScatterSlider" Style="{StaticResource PanelSlider}" Width="50"
+                            VerticalAlignment="Center" Minimum="0" Maximum="1" Value="0.25" SmallChange="0.05" LargeChange="0.25"
+                            ToolTip="{DynamicResource S_BrushScatterHint}"
+                            ValueChanged="OnBrushChanged" MouseDoubleClick="OnBrushReset" Tag="0.25" />
+                </StackPanel>
+
                 <TextBlock Text="{DynamicResource S_BrushAngle}" Style="{StaticResource PanelLabel}"
                            VerticalAlignment="Center" Margin="10,0,6,0" ToolTip="{DynamicResource S_BrushAngleHint}" />
                 <Slider x:Name="BrushAngleSlider" Style="{StaticResource PanelSlider}" Width="70"

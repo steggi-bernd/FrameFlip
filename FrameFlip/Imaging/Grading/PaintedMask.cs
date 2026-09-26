@@ -255,6 +255,86 @@ public sealed class PaintedMask
     }
 
     /// <summary>
+    /// Ein Tupfer des Stempelpinsels: die Spitze <paramref name="tip"/> (Breite mal Hoehe,
+    /// zeilenweise) aufgesetzt, gedreht um <paramref name="angle"/> Grad. Ihre lange Seite ist
+    /// der Durchmesser; <paramref name="aspect"/> staucht die Hoehe wie bei den anderen Spitzen.
+    /// Jeder Maskenpunkt nimmt den Wert der Spitze an seiner Stelle, zwischen ihren Punkten
+    /// gemittelt, als Staerke - bis zur Deckkraft, auf Wunsch begrenzt.
+    /// </summary>
+    public void StampTip(float imageX, float imageY, float imageRadius, float value, float flow, float opacity,
+                         float aspect, float angle, byte[] tip, int tipWidth, int tipHeight, byte[]? limit)
+    {
+        var cover = Cover();
+        Kept = false;
+
+        if (limit is not null && limit.Length != cover.Length) limit = null;
+        if (tipWidth <= 0 || tipHeight <= 0 || tip.Length < tipWidth * tipHeight) return;
+
+        float cx = imageX / Coarse;
+        float cy = imageY / Coarse;
+        float radius = MathF.Max(0.75f, imageRadius / Coarse);
+
+        float longest = Math.Max(tipWidth, tipHeight);
+        float halfW = radius * tipWidth / longest;
+        float halfH = MathF.Max(0.5f, radius * tipHeight / longest / Math.Clamp(aspect, 1f, 16f));
+        float reach = MathF.Sqrt(halfW * halfW + halfH * halfH);
+
+        int x0 = Math.Max(0, (int)MathF.Floor(cx - reach));
+        int x1 = Math.Min(Width - 1, (int)MathF.Ceiling(cx + reach));
+        int y0 = Math.Max(0, (int)MathF.Floor(cy - reach));
+        int y1 = Math.Min(Height - 1, (int)MathF.Ceiling(cy + reach));
+
+        float radians = angle * MathF.PI / 180f;
+        float cos = MathF.Cos(radians), sin = MathF.Sin(radians);
+        float want = value * Math.Clamp(opacity, 0f, 1f) * 255f;
+
+        for (int y = y0; y <= y1; y++)
+        {
+            for (int x = x0; x <= x1; x++)
+            {
+                float dx = x + 0.5f - cx;
+                float dy = y + 0.5f - cy;
+
+                float u = dx * cos + dy * sin;
+                float v = -dx * sin + dy * cos;
+
+                // Auf die Spitze: -halb bis +halb wird 0 bis Breite.
+                float tu = (u / halfW * 0.5f + 0.5f) * tipWidth - 0.5f;
+                float tv = (v / halfH * 0.5f + 0.5f) * tipHeight - 0.5f;
+
+                if (tu < -0.5f || tv < -0.5f || tu > tipWidth - 0.5f || tv > tipHeight - 0.5f) continue;
+
+                float sample = Sample(tip, tipWidth, tipHeight, tu, tv);
+
+                int at = y * Width + x;
+                float strength = Math.Clamp(sample / 255f * flow, 0f, 1f);
+                if (limit is not null) strength *= limit[at] / 255f;
+                if (strength <= 0f) continue;
+
+                cover[at] = value > 0.5f
+                    ? (byte)MathF.Max(cover[at], cover[at] + (want - cover[at]) * strength)
+                    : (byte)MathF.Min(cover[at], cover[at] + (want - cover[at]) * strength);
+            }
+        }
+    }
+
+    /// <summary>Zwischen vier Punkten gemittelt; am Rand zaehlt der naechste.</summary>
+    private static float Sample(byte[] tip, int width, int height, float u, float v)
+    {
+        u = Math.Clamp(u, 0f, width - 1);
+        v = Math.Clamp(v, 0f, height - 1);
+
+        int x0 = (int)u, y0 = (int)v;
+        int x1 = Math.Min(width - 1, x0 + 1), y1 = Math.Min(height - 1, y0 + 1);
+        float fx = u - x0, fy = v - y0;
+
+        float top = tip[y0 * width + x0] + (tip[y0 * width + x1] - tip[y0 * width + x0]) * fx;
+        float bottom = tip[y1 * width + x0] + (tip[y1 * width + x1] - tip[y1 * width + x0]) * fx;
+
+        return top + (bottom - top) * fy;
+    }
+
+    /// <summary>
     /// Bearbeitet die ganze Maske auf einmal: fuellen, leeren, umkehren, weiche Kante,
     /// ausweiten, schrumpfen. <paramref name="amount"/> ist die Weite in BILDpunkten, fuer
     /// die ersten drei ohne Bedeutung.
