@@ -166,6 +166,12 @@ internal sealed class AtelierProjectKeeper
         return true;
     }
 
+    /// <summary>Woher das offene Einzelbild kommt - oder null, wenn es kein herausgeloestes ist.</summary>
+    public string? Origin => (_session.Store as ProjectRecipeStore)?.Origin;
+
+    /// <summary>Ein Abdruck des offenen Projekts - fuer ein Einzelbild, das mit diesem Stand beginnt.</summary>
+    internal AtelierProject? Snapshot() => Current is not null && _session.Store is ProjectRecipeStore recipe ? recipe.ToProject(_frame) : null;
+
     /// <summary>Welches Bild in einem Projekt zuletzt offen war - aus seiner Datei, oder null.</summary>
     public string? RememberedFrame(SequenceKey key)
     {
