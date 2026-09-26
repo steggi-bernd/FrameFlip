@@ -71,4 +71,46 @@ public partial class AtelierPage
 
         return _limits[key] = PaintedMask.Pack(cover);
     }
+
+    /// <summary>Gelesene Paesse fuer den kantengebundenen Pinsel: Datei und Pass.</summary>
+    private readonly Dictionary<(string Path, string Pass), FloatFrame?> _surfaces = new();
+
+    /// <summary>
+    /// Die gepackte Begrenzung auf die Flaeche an diesem Punkt - aus Tiefe und Normale der
+    /// Datei (siehe <see cref="SurfaceLimit"/>). Null, wenn die Datei keines von beiden
+    /// fuehrt; dann malt der Strich ungebunden.
+    ///
+    /// Anders als beim Objekt haengt sie am Ansatzpunkt selbst, nicht an einer Kennung - es
+    /// gibt also nichts zu merken ausser den gelesenen Paessen.
+    /// </summary>
+    internal string? SurfaceLimitAt(float imageX, float imageY, float tolerance)
+    {
+        if (_frame is null || _path is null) return null;
+
+        var depth = SurfacePass(PassNeed.Depth);
+        var normal = SurfacePass(PassNeed.Normal);
+        var any = depth ?? normal;
+
+        if (any is null) return null;
+
+        int cols = Math.Max(1, any.Width / PaintedMask.Coarse);
+        int rows = Math.Max(1, any.Height / PaintedMask.Coarse);
+
+        var cover = SurfaceLimit.Build(depth, normal, (int)imageX, (int)imageY, tolerance, cols, rows, PaintedMask.Coarse);
+        return cover is null ? null : PaintedMask.Pack(cover);
+    }
+
+    private FloatFrame? SurfacePass(PassNeed need)
+    {
+        if (_path is null || FramePasses.NameFor(need, _passes) is not { } name) return null;
+        if (_sources.TryGetValue(name, out var known)) return known;
+
+        var key = (_path, name);
+        if (_surfaces.TryGetValue(key, out var read)) return read;
+
+        // Eine Folge wechselt die Datei mit jedem Bild - der Vorrat bleibt klein.
+        if (_surfaces.Count > 8) _surfaces.Clear();
+
+        return _surfaces[key] = FloatFrame.FromExrPass(_path, name);
+    }
 }

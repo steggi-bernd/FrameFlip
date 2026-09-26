@@ -8,6 +8,7 @@ using System.Windows.Threading;
 using FrameFlip.Atelier;
 using FrameFlip.Configuration;
 using FrameFlip.Decoding;
+using FrameFlip.Imaging;
 using FrameFlip.Imaging.Grading;
 using FrameFlip.Views;
 
@@ -31,6 +32,8 @@ public static class BrushShapeInvariants
         TheAngleFollowsTheStroke();
         TheDirectionHoldsSteady();
         TheDiamondReachesFurther();
+        PressureShapesTheStroke();
+        TheSurfaceHoldsTheStroke();
         ALimitKeepsTheStrokeOut();
         EveryStrokeReplaysExactly();
         ThePageBindsToTheObject();
@@ -252,6 +255,123 @@ public static class BrushShapeInvariants
                    string.Join(" ", corners.Select(c => $"({c.X:0.######}, {c.Y:0.######})")));
     }
 
+    /// <summary>Der Druck eines Stifts macht den Strich schmaler oder blasser - und spielt genau nach.</summary>
+    private static void PressureShapesTheStroke()
+    {
+        Check.Group("Pinsel: Druck");
+
+        PaintedMask Draw(BrushPressure to, List<float>? pressure, Func<int, float> at, int points = 21)
+        {
+            var mask = PaintedMask.For(ImageWidth, ImageHeight);
+            var stroke = new PaintStroke { Radius = 32, Hardness = 1f, Flow = 1f, PressureTo = to, Pressure = pressure };
+
+            for (int i = 0; i < points; i++)
+            {
+                if (i == 0) stroke.Begin(mask, 20, 80, at(0));
+                else stroke.To(mask, 20 + 10 * i, 80, at(i));
+            }
+
+            return mask;
+        }
+
+        var plain = Draw(BrushPressure.None, null, _ => 1f);
+
+        Check.That(Draw(BrushPressure.Size, null, _ => 1f).Cover().AsSpan().SequenceEqual(plain.Cover()) &&
+                   Draw(BrushPressure.Size | BrushPressure.Flow, new List<float>(), _ => 1f).Cover().AsSpan().SequenceEqual(plain.Cover()),
+                   "voller Druck malt Byte fuer Byte wie ohne Druck");
+        Check.That(Draw(BrushPressure.Size | BrushPressure.Flow, null, _ => 0.2f).Cover().AsSpan().SequenceEqual(plain.Cover()),
+                   "Druck ohne Aufzeichnung wirkt nicht - sonst spielte der Strich anders nach");
+
+        // Von leicht nach fest: links schmal, rechts in voller Breite. Radius 8 Maskenpunkte.
+        var ramp = Draw(BrushPressure.Size, new List<float>(), i => 0.1f + 0.9f * i / 20f);
+        byte At(PaintedMask m, int col, int row) => m.Cover()[row * Cols + col];
+
+        Check.That(At(ramp, 10, 24) == 0 && At(ramp, 50, 24) == 255 && At(plain, 10, 24) == 255,
+                   "Druck auf die Groesse: leicht gedrueckt schmal, fest gedrueckt breit");
+
+        // Auf die Staerke: ein leichter Klick traegt wenig auf.
+        var light = PaintedMask.For(ImageWidth, ImageHeight);
+        new PaintStroke { Radius = 32, Hardness = 1f, Flow = 1f, PressureTo = BrushPressure.Flow, Pressure = new() }.Begin(light, 120, 80, 0.3f);
+        Check.That(Math.Abs(At(light, 30, 20) - 77) <= 1, "Druck auf die Staerke: ein Klick mit 30 % Druck traegt 30 % auf", $"{At(light, 30, 20)}");
+
+        // Aufgezeichnet und nachgespielt, auch aus Text gelesen.
+        var recorded = new PaintStroke { Radius = 32, Hardness = 0.4f, Flow = 0.8f, PressureTo = BrushPressure.Size | BrushPressure.Flow, Pressure = new() };
+        var live = PaintedMask.For(ImageWidth, ImageHeight);
+        for (int i = 0; i < 21; i++)
+        {
+            float p = 0.2f + 0.8f * MathF.Abs(MathF.Sin(i * 0.4f));
+            if (i == 0) recorded.Begin(live, 20, 60, p);
+            else recorded.To(live, 20 + 10 * i, 60 + 3 * (i % 5), p);
+        }
+
+        var read = JsonSerializer.Deserialize<PaintStroke>(JsonSerializer.Serialize(recorded, AtelierProjectStore.Options), AtelierProjectStore.Options)!;
+        var again = PaintedMask.For(ImageWidth, ImageHeight);
+        read.Replay(again);
+
+        Check.That(recorded.Pressure!.Count * 2 == recorded.Path.Count && read.PressureTo == recorded.PressureTo &&
+                   again.Cover().AsSpan().SequenceEqual(live.Cover()),
+                   "ein Druckwert je Punkt, aus Text gelesen genau nachgespielt");
+    }
+
+    /// <summary>
+    /// Die Begrenzung auf eine Flaeche aus Tiefe und Normale: gleich weit und gleich gerichtet
+    /// wie der Ansatz - bemalt; hinter einem Sprung oder Knick - nicht.
+    /// </summary>
+    private static void TheSurfaceHoldsTheStroke()
+    {
+        Check.Group("Pinsel: auf der Flaeche gehalten");
+
+        const int w = 64, h = 48, cols = w / 4, rows = h / 4;
+
+        FloatFrame Frame(Func<int, int, (float R, float G, float B)> at)
+        {
+            var r = new float[w * h];
+            var g = new float[w * h];
+            var b = new float[w * h];
+
+            for (int y = 0; y < h; y++)
+                for (int x = 0; x < w; x++)
+                    (r[y * w + x], g[y * w + x], b[y * w + x]) = at(x, y);
+
+            return new FloatFrame { Width = w, Height = h, R = r, G = g, B = b };
+        }
+
+        bool LeftOnly(byte[]? cover) => cover is not null &&
+            Enumerable.Range(0, rows).All(row => Enumerable.Range(0, cols).All(col =>
+                cover[row * cols + col] == (col < cols / 2 ? 255 : 0)));
+
+        // Zwei Waende hintereinander: links 5 Meter, rechts 10.
+        var step = Frame((x, _) => (x < w / 2 ? 5f : 10f, 0f, 0f));
+        Check.That(LeftOnly(SurfaceLimit.Build(step, null, 10, 10, 0.3f, cols, rows, 4)), "ein Sprung in der Tiefe haelt den Strich auf");
+
+        // Rechts nichts - der Hintergrund.
+        var sky = Frame((x, _) => (x < w / 2 ? 5f : 1e10f, 0f, 0f));
+        var onSky = SurfaceLimit.Build(sky, null, 60, 10, 0.3f, cols, rows, 4)!;
+        Check.That(LeftOnly(SurfaceLimit.Build(sky, null, 10, 10, 0.3f, cols, rows, 4)) && onSky[0] == 0 && onSky[cols - 1] == 255,
+                   "auf einer Flaeche nie der Hintergrund - auf dem Hintergrund nur er");
+
+        // Gleich weit, aber ein Knick: links nach vorn, rechts zur Seite.
+        var crease = Frame((x, _) => x < w / 2 ? (0f, 0f, 1f) : (1f, 0f, 0f));
+        Check.That(LeftOnly(SurfaceLimit.Build(null, crease, 10, 10, 0.3f, cols, rows, 4)), "ein Knick in der Normale haelt ihn auch auf");
+
+        // Eine sanfte Neigung von 10 Grad: mit der Grundtoleranz ueberstrichen, mit keiner nicht.
+        float tilt = 10f * MathF.PI / 180f;
+        var gentle = Frame((x, _) => x < w / 2 ? (0f, 0f, 1f) : (MathF.Sin(tilt), 0f, MathF.Cos(tilt)));
+        Check.That(SurfaceLimit.Build(null, gentle, 10, 10, 0.3f, cols, rows, 4)!.All(b => b == 255) &&
+                   LeftOnly(SurfaceLimit.Build(null, gentle, 10, 10, 0f, cols, rows, 4)),
+                   "eine sanfte Woelbung: die Toleranz entscheidet");
+
+        // Eine Flaeche, die schraeg nach hinten laeuft: je mehr Toleranz, desto weiter.
+        var ramp = Frame((x, _) => (10f + 10f * x / w, 0f, 0f));
+        int Reached(float tolerance) => SurfaceLimit.Build(ramp, null, 2, 10, tolerance, cols, rows, 4)!.Count(b => b > 0);
+        Check.That(Reached(0.1f) < Reached(0.5f) && Reached(0.5f) < Reached(1f), "mehr Toleranz reicht weiter",
+                   $"{Reached(0.1f)} < {Reached(0.5f)} < {Reached(1f)}");
+
+        Check.That(SurfaceLimit.Build(null, null, 10, 10, 0.3f, cols, rows, 4) is null &&
+                   SurfaceLimit.Build(step, null, -1, 10, 0.3f, cols, rows, 4) is null,
+                   "ohne Pass oder neben dem Bild: ungebunden");
+    }
+
     /// <summary>Alle Flaechen einer Zeichnung, auch in Gruppen - fuer die Probe der Vorschau.</summary>
     private static IEnumerable<Geometry> Geometries(Drawing? drawing)
     {
@@ -327,19 +447,21 @@ public static class BrushShapeInvariants
                 Follow = random.Next(2) == 0,
                 Limit = random.Next(3) == 0 ? packed : null,
                 Version = random.Next(2),
+                PressureTo = (BrushPressure)random.Next(4),
+                Pressure = random.Next(2) == 0 ? new List<float>() : null,
             };
 
             // Grosse Spruenge und kleine Zitterer - die Glaettung hat mit beiden zu tun.
             var single = PaintedMask.For(ImageWidth, ImageHeight);
             float px = random.Next(ImageWidth), py = random.Next(ImageHeight);
-            stroke.Begin(single, px, py);
+            stroke.Begin(single, px, py, (float)random.NextDouble());
 
             for (int i = 0; i < 12; i++)
             {
                 if (i % 3 == 0) { px = random.Next(ImageWidth); py = random.Next(ImageHeight); }
                 else { px += random.Next(-3, 4); py += random.Next(-3, 4); }
 
-                stroke.To(single, px, py);
+                stroke.To(single, px, py, (float)random.NextDouble());
             }
 
             stroke.Finish(single);
@@ -474,6 +596,37 @@ public static class BrushShapeInvariants
             square.IsChecked = false;
             ((Slider)properties.FindName("BrushAspectSlider")).Value = 1;
             Check.That(Ellipses(PlacementAdorner.BrushKnob.Hardness), "und beim runden Pinsel den Kreis wie bisher");
+
+            // Kantengebunden: Die Probedatei fuehrt einen Tiefenpass.
+            var surface = page.SurfaceLimitAt(frame.Width / 2f, frame.Height / 2f, 0.3f);
+            var held = surface is null ? null : PaintedMask.Unpack(surface, cols * rows);
+            Check.That(held is not null && held[(frame.Height / 2 / PaintedMask.Coarse) * cols + frame.Width / 2 / PaintedMask.Coarse] == 255,
+                       "aus dem Tiefenpass der Datei: die Flaeche unter dem Ansatz voll");
+            Check.That(held is not null && held.Any(b => b < 255), "und nicht das ganze Bild",
+                       held is null ? "" : string.Join(" ", held));
+
+            // Objekt oder Flaeche - nie beides.
+            var objectToggle = (ToggleButton)properties.FindName("BrushObjectToggle");
+            var edgeToggle = (ToggleButton)properties.FindName("BrushEdgeToggle");
+            var edgeSlider = (Slider)properties.FindName("BrushEdgeSlider");
+
+            objectToggle.IsChecked = true;
+            edgeToggle.IsChecked = true;
+            Check.That(objectToggle.IsChecked == false && edgeSlider.IsEnabled && placement.LimitWanted is not null,
+                       "die Kante schaltet das Objekt ab, die Toleranz laesst sich stellen");
+            objectToggle.IsChecked = true;
+            Check.That(edgeToggle.IsChecked == false && !edgeSlider.IsEnabled, "und umgekehrt");
+            objectToggle.IsChecked = false;
+
+            // Der Druck: nur mit Stift, und nur, wenn er auf etwas wirkt.
+            var pressureBox = (ComboBox)properties.FindName("BrushPressureBox");
+            pressureBox.SelectedIndex = 3;
+            Check.That(placement.BrushPressureTo == (BrushPressure.Size | BrushPressure.Flow) &&
+                       placement.NewStroke(10, 10, pen: true).Pressure is not null &&
+                       placement.NewStroke(10, 10).Pressure is null,
+                       "Druck auf beides: ein Strich mit Stift zeichnet den Druck auf, einer mit der Maus nicht");
+            pressureBox.SelectedIndex = 0;
+            Check.That(placement.NewStroke(10, 10, pen: true).Pressure is null, "Druck aus: auch mit Stift keine Druckwerte");
         }
         finally
         {

@@ -75,6 +75,18 @@ public sealed class PaintStroke
     public const int CurrentVersion = 1;
 
     /// <summary>
+    /// Worauf der Druck eines Stifts wirkt: auf die Groesse, die Staerke oder beides. Ohne
+    /// Druckwerte im Strich (<see cref="Pressure"/>) wirkt er auf nichts.
+    /// </summary>
+    public BrushPressure PressureTo { get; init; }
+
+    /// <summary>
+    /// Der Druck je Punkt des Weges, 0 bis 1 - einer je Paar in <see cref="Path"/>. Null bei
+    /// der Maus und bei allen Strichen, auf die der Druck nicht wirkt.
+    /// </summary>
+    public List<float>? Pressure { get; init; }
+
+    /// <summary>
     /// Der Winkel folgt dem Strich: Zum eingestellten kommt die Richtung des Weges. Ein
     /// flacher Pinsel legt sich dann wie eine Breitfeder in jede Kurve.
     /// </summary>
@@ -116,6 +128,12 @@ public sealed class PaintStroke
 
     private float _x, _y;
 
+    /// <summary>Der Druck am letzten Punkt, von dem aus weitergezogen wird.</summary>
+    private float _pressure = 1f;
+
+    /// <summary>Der Abstand zum naechsten Tupfer - er haengt am Druck, wenn der die Groesse aendert.</summary>
+    private float _step;
+
     /// <summary>Der Weg seit dem letzten Tupfer.</summary>
     private float _walked;
 
@@ -151,8 +169,23 @@ public sealed class PaintStroke
     [JsonIgnore]
     public float Step => MathF.Max(0.5f, Radius * Math.Clamp(Spacing, MinSpacing, MaxSpacing));
 
-    /// <summary>Setzt an: ein Tupfer am ersten Punkt.</summary>
-    public PaintBounds Begin(PaintedMask mask, float x, float y)
+    /// <summary>
+    /// Der Radius bei diesem Druck. Ohne Druck auf die Groesse - oder bei vollem Druck - genau
+    /// <see cref="Radius"/>, damit ein Strich ohne Druck rechnet wie vorher. Nie ganz null:
+    /// Auch ein Hauch malt noch einen Punkt.
+    /// </summary>
+    private float RadiusAt(float pressure)
+        => (PressureTo & BrushPressure.Size) != 0 ? Radius * MathF.Max(0.05f, pressure) : Radius;
+
+    private float FlowAt(float pressure)
+        => (PressureTo & BrushPressure.Flow) != 0 ? Flow * pressure : Flow;
+
+    /// <summary>Der Abstand nach einem Tupfer bei diesem Druck - am Radius gemessen wie <see cref="Step"/>.</summary>
+    private float StepAt(float pressure)
+        => MathF.Max(0.5f, RadiusAt(pressure) * Math.Clamp(Spacing, MinSpacing, MaxSpacing));
+
+    /// <summary>Setzt an: ein Tupfer am ersten Punkt. <paramref name="pressure"/> ist der Druck des Stifts, 1 bei der Maus.</summary>
+    public PaintBounds Begin(PaintedMask mask, float x, float y, float pressure = 1f)
     {
         _started = true;
         _x = x;
@@ -161,8 +194,14 @@ public sealed class PaintStroke
         _anchorX = x;
         _anchorY = y;
 
+        // Druck wirkt nur, wenn er aufgezeichnet wird - sonst spielte der Strich anders
+        // nach, als er gemalt wurde.
+        _pressure = Pressure is null ? 1f : Math.Clamp(pressure, 0f, 1f);
+        _step = StepAt(_pressure);
+
         Path.Add(x);
         Path.Add(y);
+        Pressure?.Add(_pressure);
 
         if (Follow)
         {
@@ -170,7 +209,7 @@ public sealed class PaintStroke
             return PaintBounds.Empty;
         }
 
-        return Dab(mask, x, y);
+        return Dab(mask, x, y, _pressure);
     }
 
     /// <summary>
@@ -182,7 +221,7 @@ public sealed class PaintStroke
         if (!_firstPending) return PaintBounds.Empty;
 
         _firstPending = false;
-        return Dab(mask, _x, _y);
+        return Dab(mask, _x, _y, _pressure);
     }
 
     /// <summary>
@@ -190,12 +229,15 @@ public sealed class PaintStroke
     /// ab dem letzten Tupfer und nicht ab der letzten Mausmeldung. Liegt die Meldung
     /// naeher als ein Abstand, wird nur der Weg gemerkt.
     /// </summary>
-    public PaintBounds To(PaintedMask mask, float x, float y)
+    public PaintBounds To(PaintedMask mask, float x, float y, float pressure = 1f)
     {
-        if (!_started) return Begin(mask, x, y);
+        if (!_started) return Begin(mask, x, y, pressure);
+
+        pressure = Pressure is null ? 1f : Math.Clamp(pressure, 0f, 1f);
 
         Path.Add(x);
         Path.Add(y);
+        Pressure?.Add(pressure);
 
         float dx = x - _x;
         float dy = y - _y;
@@ -222,22 +264,29 @@ public sealed class PaintStroke
         if (_firstPending)
         {
             _firstPending = false;
-            bounds = Dab(mask, _x, _y);
+            bounds = Dab(mask, _x, _y, _pressure);
         }
 
-        float step = Step;
+        // Der Abstand gilt ab dem letzten Tupfer, bei dessen Druck. Ohne Druck ist er fest,
+        // und die Rechnung ist Schritt fuer Schritt die alte.
+        float step = _step;
         float at = step - _walked;
 
         while (at <= length)
         {
             float t = at / length;
-            bounds = bounds.Union(Dab(mask, _x + dx * t, _y + dy * t));
+            float here = _pressure + (pressure - _pressure) * t;
+
+            bounds = bounds.Union(Dab(mask, _x + dx * t, _y + dy * t, here));
+            step = StepAt(here);
             at += step;
         }
 
         _walked = length - (at - step);
+        _step = step;
         _x = x;
         _y = y;
+        _pressure = pressure;
 
         return bounds;
     }
@@ -289,19 +338,30 @@ public sealed class PaintStroke
             Follow = Follow,
             Limit = Limit,
             Version = Version,
+            PressureTo = PressureTo,
+            Pressure = Pressure is null ? null : new List<float>(),
         };
 
         var bounds = PaintBounds.Empty;
 
+        // Ein Druckwert je Punkt - passt die Zahl nicht, gilt voller Druck, statt dass sich
+        // Druck und Weg gegeneinander verschieben.
+        bool pressed = Pressure is { } known && known.Count * 2 == Path.Count;
+
         for (int i = 0; i + 1 < Path.Count; i += 2)
-            bounds = bounds.Union(i == 0 ? again.Begin(mask, Path[0], Path[1]) : again.To(mask, Path[i], Path[i + 1]));
+        {
+            float pressure = pressed ? Pressure![i / 2] : 1f;
+            bounds = bounds.Union(i == 0
+                ? again.Begin(mask, Path[0], Path[1], pressure)
+                : again.To(mask, Path[i], Path[i + 1], pressure));
+        }
 
         bounds = bounds.Union(again.Finish(mask));
 
         return bounds;
     }
 
-    private PaintBounds Dab(PaintedMask mask, float x, float y)
+    private PaintBounds Dab(PaintedMask mask, float x, float y, float pressure)
     {
         if (!_limitRead)
         {
@@ -309,9 +369,18 @@ public sealed class PaintStroke
             _limit = Limit is { Length: > 0 } packed ? PaintedMask.Unpack(packed, mask.Width * mask.Height) : null;
         }
 
-        mask.Stamp(x, y, Radius, Erase ? 0f : 1f, Flow, Hardness, Opacity, Tip, _limit);
+        mask.Stamp(x, y, RadiusAt(pressure), Erase ? 0f : 1f, FlowAt(pressure), Hardness, Opacity, Tip, _limit);
         return PaintBounds.Around(x, y, Reach);
     }
+}
+
+/// <summary>Worauf der Druck eines Stifts wirkt.</summary>
+[Flags]
+public enum BrushPressure
+{
+    None = 0,
+    Size = 1,
+    Flow = 2,
 }
 
 /// <summary>Die Form einer Pinselspitze.</summary>

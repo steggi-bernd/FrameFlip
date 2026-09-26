@@ -307,7 +307,7 @@ public sealed partial class PlacementAdorner : FrameworkElement
                 return;
             }
 
-            if (Canvas(e.GetPosition(this), out float px, out float py)) PaintMove(px, py);
+            if (Canvas(e.GetPosition(this), out float px, out float py)) PaintMove(px, py, PenPressure(e, this) ?? 1f);
             return;
         }
 

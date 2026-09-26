@@ -169,7 +169,12 @@ public partial class AtelierPage
         Placement.BrushAngle = Properties.BrushAngle;
         Placement.BrushFollow = Properties.BrushFollow;
         Placement.BrushSquish = Properties.BrushSquish;
-        Placement.LimitWanted = Properties.BrushObject ? ObjectLimitAt : null;
+        Placement.BrushPressureTo = Properties.BrushPressureTo;
+
+        float tolerance = Properties.BrushEdgeTolerance;
+        Placement.LimitWanted = Properties.BrushObject ? ObjectLimitAt
+                              : Properties.BrushEdge ? (x, y) => SurfaceLimitAt(x, y, tolerance)
+                              : null;
 
         Placement.InvalidateVisual();
     }
