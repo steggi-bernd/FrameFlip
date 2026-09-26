@@ -122,8 +122,12 @@ public static class PassStackNamesInvariants
         Directory.CreateDirectory(folder);
         string bare = Path.Combine(folder, "ohne", "render_0001.exr");
         string finished = Path.Combine(folder, "mit", "render_0001.exr");
+        string converted = Path.Combine(folder, "umgewandelt", "render_0001.exr");
+        string worked = Path.Combine(folder, "bearbeitet", "render_0001.exr");
         Directory.CreateDirectory(Path.GetDirectoryName(bare)!);
         Directory.CreateDirectory(Path.GetDirectoryName(finished)!);
+        Directory.CreateDirectory(Path.GetDirectoryName(converted)!);
+        Directory.CreateDirectory(Path.GetDirectoryName(worked)!);
 
         static ExrMultipartInvariants.Part Rgba(string name, float r, float g, float b)
             => new(name, "scanlineimage", new[] { $"{name}.A", $"{name}.B", $"{name}.G", $"{name}.R" },
@@ -134,6 +138,28 @@ public static class PassStackNamesInvariants
 
         File.WriteAllBytes(bare, ExrMultipartInvariants.Build(light));
         File.WriteAllBytes(finished, ExrMultipartInvariants.Build(light.Append(Rgba("Combined", 0.3f, 0.2f, 0.2f)).ToArray()));
+        File.WriteAllBytes(converted, ExrMultipartInvariants.Build(light));
+        File.WriteAllBytes(worked, ExrMultipartInvariants.Build(light));
+
+        // Zwei Projekte, wie sie entstehen, wenn jemand die Datei zuerst mit nur einer Ebene sah
+        // und in den Knotenmodus ging: einmal nur umgewandelt, einmal mit eigener Arbeit darin.
+        var bareStack = new LayerStack { Layers = { new ImageLayer { Source = "", Name = "Image" } } };
+        var plain = Imaging.Nodes.StackToGraph.Convert(bareStack, null, null);
+        var busy = Imaging.Nodes.StackToGraph.Convert(bareStack, null, null);
+        busy.Add(new Imaging.Nodes.OpticsNode { Tool = new VignetteTool() });
+
+        var store = new Atelier.AtelierProjectStore();
+        store.Save(Atelier.SequenceKey.Of(converted)!, new Atelier.AtelierProject
+        {
+            Layers = bareStack, Nodes = System.Text.Json.Nodes.JsonNode.Parse(plain.Save()),
+        });
+        store.Save(Atelier.SequenceKey.Of(worked)!, new Atelier.AtelierProject
+        {
+            Layers = bareStack, Nodes = System.Text.Json.Nodes.JsonNode.Parse(busy.Save()),
+        });
+
+        Check.That(Imaging.Nodes.StackToGraph.IsPlain(plain) && !Imaging.Nodes.StackToGraph.IsPlain(busy),
+                   "ein nur umgewandelter Graph ist leer, einer mit einem Effekt nicht");
 
         string? previous = Environment.GetEnvironmentVariable("FRAMEFLIP_CONFIG");
         Environment.SetEnvironmentVariable("FRAMEFLIP_CONFIG", Path.Combine(folder, "config.json"));
@@ -176,6 +202,19 @@ public static class PassStackNamesInvariants
             Check.That(layers.Stack.Layers.Count == 1 && layers.Stack.Layers[0].Source == "",
                        "mit fertigem Bild bleibt es beim Bild - Blenders Combined ist entrauscht, die Paesse nicht",
                        string.Join(" | ", layers.Stack.Layers.Select(l => l.Source)));
+
+            // Im Knotenmodus, der Graph nur umgewandelt: neu umgewandelt aus dem Passstapel.
+            Show(converted);
+            var shown = page.Graph is { } graph ? NodeLayerList.Of(graph) : Array.Empty<NodeLayer>();
+            Check.That(page.InNodes && shown.Count == 3 && page.Recipe.Layers?.Layers.Count == 3,
+                       "war der Graph nur umgewandelt, bekommt er alle Ebenen - und bleibt im Knotenmodus",
+                       $"InNodes={page.InNodes}, {shown.Count} Ebenen im Graphen");
+
+            // Mit eigener Arbeit im Graphen: nichts wird ueberschrieben.
+            Show(worked);
+            Check.That(page.InNodes && page.Graph!.Nodes.OfType<Imaging.Nodes.OpticsNode>().Any(n => n.Tool is VignetteTool) &&
+                       NodeLayerList.Of(page.Graph).Count == 1,
+                       "steckt eigene Arbeit im Graphen, bleibt er, wie er ist");
         }
         finally
         {

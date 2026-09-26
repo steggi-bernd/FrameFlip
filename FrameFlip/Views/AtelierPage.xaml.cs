@@ -348,12 +348,28 @@ public sealed partial class AtelierPage : UserControl
         // seine Farbe, dazu Emission und Umgebung. Sonst zeigte sie nur ihren ersten Farbpass.
         // Nur solange das Projekt noch keinen eigenen Stapel hat; und nie bei einer Datei MIT
         // fertigem Bild - Blenders Combined ist entrauscht, die einzelnen Paesse sind es nicht.
+        //
+        // Auch im Knotenmodus, solange der Graph nur die Umwandlung der leeren Grundebene ist:
+        // Dann wird er aus dem neuen Stapel neu umgewandelt. Wer die Datei zuerst mit nur einer
+        // Ebene sah und darum in den Knotenmodus ging, blieb sonst bei dieser einen Ebene.
         var stack = Prune(_recipe.Layers, passes);
+        bool plainGraph = _graph is { } open && Imaging.Nodes.StackToGraph.IsPlain(open);
 
-        if (!InNodes && PassStack.IsBare(stack) && !PassStack.HasFinishedImage(passes) &&
+        if ((!InNodes || plainGraph) && PassStack.IsBare(stack) && !PassStack.HasFinishedImage(passes) &&
             PassStack.Rebuild(passes) is { Layers.Count: > 0 } rebuilt)
         {
             stack = rebuilt;
+
+            if (plainGraph)
+            {
+                _graph = Imaging.Nodes.StackToGraph.Convert(rebuilt, _recipe.Adjustments ?? ImageAdjustments.Neutral,
+                                              _recipe.Grading ?? new GradingStack());
+                _cache.Clear();
+                _viewer = null;
+
+                SaveNodes();
+                EnterNodes();
+            }
         }
 
         Layers.Load(passes, cryptomattes, stack);
