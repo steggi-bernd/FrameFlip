@@ -67,8 +67,8 @@ public partial class MainWindow : Window
     private readonly Action? _renewWatch;
     private readonly Action<string?>? _setWatchCode;
 
-    /// <summary>Woran die Anzeige haengt - abgemeldet, sobald der Dienst wechselt.</summary>
-    private Web.WatchService? _watched;
+    /// <summary>Die Karte der Zuschauerseite in der Kopplungstafel - ihre Logik steht in <see cref="WatchCard"/>.</summary>
+    private WatchCard? _watchCard;
 
     private readonly FrameDecoderRegistry _decoders = FrameDecoderRegistry.CreateDefault();
     private readonly DashboardFrameController _frames;
@@ -221,6 +221,12 @@ public partial class MainWindow : Window
         _layout = DesktopLayout.Load();
 
         InitializeComponent();
+
+        _watchCard = new WatchCard(
+            new WatchCard.Parts(WatchToggle, WatchToggleText, WatchCodeFrame, WatchCode, WatchAddress, WatchHint,
+                                WatchPassRow, WatchPass, WatchPassHint, WatchActions),
+            new WatchCard.Host(_getSettings, _apply, _watch, _renewWatch, _setWatchCode, () => _layout.LightQr, () => _ready,
+                               then => AskTerms(then), Note, error => PairHint.Text = error, PairAction, CopyInvite));
 
         ApplyScale();
         InitializeDashboardLayout();
@@ -2097,206 +2103,14 @@ public partial class MainWindow : Window
 
     // ================================================================ Zusehen im Netz
 
-    /// <summary>
-    /// Der Schalter fuer die Seite im eigenen Netz.
-    ///
-    /// Einschalten oeffnet einen Port und legt ein neues Zeichen fuer die Adresse an;
-    /// Ausschalten macht beides wieder zu. Dass die alte Adresse danach nicht mehr
-    /// gilt, ist kein Nebeneffekt, sondern der Zweck.
-    /// </summary>
-    private void OnWatchToggled(object sender, RoutedEventArgs e)
-    {
-        if (!_ready || sender is not ToggleButton toggle) return;
-        // RefreshWatch bildet nur den Bestand ab; das ist kein neuer Auftrag.
-        if ((toggle.IsChecked == true) == _getSettings().WatchEnabled) return;
+    /// <summary>Der Schalter der Zuschauerseite - siehe <see cref="WatchCard.Toggled"/>.</summary>
+    private void OnWatchToggled(object sender, RoutedEventArgs e) => _watchCard?.Toggled();
 
-        // Einschalten heisst: eine Verbindung nach draussen. Vorher wird gefragt.
-        // Beim Ausschalten nicht - wer zumacht, braucht keine Zustimmung.
-        if (toggle.IsChecked == true && !_getSettings().TermsOk)
-        {
-            toggle.IsChecked = false;
-            AskTerms(() => { WatchToggle.IsChecked = true; });
-            return;
-        }
+    private void RefreshWatch() => _watchCard?.Refresh();
 
-        // Eine KOPIE aendern, nicht den Bestand: _getSettings() liefert dasselbe
-        // Objekt, das der Wirt haelt. Wer es an Ort und Stelle umschreibt, nimmt ihm
-        // die Moeglichkeit, die Aenderung zu bemerken - er vergleicht dann den neuen
-        // Stand mit sich selbst.
-        var settings = _getSettings().Clone();
+    private void OnWatchPassKey(object sender, KeyEventArgs e) => _watchCard?.PassKey(e);
 
-        settings.WatchEnabled = toggle.IsChecked == true;
-
-        if (_apply(settings) is { } error)
-        {
-            PairHint.Text = error;
-            return;
-        }
-
-        Note(Strings.T(settings.WatchEnabled ? "D_LogWatchOn" : "D_LogWatchOff"));
-
-        // Erst nachdem der Host den Server auf- oder abgebaut hat, steht die Adresse
-        // fest. Deshalb eine Runde spaeter nachsehen.
-        Dispatcher.BeginInvoke(new Action(RefreshWatch), DispatcherPriority.Background);
-    }
-
-    private void RefreshWatch()
-    {
-        if (WatchToggle is null) return;
-
-        var settings = _getSettings();
-        bool on = settings.WatchEnabled;
-
-        WatchToggle.IsChecked = on;
-        Track.SetAmount(WatchToggleText, 1);
-        Track.SetText(WatchToggleText, Strings.T(on ? "D_On" : "D_Off"));
-
-        WatchActions.Children.Clear();
-
-        var watch = _watch();
-        Follow(watch);
-
-        if (!on || watch is null)
-        {
-            WatchCodeFrame.Visibility = Visibility.Collapsed;
-            WatchPassRow.Visibility = Visibility.Collapsed;
-            WatchCode.Text = null;
-            WatchAddress.Text = string.Empty;
-
-            // Zwei verschiedene Faelle mit zwei verschiedenen Saetzen: schlicht aus -
-            // oder an, aber ohne Relay-Adresse, mit der sich etwas anfangen liesse.
-            WatchHint.Text = Strings.T(on ? "D_WatchNoRelay" : "D_WatchOff");
-
-            return;
-        }
-
-        string link = watch.Link;
-
-        WatchCodeFrame.Visibility = Visibility.Visible;
-        WatchCode.LightModules = _layout.LightQr;
-        WatchCode.Text = link;
-        WatchAddress.Text = link;
-
-        WatchHint.Text = WatchStanding(watch);
-
-        WatchPassRow.Visibility = Visibility.Visible;
-        WatchPassHint.Text = Strings.T("D_WatchPassHint");
-
-        // Nur nachtragen, wenn gerade niemand darin schreibt - sonst spraenge der
-        // Text unter den Fingern zurueck, sobald ein Zuschauer kommt oder geht.
-        if (!WatchPass.IsKeyboardFocusWithin) WatchPass.Text = CurrentWatchCode() ?? string.Empty;
-
-        WatchActions.Children.Add(PairAction("S_CopyLink", primary: false, () => CopyInvite(link)));
-        WatchActions.Children.Add(PairAction("D_WatchRenew", primary: false, RenewWatch));
-    }
-
-    /// <summary>
-    /// Wie es gerade um die Zuschauer steht - in Worten, nicht in Zahlenkolonnen.
-    ///
-    /// Dass hier ueberhaupt etwas Verlaessliches stehen kann, liegt am Entwurf: Es
-    /// wird nur gesendet, solange jemand zusieht. Zuschauer und Datenverkehr sind
-    /// dasselbe, und die Zeile ist deshalb keine Vermutung.
-    /// </summary>
-    private static string WatchStanding(Web.WatchService watch)
-    {
-        int watchers = watch.Watchers;
-
-        string who = watchers switch
-        {
-            0 => Strings.T("D_WatchNobody"),
-            1 => Strings.T("D_WatchOneViewer"),
-            _ => Strings.T("D_WatchViewers", watchers)
-        };
-
-        // MaxSeats, nicht OpenSeats: Offen ist immer nur einer mehr als besetzt, weil
-        // Raeume auf dem Leuchtturm knapp sind. Dem Benutzer davon zu erzaehlen waere
-        // verwirrend - fuer ihn zaehlt, wieviele ueberhaupt zusehen koennen.
-        string seats = Strings.T("D_WatchSeats", Math.Max(0, watch.MaxSeats - watchers), watch.MaxSeats);
-
-        string standing = Strings.T("D_WatchOn") + Environment.NewLine + Environment.NewLine + who + " " + seats;
-
-        if (watch.LockedUntilUtc is { } until && until > DateTime.UtcNow)
-        {
-            int minutes = Math.Max(1, (int)Math.Ceiling((until - DateTime.UtcNow).TotalMinutes));
-            standing += Environment.NewLine + Environment.NewLine + Strings.T("D_WatchLocked", minutes);
-        }
-
-        return standing;
-    }
-
-    /// <summary>
-    /// Meldet sich beim laufenden Dienst an, damit die Anzeige mitbekommt, wenn
-    /// jemand kommt oder geht - und beim alten ab, damit ein ausgetauschter Dienst
-    /// nicht in ein Fenster meldet, das ihn gar nicht mehr zeigt.
-    /// </summary>
-    private void Follow(Web.WatchService? watch)
-    {
-        if (ReferenceEquals(_watched, watch)) return;
-
-        if (_watched is not null) _watched.Changed -= OnWatchChanged;
-
-        _watched = watch;
-
-        if (_watched is not null) _watched.Changed += OnWatchChanged;
-    }
-
-    private void OnWatchChanged()
-        => Dispatcher.BeginInvoke(new Action(RefreshWatch), DispatcherPriority.Background);
-
-    private string? CurrentWatchCode()
-        => WatchStore.TryUnprotect(_getSettings().WatchSecret, out var key) ? key?.Code : null;
-
-    private void RenewWatch()
-    {
-        _renewWatch?.Invoke();
-        Note(Strings.T("D_WatchRenewed"));
-
-        Dispatcher.BeginInvoke(new Action(RefreshWatch), DispatcherPriority.Background);
-    }
-
-    private void OnWatchPassKey(object sender, KeyEventArgs e)
-    {
-        if (e.Key != Key.Enter) return;
-
-        e.Handled = true;
-        ApplyWatchPass();
-
-        // Den Tastaturschein abgeben, sonst bliebe der Text stehen und es sieht aus,
-        // als waere nichts geschehen.
-        Keyboard.ClearFocus();
-    }
-
-    private void OnWatchPassDone(object sender, RoutedEventArgs e) => ApplyWatchPass();
-
-    /// <summary>
-    /// Uebernimmt das Kennwort - aber nur, wenn es sich wirklich geaendert hat.
-    ///
-    /// Jedes Verlassen des Feldes als Aenderung zu werten, hiesse die Verbindungen
-    /// jedesmal neu aufzubauen, auch wenn niemand etwas getippt hat. Zuschauer flogen
-    /// dann heraus, weil jemand durchs Fenster geklickt hat.
-    /// </summary>
-    private void ApplyWatchPass()
-    {
-        if (_setWatchCode is null || WatchPass is null) return;
-
-        string typed = WatchPass.Text?.Trim() ?? string.Empty;
-        string? current = CurrentWatchCode();
-
-        if (string.Equals(typed, current ?? string.Empty, StringComparison.Ordinal)) return;
-
-        if (typed.Length > 0 && typed.Length < WatchKey.MinCodeLength)
-        {
-            Note(Strings.T("D_WatchPassShort"));
-            WatchPass.Text = current ?? string.Empty;
-            return;
-        }
-
-        _setWatchCode(typed.Length == 0 ? null : typed);
-
-        Note(Strings.T(typed.Length == 0 ? "D_WatchPassCleared" : "D_WatchPassSet"));
-
-        Dispatcher.BeginInvoke(new Action(RefreshWatch), DispatcherPriority.Background);
-    }
+    private void OnWatchPassDone(object sender, RoutedEventArgs e) => _watchCard?.PassDone();
 
     /* ----------------------------------------------------------- Zustimmung
 

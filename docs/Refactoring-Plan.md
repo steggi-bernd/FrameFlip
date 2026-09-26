@@ -188,6 +188,35 @@ erfolgreich.
 - Als Nächstes S1 (Öffnung und Lebenszyklus) und S2 (Bearbeitungssitzung mit
   Ablage-Adapter), jeweils ein eigener Zweig.
 
+## Fortschritt am 26. September 2026
+
+Ein Zwischenschnitt außerhalb der Reihenfolge liegt auf `refactor/watch-card`, auf
+`feature/atelier` (`0f9a2ee`). Er ist die Vorbedingung für die Einstellungen nach
+Entwurf A (Phase E in [Projekte und Masken](Projekte-und-Masken.md), Punkt 12). Dort
+soll die Zuschauerseite als zweite Karte neben der App-Kopplung stehen. Ihre Logik
+steckte bisher im Hauptfenster, an den Steuerelementen der Kopplungstafel.
+
+- **Auslagerung:** `WatchCard` besitzt Schalter, Code, Adresse, Stand, Kennwort und
+  Handgriffe der Zuschauerseite. Die Steuerelemente kommen als `Parts` herein.
+  Einstellungen, Dienst, Zustimmung, Protokoll, Handgriffe und Zwischenablage liefert
+  der Wirt als `Host`. Das Hauptfenster behält seine XAML-Ereignisse und reicht sie
+  weiter, sein Anteil schrumpft um knapp 200 Zeilen.
+- **Charakterisierung** vor der Auslagerung, 16 Prüfungen am echten Hauptfenster:
+  - was die Karte ausgeschaltet, eingeschaltet ohne Dienst und mit Dienst zeigt;
+  - dass der Schalter ohne Zustimmung nichts übernimmt, zurückspringt und die Tafel fragt;
+  - dass er sonst eine Kopie über den Wirt übernimmt und ein Fehler im Hinweis der Tafel
+    steht;
+  - dass das Anzeigen des Bestands nichts übernimmt;
+  - wie das Kennwort genommen wird: zu kurz abgewiesen, getrimmt, geleert, unverändert
+    ignoriert;
+  - dass Erneuern den Wirt ruft.
+
+  Kein Netz, „Link kopieren“ wird nicht gedrückt. Die Prüfungen liefen vor und nach der
+  Auslagerung unverändert grün. Es wurde kein Fehler gefunden.
+
+Abnahme dieses Branchstands: **4.544 Zusicherungen** in `FrameFlip.Tests` und
+**227 UI-Prüfungen**, beide vollständig erfolgreich.
+
 ## Historischer Stand der ersten Desktop-Schnitte (9. September 2026)
 
 - Der gemeinsame Ausgangspunkt ist mit `v2-secure-baseline` markiert; die

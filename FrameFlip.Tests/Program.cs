@@ -136,6 +136,7 @@ static int RunAll()
     RelayClientInvariants.Run();
     WatchInvariants.Run();
     WatchLifecycleInvariants.Run();
+    WatchCardInvariants.Run();
     DashboardLiveInvariants.Run();
     DashboardLiveControllerInvariants.Run();
     DashboardSelectionInvariants.Run();
