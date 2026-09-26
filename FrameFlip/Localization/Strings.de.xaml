@@ -1215,6 +1215,10 @@
     <sys:String x:Key="S_BrushFollowHint">Der Winkel folgt dem Strich – eine flache Spitze legt sich wie eine Breitfeder in jede Kurve. Der Winkel gilt dann zur Strichrichtung: Bei 0° liegt die Spitze längs zum Weg und malt schmal, bei 90° liegt sie quer und malt breit. Kleine Zitterer der Hand drehen die Spitze nicht.</sys:String>
     <sys:String x:Key="S_BrushSquish">Karo</sys:String>
     <sys:String x:Key="S_BrushSquishHint">Zieht zwei gegenüberliegende Ecken der eckigen Spitze auseinander – aus dem Quadrat wird ein Karo, das mit seiner Spitze in schmale Spalten kommt. Mit dem Winkel ausrichten.</sys:String>
+    <sys:String x:Key="S_BrushModeStrokeHint">Pinsel: Züge malen. Umschalt und Klick zieht eine gerade Linie vom Ende des letzten Zugs.</sys:String>
+    <sys:String x:Key="S_BrushModeRectangleHint">Rechteck aufziehen und füllen – Umschalt macht ein Quadrat. Rechte Taste oder Alt nimmt weg. Es gilt die Deckkraft, auf Wunsch nur aufs Objekt oder die Fläche.</sys:String>
+    <sys:String x:Key="S_BrushModeEllipseHint">Ellipse aufziehen und füllen – Umschalt macht einen Kreis. Rechte Taste oder Alt nimmt weg.</sys:String>
+    <sys:String x:Key="S_BrushModeLassoHint">Lasso: eine Form frei umfahren und füllen. Beim Loslassen schließt sie sich. Rechte Taste oder Alt nimmt weg.</sys:String>
     <sys:String x:Key="S_BrushEdgeHint">Nur auf der Fläche malen, auf der der Strich beginnt – aus Tiefe und Normale der Datei. An einem Sprung in der Tiefe oder einem Knick hört der Strich auf.</sys:String>
     <sys:String x:Key="S_BrushEdgeTolerance">Toleranz</sys:String>
     <sys:String x:Key="S_BrushEdgeToleranceHint">Wie weit Tiefe und Richtung der Fläche vom Ansatz abweichen dürfen. Wenig hält an jeder Rundung an, viel geht über sanfte Wölbungen hinweg.</sys:String>

@@ -255,6 +255,104 @@ public sealed class PaintedMask
     }
 
     /// <summary>
+    /// Fuellt ein Vieleck - Rechteck, Ellipse oder Lasso. <paramref name="path"/> sind die
+    /// Ecken in BILDpunkten, abwechselnd x und y; das Vieleck ist geschlossen, und wo es sich
+    /// selbst kreuzt, gilt gerade-ungerade: Eine Schleife im Lasso wird ein Loch.
+    ///
+    /// Die Kante ist geglaettet: Jeder Maskenpunkt wird vier mal vier Mal abgetastet, und
+    /// sein Anteil im Vieleck ist die Staerke, mit der er gefuellt wird - wie bei einem
+    /// Tupfer, bis zur Deckkraft und nie ueber das hinaus, was schon da ist.
+    ///
+    /// Gerechnet Zeile fuer Zeile an den Schnittpunkten mit den Kanten und nicht Punkt fuer
+    /// Punkt gegen alle Kanten: Ein Lasso hat Hunderte davon.
+    /// </summary>
+    public PaintBounds Fill(IReadOnlyList<float> path, float value, float opacity, byte[]? limit)
+    {
+        int n = path.Count / 2;
+        if (n < 3) return PaintBounds.Empty;
+
+        var cover = Cover();
+        Kept = false;
+
+        if (limit is not null && limit.Length != cover.Length) limit = null;
+
+        var xs = new float[n];
+        var ys = new float[n];
+        float minX = float.MaxValue, minY = float.MaxValue, maxX = float.MinValue, maxY = float.MinValue;
+
+        for (int i = 0; i < n; i++)
+        {
+            xs[i] = path[2 * i] / Coarse;
+            ys[i] = path[2 * i + 1] / Coarse;
+
+            minX = MathF.Min(minX, xs[i]);
+            minY = MathF.Min(minY, ys[i]);
+            maxX = MathF.Max(maxX, xs[i]);
+            maxY = MathF.Max(maxY, ys[i]);
+        }
+
+        int x0 = Math.Max(0, (int)MathF.Floor(minX));
+        int x1 = Math.Min(Width - 1, (int)MathF.Ceiling(maxX));
+        int y0 = Math.Max(0, (int)MathF.Floor(minY));
+        int y1 = Math.Min(Height - 1, (int)MathF.Ceiling(maxY));
+
+        if (x0 > x1 || y0 > y1) return PaintBounds.Empty;
+
+        const int Sub = 4;
+        int across = x1 - x0 + 1;
+        var hits = new int[across];
+        var crossings = new List<float>();
+        float want = value * Math.Clamp(opacity, 0f, 1f) * 255f;
+
+        for (int y = y0; y <= y1; y++)
+        {
+            Array.Clear(hits);
+
+            for (int s = 0; s < Sub; s++)
+            {
+                float sy = y + (s + 0.5f) / Sub;
+                crossings.Clear();
+
+                for (int i = 0, j = n - 1; i < n; j = i++)
+                {
+                    // Halboffen: Ein Eckpunkt genau auf der Zeile zaehlt nur fuer eine Kante.
+                    if ((ys[j] <= sy) == (ys[i] <= sy)) continue;
+
+                    crossings.Add(xs[j] + (sy - ys[j]) * (xs[i] - xs[j]) / (ys[i] - ys[j]));
+                }
+
+                crossings.Sort();
+
+                for (int k = 0; k + 1 < crossings.Count; k += 2)
+                {
+                    // Die Unterspalten, deren Mitte zwischen zwei Schnittpunkten liegt.
+                    int first = Math.Max(0, (int)MathF.Ceiling((crossings[k] - x0) * Sub - 0.5f));
+                    int last = Math.Min(across * Sub - 1, (int)MathF.Ceiling((crossings[k + 1] - x0) * Sub - 0.5f) - 1);
+
+                    for (int c = first; c <= last; c++) hits[c / Sub]++;
+                }
+            }
+
+            for (int x = 0; x < across; x++)
+            {
+                if (hits[x] == 0) continue;
+
+                int at = y * Width + x0 + x;
+
+                float strength = hits[x] / (float)(Sub * Sub);
+                if (limit is not null) strength *= limit[at] / 255f;
+                if (strength <= 0f) continue;
+
+                cover[at] = value > 0.5f
+                    ? (byte)MathF.Max(cover[at], cover[at] + (want - cover[at]) * strength)
+                    : (byte)MathF.Min(cover[at], cover[at] + (want - cover[at]) * strength);
+            }
+        }
+
+        return new PaintBounds(minX * Coarse - Coarse, minY * Coarse - Coarse, maxX * Coarse + Coarse, maxY * Coarse + Coarse);
+    }
+
+    /// <summary>
     /// Ein Tupfer mit einer Pinselspitze: rund oder eckig, gestreckt, gedreht - und
     /// wahlweise begrenzt durch ein Feld (<paramref name="limit"/>, gleich gross wie die
     /// Maske), etwa die Deckung eines Objekts aus der Kryptomatte.

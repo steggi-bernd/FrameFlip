@@ -72,6 +72,32 @@ public partial class PropertiesPanel : UserControl
     /// <summary>Wie weit die eckige Spitze zum Karo gezogen ist, 0 bis 1.</summary>
     public float BrushSquish => (float)BrushSquishSlider.Value;
 
+    /// <summary>Malt der Pinsel Zuege oder zieht er Flaechen auf.</summary>
+    public PaintArea BrushArea
+        => BrushModeRectangle.IsChecked == true ? PaintArea.Rectangle
+         : BrushModeEllipse.IsChecked == true ? PaintArea.Ellipse
+         : BrushModeLasso.IsChecked == true ? PaintArea.Lasso
+         : PaintArea.None;
+
+    private bool _choosingMode;
+
+    /// <summary>Genau eine Art ist an: Die gewaehlte schaltet die anderen ab und laesst sich selbst nicht abschalten.</summary>
+    private void OnBrushMode(object sender, RoutedEventArgs e)
+    {
+        // Der erste Knopf steht im XAML auf an - sein Checked kommt beim Laden, bevor die
+        // anderen Knoepfe da sind. Dann gibt es noch nichts abzuschalten.
+        if (_choosingMode || BrushModeLasso is null) return;
+
+        _choosingMode = true;
+
+        foreach (var mode in new[] { BrushModeStroke, BrushModeRectangle, BrushModeEllipse, BrushModeLasso })
+            mode.IsChecked = ReferenceEquals(mode, sender);
+
+        _choosingMode = false;
+
+        if (IsLoaded) BrushChanged?.Invoke();
+    }
+
     /// <summary>Der Strich bleibt auf der Flaeche, auf der er ansetzt - aus Tiefe und Normale.</summary>
     public bool BrushEdge => BrushEdgeToggle.IsChecked == true;
 

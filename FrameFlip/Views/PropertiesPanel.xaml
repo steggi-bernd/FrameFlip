@@ -32,6 +32,20 @@
             <WrapPanel x:Name="BrushBody" DockPanel.Dock="Left" Orientation="Horizontal"
                        VerticalAlignment="Center" Visibility="Collapsed">
 
+                <!-- Womit gemalt wird: Zug oder Flaeche. Genau einer ist an. -->
+                <ToggleButton x:Name="BrushModeStroke" Style="{StaticResource OverlayToggle}" IsChecked="True"
+                              VerticalAlignment="Center" Content="✎" ToolTip="{DynamicResource S_BrushModeStrokeHint}"
+                              Checked="OnBrushMode" Unchecked="OnBrushMode" />
+                <ToggleButton x:Name="BrushModeRectangle" Style="{StaticResource OverlayToggle}" Margin="4,0,0,0"
+                              VerticalAlignment="Center" Content="▭" ToolTip="{DynamicResource S_BrushModeRectangleHint}"
+                              Checked="OnBrushMode" Unchecked="OnBrushMode" />
+                <ToggleButton x:Name="BrushModeEllipse" Style="{StaticResource OverlayToggle}" Margin="4,0,0,0"
+                              VerticalAlignment="Center" Content="◯" ToolTip="{DynamicResource S_BrushModeEllipseHint}"
+                              Checked="OnBrushMode" Unchecked="OnBrushMode" />
+                <ToggleButton x:Name="BrushModeLasso" Style="{StaticResource OverlayToggle}" Margin="4,0,14,0"
+                              VerticalAlignment="Center" Content="➰" ToolTip="{DynamicResource S_BrushModeLassoHint}"
+                              Checked="OnBrushMode" Unchecked="OnBrushMode" />
+
                 <TextBlock Text="{DynamicResource S_BrushSize}" Style="{StaticResource PanelLabel}"
                            VerticalAlignment="Center" Margin="0,0,6,0" />
                 <Slider x:Name="BrushSizeSlider" Style="{StaticResource PanelSlider}" Width="110"
