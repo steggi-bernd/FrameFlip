@@ -14,6 +14,8 @@
                     <Run Text="⌕ " /><Run Text="{DynamicResource S_ToolSearch}" /><Run Text="  Strg+K" Foreground="{StaticResource MutedBrush}" />
                 </TextBlock>
             </Button>
+            <!-- Vorn, was die Seite hier haben will - im Atelier "Bild oeffnen". -->
+            <ContentControl x:Name="LeadingSlot" DockPanel.Dock="Left" VerticalAlignment="Center" Focusable="False" />
             <WrapPanel x:Name="CategoryRow" Orientation="Horizontal" VerticalAlignment="Center" />
         </DockPanel>
 

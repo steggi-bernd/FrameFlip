@@ -84,14 +84,24 @@ public partial class AtelierPage
         if (_frame is null || _sequence is null || _sequence.Count == 0)
         {
             ExportBar.Visibility = Visibility.Collapsed;
+            SequenceText.Text = "";
+            PreviousFrameButton.Visibility = NextFrameButton.Visibility = Visibility.Collapsed;
             return;
         }
 
         ExportBar.Visibility = Visibility.Visible;
 
-        SequenceText.Text = _sequence.Count == 1
-            ? Strings.T("S_SingleImage")
+        // Unten in der Statuszeile: welches Bild der Folge, und die Schritte davor und danach.
+        int at = FrameIndex();
+
+        SequenceText.Text = _sequence.Count == 1 ? Strings.T("S_SingleImage")
+            : at >= 0 ? Strings.T("S_FramePosition", (at + 1).ToString(), _sequence.Count.ToString())
             : Strings.T("S_FrameCount", _sequence.Count.ToString());
+
+        var steps = _sequence.Count > 1 && at >= 0 ? Visibility.Visible : Visibility.Collapsed;
+        PreviousFrameButton.Visibility = NextFrameButton.Visibility = steps;
+        PreviousFrameButton.IsEnabled = at > 0;
+        NextFrameButton.IsEnabled = at >= 0 && at < _sequence.Count - 1;
 
         // Ohne Ziel kein Lauf: den Ordner zu erraten waere die Art Bequemlichkeit,
         // die irgendwann dreihundert Dateien an einer ueberraschenden Stelle ablegt.
@@ -104,6 +114,36 @@ public partial class AtelierPage
     }
 
     private void OnFormatChanged(object sender, SelectionChangedEventArgs e) => UpdateBatchBar();
+
+    /// <summary>Wo das offene Bild in seiner Folge steht - oder -1.</summary>
+    private int FrameIndex()
+    {
+        if (_sequence is null || _path is null) return -1;
+
+        string open = Path.GetFullPath(_path);
+
+        for (int i = 0; i < _sequence.Frames.Count; i++)
+            if (string.Equals(Path.GetFullPath(_sequence.Frames[i].Path), open, StringComparison.OrdinalIgnoreCase)) return i;
+
+        return -1;
+    }
+
+    /// <summary>Ein Bild zurueck in der Folge - unten in der Statuszeile.</summary>
+    private void OnPreviousFrame(object sender, RoutedEventArgs e) => StepFrame(-1);
+
+    /// <summary>Ein Bild weiter in der Folge.</summary>
+    private void OnNextFrame(object sender, RoutedEventArgs e) => StepFrame(+1);
+
+    internal void StepFrame(int by)
+    {
+        int at = FrameIndex();
+        if (_sequence is null || at < 0) return;
+
+        int next = at + by;
+        if (next < 0 || next >= _sequence.Count) return;
+
+        Open(_sequence.Frames[next].Path);
+    }
 
     private void OnChooseTargetClicked(object sender, RoutedEventArgs e)
     {

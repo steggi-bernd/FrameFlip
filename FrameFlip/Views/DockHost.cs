@@ -63,6 +63,20 @@ public sealed class DockHost : Border
     public static void SetTitleKey(DependencyObject at, string value) => at.SetValue(TitleKeyProperty, value);
     public static string GetTitleKey(DependencyObject at) => (string)at.GetValue(TitleKeyProperty);
 
+    /// <summary>
+    /// Ein Feld, das so gross ist wie sein Inhalt - etwa die Ausgabe mit ihren zwei Zeilen
+    /// Knoepfe. Liegen in einer Gruppe nur solche Felder, bekommt sie genau ihre Hoehe
+    /// (nebeneinander: ihre Breite), und der Rest der Zone gehoert den anderen. Ein Anteil
+    /// wie bei den uebrigen Gruppen schnitte sie in einem kleinen Fenster ab und liesse
+    /// in einem grossen leere Flaeche stehen.
+    /// </summary>
+    public static readonly DependencyProperty FitsContentProperty =
+        DependencyProperty.RegisterAttached("FitsContent", typeof(bool), typeof(DockHost),
+                                            new PropertyMetadata(false));
+
+    public static void SetFitsContent(DependencyObject at, bool value) => at.SetValue(FitsContentProperty, value);
+    public static bool GetFitsContent(DependencyObject at) => (bool)at.GetValue(FitsContentProperty);
+
     /// <summary>Die Felder, die sich andocken lassen.</summary>
     public Collection<FrameworkElement> Panels { get; } = new();
 
@@ -82,6 +96,10 @@ public sealed class DockHost : Border
         => Panels.FirstOrDefault(p => GetPanelId(p) == id);
 
     private IReadOnlyCollection<string> Ids => Panels.Select(GetPanelId).ToArray();
+
+    /// <summary>Ob eine Gruppe nur aus Feldern besteht, die so gross sind wie ihr Inhalt.</summary>
+    private bool FitsContent(DockGroup group)
+        => group.Panels.Count > 0 && group.Panels.All(id => PanelOf(id) is { } panel && GetFitsContent(panel));
 
     // ------------------------------------------------------------ von aussen
 
@@ -454,19 +472,22 @@ public sealed class DockHost : Border
                 if (vertical) grid.RowDefinitions.Add(new RowDefinition { Height = new GridLength(10) });
                 else grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(10) });
 
-                // Ein Griff nur zwischen zwei offenen Gruppen. Eine eingeklappte ist so
-                // gross wie ihre Leiste; sie groesser zu ziehen hiesse, sie aufzuklappen,
-                // ohne dass das Modell davon weiss.
-                if (!groups[i - 1].Collapsed && !groups[i].Collapsed)
+                // Ein Griff nur zwischen zwei Gruppen, die ihre Groesse teilen. Eine
+                // eingeklappte ist so gross wie ihre Leiste; sie groesser zu ziehen hiesse,
+                // sie aufzuklappen, ohne dass das Modell davon weiss. Eine, die so gross
+                // ist wie ihr Inhalt, hat ebenso nichts abzugeben.
+                if (Shares(groups[i - 1]) && Shares(groups[i]))
                     grid.Children.Add(GroupSplitter(grid, groups, vertical));
             }
 
-            var size = groups[i].Collapsed
+            bool fixedSize = !Shares(groups[i]);
+
+            var size = fixedSize
                 ? GridLength.Auto
                 : new GridLength(Math.Max(0.01, groups[i].Weight), GridUnitType.Star);
 
-            if (vertical) grid.RowDefinitions.Add(new RowDefinition { Height = size, MinHeight = groups[i].Collapsed ? 0 : 90 });
-            else grid.ColumnDefinitions.Add(new ColumnDefinition { Width = size, MinWidth = groups[i].Collapsed ? 0 : 160 });
+            if (vertical) grid.RowDefinitions.Add(new RowDefinition { Height = size, MinHeight = fixedSize ? 0 : 90 });
+            else grid.ColumnDefinitions.Add(new ColumnDefinition { Width = size, MinWidth = fixedSize ? 0 : 160 });
 
             var view = GroupView(zone, i, groups[i]);
 
@@ -481,6 +502,12 @@ public sealed class DockHost : Border
 
         return grid;
     }
+
+    /// <summary>
+    /// Ob eine Gruppe ihre Groesse mit den anderen teilt - offen und nicht so gross wie ihr
+    /// Inhalt. Nur solche Gruppen haben einen Griff und ein Gewicht, das zaehlt.
+    /// </summary>
+    private bool Shares(DockGroup group) => !group.Collapsed && !FitsContent(group);
 
     /// <summary>Der Griff zwischen zwei offenen Gruppen - am Ende der Definitionen, die es bis hierher gibt.</summary>
     private GridSplitter GroupSplitter(Grid grid, List<DockGroup> groups, bool vertical)
@@ -513,7 +540,7 @@ public sealed class DockHost : Border
                 double size = vertical ? grid.RowDefinitions[d].ActualHeight
                                        : grid.ColumnDefinitions[d].ActualWidth;
 
-                if (g < groups.Count && size > 0 && !groups[g].Collapsed) groups[g].Weight = size;
+                if (g < groups.Count && size > 0 && Shares(groups[g])) groups[g].Weight = size;
                 g++;
             }
 

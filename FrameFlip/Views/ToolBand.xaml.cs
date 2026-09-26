@@ -46,6 +46,13 @@ public partial class ToolBand : UserControl
         Choose(ToolCatalog.Paint);
     }
 
+    /// <summary>Was vor den Kategorien steht - im Atelier der Knopf "Bild oeffnen".</summary>
+    public object? Leading
+    {
+        get => LeadingSlot.Content;
+        set => LeadingSlot.Content = value;
+    }
+
     /// <summary>Ein Werkzeug wurde gewaehlt - aus der Zeile oder aus der Suche.</summary>
     public event Action<ToolEntry>? Chosen;
 
