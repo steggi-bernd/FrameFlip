@@ -32,6 +32,9 @@
             <WrapPanel x:Name="BrushBody" DockPanel.Dock="Left" Orientation="Horizontal"
                        VerticalAlignment="Center" Visibility="Collapsed">
 
+                <!-- Die Arten stehen seit Phase U als Werkzeuge in der Werkzeugzeile (Malen);
+                     hier bleiben sie nur als Stand, unsichtbar. -->
+                <StackPanel x:Name="BrushModeRow" Orientation="Horizontal" VerticalAlignment="Center" Visibility="Collapsed">
                 <!-- Womit gemalt wird: Zug oder Flaeche. Genau einer ist an. -->
                 <ToggleButton x:Name="BrushModeStroke" Style="{StaticResource OverlayToggle}" IsChecked="True"
                               VerticalAlignment="Center" Content="✎" ToolTip="{DynamicResource S_BrushModeStrokeHint}"
@@ -45,6 +48,9 @@
                 <ToggleButton x:Name="BrushModeLasso" Style="{StaticResource OverlayToggle}" Margin="4,0,14,0"
                               VerticalAlignment="Center" Content="➰" ToolTip="{DynamicResource S_BrushModeLassoHint}"
                               Checked="OnBrushMode" Unchecked="OnBrushMode" />
+
+                <StackPanel x:Name="BrushTipRow" Orientation="Horizontal" VerticalAlignment="Center">
+                </StackPanel>
 
                 <TextBlock Text="{DynamicResource S_BrushSize}" Style="{StaticResource PanelLabel}"
                            VerticalAlignment="Center" Margin="0,0,6,0" />
@@ -76,6 +82,8 @@
                            VerticalAlignment="Center" Width="36" Margin="6,0,14,0"
                            HorizontalAlignment="Left" />
 
+                </StackPanel>
+
                 <!--
                     Staerke und Deckkraft sind nicht dasselbe, auch wenn sie sich
                     aehnlich anfuehlen: Die eine sagt, wieviel EIN Strich auftraegt,
@@ -91,6 +99,7 @@
                            VerticalAlignment="Center" Width="36" Margin="6,0,14,0"
                            HorizontalAlignment="Left" />
 
+                <StackPanel x:Name="BrushSpacingRow" Orientation="Horizontal" VerticalAlignment="Center">
                 <!-- Der Abstand der Tupfer, als Anteil des Radius. Strg und Rad am Bild tun dasselbe. -->
                 <TextBlock Text="{DynamicResource S_BrushSpacing}" Style="{StaticResource PanelLabel}"
                            VerticalAlignment="Center" Margin="0,0,6,0"
@@ -104,13 +113,16 @@
                            VerticalAlignment="Center" Width="40" Margin="6,0,0,0"
                            HorizontalAlignment="Left" />
 
+                <StackPanel x:Name="BrushShapeRow" Orientation="Horizontal" VerticalAlignment="Center">
+                </StackPanel>
+
                 <!-- Die Spitze: eckig oder rund, gedreht, gestreckt - und woran sie sich haelt. -->
                 <ToggleButton x:Name="BrushSquareToggle" Style="{StaticResource OverlayToggle}" Margin="14,0,0,0"
                               VerticalAlignment="Center" Content="▢" ToolTip="{DynamicResource S_BrushSquareHint}"
                               Checked="OnBrushToggle" Unchecked="OnBrushToggle" />
 
                 <!-- Der Stempel: eine Spitze aus einem Bild, je Tupfer zufaellig gedreht und gestreut. -->
-                <ToggleButton x:Name="BrushStampToggle" Style="{StaticResource OverlayToggle}" Margin="4,0,0,0"
+                <ToggleButton x:Name="BrushStampToggle" Style="{StaticResource OverlayToggle}" Margin="4,0,0,0" Visibility="Collapsed"
                               VerticalAlignment="Center" Content="✿" ToolTip="{DynamicResource S_BrushStampHint}"
                               Checked="OnBrushToggle" Unchecked="OnBrushToggle" />
                 <StackPanel x:Name="BrushStampRow" Orientation="Horizontal" VerticalAlignment="Center" Margin="6,0,0,0"
@@ -166,6 +178,8 @@
                 <ToggleButton x:Name="BrushFollowToggle" Style="{StaticResource OverlayToggle}"
                               VerticalAlignment="Center" Content="↻" ToolTip="{DynamicResource S_BrushFollowHint}"
                               Checked="OnBrushToggle" Unchecked="OnBrushToggle" />
+                </StackPanel>
+
                 <ToggleButton x:Name="BrushObjectToggle" Style="{StaticResource OverlayToggle}" Margin="6,0,0,0"
                               VerticalAlignment="Center" Content="⬢" ToolTip="{DynamicResource S_BrushObjectHint}"
                               Checked="OnBrushToggle" Unchecked="OnBrushToggle" />
@@ -186,6 +200,7 @@
                                VerticalAlignment="Center" Width="36" Margin="6,0,0,0" HorizontalAlignment="Left" />
                 </StackPanel>
 
+                <StackPanel x:Name="BrushPressureRow" Orientation="Horizontal" VerticalAlignment="Center">
                 <!-- Der Druck eines Stifts - die Maus hat keinen. -->
                 <TextBlock Text="{DynamicResource S_BrushPressure}" Style="{StaticResource PanelLabel}"
                            VerticalAlignment="Center" Margin="14,0,6,0" ToolTip="{DynamicResource S_BrushPressureHint}" />
@@ -197,6 +212,8 @@
                     <ComboBoxItem Content="{DynamicResource S_BrushPressureFlow}" />
                     <ComboBoxItem Content="{DynamicResource S_BrushPressureBoth}" />
                 </ComboBox>
+
+                </StackPanel>
 
                 <!-- Der Verlauf der Maske, auf die der Pinsel malt - nur im Knotenmodus,
                      nur dort wird er aufgezeichnet. -->

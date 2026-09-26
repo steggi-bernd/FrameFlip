@@ -22,7 +22,20 @@ namespace FrameFlip.Views;
 /// </summary>
 public partial class PropertiesPanel : UserControl
 {
-    public PropertiesPanel() => InitializeComponent();
+    public PropertiesPanel()
+    {
+        InitializeComponent();
+        ShowBrushGroups();
+    }
+
+    /// <summary>Das Werkzeug der Zeile, das der Pinsel gerade ist - Art oder Stempel.</summary>
+    public string BrushToolKey => BrushArea switch
+    {
+        PaintArea.Rectangle => "rectangle",
+        PaintArea.Ellipse => "ellipse",
+        PaintArea.Lasso => "lasso",
+        _ => BrushShape == BrushShape.Stamp ? "stamp" : "brush",
+    };
 
     /// <summary>Jemand moechte die gelesene Entfernung als Scharfstellung.</summary>
     public event Action<float>? FocusWanted;
@@ -153,6 +166,13 @@ public partial class PropertiesPanel : UserControl
             BrushStampToggle.IsChecked = true;
             if (BrushStamp is null) Told(Strings.T("S_ToolStampNeedsTip"));
         }
+        else if (area == PaintArea.None)
+        {
+            // "Pinsel" ist der Pinsel ohne Stempel - eckig oder rund, wie eingestellt.
+            BrushStampToggle.IsChecked = false;
+        }
+
+        ShowBrushGroups();
     }
 
     /// <summary>Genau eine Art ist an: Die gewaehlte schaltet die anderen ab und laesst sich selbst nicht abschalten.</summary>
@@ -169,7 +189,30 @@ public partial class PropertiesPanel : UserControl
 
         _choosingMode = false;
 
+        ShowBrushGroups();
         if (IsLoaded) BrushChanged?.Invoke();
+    }
+
+    /// <summary>
+    /// Zeigt nur, was zum gewaehlten Werkzeug gehoert (Phase U3). Rechteck, Ellipse und Lasso
+    /// fuellen - Spitze, Abstand und Druck haben dort nichts zu sagen. Das Karo gibt es nur
+    /// eckig, Spitze, Zufall und Streuung nur beim Stempel, die Toleranz nur mit der Kante.
+    /// </summary>
+    private void ShowBrushGroups()
+    {
+        if (BrushModeLasso is null || BrushEdgeRow is null) return;
+
+        bool stroke = BrushArea == PaintArea.None;
+
+        static void Show(UIElement element, bool shown) => element.Visibility = shown ? Visibility.Visible : Visibility.Collapsed;
+
+        Show(BrushTipRow, stroke);
+        Show(BrushSpacingRow, stroke);
+        Show(BrushShapeRow, stroke);
+        Show(BrushPressureRow, stroke);
+        Show(BrushStampRow, BrushShape == BrushShape.Stamp);
+        Show(BrushSquishRow, BrushShape == BrushShape.Square);
+        Show(BrushEdgeRow, BrushEdge);
     }
 
     /// <summary>Der Strich bleibt auf der Flaeche, auf der er ansetzt - aus Tiefe und Normale.</summary>
@@ -207,6 +250,8 @@ public partial class PropertiesPanel : UserControl
         // traegt nur eine.
         if (ReferenceEquals(sender, BrushObjectToggle) && BrushObject) BrushEdgeToggle.IsChecked = false;
         if (ReferenceEquals(sender, BrushEdgeToggle) && BrushEdge) BrushObjectToggle.IsChecked = false;
+
+        ShowBrushGroups();
 
         if (!IsLoaded) return;
 

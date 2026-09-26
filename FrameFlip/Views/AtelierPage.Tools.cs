@@ -36,6 +36,10 @@ public partial class AtelierPage
     {
         if (_switchingTool) return;
 
+        // Die Werkzeugzeile zeigt gedrueckt, als was der Pinsel malt - und nichts, wenn die Maus
+        // etwas anderes tut.
+        ToolBand.MarkActive(tool == AtelierTool.Brush ? Properties.BrushToolKey : null);
+
         _switchingTool = true;
 
         try
