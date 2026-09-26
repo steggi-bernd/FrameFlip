@@ -173,6 +173,27 @@ werden freigegeben. Aus-/Einblenden einer weiterhin vorhandenen Ebene bleibt ohn
 unnötiges Neulesen möglich. Rezept und Auswahl überstehen einen Seitenwechsel.
 Ressourcenpolitik beim Verbergen und Exportbesitz werden in S3/S4 vervollständigt.
 
+### Stand S1, erster Teil (25. September 2026)
+
+Auf `refactor/studio-s1-open`, aufgebaut auf `refactor/studio-s0`, **implementiert und
+geprüft**, noch nicht gemergt: die Hauptbild-Öffnung.
+
+- `FrameFlip/Atelier/AtelierSourceSession` besitzt die laufende Anfrage, ihre Nummer,
+  das Lesen im Hintergrund und die Zustellung auf den Oberflächenfaden. Zugestellt wird
+  nur, was noch gilt. Ein Lesefehler kommt als unlesbares Bild an. Pass-Nachladen und
+  Miniaturen fragen die Sitzung, ob ihr Öffnen noch gilt.
+- Anzeigen, Werkzeuge, Rezept und der Vorrat gelesener Quellen bleiben bei der Seite.
+- Charakterisierung vorher (`AtelierOpenInvariants`): lesbar, unlesbar (Hinweis, leere
+  Fläche, nicht gemerkt), Lesefehler als Ausnahme, erneutes Öffnen nach einem Fehler.
+  Dazu die Rennen aus S0. Beide liefen vor und nach der Auslagerung unverändert grün.
+  `AtelierSourceSessionInvariants` prüft die Sitzung ohne Fenster: neueres Öffnen,
+  A → B → A, Lesefehler, Nummern und das Ende.
+
+Abnahme: **4.561 Zusicherungen** in `FrameFlip.Tests` (Release). Offen für die weiteren
+Teile von S1: Pass- und Bildquellen samt Vorrat in die Sitzung, Miniaturen, und der
+Endpfad am Hauptfenster. Die Sitzung wird heute nie beendet, daher liefert ein
+Schließen bei laufendem Lesen weiter eine späte Rückgabe an die Seite.
+
 ## S2: Rezept, Auswahl und Speichern trennen
 
 **Nach S0; Integration nach S1.** Zuerst `Bind`, `Snapshot`, `OnToolsChanged`

@@ -177,7 +177,7 @@ public partial class AtelierPage
     {
         BusyBadge.Visibility = Visibility.Visible;
 
-        long opened = _opened;
+        long opened = _source.Opened;
 
         Task.Run(() =>
         {
@@ -210,7 +210,7 @@ public partial class AtelierPage
                 // Waehrend gelesen wurde, kann eine andere Datei geoeffnet worden
                 // sein. Die Passe gehoeren dann zu einem Bild, das nicht mehr auf
                 // dem Schirm steht - auch wenn es dieselbe Datei ist, neu geoeffnet.
-                if (opened != _opened || !string.Equals(path, _path, StringComparison.Ordinal)) return;
+                if (!_source.IsCurrent(opened) || !string.Equals(path, _path, StringComparison.Ordinal)) return;
 
                 foreach (var (name, frame) in read) _sources[name] = frame;
 
