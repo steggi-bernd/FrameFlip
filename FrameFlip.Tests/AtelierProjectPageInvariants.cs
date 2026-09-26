@@ -25,8 +25,10 @@ public static class AtelierProjectPageInvariants
         string firstNext = Path.Combine(root, "eins", "render_0002.png");
         string second = Path.Combine(root, "zwei", "shot_0001.png");
         string third = Path.Combine(root, "drei", "neu_0001.png");
+        string fourth = Path.Combine(root, "vier", "neu_0001.png");
+        string fifth = Path.Combine(root, "fuenf", "neu_0001.png");
 
-        foreach (string file in new[] { first, firstNext, second, third })
+        foreach (string file in new[] { first, firstNext, second, third, fourth, fifth })
         {
             Directory.CreateDirectory(Path.GetDirectoryName(file)!);
             WritePng(file);
@@ -109,6 +111,8 @@ public static class AtelierProjectPageInvariants
 
             Show(third);
             var thirdKey = page.Projects.Current!;
+            var layerPanel = (LayerPanel)page.FindName("Layers");
+            int fresh = layerPanel.Stack.Layers.Count;
             Check.That(saved.ToolTip as string == AtelierProjectStore.PrimaryPath(thirdKey),
                        "ein neues Projekt: der Tooltip nennt seine Datei im eigenen Ordner", saved.ToolTip as string);
             Check.That(!saved.Text.StartsWith(savedPrefix, StringComparison.Ordinal) && page.Projects.SavedAt is null,
@@ -121,6 +125,32 @@ public static class AtelierProjectPageInvariants
             Check.That(saved.ToolTip as string == AtelierProjectStore.PrimaryPath(key) &&
                        page.Projects.SavedAt is { } at && Math.Abs((at - secondSaved).TotalSeconds) < 1,
                        "zurueck zur zweiten Folge: ihre Datei und ihre Zeit", $"{page.Projects.SavedAt} | {saved.ToolTip}");
+
+            // Ein Projekt mit Ebenen im Stapel, dann ein Bild aus einem neuen Ordner: Rechts
+            // stehen nicht die Ebenen des vorigen Projekts ueber dem neuen Bild.
+            Show(first);
+            layerPanel.AddAdjustment();
+            layerPanel.AddAdjustment();
+            Pump(() => false, 0.3);
+            int had = layerPanel.Stack.Layers.Count;
+
+            Show(fourth);
+            Check.That(had >= fresh + 2 && layerPanel.Stack.Layers.Count == fresh && (page.Recipe.Layers?.Layers.Count ?? 0) == fresh,
+                       "aus dem Stapel mit Ebenen in ein neues Projekt: kein fremder Stapel", $"{had} -> {layerPanel.Stack.Layers.Count}");
+
+            // Dasselbe aus dem Knotenmodus - der Graph und seine Ebenen bleiben beim alten Projekt.
+            Show(second);
+            Pump(() => page.InNodes);
+            Show(fifth);
+            Check.That(!page.InNodes && page.Graph is null && layerPanel.Stack.Layers.Count == fresh,
+                       "aus dem Knotenmodus in ein neues Projekt: kein fremder Graph, kein fremder Stapel",
+                       $"InNodes={page.InNodes} Ebenen={layerPanel.Stack.Layers.Count}");
+
+            // Und die Dateien: Das neue Projekt traegt nichts vom alten.
+            AtelierProjectStore.WaitForWrites(TimeSpan.FromSeconds(10));
+            var fourthProject = new AtelierProjectStore().Load(SequenceKey.Of(fourth)!);
+            Check.That(fourthProject is null || (fourthProject.Layers?.Layers.Count ?? 0) == fresh,
+                       "auch in der Projektdatei des neuen Ordners steht kein fremder Stapel");
         }
         finally
         {

@@ -67,6 +67,9 @@ public static class NodeModeInvariants
                 },
                 Adjustments = new ImageAdjustments { Exposure = 0.2 },
                 Grading = new GradingStack { Optics = { new VignetteTool { Amount = -0.5f } } },
+
+                // Das Rezept gehoert zu diesem Bild - nur dessen Folge uebernimmt es.
+                AtelierImage = picture,
             };
 
             TheSwitchKeepsThePicture(settings, picture);

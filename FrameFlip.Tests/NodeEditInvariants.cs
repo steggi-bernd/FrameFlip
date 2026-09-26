@@ -655,7 +655,8 @@ public static class NodeEditInvariants
         foreach (var node in old.Nodes.Where(n => !live.Contains(n.Id)).ToList()) NodeEdits.Remove(old, node, reconnect: false);
         foreach (var node in old.Nodes) node.Label = null;
 
-        var settings = new AppSettings { Layers = stack, AtelierNodes = old.Save() };
+        // Das Rezept gehoert zu diesem Bild - nur dessen Folge uebernimmt es.
+        var settings = new AppSettings { Layers = stack, AtelierNodes = old.Save(), AtelierImage = picture };
         var page = new AtelierPage(FrameDecoderRegistry.CreateDefault(() => null), settings, _ => { });
         var window = Window(page);
 

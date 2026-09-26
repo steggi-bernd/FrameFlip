@@ -681,7 +681,8 @@ public static class AtelierLayerInvariants
             },
         };
 
-        var settings = new AppSettings { Layers = saved };
+        // Das Rezept gehoert zu diesem Bild - nur dessen Folge uebernimmt es.
+        var settings = new AppSettings { Layers = saved, AtelierImage = picture };
         var page = new AtelierPage(FrameDecoderRegistry.CreateDefault(() => null), settings, _ => { });
 
         var window = new Window
