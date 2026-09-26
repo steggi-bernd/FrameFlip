@@ -1,3 +1,5 @@
+using System.Text.Json;
+using System.Text.RegularExpressions;
 using FrameFlip.Decoding.Exr;
 
 namespace FrameFlip.Imaging.Grading;
@@ -73,27 +75,71 @@ public static class PassStack
     }
 
     /// <summary>
-    /// Ein Pass, der Licht traegt und damit in die Summe gehoert.
-    ///
-    /// "Dir" und "Ind" sind direktes und indirektes Licht; Emission und Umgebung
-    /// kommen ohne Farbpass und stehen fuer sich. Alles Uebrige - Farbe, Tiefe,
-    /// Verschattung, Kryptomatten - ist entweder Faktor oder gar kein Licht und
-    /// gehoert nicht in die Summe.
+    /// Ob die Datei ein fertiges Bild fuehrt: die schmucklosen Kanaele R, G, B oder einen Pass
+    /// "Combined" (Blender 5.2 nennt ihn womoeglich "Image"). Ohne fertiges Bild zeigt das
+    /// Atelier sonst nur den ersten Farbpass - bei Blender 5.2 mit allen Paessen ist das
+    /// "Diffuse Direct", ein Bild ohne Farbe und ohne Glanz.
     /// </summary>
-    private static bool IsLight(string leaf)
-        => leaf.EndsWith("Dir", StringComparison.OrdinalIgnoreCase) ||
-           leaf.EndsWith("Ind", StringComparison.OrdinalIgnoreCase) ||
-           leaf.Equals("Emit", StringComparison.OrdinalIgnoreCase) ||
-           leaf.Equals("Env", StringComparison.OrdinalIgnoreCase);
+    public static bool HasFinishedImage(IReadOnlyList<ExrPass> passes)
+        => passes.Any(p => !p.Grey &&
+                           (p.Name.Length == 0 ||
+                            p.ShortName.Equals("Combined", StringComparison.OrdinalIgnoreCase) ||
+                            p.ShortName.Equals("Image", StringComparison.OrdinalIgnoreCase)));
 
     /// <summary>
-    /// Der Farbpass zu einem Lichtpass, oder null. "GlossDir" gehoert zu
-    /// "GlossCol"; "VolumeDir" hat keinen, und das ist kein Fehler.
+    /// Ob ein gespeicherter Stapel noch nichts traegt: keiner, leer, oder nur die Grundebene,
+    /// wie das Atelier sie beim ersten Oeffnen anlegt - unberuehrt bis auf ihren Namen. Dann
+    /// darf der Stapel aus den Paessen an seine Stelle treten, ohne dass jemandem etwas fehlt.
+    /// </summary>
+    public static bool IsBare(LayerStack? stack)
+    {
+        if (stack is null || stack.Layers.Count == 0) return true;
+        if (stack.Layers.Count != 1) return false;
+
+        var layer = stack.Layers[0];
+        var untouched = new ImageLayer { Source = "", Mode = BlendMode.Normal, Name = layer.Name };
+
+        return JsonSerializer.Serialize(layer) == JsonSerializer.Serialize(untouched);
+    }
+
+    // Blender vor 5.x schreibt die Lichtpasse kurz - "DiffDir", "GlossCol" -, Blender 5.2
+    // ausgeschrieben - "Diffuse Direct", "Glossy Color". Beide meinen dasselbe.
+    private static readonly Regex Short = new(@"^(?<kind>Diff|Gloss|Trans|Volume)(?<part>Dir|Ind|Col)$",
+                                              RegexOptions.IgnoreCase | RegexOptions.CultureInvariant);
+
+    private static readonly Regex Long = new(@"^(?<kind>Diffuse|Glossy|Transmission|Volume)\s+(?<part>Direct|Indirect|Color)$",
+                                             RegexOptions.IgnoreCase | RegexOptions.CultureInvariant);
+
+    /// <summary>
+    /// Ein Pass, der Licht traegt und damit in die Summe gehoert.
+    ///
+    /// Direktes und indirektes Licht ("Dir"/"Direct", "Ind"/"Indirect"); Emission und
+    /// Umgebung kommen ohne Farbpass und stehen fuer sich. Alles Uebrige - Farbe, Tiefe,
+    /// Verschattung, Kryptomatten - ist entweder Faktor oder gar kein Licht und gehoert
+    /// nicht in die Summe.
+    /// </summary>
+    private static bool IsLight(string leaf)
+    {
+        var match = Short.Match(leaf);
+        if (!match.Success) match = Long.Match(leaf);
+
+        if (match.Success) return !match.Groups["part"].Value.StartsWith("Col", StringComparison.OrdinalIgnoreCase);
+
+        return leaf.Equals("Emit", StringComparison.OrdinalIgnoreCase) ||
+               leaf.Equals("Emission", StringComparison.OrdinalIgnoreCase) ||
+               leaf.Equals("Env", StringComparison.OrdinalIgnoreCase) ||
+               leaf.Equals("Environment", StringComparison.OrdinalIgnoreCase);
+    }
+
+    /// <summary>
+    /// Der Farbpass zu einem Lichtpass, oder null. "GlossDir" gehoert zu "GlossCol",
+    /// "Glossy Direct" zu "Glossy Color"; Volume hat keinen, und das ist kein Fehler.
     /// </summary>
     private static string? ColourFor(string leaf)
-        => leaf.Length > 3 &&
-           (leaf.EndsWith("Dir", StringComparison.OrdinalIgnoreCase) ||
-            leaf.EndsWith("Ind", StringComparison.OrdinalIgnoreCase))
-            ? leaf[..^3] + "Col"
-            : null;
+    {
+        if (Short.Match(leaf) is { Success: true } shortName) return shortName.Groups["kind"].Value + "Col";
+        if (Long.Match(leaf) is { Success: true } longName) return longName.Groups["kind"].Value + " Color";
+
+        return null;
+    }
 }

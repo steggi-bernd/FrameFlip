@@ -22,7 +22,7 @@ public static class ExrMultipartInvariants
     private const int W = 8, H = 5;
 
     /// <summary>Ein Teil der Probedatei: Name, Art, Kanaele und der Wert je Kanal und Bildpunkt.</summary>
-    private sealed record Part(string Name, string Type, string[] Channels, Func<int, int, int, float> Value,
+    internal sealed record Part(string Name, string Type, string[] Channels, Func<int, int, int, float> Value,
                                IReadOnlyDictionary<string, string>? Extra = null);
 
     public static void Run()
@@ -128,7 +128,7 @@ public static class ExrMultipartInvariants
     /// gekachelte Teil bekommt einen Kopf und eine Tabelle, aber keinen lesbaren Inhalt -
     /// der Leser darf ihn nicht anfassen.
     /// </summary>
-    private static byte[] Build(Part[] parts)
+    internal static byte[] Build(Part[] parts)
     {
         using var file = new MemoryStream();
         var writer = new BinaryWriter(file);

@@ -120,6 +120,7 @@ static int RunAll()
     BlendSpaceInvariants.Run();
     LayerPanelInvariants.Run();
     PassRebuildInvariants.Run();
+    PassStackNamesInvariants.Run();
     CryptomatteInvariants.Run();
     ImageHitInvariants.Run();
     SortInvariants.Run();
