@@ -132,6 +132,29 @@ public partial class PropertiesPanel : UserControl
 
     private bool _choosingMode;
 
+    /// <summary>
+    /// Der Pinsel aus der Werkzeugleiste: Zug oder Flaeche, und beim Stempel die Spitze.
+    /// Ohne geladene Spitze fragt der Stempel nach einer.
+    /// </summary>
+    public void ChooseBrush(PaintArea area, BrushShape? shape)
+    {
+        var mode = area switch
+        {
+            PaintArea.Rectangle => BrushModeRectangle,
+            PaintArea.Ellipse => BrushModeEllipse,
+            PaintArea.Lasso => BrushModeLasso,
+            _ => BrushModeStroke,
+        };
+
+        mode.IsChecked = true;
+
+        if (shape == BrushShape.Stamp)
+        {
+            BrushStampToggle.IsChecked = true;
+            if (BrushStamp is null) Told(Strings.T("S_ToolStampNeedsTip"));
+        }
+    }
+
     /// <summary>Genau eine Art ist an: Die gewaehlte schaltet die anderen ab und laesst sich selbst nicht abschalten.</summary>
     private void OnBrushMode(object sender, RoutedEventArgs e)
     {

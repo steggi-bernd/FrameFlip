@@ -95,6 +95,7 @@ static int RunAll()
     MaskHistoryInvariants.Run();
     MaskEditInvariants.Run();
     BrushShapeInvariants.Run();
+    ToolBandInvariants.Run();
     BrushStampInvariants.Run();
     PersistedEnumInvariants.Run();
     ExportFrameNumberInvariants.Run();

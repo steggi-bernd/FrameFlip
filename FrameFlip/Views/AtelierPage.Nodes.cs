@@ -333,6 +333,8 @@ public partial class AtelierPage
     /// </summary>
     private void ShowNodeMode()
     {
+        ToolBand.InNodes = InNodes;
+
         bool nodesTool = _tool == AtelierTool.Nodes;
 
         NodeView.Visibility = nodesTool && InNodes ? Visibility.Visible : Visibility.Collapsed;
