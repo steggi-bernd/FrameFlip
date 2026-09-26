@@ -134,8 +134,18 @@ internal sealed class AtelierProjectStore
 
     private static string FileNameOf(SequenceKey key) => key.Name + key.Extension + FileExtension;
 
-    /// <summary>Wo das Projekt zuletzt geschrieben wurde - fuer die Anzeige.</summary>
+    /// <summary>Wo zuletzt irgendein Projekt geschrieben wurde - fuer die Probe der Ablage.</summary>
     public string? LastWritten { get; private set; }
+
+    /// <summary>
+    /// Wo das Projekt einer Folge zuletzt gelesen oder geschrieben wurde. Je Folge und nicht
+    /// "zuletzt irgendwo": Die Anzeige im Atelier nannte sonst nach einem Wechsel die Datei
+    /// der Folge davor - ein neues Bild sah aus, als laege es in einem fremden Projekt.
+    /// </summary>
+    private readonly System.Collections.Concurrent.ConcurrentDictionary<SequenceKey, string> _places = new();
+
+    /// <summary>Die Datei des Projekts dieser Folge, wie zuletzt gelesen oder geschrieben - oder null, wenn es noch keine gibt.</summary>
+    public string? PlaceOf(SequenceKey key) => _places.TryGetValue(key, out var place) ? place : null;
 
     private static readonly object Gate = new();
 
@@ -182,7 +192,10 @@ internal sealed class AtelierProjectStore
                 if (!File.Exists(path)) continue;
 
                 var project = JsonSerializer.Deserialize<AtelierProject>(File.ReadAllText(path), Options);
-                if (project is not null) return project;
+                if (project is null) continue;
+
+                _places[key] = path;
+                return project;
             }
             catch (Exception e) when (e is IOException or UnauthorizedAccessException or JsonException or NotSupportedException)
             {
@@ -294,6 +307,7 @@ internal sealed class AtelierProjectStore
                 File.Move(temp, path, overwrite: true);
 
                 LastWritten = path;
+                _places[key] = path;
                 return true;
             }
             catch (Exception e) when (e is IOException or UnauthorizedAccessException)

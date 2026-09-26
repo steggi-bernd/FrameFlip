@@ -51,6 +51,14 @@ internal sealed class AtelierProjectKeeper
     private string? _frame;
     private bool _frameChanged;
 
+    /// <summary>
+    /// Die Folge, zu der das Rezept aus der Zeit vor den Projektdateien gehoert: die, an der
+    /// das Atelier beim Start stand. Nur sie bekommt es - vorher nahm es die erste neue Folge
+    /// ohne Projektdatei mit, gleich aus welchem Ordner, und ein neues Bild trug die Ebenen
+    /// eines fremden, aelteren Projekts.
+    /// </summary>
+    private readonly SequenceKey? _recipeOwner;
+
     /// <param name="later">Ruft eine Aktion nach einer Weile auf dem Oberflaechenfaden; liefert, was sie absagt.</param>
     /// <param name="dispatch">Bringt das Ende eines Schreibvorgangs auf den Oberflaechenfaden - ohne darauf zu warten.</param>
     internal AtelierProjectKeeper(AtelierEditingSession session, AtelierProjectStore store, AppSettings settings,
@@ -63,6 +71,9 @@ internal sealed class AtelierProjectKeeper
         _dispatch = dispatch;
 
         _session.Changed += OnChanged;
+
+        // Beim Start, bevor ein Bild es weiterschiebt: Das Atelier merkt sich jedes gezeigte Bild.
+        _recipeOwner = settings.AtelierImage is { Length: > 0 } image ? SequenceKey.Of(image) : null;
     }
 
     /// <summary>Die Folge des offenen Projekts - null, solange keines offen ist.</summary>
@@ -105,12 +116,21 @@ internal sealed class AtelierProjectKeeper
 
         ProjectRecipeStore recipe;
         bool moved = false;
+        DateTime? savedAt = null;
+
+        bool ownsOldRecipe = !_settings.AtelierRecipeMoved && key.Equals(_recipeOwner);
 
         if (_store.Load(key) is { } project)
         {
             recipe = ProjectRecipeStore.From(project);
+
+            // Die Zeit dieses Projekts - nicht die des vorigen, das zuletzt geschrieben wurde.
+            if (project.SavedUtc != default) savedAt = project.SavedUtc.ToLocalTime();
+
+            // Hat die Folge des alten Rezepts schon ihre Datei, gilt die - das alte ist erledigt.
+            if (ownsOldRecipe) _settings.AtelierRecipeMoved = true;
         }
-        else if (!_settings.AtelierRecipeMoved)
+        else if (ownsOldRecipe)
         {
             recipe = new ProjectRecipeStore
             {
@@ -126,9 +146,13 @@ internal sealed class AtelierProjectKeeper
         else
         {
             recipe = new ProjectRecipeStore();
+
+            // Ohne Bild, zu dem das alte Rezept gehoert, gibt es nichts zu uebernehmen.
+            if (_recipeOwner is null) _settings.AtelierRecipeMoved = true;
         }
 
         Current = key;
+        SavedAt = savedAt;
         _frame = frame;
         _frameChanged = false;
 
@@ -172,6 +196,11 @@ internal sealed class AtelierProjectKeeper
         {
             _dispatch(() =>
             {
+                // Beim Wechsel wird das bisherige Projekt geschrieben, und die Nachricht kommt,
+                // wenn schon das naechste offen ist. Sie gehoert nicht in dessen Anzeige - weder
+                // die Uhrzeit noch "gespeichert". Scheitert es, steht das im Protokoll der Ablage.
+                if (!key.Equals(Current)) return;
+
                 if (written)
                 {
                     // Kam waehrend des Schreibens etwas dazu, bleibt es ungespeichert.

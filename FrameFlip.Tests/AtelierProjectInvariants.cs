@@ -19,6 +19,7 @@ public static class AtelierProjectInvariants
         TheKeyIgnoresTheNumber();
         TheStoreWritesNextToTheSource();
         TheKeeperSwitchesAndSaves();
+        TheOldRecipeGoesToItsOwnSequence();
     }
 
     private static void TheKeyIgnoresTheNumber()
@@ -103,6 +104,9 @@ public static class AtelierProjectInvariants
         {
             Grading = new GradingStack { Optics = { new VignetteTool { Amount = -0.25f } } },
             Adjustments = new ImageAdjustments { Exposure = 0.3 },
+
+            // Das bisherige Rezept gehoert zu dieser Folge - an ihr stand das Atelier zuletzt.
+            AtelierImage = Path.Combine(place.Source, "render_0005.exr"),
         };
 
         var session = new AtelierEditingSession(new SettingsRecipeStore(settings));
@@ -160,6 +164,12 @@ public static class AtelierProjectInvariants
 
         Check.That(session.Adjustments is null && session.Grading is null && !session.Dirty,
                    "die neue Folge beginnt frisch - die Uebernahme gab es nur einmal");
+
+        // Die Nachricht vom Schreiben der ersten kam erst, als die zweite schon offen war.
+        // Sie setzt dort weder eine Uhrzeit noch eine Datei.
+        Check.That(keeper.SavedAt is null && store.PlaceOf(keeper.Current!) is null &&
+                   store.PlaceOf(firstKey) == AtelierProjectStore.PrimaryPath(firstKey),
+                   "die zweite hat noch keine Datei und keine Zeit - die erste behaelt ihre", $"{keeper.SavedAt}");
         Check.That(Math.Abs(store.Load(firstKey)!.Adjustments!.Exposure + 0.5) < 1e-9 &&
                    store.Load(firstKey)!.Frame == "render_0002.exr",
                    "und das bisherige Projekt ist mit seiner letzten Aenderung geschrieben");
@@ -175,6 +185,80 @@ public static class AtelierProjectInvariants
                    "zurueck zur ersten Folge steht ihr Rezept wieder da");
         Check.That(store.Load(SequenceKey.Of(second)!)!.Layers!.Layers.Single().Name == "zweite",
                    "und die zweite hat ihres behalten");
+    }
+
+    /// <summary>
+    /// Das Rezept aus der Zeit vor den Projektdateien gehoert zu der Folge, an der das Atelier
+    /// damals stand - nicht zur ersten neuen, die danach geoeffnet wird. Vorher bekam die
+    /// erste Folge ohne Projektdatei die Ebenen eines fremden, aelteren Projekts.
+    /// </summary>
+    private static void TheOldRecipeGoesToItsOwnSequence()
+    {
+        Check.Group("Projekte: das alte Rezept geht an seine Folge");
+
+        using var place = new Place();
+
+        string owner = Path.Combine(place.Source, "alt", "render_0003.exr");
+        string stranger = Path.Combine(place.Source, "neu", "bild_0001.png");
+        Directory.CreateDirectory(Path.GetDirectoryName(owner)!);
+        Directory.CreateDirectory(Path.GetDirectoryName(stranger)!);
+
+        AppSettings OldRecipe(string? image) => new()
+        {
+            Layers = new LayerStack
+            {
+                Layers = { new ImageLayer { Content = LayerContent.Adjustment, Name = "alt eins" },
+                           new ImageLayer { Content = LayerContent.Adjustment, Name = "alt zwei" } },
+            },
+            Adjustments = new ImageAdjustments { Exposure = 0.7 },
+            AtelierImage = image,
+        };
+
+        AtelierProjectKeeper Keeper(AppSettings settings, AtelierEditingSession session)
+            => new(session, new AtelierProjectStore(() => place.Fallback), settings, (_, _) => () => { }, action => action());
+
+        // Zuerst ein Bild aus einem anderen Ordner: Es beginnt leer, das alte Rezept wartet.
+        var settings = OldRecipe(owner);
+        var session = new AtelierEditingSession(new SettingsRecipeStore(settings));
+        var keeper = Keeper(settings, session);
+
+        keeper.Enter(stranger);
+        keeper.Flush();
+
+        Check.That((session.Layers?.Layers.Count ?? 0) == 0 && session.Adjustments is null && !settings.AtelierRecipeMoved,
+                   "ein fremdes neues Bild bekommt nicht die Ebenen des alten Rezepts - es wartet auf seine Folge",
+                   $"{session.Layers?.Layers.Count ?? 0} Ebenen");
+
+        // Dann die Folge, zu der es gehoert: Sie bekommt es, und nur einmal.
+        keeper.Enter(owner);
+        keeper.Flush();
+
+        Check.That(session.Layers?.Layers.Count == 2 && Math.Abs(session.Adjustments!.Exposure - 0.7) < 1e-9 &&
+                   settings.AtelierRecipeMoved && File.Exists(AtelierProjectStore.PrimaryPath(keeper.Current!)),
+                   "seine eigene Folge bekommt es - und es steht gleich in ihrer Datei");
+
+        // Hat die Folge schon eine Projektdatei, gilt die - und das alte Rezept ist erledigt.
+        var later = OldRecipe(owner);
+        var laterSession = new AtelierEditingSession(new SettingsRecipeStore(later));
+        var laterKeeper = Keeper(later, laterSession);
+
+        laterSession.Adjustments = null;
+        laterKeeper.Enter(owner);
+        laterKeeper.Flush();
+
+        Check.That(laterSession.Layers?.Layers.Count == 2 && later.AtelierRecipeMoved,
+                   "mit Projektdatei zaehlt die Datei, und das alte Rezept gilt als uebernommen");
+
+        // Ohne Bild, zu dem es gehoert, gibt es nichts zu uebernehmen.
+        var none = OldRecipe(null);
+        var noneSession = new AtelierEditingSession(new SettingsRecipeStore(none));
+        var noneKeeper = Keeper(none, noneSession);
+
+        noneKeeper.Enter(Path.Combine(place.Source, "neu", "anderes_0001.png"));
+        noneKeeper.Flush();
+
+        Check.That((noneSession.Layers?.Layers.Count ?? 0) == 0 && none.AtelierRecipeMoved,
+                   "ohne zugehoeriges Bild beginnt jede neue Folge leer");
     }
 
     /// <summary>Ein Quellordner und ein Ausweichort unter %TEMP% - nie die Ordner des Nutzers.</summary>

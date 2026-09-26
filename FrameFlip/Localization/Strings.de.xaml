@@ -1234,6 +1234,7 @@
     <sys:String x:Key="S_ProjectSave">Speichern</sys:String>
     <sys:String x:Key="S_ProjectSaveHint">Speichert das Projekt dieser Folge jetzt (Strg+S). Es speichert sich auch von selbst, zwei Sekunden nach der letzten Änderung – im Ordner FrameFlip neben den Bildern.</sys:String>
     <sys:String x:Key="S_ProjectSavedAt">Gespeichert {0}</sys:String>
+    <sys:String x:Key="S_ProjectNew">Neues Projekt</sys:String>
     <sys:String x:Key="S_ProjectOpen">Projekt geöffnet</sys:String>
     <sys:String x:Key="S_ProjectUnsaved">Nicht gespeichert</sys:String>
     <sys:String x:Key="S_ProjectSaveFailed">Speichern fehlgeschlagen</sys:String>
