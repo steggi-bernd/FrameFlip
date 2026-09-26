@@ -127,6 +127,7 @@ static int RunAll()
     GradeBatchInvariants.Run();
     GradeVideoInvariants.Run();
     ExrInvariants.Run();
+    ExrMultipartInvariants.Run();
     RawCacheInvariants.Run();
     CadenceInvariants.Run();
     RangeInvariants.Run();
