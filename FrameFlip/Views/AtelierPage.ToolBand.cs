@@ -29,6 +29,7 @@ public partial class AtelierPage
             case ToolAction.Brush:
                 MouseTools.Select(AtelierTool.Brush, notify: true);
                 Properties.ChooseBrush(entry.Area, entry.Shape);
+                ToolBand.MarkActive(entry.Key);
                 break;
 
             case ToolAction.MaskEdit:

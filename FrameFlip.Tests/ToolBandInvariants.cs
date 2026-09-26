@@ -127,9 +127,27 @@ public static class ToolBandInvariants
             Check.That(column.Tool == AtelierTool.Brush && placement.BrushArea == PaintArea.Rectangle,
                        "Rechteck aus der Leiste: der Pinsel zieht Rechtecke auf");
 
+            // U3: Die Pinselleiste zeigt nur, was zum Werkzeug gehoert - und die Zeile, was wirkt.
+            var properties = (PropertiesPanel)page.FindName("Properties");
+            bool Shown(string name) => ((FrameworkElement)properties.FindName(name)).Visibility == Visibility.Visible;
+
+            Check.That(band.Active == "rectangle" && !Shown("BrushTipRow") && !Shown("BrushShapeRow") && !Shown("BrushPressureRow") &&
+                       !Shown("BrushModeRow"),
+                       "Rechteck: gedrueckt in der Zeile, und keine Spitze, kein Abstand, kein Druck in der Pinselleiste");
+
             page.UseTool(ToolCatalog.All.Single(e => e.Key == "brush"));
             Pump();
             Check.That(placement.BrushArea == PaintArea.None, "Pinsel aus der Leiste: wieder Zuege");
+            Check.That(band.Active == "brush" && Shown("BrushTipRow") && Shown("BrushShapeRow") && !Shown("BrushSquishRow") && !Shown("BrushStampRow"),
+                       "Pinsel: die Spitze ist wieder da - das Karo nur eckig, der Stempel nur als Stempel");
+
+            ((System.Windows.Controls.Primitives.ToggleButton)properties.FindName("BrushSquareToggle")).IsChecked = true;
+            Check.That(Shown("BrushSquishRow"), "eckig: jetzt gibt es das Karo");
+            ((System.Windows.Controls.Primitives.ToggleButton)properties.FindName("BrushSquareToggle")).IsChecked = false;
+
+            column.Select(AtelierTool.Move, notify: true);
+            Pump();
+            Check.That(band.Active is null, "ein anderes Mauswerkzeug: kein Malwerkzeug mehr gedrueckt");
 
             // Die Suche waehlt die Kategorie, in der das Gefundene steht.
             var found = band.Search("vign");

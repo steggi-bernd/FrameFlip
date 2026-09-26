@@ -291,7 +291,7 @@ In drei Schnitten:
   laden, alle Texte blieben Schlüssel. Die Probe prüft jetzt, dass jeder Name übersetzt
   ankommt.
 
-**U2 (`feature/nur-dieses-bild`):**
+**U2 (PR #50, gemergt):**
 
 - Am Ende der Werkzeugzeile steht bei einer Folge der Umschalter: Filmstreifen oder Bild,
   als gezeichnete Zeichen. Bei einem gewöhnlichen Einzelbild erscheint er nicht.
@@ -305,6 +305,20 @@ In drei Schnitten:
     als fertiges Bild dasteht.
 - **Zurück:** Das Einzelbild merkt sich seine Herkunft im Projekt (`Origin`). Der
   Filmstreifen führt zurück auf das Bild der Folge, aus dem es kam.
+
+**U3 (`feature/pinselleiste-schlank`):**
+
+- Die Pinselleiste zeigt nur, was zum gewählten Werkzeug gehört:
+  - Bei Rechteck, Ellipse und Lasso nur Deckkraft und Bindung. Spitze, Abstand und Druck
+    haben beim Füllen nichts zu sagen.
+  - Das Karo nur bei eckiger Spitze, Spitze/Zufall/Streuung nur beim Stempel, die Toleranz
+    nur mit der Kante.
+- Die Knöpfe der Arten und des Stempels treten aus der Pinselleiste zurück. Sie sind
+  Werkzeuge der Zeile „Malen“.
+- Die Werkzeugzeile zeigt gedrückt, als was der Pinsel gerade malt, auch wenn er über die
+  Spalte links oder mit B gewählt wurde. Tut die Maus etwas anderes, ist nichts gedrückt.
+
+**Phase U ist damit abgeschlossen.** Als Nächstes laut Reihenfolge: W2 Tonwert.
 
 ## 5. KI-Werkzeuge: Last, Größe, Lizenz
 

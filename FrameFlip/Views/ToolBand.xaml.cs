@@ -19,6 +19,9 @@ public partial class ToolBand : UserControl
     private readonly Dictionary<string, ToggleButton> _categories = new(StringComparer.Ordinal);
     private bool _inNodes;
 
+    /// <summary>Das Werkzeug, das gerade wirkt - in der Zeile gedrueckt. Null: keines.</summary>
+    private string? _active;
+
     public ToolBand()
     {
         InitializeComponent();
@@ -50,7 +53,22 @@ public partial class ToolBand : UserControl
     public string Category { get; private set; } = "";
 
     /// <summary>Die Knoepfe der Werkzeugzeile - fuer die Probe.</summary>
-    internal IReadOnlyList<Button> ToolButtons => ToolRow.Children.OfType<Button>().ToList();
+    internal IReadOnlyList<ToggleButton> ToolButtons => ToolRow.Children.OfType<ToggleButton>().ToList();
+
+    /// <summary>
+    /// Welches Werkzeug gerade wirkt - der Pinsel in seiner Art. Die Zeile zeigt es gedrueckt,
+    /// wie die Spalte links das Werkzeug der Maus.
+    /// </summary>
+    public void MarkActive(string? key)
+    {
+        _active = key;
+
+        foreach (var button in ToolButtons)
+            button.IsChecked = button.Tag is ToolEntry entry && entry.Key == key;
+    }
+
+    /// <summary>Welches Werkzeug gerade gedrueckt steht - fuer die Probe.</summary>
+    internal string? Active => _active;
 
     /// <summary>
     /// Ob das Atelier im Knotenmodus rechnet. Was nur dort Platz hat - Masken als Knoten,
@@ -81,9 +99,10 @@ public partial class ToolBand : UserControl
         {
             bool usable = !entry.NodesOnly || _inNodes;
 
-            var button = new Button
+            var button = new ToggleButton
             {
-                Style = (Style)FindResource("OverlayButton"),
+                Style = (Style)FindResource("OverlayToggle"),
+                IsChecked = entry.Key == _active,
                 Margin = new Thickness(0, 0, 4, 4),
                 Content = entry.Glyph + " " + Strings.T(entry.TitleKey),
                 Tag = entry,
@@ -94,7 +113,12 @@ public partial class ToolBand : UserControl
             };
 
             ToolTipService.SetShowOnDisabled(button, true);
-            button.Click += (_, _) => Chosen?.Invoke(entry);
+            // Gedrueckt steht nur, was die Seite als wirkend meldet - ein Klick allein schaltet nichts um.
+            button.Click += (_, _) =>
+            {
+                button.IsChecked = entry.Key == _active;
+                Chosen?.Invoke(entry);
+            };
             ToolRow.Children.Add(button);
         }
     }
