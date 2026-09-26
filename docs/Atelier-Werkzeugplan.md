@@ -217,7 +217,7 @@ Knotenmodus und die Einstellungen lesen alle aus derselben Liste.
 - Die Flächen stehen vorerst in der Pinselleiste. Mit Phase U wandern sie als eigene
   Werkzeuge in die Kategorie „Malen“ der Werkzeugzeile.
 
-**Maske bearbeiten (`feature/maske-bearbeiten`):**
+**Maske bearbeiten (PR #43, gemergt):**
 
 - Umkehren, Füllen, Leeren, Weiche Kante, Ausweiten, Schrumpfen, für die ganze gemalte
   Maske.
@@ -232,9 +232,25 @@ Knotenmodus und die Einstellungen lesen alle aus derselben Liste.
   für Byte nach, und Strg+Z nimmt sie zurück. Was nichts ändern würde, ist kein Schritt.
 - In Phase U werden die Bearbeitungen eigene Befehle in der Kategorie „Malen“.
 
-**Offen in W1:**
+**Kanten verfeinern (`feature/kanten-verfeinern`):**
 
-- Kanten verfeinern.
+- Im Menü „Maske bearbeiten“, mit 4, 8, 16 oder 32 Bildpunkten Weite.
+  - Ragt die Maske über eine Kante im Bild hinaus, zieht sie sich zurück.
+  - Hört sie davor auf, wächst sie bis an die Kante.
+  - Wo das Bild keine Kante hat, bleibt sie.
+- Verfahren: lokales Matting mit zwei Klassen auf dem Raster der Maske, geführt von der
+  gestauchten Helligkeit (l / (1 + l), Wurzel), damit Glanzlichter die Schatten nicht
+  erschlagen.
+  - Um den Rand liegt ein unsicherer Streifen so breit wie die Weite.
+  - Jeder Punkt darin wird mit dem sicher Inneren und dem sicher Äußeren in seiner Nähe
+    verglichen.
+- Erst versucht war der geführte Filter nach He et al. Die Probe zeigte, dass er Kanten
+  weich macht, aber nicht einrastet: Eine Maske, die in eine gleichmäßig helle Fläche
+  ragt, behielt dort Zwischenwerte.
+- Das Ergebnis hängt am Bild. Der Strich trägt es gepackt mit (`PaintStroke.Result`),
+  der Maskenverlauf setzt es ein, statt neu zu rechnen.
+
+**Offen in W1:**
 - Stempelpinsel.
 
 ## 5. KI-Werkzeuge: Last, Größe, Lizenz
