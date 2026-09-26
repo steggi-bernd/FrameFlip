@@ -584,3 +584,57 @@ Only the alpha channel of exports changes, and only in those cases.
     afterwards, a stroke of many reports adds exactly one undo step on release, the picture
     at release already holds the stroke's last piece, and the whole picture follows at
     rest - at once after a coarse tick.
+
+15. **Masks as elements of their own** (from the plan in
+    [Projekte und Masken](Projekte-und-Masken.md), phase D, points 3, 4, 10 and 11).
+
+    *Done (2026-09-26).*
+    - **Mask menu:** the menu of a mask node offers cut out as layer, detach, duplicate and
+      connect to layer; a painted mask also offers its history. Detach removes the mask
+      from the factor of its layers, which then act everywhere; the mask stays as a free
+      node. Duplicate makes a free copy with an id of its own (`LayerMask.Id`, a fixed id
+      that history and "shared with" hang on). Connect lists the other layers; a layer that
+      had a mask before gets this one instead. In the picture menu, node mode adds "object
+      here as layer" per Cryptomatte.
+    - **Cut out as layer** uses the new `CutoutNode` (image times mask gives an image with
+      coverage) and puts a normal mix directly above the mask's first layer, or on top of
+      the layers for a free mask. What is cut out is what that point already shows: the same
+      image that flows into the new mix from below. So the picture stays byte for byte the
+      same, at soft mask edges and under every blend mode. Cutting the layer's own image
+      would double it at a soft edge (by m(1-m)(S-B)), and cutting the file's picture would
+      lose what the layers below did to it. The original layer keeps its mask.
+    - **In the graph:** wires that carry a mask are dashed and have their own colour. A mix
+      with a mask shows a tab above its header with a small picture of the mask and its
+      name. A mask node says "free" when it is plugged in nowhere and "-> n layers" when
+      several layers use it. A selected mask outlines its layers in the graph and in the
+      layer list. `MaskUse` answers who uses a mask for the menu, the graph and the list.
+    - **Layer list:** free masks get a section "Masks" below the layers, with the same menu
+      as on the node plus show in graph and delete.
+    - **Mask history** (`MaskHistory`, `MaskHistoryKeeper`): every stroke is recorded on
+      release. A new state appears once a tenth of the mask's cells differ from the last
+      state; the same spot painted ten times counts once. At most 20 states. Every fifth
+      state is a snapshot, the others hold only their strokes, which are replayed from the
+      snapshot before. On recording, the stroke is replayed on the previous mask and
+      compared: if the mask changed any other way (undo, restore, a stroke in the stack),
+      the next state is a snapshot. Histories are stored per mask id (and per frame for
+      unlocked masks) next to the project file, in `FrameFlip/<name>.ffdata/verlauf/`, and
+      written in the background when a state appears. "Mask history ..." lists the states
+      with small pictures; a click restores one as a single undo step. What changed since
+      the last state is kept as a state first. Recording costs 0.9 ms on release at 4K.
+
+    Not done: moving the cut-out layer on its own. `PlaceNode` places a file, not an image
+    from the graph, so a cut-out layer cannot be moved yet; that needs a transform for graph
+    images. Mask rasters still live in the project file (3.3 planned them by content in
+    `.ffdata`); only the history is stored there.
+
+    Tests: cutting out keeps the picture byte for byte under normal, screen and multiply,
+    for a mask with a layer and for a free one; changing the cut-out layer changes the
+    picture only where the mask is; region rendering with a cutout matches the whole
+    picture; detach, duplicate (new id, free), connect and "object here as layer" on the
+    page, each one undo step and the picture unchanged; mask wires, tags, the mix tab and
+    the highlight in graph and list. History: replay equals painting, a state per tenth of
+    area with unique cells, every state returns byte for byte (snapshots at 1, 6, 11),
+    foreign changes and restores lead to snapshots, 27 states trim to 20 and stay correct,
+    save and load in JSON and in the folder next to the project, recording under 10 ms at
+    4K, and on the page: painting makes states, the menu shows them newest first, a click
+    restores one as an undo step and Ctrl+Z takes it back.
