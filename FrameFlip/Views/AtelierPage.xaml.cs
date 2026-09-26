@@ -214,9 +214,21 @@ public sealed partial class AtelierPage : UserControl
         Open(last);
     }
 
+    /// <summary>Wie eine Datei gelesen wird - fuer die Probe austauschbar, sonst <see cref="Load"/>.</summary>
+    internal Func<string, (FloatFrame? Frame, IReadOnlyList<ExrPass> Passes, IReadOnlyList<CryptomatteSet> Cryptomattes)>? Reader { get; set; }
+
+    /// <summary>
+    /// Zaehlt jedes Oeffnen. Eine Rueckgabe aus dem Hintergrund, die eine andere Nummer
+    /// traegt, gehoert zu einem Oeffnen, das inzwischen abgeloest ist - auch wenn ihr Pfad
+    /// wieder stimmt, weil jemand von A ueber B zurueck zu A gegangen ist.
+    /// </summary>
+    private long _opened;
+
     /// <summary>Oeffnet ein Bild - der Weg, den auch die Projektseite nehmen kann.</summary>
     public void Open(string path)
     {
+        long opened = ++_opened;
+
         _path = path;
 
         // Die Bildnummer aus dem Dateinamen. Sie ist der Wurf fuer das Filmkorn,
@@ -234,13 +246,23 @@ public sealed partial class AtelierPage : UserControl
 
         // Lesen und Auspacken dauert bei 4K spuerbar lange; auf dem Oberflaechenfaden
         // staende dabei das ganze Fenster.
-        Task.Run(() => Load(path)).ContinueWith(task =>
+        var read = Reader ?? Load;
+
+        Task.Run(() => read(path)).ContinueWith(task =>
         {
             var loaded = task.IsCompletedSuccessfully
                 ? task.Result
                 : (null, Array.Empty<ExrPass>(), Array.Empty<CryptomatteSet>());
 
-            Dispatcher.Invoke(() => Show(path, loaded.Frame, loaded.Passes, loaded.Cryptomattes));
+            Dispatcher.Invoke(() =>
+            {
+                // Waehrend gelesen wurde, kam ein neueres Oeffnen - dessen Bild gilt. Vorher
+                // uebernahm die Seite hier jedes Ergebnis: Ein langsames A nach einem schnellen
+                // B zeigte A, hielt B fuer offen und merkte sich A fuer den naechsten Start.
+                if (opened != _opened) return;
+
+                Show(path, loaded.Frame, loaded.Passes, loaded.Cryptomattes);
+            });
         });
     }
 

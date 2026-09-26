@@ -118,6 +118,38 @@ behobene oder noch offene Befunde und dokumentierte Ergebnisse beider vorhandene
 Desktop-Prüfreihen. Keine historische Zusicherungszahl als aktuellen Nachweis
 übernehmen. Sicherheits-/Verhaltenskorrekturen bleiben eigene Änderungen.
 
+### Stand S0 (25. September 2026)
+
+Auf `refactor/studio-s0`, aufgebaut auf `feature/atelier` bei `bbe0e49`, **implementiert
+und geprüft**, noch nicht gemergt:
+
+1. **Maskenkennungen:** Die Zählung vom 18. bis 20. September (5 = Cryptomatte,
+   6 = Painted) hat `main` nie erreicht. Das Atelier kam erst am 24. September mit
+   PR #23, schon mit Colour = 5, Cryptomatte = 6, Painted = 7. Eine Migration entfällt
+   deshalb. `PersistedEnumInvariants` schreibt die Zahlen aller 17 Aufzählungen fest,
+   die von `AppSettings` aus gespeichert werden, einschließlich der abgeleiteten
+   Werkzeugtypen. Angehängte Werte sind erlaubt, verschobene machen die Probe rot
+   (Gegenprobe: ein eingefügter Wert vor Cryptomatte). Eine Altdatei prüft die
+   Bedeutung von 5, 6 und 7 nach Laden und erneutem Speichern. Offen und bewusst nicht
+   geändert: `config.json` schreibt weiter Zahlen. Die Projektdatei aus
+   [Projekte und Masken](Projekte-und-Masken.md) soll Namen schreiben.
+2. **Bildnummer im Export:** bestätigt und behoben (`fix:`). `LayeredFrameLoader.LoadAll`
+   setzte den Stapel ohne Nummer zusammen, also las jedes Bild die Maske von Bild 0. Eine
+   entsperrte gemalte Maske fand keinen Anstrich, und die Ebene wirkte überall. Der
+   Knotenweg gab die Nummer schon weiter. `ExportFrameNumberInvariants` exportiert zwei
+   gleiche Bilder mit links bzw. rechts gemalter Maske; der Stapelfall war vor der
+   Korrektur rot.
+3. **Überholte Öffnungen:** bestätigt und behoben (`fix:`). Ein langsames A nach einem
+   schnellen B zeigte A, hielt B für offen und merkte sich A für den nächsten Start. Jedes
+   Öffnen trägt jetzt eine Nummer. Hauptlesen, Pass-Nachladen und beide
+   Miniaturwege verwerfen Rückgaben eines abgelösten Öffnens, auch bei A → B → A. Eine
+   Lesenaht (`AtelierPage.Reader`) lässt die Probe das erste Lesen anhalten. Beide Fälle
+   waren vor der Korrektur rot.
+
+Abnahme: **4.550 Zusicherungen** in `FrameFlip.Tests` (ein Gesamtlauf, 105 Sekunden, Release).
+`FrameFlip.UiTests` läuft in der CI des PR. Nicht Teil von S0 und weiter offen: fehlende
+oder defekte Bilder und Lesefehler als eigene Abnahmefälle, sie gehören zu S1.
+
 ## S1: Öffnung und Lebenszyklus herauslösen
 
 **Nach S0; erster struktureller Studio-Schnitt.** Ausgangspunkte:

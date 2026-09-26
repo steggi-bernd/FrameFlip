@@ -179,6 +179,15 @@ einschließlich Claudes Atelier-Commits bis `1659d67`: **4.350 Zusicherungen** i
 `FrameFlip.Tests` (ein Gesamtlauf, 70 Sekunden) und **227 UI-Prüfungen**, alle
 erfolgreich.
 
+## Fortschritt am 25. September 2026
+
+- **S0 implementiert und geprüft** auf `refactor/studio-s0` (vorgezogen, siehe oben).
+  Von den drei Befunden war einer keiner mehr, zwei waren echte Fehler und sind jeweils
+  als eigener `fix:` behoben. Einzelheiten und Abnahme stehen unter
+  [Stand S0](Refactoring-Studio.md#stand-s0-25-september-2026).
+- Als Nächstes S1 (Öffnung und Lebenszyklus) und S2 (Bearbeitungssitzung mit
+  Ablage-Adapter), jeweils ein eigener Zweig.
+
 ## Historischer Stand der ersten Desktop-Schnitte (9. September 2026)
 
 - Der gemeinsame Ausgangspunkt ist mit `v2-secure-baseline` markiert; die
