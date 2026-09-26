@@ -16,6 +16,12 @@ public partial class AtelierPage
     /// <summary>Die Weiten, die das Menue anbietet, in Bildpunkten.</summary>
     internal static readonly float[] MaskEditAmounts = { 2f, 5f, 10f, 25f };
 
+    /// <summary>
+    /// Wie weit sich das Verfeinern nach einer Kante umsieht, in Bildpunkten. Weiter als beim
+    /// Ausweiten: Eine grob gemalte Maske liegt oft ein gutes Stueck neben der Kante.
+    /// </summary>
+    internal static readonly float[] MaskRefineAmounts = { 4f, 8f, 16f, 32f };
+
     /// <summary>Das zuletzt geoeffnete Menue der Maskenbearbeitung - fuer die Probe.</summary>
     internal FlipMenu? MaskEditMenu { get; private set; }
 
@@ -31,7 +37,9 @@ public partial class AtelierPage
             .Separator()
             .Item("≈", Strings.T("S_MaskEditFeather"), () => ShowMaskAmountMenu(mask, PaintEdit.Feather, anchor), enabled: painted)
             .Item("⊕", Strings.T("S_MaskEditGrow"), () => ShowMaskAmountMenu(mask, PaintEdit.Grow, anchor), enabled: painted)
-            .Item("⊖", Strings.T("S_MaskEditShrink"), () => ShowMaskAmountMenu(mask, PaintEdit.Shrink, anchor), enabled: painted);
+            .Item("⊖", Strings.T("S_MaskEditShrink"), () => ShowMaskAmountMenu(mask, PaintEdit.Shrink, anchor), enabled: painted)
+            .Separator()
+            .Item("⌁", Strings.T("S_MaskEditRefine"), () => ShowMaskAmountMenu(mask, PaintEdit.Refine, anchor), enabled: painted);
 
         MaskEditMenu = menu;
         menu.Open();
@@ -42,7 +50,7 @@ public partial class AtelierPage
     {
         var menu = new FlipMenu(anchor);
 
-        foreach (float amount in MaskEditAmounts)
+        foreach (float amount in edit == PaintEdit.Refine ? MaskRefineAmounts : MaskEditAmounts)
             menu.Item("", $"{amount:0} px", () => EditMask(mask, edit, amount));
 
         MaskEditMenu = menu;
@@ -69,7 +77,11 @@ public partial class AtelierPage
         // Der Verlauf kennt den Stand davor - vor der ersten Aenderung.
         WatchMask(mask, paint);
 
-        var stroke = new PaintStroke { Edit = edit, Amount = amount, Version = PaintStroke.CurrentVersion };
+        var stroke = edit == PaintEdit.Refine
+            ? RefineStroke(paint, amount)
+            : new PaintStroke { Edit = edit, Amount = amount, Version = PaintStroke.CurrentVersion };
+
+        if (stroke is null) return false;
 
         // Erst zur Probe: Aendert sich nichts, gibt es auch keinen Schritt zum Zuruecknehmen.
         // An der Deckung, wie sie gerade ist - Clone kopierte nur den gepackten Stand, und der
@@ -90,5 +102,27 @@ public partial class AtelierPage
         AfterNodeEdit();
 
         return true;
+    }
+
+    /// <summary>
+    /// Kanten verfeinern: am Bild gerechnet und als fertiges Ergebnis in den Strich gepackt.
+    /// Gefuehrt wird vom gelesenen Bild selbst, nicht vom fertig gerechneten - die Kanten, an
+    /// die eine Maske gehoert, sind die des Renders, nicht die einer Korrektur darauf.
+    /// </summary>
+    private PaintStroke? RefineStroke(PaintedMask paint, float amount)
+    {
+        if ((_base ?? _frame) is not { } image) return null;
+
+        var guide = MaskRefine.Guide(image, paint.Width, paint.Height, PaintedMask.Coarse);
+        int radius = Math.Max(1, (int)MathF.Round(amount / PaintedMask.Coarse));
+        var refined = MaskRefine.Refine(paint.Cover(), guide, paint.Width, paint.Height, radius);
+
+        return new PaintStroke
+        {
+            Edit = PaintEdit.Refine,
+            Amount = amount,
+            Result = PaintedMask.Pack(refined),
+            Version = PaintStroke.CurrentVersion,
+        };
     }
 }

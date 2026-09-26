@@ -950,13 +950,14 @@
     <sys:String x:Key="S_NodeLayerMaskFree">frei – an keiner Ebene</sys:String>
     <sys:String x:Key="S_MaskEdit">Maske bearbeiten …</sys:String>
     <sys:String x:Key="S_MaskEditButton">Maske ▾</sys:String>
-    <sys:String x:Key="S_MaskEditHint">Die ganze Maske auf einmal bearbeiten: umkehren, füllen, leeren, weiche Kante, ausweiten, schrumpfen. Jeder Schritt steht im Maskenverlauf und lässt sich mit Strg+Z zurücknehmen.</sys:String>
+    <sys:String x:Key="S_MaskEditHint">Die ganze Maske auf einmal bearbeiten: umkehren, füllen, leeren, weiche Kante, ausweiten, schrumpfen, Kanten verfeinern – die Maske legt sich dabei an die Kanten des Bildes. Jeder Schritt steht im Maskenverlauf und lässt sich mit Strg+Z zurücknehmen.</sys:String>
     <sys:String x:Key="S_MaskEditInvert">Umkehren</sys:String>
     <sys:String x:Key="S_MaskEditFill">Füllen</sys:String>
     <sys:String x:Key="S_MaskEditClear">Leeren</sys:String>
     <sys:String x:Key="S_MaskEditFeather">Weiche Kante …</sys:String>
     <sys:String x:Key="S_MaskEditGrow">Ausweiten …</sys:String>
     <sys:String x:Key="S_MaskEditShrink">Schrumpfen …</sys:String>
+    <sys:String x:Key="S_MaskEditRefine">Kanten verfeinern …</sys:String>
     <sys:String x:Key="S_MaskMenuHistory">Maskenverlauf …</sys:String>
     <sys:String x:Key="S_MaskHistoryTitle">Maskenverlauf – {0}</sys:String>
     <sys:String x:Key="S_MaskHistoryState">Stand {0}</sys:String>

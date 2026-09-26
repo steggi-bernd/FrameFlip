@@ -26,6 +26,7 @@ public static class MaskEditInvariants
     public static void Run()
     {
         TheEditsDoWhatTheySay();
+        RefiningFollowsTheImage();
         EditsReplayExactly();
         ThePageTakesEditsAsSteps();
     }
@@ -89,6 +90,58 @@ public static class MaskEditInvariants
         Check.That(full.Cover().All(b => b == 255), "am Bildrand: eine volle Maske bleibt voll - der Rand zaehlt nicht als leer");
     }
 
+    /// <summary>
+    /// Kanten verfeinern: Eine grob gemalte Maske ragt vier Punkte ueber eine Kante im Bild
+    /// hinaus - danach nicht mehr. Wo das Bild eben ist, bleibt sie, wie sie war.
+    /// </summary>
+    private static void RefiningFollowsTheImage()
+    {
+        Check.Group("Maske bearbeiten: Kanten verfeinern");
+
+        // Das Bild: links dunkel, ab Spalte 30 hell. Die Maske: bis Spalte 33 voll.
+        var guide = new float[Cols * Rows];
+        var rough = new byte[Cols * Rows];
+        for (int y = 0; y < Rows; y++)
+        {
+            for (int x = 0; x < Cols; x++)
+            {
+                guide[y * Cols + x] = x < 30 ? 0.1f : 0.9f;
+                rough[y * Cols + x] = (byte)(x < 34 ? 255 : 0);
+            }
+        }
+
+        var refined = MaskRefine.Refine(rough, guide, Cols, Rows, radius: 4);
+        byte At(int x) => refined[20 * Cols + x];
+
+        Check.That(At(31) < 60 && At(33) < 60, "was ueber die Kante hinausragte, zieht sich zurueck", $"{At(31)} / {At(33)}");
+        Check.That(At(20) > 240 && At(28) > 200, "diesseits der Kante bleibt die Maske voll", $"{At(20)} / {At(28)}");
+        Check.That(At(45) < 5, "weit jenseits bleibt sie leer");
+
+        // Umgekehrt: Die Maske hoert drei Punkte vor der Kante auf - und waechst bis an sie.
+        var shy = new byte[Cols * Rows];
+        for (int i = 0; i < shy.Length; i++) shy[i] = (byte)(i % Cols < 27 ? 255 : 0);
+        var grown = MaskRefine.Refine(shy, guide, Cols, Rows, radius: 4);
+        Check.That(grown[20 * Cols + 28] > 240 && grown[20 * Cols + 29] > 240 && grown[20 * Cols + 30] < 15,
+                   "hoert sie davor auf, waechst sie bis an die Kante", $"{grown[20 * Cols + 28]} {grown[20 * Cols + 29]} {grown[20 * Cols + 30]}");
+
+        // Ohne Kante im Bild sagt es nichts - die Maske bleibt, wie sie war.
+        var flat = Enumerable.Repeat(0.5f, Cols * Rows).ToArray();
+        Check.That(MaskRefine.Refine(rough, flat, Cols, Rows, radius: 4).AsSpan().SequenceEqual(rough),
+                   "ohne Kante im Bild bleibt die Maske unveraendert");
+
+        // Die Fuehrung aus einem Bild: je Maskenpunkt die gestauchte Helligkeit seines Feldes.
+        var frame = new Imaging.FloatFrame
+        {
+            Width = 8, Height = 4,
+            R = Enumerable.Range(0, 32).Select(i => i % 8 < 4 ? 0f : 3f).ToArray(),
+            G = Enumerable.Range(0, 32).Select(i => i % 8 < 4 ? 0f : 3f).ToArray(),
+            B = Enumerable.Range(0, 32).Select(i => i % 8 < 4 ? 0f : 3f).ToArray(),
+        };
+        var fromFrame = MaskRefine.Guide(frame, 2, 1, PaintedMask.Coarse);
+        Check.That(fromFrame[0] == 0f && Math.Abs(fromFrame[1] - MathF.Sqrt(0.75f)) < 1e-4f,
+                   "die Fuehrung staucht die Helligkeit - ein Glanzlicht erschlaegt die Schatten nicht", $"{fromFrame[0]} / {fromFrame[1]}");
+    }
+
     private static void EditsReplayExactly()
     {
         Check.Group("Maske bearbeiten: als Strich genau nachgespielt");
@@ -97,13 +150,22 @@ public static class MaskEditInvariants
         var history = MaskHistory.Start(paint);
         var states = new List<byte[]> { paint.Cover().ToArray() };
 
+        // Eine Fuehrung fuer das Verfeinern - das Ergebnis reist im Strich mit.
+        var guide = Enumerable.Range(0, Cols * Rows).Select(i => i % Cols < 26 ? 0.2f : 0.8f).ToArray();
+
         foreach (var (edit, amount) in new[]
                  {
-                     (PaintEdit.Grow, 5f), (PaintEdit.Feather, 10f), (PaintEdit.Invert, 0f),
+                     (PaintEdit.Grow, 5f), (PaintEdit.Feather, 10f), (PaintEdit.Refine, 16f), (PaintEdit.Invert, 0f),
                      (PaintEdit.Shrink, 2f), (PaintEdit.Feather, 25f), (PaintEdit.Invert, 0f),
                  })
         {
-            var stroke = new PaintStroke { Edit = edit, Amount = amount, Version = PaintStroke.CurrentVersion };
+            var stroke = edit == PaintEdit.Refine
+                ? new PaintStroke
+                  {
+                      Edit = edit, Amount = amount, Version = PaintStroke.CurrentVersion,
+                      Result = PaintedMask.Pack(MaskRefine.Refine(paint.Cover(), guide, Cols, Rows, 4)),
+                  }
+                : new PaintStroke { Edit = edit, Amount = amount, Version = PaintStroke.CurrentVersion };
             var read = JsonSerializer.Deserialize<PaintStroke>(JsonSerializer.Serialize(stroke, AtelierProjectStore.Options), AtelierProjectStore.Options)!;
 
             read.Replay(paint);
@@ -119,6 +181,10 @@ public static class MaskEditInvariants
 
         var old = JsonSerializer.Deserialize<PaintStroke>("""{"Radius":20,"Path":[1,1]}""", AtelierProjectStore.Options)!;
         Check.That(old.Edit == PaintEdit.None && old.Amount == 0f, "ein alter Strich ist keine Bearbeitung");
+
+        var lost = Square();
+        new PaintStroke { Edit = PaintEdit.Refine, Amount = 8 }.Replay(lost);
+        Check.That(lost.Cover().AsSpan().SequenceEqual(Square().Cover()), "Verfeinern ohne gespeichertes Ergebnis raet nicht - es laesst die Maske stehen");
     }
 
     /// <summary>
@@ -137,8 +203,9 @@ public static class MaskEditInvariants
         var bytes = new byte[W * H * 4];
         for (int i = 0; i < W * H; i++)
         {
-            bytes[i * 4] = (byte)(i % W * 255 / W);
-            bytes[i * 4 + 1] = 90;
+            // Eine Kante mitten im Bild: links dunkel, ab x = 160 hell.
+            bytes[i * 4] = (byte)(i % W < 160 ? 20 : 230);
+            bytes[i * 4 + 1] = (byte)(i % W < 160 ? 30 : 220);
             bytes[i * 4 + 2] = (byte)(i / W * 255 / H);
             bytes[i * 4 + 3] = 255;
         }
@@ -212,6 +279,36 @@ public static class MaskEditInvariants
             Pump(TimeSpan.FromSeconds(0.3), () => false);
             var undone = page.Graph!.Nodes.OfType<MaskNode>().Single(m => m.Mask.Kind == MaskKind.Painted).Mask.PaintFor(0)!;
             Check.That(undone.Cover().AsSpan().SequenceEqual(before), "Strg+Z nimmt das Umkehren zurueck");
+
+            // Kanten verfeinern: ein grobes Rechteck, das 16 Bildpunkte ueber die Kante bei x = 160
+            // hinausragt - danach nicht mehr. Ein Schritt im Verlauf und fuer Strg+Z.
+            var refineMask = page.Graph!.Nodes.OfType<MaskNode>().Single(m => m.Mask.Kind == MaskKind.Painted);
+            var roughPaint = refineMask.Mask.PaintFor(0)!;
+            var box = new PaintStroke { Area = PaintArea.Rectangle, Path = PaintStroke.RectanglePath(40, 20, 176, 80) };
+            box.Fill(roughPaint);
+            roughPaint.Keep();
+            typeof(PlacementAdorner).GetProperty("LastStroke", flags)!.SetValue(page.FindName("Placement"), box);
+            typeof(AtelierPage).GetMethod("OnPainted", flags)!.Invoke(page, new object[] { false });
+            Pump(TimeSpan.FromSeconds(0.3), () => false);
+
+            var beforeRefine = refineMask.Mask.PaintFor(0)!.Cover().ToArray();
+            int cols = roughPaint.Width;
+            int rowsBeforeRefine = page.MaskHistoryRows(refineMask, out _)?.Count ?? 0;
+
+            Check.That(page.EditMask(refineMask, PaintEdit.Refine, 16), "Kanten verfeinern wirkt auf der Seite");
+            Pump(TimeSpan.FromSeconds(0.3), () => false);
+
+            var snapped = refineMask.Mask.PaintFor(0)!.Cover();
+            Check.That(beforeRefine[12 * cols + 42] == 255 && snapped[12 * cols + 42] < 40 && snapped[12 * cols + 30] == 255,
+                       "das Rechteck zieht sich an die Kante im Bild zurueck", $"{snapped[12 * cols + 42]} / {snapped[12 * cols + 30]}");
+            Check.That((page.MaskHistoryRows(refineMask, out _)?.Count ?? 0) == rowsBeforeRefine + 1,
+                       "und steht im Maskenverlauf");
+
+            page.StepNodes(back: true);
+            Pump(TimeSpan.FromSeconds(0.3), () => false);
+            Check.That(page.Graph!.Nodes.OfType<MaskNode>().Single(m => m.Mask.Kind == MaskKind.Painted)
+                           .Mask.PaintFor(0)!.Cover().AsSpan().SequenceEqual(beforeRefine),
+                       "Strg+Z nimmt das Verfeinern zurueck");
 
             // Leeren an einer leeren Maske aendert nichts - und ist dann kein Schritt.
             var fresh = page.Graph!.Nodes.OfType<MaskNode>().Single(m => m.Mask.Kind == MaskKind.Painted);
