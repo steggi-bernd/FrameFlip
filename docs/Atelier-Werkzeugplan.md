@@ -1,6 +1,6 @@
 # Atelier – Werkzeugplan
 
-Stand: 26. September 2026. Aus dem [Werkzeugkatalog](Atelier-Werkzeugkatalog.md) wird hier
+Stand: 27. September 2026. Aus dem [Werkzeugkatalog](Atelier-Werkzeugkatalog.md) wird hier
 ein Plan: was gebaut wird, in welcher Reihenfolge, und wie die Oberfläche das alles
 aufnimmt.
 
@@ -38,6 +38,18 @@ Getroffen am 26. September 2026:
    des Bildes. Darin liegen eine Kopie des Originals, die FrameFlip-Daten (ein eigenes
    Projekt, beginnend mit dem Stand der Folge) und später die Ausgabe. Die Folge bleibt,
    wie sie ist.
+9. **Ein neuer Rahmen im Stil von FrameFlip** (entschieden am 27. September 2026, nach
+   dem Entwurf mit runden Feldern und Chips aus Zeichen und Namen):
+   - „Bild öffnen“ steht vorn im Kategorienband, eine eigene Kopfzeile gibt es nicht mehr.
+   - Die Einstellungen des gewählten Werkzeugs stehen als Leiste unter der Werkzeugzeile,
+     aufgeräumter als bisher.
+   - Unten eine niedrige Statuszeile: Folge und Bild, Datei, Größe, Pipette, Vergleich,
+     Zoom und der Speicherstand („Gespeichert 00:14“).
+   - Format, Ziel und Export stehen unten im rechten Seitenbereich.
+   - Das heutige Knotensymbol bleibt.
+   - Die Ebenen behalten ihre Zeilen (ein- und ausgeblendet, Größe, Vorschau). Die Vorschau
+     wird etwas kleiner, damit rechts Platz für neue Knöpfe ist. Dazu kommen unten
+     „+ Ebene“, „Einstellung“ und „Objektmaske“.
 
 ## 2. Reihenfolge
 
@@ -49,6 +61,7 @@ weiteren Werkzeuge gleich an ihren Platz kommen.
 |---|---|---|
 | **W1 Pinsel** | quadratisch und rechteckig, drehbar, Winkel folgt dem Strich, objektgebunden (Kryptomatte), kantengebunden (Pässe), Druckstärke, gerade Linien, Rechteck, Ellipse und Lasso, Maske bearbeiten (füllen, leeren, umkehren, weiche Kante, ausweiten, schrumpfen), Kanten verfeinern, Stempelpinsel | Wunsch des Nutzers, klein, vom Umbau unabhängig. Der Strich muss für den Maskenverlauf exakt nachspielbar bleiben. |
 | **U Oberfläche** | Werkzeugleiste, Kontext Folge/Einzelbild, Suche, Werkzeugbeschreibung als Daten | Die Grundlage für alle weiteren Werkzeuge. |
+| **R Rahmen** | Rahmen der Seite, aufgeräumte Einstellungsleiste mit Zeichen, Ebenen mit Knöpfen und Wirkung nur auf die gewählte Ebene, Objektmaske per Klick | Wunsch des Nutzers nach dem Umbau (Entscheidung 9). Die Werkzeuge ab W2 bekommen so gleich ihren Platz. |
 | **W2 Tonwert** | Tonwert am Histogramm, Auto-Tonwert, Pipetten, Kurvenpunkt aus dem Bild, Clipping und Falschfarben, Messgeräte (Waveform, Parade, Vektorskop), Ausgleich und CLAHE, Farbe angleichen, Deflicker, Tonwerttrennung nach Quantilen | Größter Nutzen beim Graden. |
 | **W3 Auswahl** | Kryptomatte ausbauen, Auswahl aus Tiefe, Normale und Bewegung, Zauberstab, Maske über die Folge tragen | Baut auf W1 und den Pässen auf. |
 | **W4 Retusche** | Glühwürmchen entfernen, Weichzeichner, kantenerhaltendes Glätten, Entrauschen, Stempel und Reparatur, inhaltsbasiertes Füllen | Glühwürmchen zuerst, klein und ständig gebraucht. |
@@ -71,9 +84,9 @@ Neben „Bild öffnen“ steht eine waagerechte Leiste mit den Kategorien:
 
 Die Kategorien stehen als Band (Entscheidung 6). Darunter zeigt eine zweite Zeile die
 Werkzeuge der gewählten Kategorie, jedes mit Zeichen und Namen. Der erklärende Satz steht
-im Tooltip. Die Einstellungen des gewählten Werkzeugs stehen rechts, wo heute der
-Farbstreifen steht. Eine Suche mit Strg+K findet jedes Werkzeug beim Namen, so wie der
-Hub im Knotenmodus.
+im Tooltip. Die Einstellungen des gewählten Werkzeugs stehen als Leiste darunter, über die
+ganze Breite (Entscheidung 9). Eine Suche mit Strg+K findet jedes Werkzeug beim Namen, so
+wie der Hub im Knotenmodus.
 
 Die senkrechte Spalte links bleibt für das, was die **Maus** tut: verschieben, wählen,
 zuschneiden, Hand, Pinsel, Pipette, Knoten. Die neue Leiste ist für das, was dem **Bild**
@@ -318,7 +331,43 @@ In drei Schnitten:
 - Die Werkzeugzeile zeigt gedrückt, als was der Pinsel gerade malt, auch wenn er über die
   Spalte links oder mit B gewählt wurde. Tut die Maus etwas anderes, ist nichts gedrückt.
 
-**Phase U ist damit abgeschlossen.** Als Nächstes laut Reihenfolge: W2 Tonwert.
+**Phase U ist damit abgeschlossen.**
+
+## 4b. Phase R im Einzelnen
+
+Der Rahmen nach Entscheidung 9, in vier Schnitten:
+
+1. **R1 – Rahmen** (`feature/atelier-rahmen`): wo was steht.
+2. **R2 – Einstellungsleiste und Zeichen:** die Einstellungen in beschrifteten Gruppen;
+   Zeichen aus Tabler Icons (MIT) für Chips und Werkzeugleiste. Das Knotensymbol bleibt.
+3. **R3 – Ebenen:**
+   - Zeilen wie heute, die Vorschau etwas kleiner.
+   - Rechts in der Zeile Chips für Effekte und Maske, unten „+ Ebene“, „Einstellung“ und
+     „Objektmaske“.
+   - Ein Effekt wirkt nur auf die gewählte Ebene: Im Knotenmodus wird er in den Zweig der
+     Ebene eingesetzt, vor ihrem Mischen. Heute wählt ein Klick auf die Ebene ihr Mischen,
+     und alles darunter ist mit betroffen.
+4. **R4 – Objektmaske:** ein Objekt im Bild anklicken, und aus der Kryptomatte entsteht eine
+   Maske auf der gewählten Ebene.
+
+**R1 (`feature/atelier-rahmen`):**
+
+- **Oben:** „Bild öffnen“ vorn im Kategorienband. Die alte Kopfzeile fällt weg.
+- **Darunter** die Einstellungen des Werkzeugs als Leiste über die ganze Breite, nicht mehr
+  über dem Bild.
+- **Unten eine niedrige Statuszeile:**
+  - links: Bild i von n mit Schritten davor und danach, Datei, Größe, Ansicht, Pipette;
+  - rechts: Original zeigen, Zoom, Speicherstand und Speichern.
+- **Ausgabe:** ein Feld der Andockfläche, in der Grundanordnung unten rechts. Format und
+  Ziel stehen in einer Zeile, darunter Schnell-Export und „Sequenz ausgeben“.
+  - Eine Anordnung von früher bekommt das Feld beim Laden dazu (`Normalise`).
+  - Das Feld ist so hoch wie sein Inhalt (`DockHost.FitsContent`). Ein Anteil der Spalte
+    schnitt die Knöpfe in einem kleinen Fenster ab. Liegt es als Reiter bei anderen
+    Feldern, teilt es sich die Höhe wie gewohnt.
+- Die Proben kennen das neue Feld: Andocken, Einklappen, Grundanordnung, dazu die volle
+  Höhe der Ausgabe, unabhängig vom Gewicht.
+
+Danach R2 bis R4, dann laut Reihenfolge W2 Tonwert.
 
 ## 5. KI-Werkzeuge: Last, Größe, Lizenz
 
