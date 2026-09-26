@@ -197,7 +197,7 @@ Knotenmodus und die Einstellungen lesen alle aus derselben Liste.
   - Sprung, Hintergrund, Knick, Wölbung und Toleranz an künstlichen Pässen.
   - Der Tiefenpass der Blender-Probedatei auf der Seite.
 
-**Linien und Flächen (`feature/pinsel-formen`):**
+**Linien und Flächen (PR #41, gemergt):**
 
 - **Gerade Linie:** Umschalt + Klick zieht eine Linie vom Ende des letzten Zugs auf
   derselben Maske. Solange Umschalt gehalten wird, zeigt eine gestrichelte Linie, wohin
@@ -217,9 +217,23 @@ Knotenmodus und die Einstellungen lesen alle aus derselben Liste.
 - Die Flächen stehen vorerst in der Pinselleiste. Mit Phase U wandern sie als eigene
   Werkzeuge in die Kategorie „Malen“ der Werkzeugzeile.
 
+**Maske bearbeiten (`feature/maske-bearbeiten`):**
+
+- Umkehren, Füllen, Leeren, Weiche Kante, Ausweiten, Schrumpfen, für die ganze gemalte
+  Maske.
+  - Zu finden im Maskenmenü („Maske bearbeiten …“) und am Knopf „Maske ▾“ in der
+    Pinselleiste, sobald der Pinsel auf einer gemalten Maske liegt.
+  - Weiche Kante, Ausweiten und Schrumpfen fragen nach der Weite: 2, 5, 10 oder
+    25 Bildpunkte.
+- Ausweiten und Schrumpfen nehmen den hellsten oder dunkelsten Wert in einem Kreis, Ecken
+  werden beim Ausweiten rund. Der Bildrand zählt weder als voll noch als leer.
+- Die weiche Kante sind drei Kastenfilter in ganzen Zahlen, zusammen nahe an einer Glocke.
+- Jede Bearbeitung ist ein Strich (`PaintStroke.Edit`). Der Maskenverlauf spielt sie Byte
+  für Byte nach, und Strg+Z nimmt sie zurück. Was nichts ändern würde, ist kein Schritt.
+- In Phase U werden die Bearbeitungen eigene Befehle in der Kategorie „Malen“.
+
 **Offen in W1:**
 
-- Maske bearbeiten.
 - Kanten verfeinern.
 - Stempelpinsel.
 

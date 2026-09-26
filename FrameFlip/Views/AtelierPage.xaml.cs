@@ -156,6 +156,10 @@ public sealed partial class AtelierPage : UserControl
         {
             if (PaintTarget() is { } painted) ShowMaskHistory(painted, anchor);
         };
+        Properties.BrushEditWanted += anchor =>
+        {
+            if (PaintTarget() is { } painted) ShowMaskEditMenu(painted, anchor);
+        };
         Placement.BrushAdjusted += () =>
         {
             Properties.SetBrush(Placement.BrushRadius, Placement.BrushHardness, Placement.BrushSpacing);

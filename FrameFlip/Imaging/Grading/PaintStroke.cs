@@ -82,6 +82,16 @@ public sealed class PaintStroke
     public PaintArea Area { get; init; }
 
     /// <summary>
+    /// Kein Zug und keine Flaeche, sondern eine Bearbeitung der ganzen Maske - fuellen,
+    /// leeren, umkehren, weiche Kante, ausweiten, schrumpfen. Dann zaehlt nur noch
+    /// <see cref="Amount"/>. Als Strich, damit der Maskenverlauf sie fuehrt wie jeden Zug.
+    /// </summary>
+    public PaintEdit Edit { get; init; }
+
+    /// <summary>Die Weite einer Bearbeitung in Bildpunkten - fuer weiche Kante, ausweiten und schrumpfen.</summary>
+    public float Amount { get; init; }
+
+    /// <summary>
     /// Worauf der Druck eines Stifts wirkt: auf die Groesse, die Staerke oder beides. Ohne
     /// Druckwerte im Strich (<see cref="Pressure"/>) wirkt er auf nichts.
     /// </summary>
@@ -368,6 +378,7 @@ public sealed class PaintStroke
     /// </summary>
     public PaintBounds Replay(PaintedMask mask)
     {
+        if (Edit != PaintEdit.None) return mask.Apply(Edit, Amount);
         if (Area != PaintArea.None) return Fill(mask);
 
         var again = new PaintStroke
@@ -419,6 +430,18 @@ public sealed class PaintStroke
         mask.Stamp(x, y, RadiusAt(pressure), Erase ? 0f : 1f, FlowAt(pressure), Hardness, Opacity, Tip, _limit);
         return PaintBounds.Around(x, y, Reach);
     }
+}
+
+/// <summary>Was mit der ganzen Maske geschieht.</summary>
+public enum PaintEdit
+{
+    None,
+    Fill,
+    Clear,
+    Invert,
+    Feather,
+    Grow,
+    Shrink,
 }
 
 /// <summary>Womit der Pinsel malt: als Zug oder als Flaeche.</summary>
