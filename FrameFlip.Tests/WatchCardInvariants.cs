@@ -31,7 +31,168 @@ public static class WatchCardInvariants
         TogglesThroughTheHost();
         TakesThePassword();
         TheSettingsShowTheSameCard();
-        TheSettingsLayOut();
+        Isolated(TheSettingsLayOut);
+        Isolated(TheOverviewMirrorsTheSections);
+        ScreensScaleTheSurface();
+    }
+
+    /// <summary>
+    /// Die Uebersicht (Entwurf 2): Ihre Kacheln sind dieselben Einstellungen wie auf den
+    /// Kategorieseiten - wer eine aendert, aendert die andere -, und ein Klick oeffnet die
+    /// Kategorie. Die Spalten richten sich nach der Breite.
+    /// </summary>
+    private static void TheOverviewMirrorsTheSections()
+    {
+        Check.Group("Einstellungen: die Uebersicht");
+
+        var current = new AppSettings { Fps = 24, Loop = false, MemoryBudgetMb = 2048, BridgeEnabled = false };
+        var applied = new List<AppSettings>();
+        var layout = new DesktopLayout();
+        var editor = new SettingsEditor(current, next => { applied.Add(next); current = next; return null; }, () => null, () => current, layout);
+        editor.ConnectWatch(() => null, null, null, then => then(), _ => { });
+        editor.ConnectStatus(() => new SettingsStatus("lauscht", "512 von 2048 MB"));
+
+        var window = new Window
+        {
+            Content = editor, Width = 1400, Height = 900, ShowInTaskbar = false,
+            WindowStyle = WindowStyle.None, ShowActivated = false, Left = -4000, Top = -4000,
+        };
+
+        try
+        {
+            window.Show();
+            Pump(0.3);
+
+            var tabs = (TabControl)editor.FindName("Tabs");
+            Check.That(tabs.SelectedItem == editor.FindName("OverviewTab"), "die Einstellungen beginnen mit der Uebersicht");
+
+            // Die Kacheln spiegeln die Kategorieseiten.
+            var tilePlayback = (Border)editor.FindName("TilePlayback");
+            var tileLoop = Descendants<CheckBox>(tilePlayback).Single();
+            var loop = (CheckBox)editor.FindName("LoopBox");
+
+            tileLoop.IsChecked = true;
+            Check.That(loop.IsChecked == true, "Wiederholen in der Kachel ist Wiederholen auf der Seite");
+
+            var tileRate = Descendants<ComboBox>(tilePlayback).Single();
+            var rate = (ComboBox)editor.FindName("FpsBox");
+            tileRate.SelectedIndex = tileRate.Items.Count - 1;
+            Check.That(rate.SelectedItem == tileRate.SelectedItem && rate.SelectedItem is not null, "die Bildrate ebenso");
+
+            var tileBudget = Descendants<TextBox>((Border)editor.FindName("TilePerformance")).First();
+            tileBudget.Text = "3072";
+            Check.That(((TextBox)editor.FindName("BudgetBox")).Text == "3072", "der Speicher ebenso - schon beim Tippen");
+
+            var tileBridge = Descendants<CheckBox>((Border)editor.FindName("TilePermissions")).First();
+            tileBridge.IsChecked = true;
+            Check.That(((CheckBox)editor.FindName("BridgeBox")).IsChecked == true, "die Bruecke ebenso");
+
+            Check.That(((CheckBox)editor.FindName("TileWatch")).IsEnabled, "die Zuschauerseite ist schaltbar, sobald ein Dienst verbunden ist");
+
+            // Die Automatik der Skalierung wirkt aus der Kachel, auch wenn der Reiter nie offen war.
+            ((CheckBox)editor.FindName("TileAutoScale")).IsChecked = true;
+            Check.That(layout.AutoScale && ((TextBlock)editor.FindName("TileScaleValue")).Text.EndsWith("%"),
+                       "Nach Bildschirm in der Kachel stellt das Layout um und zeigt den Wert");
+            ((CheckBox)editor.FindName("TileAutoScale")).IsChecked = false;
+            Check.That(!layout.AutoScale, "und wieder zurueck");
+
+            // Nur die Bildrate traegt eine Einheit.
+            Check.That(Equals(((ComboBox)editor.FindName("FpsBox")).Tag, "fps") && ((ComboBox)editor.FindName("LanguageBox")).Tag is null,
+                       "die Einheit fps steht an der Bildrate, nicht an der Sprache");
+
+            // Uebernehmen nimmt, was in den Kacheln geaendert wurde.
+            ((Button)editor.FindName("SaveButton")).RaiseEvent(new RoutedEventArgs(ButtonBase.ClickEvent));
+            Check.That(applied.Count == 1 && applied[0].Loop && applied[0].MemoryBudgetMb == 3072 && applied[0].BridgeEnabled,
+                       "Uebernehmen nimmt die Aenderungen aus den Kacheln");
+
+            // Die Zustandsfelder.
+            editor.UpdateStatus();
+            Check.That(((TextBlock)editor.FindName("StatusBridge")).Text == "lauscht" &&
+                       ((TextBlock)editor.FindName("StatusMemory")).Text == "512 von 2048 MB" &&
+                       ((TextBlock)editor.FindName("StatusViewers")).Text == T("S_StatusOff"),
+                       "die Zustandsfelder zeigen, was der Wirt meldet - die Zuschauerseite ist aus");
+
+            // Spalten nach Breite.
+            var tiles = (System.Windows.Controls.Primitives.UniformGrid)editor.FindName("OverviewTiles");
+            int wide = tiles.Columns;
+            window.Width = 820;
+            Pump(0.3);
+            int middle = tiles.Columns;
+
+            Check.That(wide == 3 && middle < wide, "breit drei Kachelspalten, schmaler weniger", $"{wide} -> {middle}");
+
+            // Ein Klick auf eine Kachel oeffnet ihre Kategorie.
+            var header = Descendants<DockPanel>((Border)editor.FindName("TilePerformance")).First();
+            header.RaiseEvent(new System.Windows.Input.MouseButtonEventArgs(System.Windows.Input.Mouse.PrimaryDevice, 0, System.Windows.Input.MouseButton.Left)
+            {
+                RoutedEvent = UIElement.MouseLeftButtonUpEvent,
+            });
+            Check.That(tabs.SelectedItem == editor.FindName("PerformanceTab"), "ein Klick auf die Kachel oeffnet ihre Kategorie");
+        }
+        finally
+        {
+            window.Close();
+            editor.Dispose();
+        }
+    }
+
+    /// <summary>Die Skalierung nach dem Bildschirm: 1080 Punkte ergeben 100 %, mehr ergibt mehr, in Zwanzigsteln und Grenzen.</summary>
+    private static void ScreensScaleTheSurface()
+    {
+        Check.Group("Einstellungen: Skalierung nach Bildschirm");
+
+        Check.That(DesktopLayout.AutoFor(1080) == 1.0, "1080 Punkte hoch: 100 %");
+        Check.That(DesktopLayout.AutoFor(1440) == 1.15, "1440 (etwa 27 Zoll mit 100 % oder 4K mit 150 %): 115 %", $"{DesktopLayout.AutoFor(1440)}");
+        Check.That(DesktopLayout.AutoFor(2160) == 1.35, "2160 (4K mit 100 %): 135 %, die Obergrenze", $"{DesktopLayout.AutoFor(2160)}");
+        Check.That(DesktopLayout.AutoFor(768) == 0.85, "768: 85 %, die Untergrenze", $"{DesktopLayout.AutoFor(768)}");
+        Check.That(DesktopLayout.AutoFor(double.NaN) == 1.0 && DesktopLayout.AutoFor(0) == 1.0, "ohne brauchbare Hoehe: 100 %");
+
+        var layout = new DesktopLayout { AutoScale = true, Scale = 1.2 };
+        layout.Normalize();
+        Check.That(layout.AutoScale && layout.Scale == 1.2, "die Automatik laesst den festen Wert stehen - fuer den Weg zurueck");
+    }
+
+    /// <summary>
+    /// Laesst einen Test in einem eigenen Konfigurationsordner laufen. Ein Editor liest und
+    /// schreibt sein Layout dort, und nicht in den Einstellungen dessen, der die Probe startet.
+    /// </summary>
+    private static void Isolated(Action run)
+    {
+        string root = Path.Combine(Path.GetTempPath(), "frameflip-einstellungen-" + Guid.NewGuid().ToString("N")[..8]);
+        string? previous = Environment.GetEnvironmentVariable("FRAMEFLIP_CONFIG");
+
+        Directory.CreateDirectory(root);
+        Environment.SetEnvironmentVariable("FRAMEFLIP_CONFIG", Path.Combine(root, "config.json"));
+
+        try
+        {
+            run();
+        }
+        finally
+        {
+            Environment.SetEnvironmentVariable("FRAMEFLIP_CONFIG", previous);
+            try { Directory.Delete(root, true); } catch (IOException) { }
+        }
+    }
+
+    private static IEnumerable<T> Descendants<T>(DependencyObject root) where T : DependencyObject
+    {
+        for (int i = 0; i < VisualTreeHelper.GetChildrenCount(root); i++)
+        {
+            var child = VisualTreeHelper.GetChild(root, i);
+            if (child is T match) yield return match;
+            foreach (var deeper in Descendants<T>(child)) yield return deeper;
+        }
+    }
+
+    private static void Pump(double seconds)
+    {
+        var end = DateTime.UtcNow + TimeSpan.FromSeconds(seconds);
+        while (DateTime.UtcNow < end)
+        {
+            Dispatcher.CurrentDispatcher.Invoke(() => { }, DispatcherPriority.Background);
+            Thread.Sleep(5);
+        }
     }
 
     /// <summary>
@@ -86,7 +247,7 @@ public static class WatchCardInvariants
         }
 
         // Ein Editor ohne Wirt - etwa ausserhalb des Hauptfensters - kennt keinen Dienst.
-        var alone = new SettingsEditor(new AppSettings(), _ => null, () => null);
+        var alone = new SettingsEditor(new AppSettings(), _ => null, () => null, layout: new DesktopLayout());
         Check.That(((FrameworkElement)alone.FindName("WatchCardFrame")).Visibility == Visibility.Collapsed &&
                    ((System.Windows.Controls.Primitives.UniformGrid)alone.FindName("ConnectionCards")).Columns == 1,
                    "ohne Wirt: keine Zuschauerkarte, die Kopplung allein");
@@ -98,7 +259,7 @@ public static class WatchCardInvariants
     {
         Check.Group("Einstellungen: Leiste und Karten");
 
-        var editor = new SettingsEditor(new AppSettings(), _ => null, () => null);
+        var editor = new SettingsEditor(new AppSettings(), _ => null, () => null, layout: new DesktopLayout());
         editor.ConnectWatch(() => null, null, null, then => then(), _ => { });
 
         var tabs = (TabControl)editor.FindName("Tabs");
@@ -113,15 +274,16 @@ public static class WatchCardInvariants
             editor.UpdateLayout();
         }
 
-        tabs.SelectedIndex = 3;
+        tabs.SelectedItem = editor.FindName("ConnectionsTab");
         Size(1200);
         Check.That(tabs.Tag is null && cards.Columns == 2, "breit: Leiste links, die zwei Karten nebeneinander", $"{tabs.Tag}, {cards.Columns}");
 
         Size(500);
         Check.That(Equals(tabs.Tag, "Narrow") && cards.Columns == 1, "schmal: Leiste oben, die Karten untereinander", $"{tabs.Tag}, {cards.Columns}");
 
-        Check.That(tabs.Items.Count == 6 && ((TabItem)tabs.Items[3]).Header is string header && header == T("S_TabConnections"),
-                   "sechs Abschnitte, der vierte heisst Verbindungen");
+        Check.That(tabs.Items.Count == 7 && ((TabItem)tabs.Items[0]).Header is string first && first == T("S_TabOverview") &&
+                   ((TabItem)tabs.Items[4]).Header is string header && header == T("S_TabConnections"),
+                   "sieben Abschnitte: vorn die Uebersicht, Verbindungen an fuenfter Stelle");
 
         editor.Dispose();
     }

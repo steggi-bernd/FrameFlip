@@ -1,5 +1,6 @@
 ﻿<ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
-                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" xmlns:views="clr-namespace:FrameFlip.Views">
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" xmlns:views="clr-namespace:FrameFlip.Views"
+                    xmlns:sys="clr-namespace:System;assembly=System.Runtime">
 
     <!-- ================================================================ Werte aus dem Entwurf
 
@@ -147,7 +148,9 @@
                                      FontFamily="{TemplateBinding FontFamily}"
                                      FontSize="{TemplateBinding FontSize}" />
 
-                            <TextBlock Grid.Column="1" Text="fps" VerticalAlignment="Center" Margin="4,1,0,0"
+                            <!-- Die Einheit steht in Tag: "fps" bei Bildraten, sonst nichts. Fest
+                                 eingetragen stand sie auch hinter Sprache und Kanal. -->
+                            <TextBlock Grid.Column="1" Text="{TemplateBinding Tag}" VerticalAlignment="Center" Margin="4,1,0,0"
                                        FontFamily="{StaticResource HeadFont}" FontWeight="Bold" FontSize="8.5"
                                        Foreground="{StaticResource DesktopFaint}" />
 
@@ -881,8 +884,11 @@
 
     <!-- Der Inhalt eines Abschnitts: mittig und hoechstens so breit, wie eine Zeile sich
          noch bequem liest. Gestreckt mit Hoechstbreite heisst in WPF: mittig. -->
+    <sys:Double x:Key="SettingsBodyWidth">760</sys:Double>
+    <sys:Double x:Key="SettingsOverviewWidth">760</sys:Double>
+
     <Style x:Key="SettingsPageBody" TargetType="StackPanel">
-        <Setter Property="MaxWidth" Value="760" />
+        <Setter Property="MaxWidth" Value="{DynamicResource SettingsBodyWidth}" />
         <Setter Property="HorizontalAlignment" Value="Stretch" />
     </Style>
 
@@ -925,6 +931,54 @@
         <Setter Property="CornerRadius" Value="10" />
         <Setter Property="HorizontalAlignment" Value="Center" />
         <Setter Property="Background" Value="{StaticResource DesktopSurface}" />
+    </Style>
+
+    <!-- Die Uebersicht der Einstellungen (Entwurf 2): Zustandsfelder oben, darunter je
+         Kategorie eine Kachel mit dem, was man am haeufigsten aendert. -->
+    <Style x:Key="SettingsTile" TargetType="Border" BasedOn="{StaticResource SettingsCard}">
+        <Setter Property="Padding" Value="14,12" />
+    </Style>
+
+    <Style x:Key="SettingsTileTitle" TargetType="TextBlock">
+        <Setter Property="FontSize" Value="13" />
+        <Setter Property="FontWeight" Value="SemiBold" />
+        <Setter Property="Foreground" Value="{StaticResource DesktopInk}" />
+        <Setter Property="VerticalAlignment" Value="Center" />
+    </Style>
+
+    <Style x:Key="SettingsTileLabel" TargetType="TextBlock">
+        <Setter Property="FontSize" Value="12" />
+        <Setter Property="Foreground" Value="{StaticResource DesktopMuted}" />
+        <Setter Property="VerticalAlignment" Value="Center" />
+        <Setter Property="TextTrimming" Value="CharacterEllipsis" />
+    </Style>
+
+    <Style x:Key="SettingsTileMore" TargetType="TextBlock">
+        <Setter Property="FontSize" Value="11" />
+        <Setter Property="Margin" Value="0,10,0,0" />
+        <Setter Property="Foreground" Value="{StaticResource DesktopAccent}" />
+        <Setter Property="Cursor" Value="Hand" />
+    </Style>
+
+    <Style x:Key="SettingsStat" TargetType="Border">
+        <Setter Property="CornerRadius" Value="10" />
+        <Setter Property="Padding" Value="12,9" />
+        <Setter Property="Margin" Value="0,0,10,10" />
+        <Setter Property="Background" Value="{StaticResource DesktopPanel}" />
+        <Setter Property="BorderBrush" Value="{StaticResource DesktopLine}" />
+        <Setter Property="BorderThickness" Value="1" />
+    </Style>
+
+    <Style x:Key="SettingsStatLabel" TargetType="TextBlock">
+        <Setter Property="FontSize" Value="10.5" />
+        <Setter Property="Foreground" Value="{StaticResource DesktopMuted}" />
+    </Style>
+
+    <Style x:Key="SettingsStatValue" TargetType="TextBlock">
+        <Setter Property="FontSize" Value="13" />
+        <Setter Property="Margin" Value="0,3,0,0" />
+        <Setter Property="Foreground" Value="{StaticResource DesktopInk}" />
+        <Setter Property="TextTrimming" Value="CharacterEllipsis" />
     </Style>
 
 </ResourceDictionary>

@@ -20,6 +20,7 @@ public partial class AppearancePanel : UserControl
     {
         _syncing = true;
         ScaleSlider.Value = _layout.Scale * 100; TileSlider.Value = _layout.TileSize;
+        AutoScaleBox.IsChecked = _layout.AutoScale; ScaleSlider.IsEnabled = !_layout.AutoScale;
         ShareSlider.Value = _layout.MonitorShare * 100; NavSlider.Value = _layout.NavigationWidth;
         HeightSlider.Value = _layout.LowerPanelHeight;
         OrderBox.IsChecked = _layout.MonitorFirst; MotionBox.IsChecked = _layout.ReduceMotion;
@@ -27,7 +28,7 @@ public partial class AppearancePanel : UserControl
     }
     private void UpdateLabels()
     {
-        ScaleValue.Text = $"{_layout.Scale * 100:0} %"; TileValue.Text = $"{_layout.TileSize:0} px";
+        ScaleValue.Text = $"{EffectiveScale * 100:0} %"; TileValue.Text = $"{_layout.TileSize:0} px";
         ShareValue.Text = $"{_layout.MonitorShare * 100:0} %"; NavValue.Text = $"{_layout.NavigationWidth:0} px";
         HeightValue.Text = $"{_layout.LowerPanelHeight:0} px";
         double sequence = _layout.NavigationWidth / 100;
@@ -41,10 +42,20 @@ public partial class AppearancePanel : UserControl
     {
         if (_syncing || !IsLoaded) return;
         _layout.Scale = ScaleSlider.Value / 100; _layout.TileSize = TileSlider.Value;
+        _layout.AutoScale = AutoScaleBox.IsChecked == true; ScaleSlider.IsEnabled = !_layout.AutoScale;
         _layout.MonitorShare = ShareSlider.Value / 100; _layout.NavigationWidth = NavSlider.Value;
         _layout.LowerPanelHeight = HeightSlider.Value;
         _layout.MonitorFirst = OrderBox.IsChecked == true; _layout.ReduceMotion = MotionBox.IsChecked == true;
         UpdateLabels(); _saveTimer.Stop(); _saveTimer.Start();
     }
     private void OnReset(object sender, RoutedEventArgs e) => _layout.Reset();
+
+    /// <summary>Die Skalierung, die gerade gilt: bei der Automatik die des Bildschirms unter dem Fenster.</summary>
+    internal double EffectiveScale => _layout.AutoScale ? DesktopLayout.AutoFor(ScreenScale.EffectiveHeight(this)) : _layout.Scale;
+
+    /// <summary>Der Regler fuer die Skalierung - fuer die Kachel der Uebersicht, die ihn spiegelt.</summary>
+    internal Slider Scale => ScaleSlider;
+
+    /// <summary>Der Schalter fuer die Automatik - ebenfalls fuer die Uebersicht.</summary>
+    internal CheckBox AutoScale => AutoScaleBox;
 }

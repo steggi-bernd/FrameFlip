@@ -218,6 +218,8 @@ internal static partial class Program
         typeof(SettingsPage).GetMethod("ConnectWatch", BindingFlags.Instance | BindingFlags.NonPublic)!
             .Invoke(connections, new object?[] { new Func<FrameFlip.Web.WatchService?>(() => service), null, null,
                                                  new Action<Action>(then => then()), new Action<string>(_ => { }) });
+        Render(connections, 1400, 860, "settings-overview.png");
+        Render(connections, 900, 860, "settings-overview-medium.png");
         connections.SelectRemote();
         Render(connections, 1100, 760, "settings-connections.png");
         var connEditor = (SettingsEditor)Find<ContentControl>(connections, "EditorHost").Content;

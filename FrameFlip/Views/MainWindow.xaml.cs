@@ -245,7 +245,15 @@ public partial class MainWindow : Window
 
         StateChanged += (_, _) => RefreshMaximizeGlyph();
         PreviewKeyDown += OnWindowKeyDown;
-        LocationChanged += (_, _) => Remember();
+        LocationChanged += (_, _) =>
+        {
+            Remember();
+
+            // Auf einen anderen Bildschirm gezogen: dessen Groesse gilt.
+            if (_layout.AutoScale) ApplyScale();
+        };
+
+        DpiChanged += (_, _) => ApplyScale();
 
         SizeChanged += (_, _) =>
         {
@@ -399,7 +407,14 @@ public partial class MainWindow : Window
         if (width > 0 && height > 0 && !double.IsNaN(width) && !double.IsNaN(height))
             elastic = ElasticFor(width, height);
 
-        double scale = Math.Min(_layout.Scale * elastic, Math.Min(width / NeededWidth, height / NeededHeight));
+        double fit = Math.Min(width / NeededWidth, height / NeededHeight);
+
+        // Automatisch: der Wert des Bildschirms, und das Fenster verkleinert nur noch, wenn
+        // es zu klein ist. Die grosse Stufe fuer grosse Fenster entfaellt - sie war der
+        // grobe Ersatz fuer genau diese Frage.
+        double scale = _layout.AutoScale
+            ? Math.Min(DesktopLayout.AutoFor(ScreenScale.EffectiveHeight(this)) * Math.Min(1.0, elastic), fit)
+            : Math.Min(_layout.Scale * elastic, fit);
 
         // Unter einem Promille sieht niemand etwas, aber jede Zuweisung stoesst ein
         // neues Layout an - und SizeChanged feuert waehrend des Ziehens dauernd.
@@ -569,7 +584,24 @@ public partial class MainWindow : Window
     {
         var page = new SettingsPage(_getSettings, _apply, _remoteState, _layout);
         page.ConnectWatch(_watch, _renewWatch, _setWatchCode, then => AskTerms(then), Note);
+        page.ConnectStatus(SettingsStatusNow);
         return page;
+    }
+
+    /// <summary>Was die Uebersicht der Einstellungen nur hier erfaehrt: die Bruecke und den Vorschau-Speicher.</summary>
+    private SettingsStatus SettingsStatusNow()
+    {
+        var settings = _getSettings();
+
+        string bridge = !settings.BridgeEnabled ? Strings.T("S_StatusOff")
+            : _monitor?.IsListening == true ? Strings.T("S_StatusListening")
+            : Strings.T("S_StatusNotListening");
+
+        string memory = _lastPreload is { } preload
+            ? Strings.T("S_StatusMemoryUsed", Math.Round(preload.Bytes / 1048576.0), settings.MemoryBudgetMb)
+            : Strings.T("S_StatusMemoryBudget", settings.MemoryBudgetMb);
+
+        return new SettingsStatus(bridge, memory);
     }
 
     /// <summary>
@@ -1752,15 +1784,19 @@ public partial class MainWindow : Window
                 e.Handled = true;
                 return;
             }
+            // Von der Automatik aus weiter in festen Schritten - ausgehend von ihrem Wert,
+            // damit nichts springt.
+            double current = _layout.AutoScale ? DesktopLayout.AutoFor(ScreenScale.EffectiveHeight(this)) : _layout.Scale;
             double? scale = e.Key switch
             {
-                Key.Add or Key.OemPlus => _layout.Scale + .05,
-                Key.Subtract or Key.OemMinus => _layout.Scale - .05,
+                Key.Add or Key.OemPlus => current + .05,
+                Key.Subtract or Key.OemMinus => current - .05,
                 Key.D0 or Key.NumPad0 => 1,
                 _ => null,
             };
             if (scale is { } requested)
             {
+                _layout.AutoScale = false;
                 _layout.Scale = requested;
                 _layout.Save();
                 e.Handled = true;
