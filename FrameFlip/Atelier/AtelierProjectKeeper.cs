@@ -105,10 +105,14 @@ internal sealed class AtelierProjectKeeper
 
         ProjectRecipeStore recipe;
         bool moved = false;
+        DateTime? savedAt = null;
 
         if (_store.Load(key) is { } project)
         {
             recipe = ProjectRecipeStore.From(project);
+
+            // Die Zeit dieses Projekts - nicht die des vorigen, das zuletzt geschrieben wurde.
+            if (project.SavedUtc != default) savedAt = project.SavedUtc.ToLocalTime();
         }
         else if (!_settings.AtelierRecipeMoved)
         {
@@ -129,6 +133,7 @@ internal sealed class AtelierProjectKeeper
         }
 
         Current = key;
+        SavedAt = savedAt;
         _frame = frame;
         _frameChanged = false;
 
@@ -172,6 +177,11 @@ internal sealed class AtelierProjectKeeper
         {
             _dispatch(() =>
             {
+                // Beim Wechsel wird das bisherige Projekt geschrieben, und die Nachricht kommt,
+                // wenn schon das naechste offen ist. Sie gehoert nicht in dessen Anzeige - weder
+                // die Uhrzeit noch "gespeichert". Scheitert es, steht das im Protokoll der Ablage.
+                if (!key.Equals(Current)) return;
+
                 if (written)
                 {
                     // Kam waehrend des Schreibens etwas dazu, bleibt es ungespeichert.

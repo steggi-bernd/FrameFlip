@@ -108,17 +108,21 @@ public partial class AtelierPage
     {
         SaveButton.IsEnabled = _projects.Current is not null;
 
+        var open = _projects.Current;
+        string? place = open is null ? null : _projects.Store.PlaceOf(open);
+
         SaveText.Text = _projects.State switch
         {
             AtelierSaveState.Saved when _projects.SavedAt is { } at => Strings.T("S_ProjectSavedAt", at.ToString("HH:mm")),
+            AtelierSaveState.Saved when open is not null && place is null => Strings.T("S_ProjectNew"),
             AtelierSaveState.Saved => Strings.T("S_ProjectOpen"),
             AtelierSaveState.Unsaved => Strings.T("S_ProjectUnsaved"),
             AtelierSaveState.Failed => Strings.T("S_ProjectSaveFailed"),
             _ => "",
         };
 
-        SaveText.ToolTip = _projects.Store.LastWritten ??
-                           (_projects.Current is { } key ? AtelierProjectStore.PrimaryPath(key) : null);
+        // Die Datei DIESES Projekts - wo sie liegt, oder wo sie hinkommt, wenn es noch keine gibt.
+        SaveText.ToolTip = open is null ? null : place ?? AtelierProjectStore.PrimaryPath(open);
     }
 
     /// <summary>

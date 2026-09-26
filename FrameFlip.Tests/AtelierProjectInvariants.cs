@@ -160,6 +160,12 @@ public static class AtelierProjectInvariants
 
         Check.That(session.Adjustments is null && session.Grading is null && !session.Dirty,
                    "die neue Folge beginnt frisch - die Uebernahme gab es nur einmal");
+
+        // Die Nachricht vom Schreiben der ersten kam erst, als die zweite schon offen war.
+        // Sie setzt dort weder eine Uhrzeit noch eine Datei.
+        Check.That(keeper.SavedAt is null && store.PlaceOf(keeper.Current!) is null &&
+                   store.PlaceOf(firstKey) == AtelierProjectStore.PrimaryPath(firstKey),
+                   "die zweite hat noch keine Datei und keine Zeit - die erste behaelt ihre", $"{keeper.SavedAt}");
         Check.That(Math.Abs(store.Load(firstKey)!.Adjustments!.Exposure + 0.5) < 1e-9 &&
                    store.Load(firstKey)!.Frame == "render_0002.exr",
                    "und das bisherige Projekt ist mit seiner letzten Aenderung geschrieben");
