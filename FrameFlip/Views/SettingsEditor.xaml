@@ -16,12 +16,18 @@
             <RowDefinition Height="Auto" />
         </Grid.RowDefinitions>
 
-        <TabControl x:Name="Tabs" Grid.Row="0" Style="{StaticResource DesktopTabs}" Background="Transparent">
+        <!-- Entwurf A: die Abschnitte als Leiste links, der Inhalt mittig daneben - siehe
+             SettingsSections in DashboardTokens.xaml. -->
+        <TabControl x:Name="Tabs" Grid.Row="0" Style="{StaticResource SettingsSections}" Background="Transparent"
+                    SelectionChanged="OnSectionChanged">
 
-            <TabItem Style="{StaticResource DesktopTab}" Header="{DynamicResource S_TabGeneral}">
+            <TabItem Style="{StaticResource SettingsSection}" Header="{DynamicResource S_TabGeneral}">
                 <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" Padding="0,4,10,8">
-                    <StackPanel>
-                        <views:SettingGroup Style="{StaticResource SettingGroupStyle}" Header="{DynamicResource S_TabGeneral}">
+                    <StackPanel Style="{StaticResource SettingsPageBody}">
+                        <TextBlock Style="{StaticResource SettingsPageTitle}" Text="{DynamicResource S_TabGeneral}" />
+                        <TextBlock Style="{StaticResource SettingsPageSub}" Text="{DynamicResource S_SectionGeneralSub}" />
+
+                        <views:SettingGroup Style="{StaticResource SettingGroupStyle}">
                             <views:SettingRow Style="{StaticResource SettingRowStyle}" Header="{DynamicResource S_Hotkey}"
                                               Explain="{DynamicResource X_Hotkey}"
                                               Footnote="{DynamicResource S_HotkeyNote}" Important="True">
@@ -40,10 +46,13 @@
                 </ScrollViewer>
             </TabItem>
 
-            <TabItem Style="{StaticResource DesktopTab}" Header="{DynamicResource S_TabPlayback}">
+            <TabItem Style="{StaticResource SettingsSection}" Header="{DynamicResource S_TabPlayback}">
                 <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" Padding="0,4,10,8">
-                    <StackPanel>
-                        <views:SettingGroup Style="{StaticResource SettingGroupStyle}" Header="{DynamicResource S_TabPlayback}">
+                    <StackPanel Style="{StaticResource SettingsPageBody}">
+                        <TextBlock Style="{StaticResource SettingsPageTitle}" Text="{DynamicResource S_TabPlayback}" />
+                        <TextBlock Style="{StaticResource SettingsPageSub}" Text="{DynamicResource S_SectionPlaybackSub}" />
+
+                        <views:SettingGroup Style="{StaticResource SettingGroupStyle}">
                             <views:SettingRow Style="{StaticResource SettingRowStyle}" Header="{DynamicResource S_FrameRate}"
                                               Explain="{DynamicResource X_FrameRate}" Important="True">
                                 <ComboBox x:Name="FpsBox" Style="{StaticResource DesktopCombo}" Width="180" />
@@ -67,10 +76,13 @@
                 </ScrollViewer>
             </TabItem>
 
-            <TabItem Style="{StaticResource DesktopTab}" Header="{DynamicResource S_TabPerformance}">
+            <TabItem Style="{StaticResource SettingsSection}" Header="{DynamicResource S_TabPerformance}">
                 <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" Padding="0,4,10,8">
-                    <StackPanel>
-                        <views:SettingGroup Style="{StaticResource SettingGroupStyle}" Header="{DynamicResource S_TabPerformance}">
+                    <StackPanel Style="{StaticResource SettingsPageBody}">
+                        <TextBlock Style="{StaticResource SettingsPageTitle}" Text="{DynamicResource S_TabPerformance}" />
+                        <TextBlock Style="{StaticResource SettingsPageSub}" Text="{DynamicResource S_SectionPerformanceSub}" />
+
+                        <views:SettingGroup Style="{StaticResource SettingGroupStyle}">
                             <views:SettingRow Style="{StaticResource SettingRowStyle}" Header="{DynamicResource S_MemoryBudget}"
                                               Explain="{DynamicResource X_MemoryBudget}" Important="True">
                                 <TextBox x:Name="BudgetBox" Style="{StaticResource DashTextBox}" Width="120" />
@@ -112,9 +124,94 @@
                 </ScrollViewer>
             </TabItem>
 
-            <TabItem Style="{StaticResource DesktopTab}" Header="{DynamicResource S_TabRemote}">
+            <TabItem Style="{StaticResource SettingsSection}" Header="{DynamicResource S_TabConnections}">
                 <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" Padding="0,4,10,8">
-                    <StackPanel>
+                    <StackPanel Style="{StaticResource SettingsPageBody}">
+                        <TextBlock Style="{StaticResource SettingsPageTitle}" Text="{DynamicResource S_TabConnections}" />
+                        <TextBlock Style="{StaticResource SettingsPageSub}" Text="{DynamicResource S_SectionConnectionsSub}" />
+
+                        <!-- Zwei gleichwertige Karten: das Handy koppeln und Zuschauer einladen.
+                             Nebeneinander, solange beide Platz haben, sonst untereinander -
+                             siehe OnCardsSized. Die Zuschauerkarte fuellt WatchCard; ohne
+                             Wirt (ein Editor ausserhalb des Hauptfensters) bleibt sie weg. -->
+                        <UniformGrid x:Name="ConnectionCards" Columns="2" Margin="0,0,-12,6"
+                                     SizeChanged="OnCardsSized">
+                            <Border x:Name="PairCard" Style="{StaticResource SettingsCard}">
+                                <StackPanel>
+                                    <DockPanel>
+                                        <TextBlock x:Name="RemoteState" DockPanel.Dock="Right" VerticalAlignment="Center"
+                                                   Foreground="{StaticResource DesktopAccent}" FontSize="11"
+                                                   FontFamily="{StaticResource MonoFont}" />
+                                        <TextBlock Style="{StaticResource SettingsCardTitle}" Text="{DynamicResource S_CardPairApp}" />
+                                    </DockPanel>
+
+                                    <Border Style="{StaticResource SettingsCardCode}">
+                                        <views:QrCodeView x:Name="PairingCode" LightModules="True" />
+                                    </Border>
+
+                                    <TextBlock x:Name="RoomText" Margin="0,10,0,0" HorizontalAlignment="Center"
+                                               Foreground="{StaticResource DesktopFaint}" FontSize="10"
+                                               FontFamily="{StaticResource MonoFont}" />
+                                    <TextBlock x:Name="PairingHint" Margin="0,8,0,0" TextWrapping="Wrap" TextAlignment="Center"
+                                               Foreground="{StaticResource DesktopMuted}" FontSize="11" />
+                                    <TextBlock Text="{DynamicResource S_ScanHint}" Margin="0,6,0,0" TextWrapping="Wrap"
+                                               TextAlignment="Center" Foreground="{StaticResource DesktopFaint}" FontSize="10.5" />
+
+                                    <WrapPanel Margin="0,14,0,0" HorizontalAlignment="Center">
+                                        <Button x:Name="CopyLinkButton" Style="{StaticResource DesktopButton}"
+                                                Content="{DynamicResource S_CopyLink}" MinWidth="120" Margin="0,0,8,8"
+                                                Click="OnCopyLinkClicked" />
+                                        <Button x:Name="NewKeyButton" Style="{StaticResource DesktopButton}"
+                                                Content="{DynamicResource S_NewKey}" MinWidth="120" Margin="0,0,0,8"
+                                                ToolTip="{DynamicResource S_NewKeyHint}"
+                                                Click="OnNewKeyClicked" />
+                                    </WrapPanel>
+                                </StackPanel>
+                            </Border>
+
+                            <Border x:Name="WatchCardFrame" Style="{StaticResource SettingsCard}">
+                                <StackPanel>
+                                    <DockPanel>
+                                        <ToggleButton x:Name="WatchToggle" DockPanel.Dock="Right" VerticalAlignment="Center"
+                                                      Style="{StaticResource DashChipSmall}"
+                                                      Checked="OnWatchToggled" Unchecked="OnWatchToggled">
+                                            <TextBlock x:Name="WatchToggleText" FontSize="8.5" />
+                                        </ToggleButton>
+                                        <TextBlock Style="{StaticResource SettingsCardTitle}" Text="{DynamicResource S_CardWatch}" />
+                                    </DockPanel>
+
+                                    <Border x:Name="WatchCodeFrame" Style="{StaticResource SettingsCardCode}" Visibility="Collapsed">
+                                        <views:QrCodeView x:Name="WatchCode" LightModules="True" />
+                                    </Border>
+
+                                    <TextBlock x:Name="WatchAddress" Margin="0,10,0,0" HorizontalAlignment="Center"
+                                               TextAlignment="Center" TextWrapping="Wrap" FontSize="10.5"
+                                               FontFamily="{StaticResource MonoFont}" Foreground="{StaticResource DesktopInk}" />
+                                    <TextBlock x:Name="WatchHint" Margin="0,8,0,0" TextWrapping="Wrap" TextAlignment="Center"
+                                               FontSize="11" Foreground="{StaticResource DesktopMuted}" />
+
+                                    <!-- Das Kennwort steht sichtbar - es ist zum Weitersagen da. -->
+                                    <StackPanel x:Name="WatchPassRow" Margin="0,14,0,0" Visibility="Collapsed">
+                                        <TextBlock Text="{DynamicResource D_WatchPass}" HorizontalAlignment="Center"
+                                                   FontSize="10.5" Foreground="{StaticResource DesktopMuted}" />
+                                        <TextBox x:Name="WatchPass" Margin="0,6,0,0" Width="180" HorizontalAlignment="Center"
+                                                 MaxLength="32" Style="{StaticResource DashTextBox}"
+                                                 HorizontalContentAlignment="Center"
+                                                 KeyDown="OnWatchPassKey" LostFocus="OnWatchPassDone" />
+                                        <TextBlock x:Name="WatchPassHint" Margin="0,6,0,0" TextWrapping="Wrap"
+                                                   TextAlignment="Center" FontSize="10" Foreground="{StaticResource DesktopMuted}" />
+                                    </StackPanel>
+
+                                    <WrapPanel x:Name="WatchActions" Margin="0,14,0,0" HorizontalAlignment="Center" />
+                                </StackPanel>
+                            </Border>
+                        </UniformGrid>
+
+                        <!-- Gilt fuer beide Codes. -->
+                        <CheckBox x:Name="ClassicQr" Content="{DynamicResource D_ClassicQr}"
+                                  Style="{StaticResource DesktopCheckBox}" Margin="2,0,0,18"
+                                  Checked="OnQrStyle" Unchecked="OnQrStyle" />
+
                         <views:SettingGroup Style="{StaticResource SettingGroupStyle}" Header="{DynamicResource S_TabRemote}">
                             <views:SettingRow Style="{StaticResource SettingRowStyle}" Header="{DynamicResource S_RelayHost}"
                                               Explain="{DynamicResource X_RelayHost}"
@@ -138,48 +235,15 @@
                                 <CheckBox x:Name="LibraryBox" Style="{StaticResource DesktopCheckBox}" />
                             </views:SettingRow>
                         </views:SettingGroup>
-
-                        <views:SettingGroup Style="{StaticResource SettingGroupStyle}" Header="{DynamicResource S_Pairing}">
-                            <views:SettingRow Style="{StaticResource SettingRowStyle}" Header="{DynamicResource S_Pairing}"
-                                              Footnote="{DynamicResource S_ScanHint}">
-                                <StackPanel HorizontalAlignment="Right">
-                                    <Border Background="{StaticResource DesktopSurface}" CornerRadius="10"
-                                            Width="252" Height="252" HorizontalAlignment="Right">
-                                        <views:QrCodeView x:Name="PairingCode" LightModules="True" />
-                                    </Border>
-                                    <TextBlock x:Name="RemoteState" Margin="0,10,0,0" HorizontalAlignment="Right"
-                                               Foreground="{StaticResource DesktopAccent}" FontSize="11"
-                                               FontFamily="{StaticResource MonoFont}" />
-                                    <TextBlock x:Name="RoomText" Margin="0,6,0,0" HorizontalAlignment="Right"
-                                               Foreground="{StaticResource DesktopFaint}" FontSize="10"
-                                               FontFamily="{StaticResource MonoFont}" />
-                                    <TextBlock x:Name="PairingHint" Margin="0,6,0,0" TextWrapping="Wrap"
-                                               HorizontalAlignment="Right" TextAlignment="Right" MaxWidth="300"
-                                               Foreground="{StaticResource DesktopMuted}" FontSize="11" />
-                                    <CheckBox x:Name="ClassicQr" Content="{DynamicResource D_ClassicQr}"
-                                              Style="{StaticResource DesktopCheckBox}" Margin="0,12,0,0"
-                                              HorizontalAlignment="Right" Checked="OnQrStyle" Unchecked="OnQrStyle" />
-                                    <WrapPanel Margin="0,12,0,0" HorizontalAlignment="Right">
-                                        <Button x:Name="CopyLinkButton" Style="{StaticResource DesktopButton}"
-                                                Content="{DynamicResource S_CopyLink}" MinWidth="120"
-                                                Click="OnCopyLinkClicked" />
-                                        <Button x:Name="NewKeyButton" Style="{StaticResource DesktopButton}"
-                                                Content="{DynamicResource S_NewKey}" MinWidth="120" Margin="8,0,0,0"
-                                                ToolTip="{DynamicResource S_NewKeyHint}"
-                                                Click="OnNewKeyClicked" />
-                                    </WrapPanel>
-                                </StackPanel>
-                            </views:SettingRow>
-                        </views:SettingGroup>
                     </StackPanel>
                 </ScrollViewer>
             </TabItem>
 
-            <TabItem Style="{StaticResource DesktopTab}" Header="{DynamicResource D_Permissions}">
+            <TabItem Style="{StaticResource SettingsSection}" Header="{DynamicResource D_Permissions}">
                 <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" Padding="0,4,10,8">
-                    <StackPanel>
-                        <TextBlock Text="{DynamicResource D_PermissionsIntro}" TextWrapping="Wrap"
-                                   Foreground="{StaticResource DesktopMuted}" FontSize="11.5" Margin="0,0,0,14" />
+                    <StackPanel Style="{StaticResource SettingsPageBody}">
+                        <TextBlock Style="{StaticResource SettingsPageTitle}" Text="{DynamicResource D_Permissions}" />
+                        <TextBlock Style="{StaticResource SettingsPageSub}" Text="{DynamicResource D_PermissionsIntro}" />
 
                         <views:SettingGroup Style="{StaticResource SettingGroupStyle}" Header="{DynamicResource S_BlenderLabel}">
                             <views:SettingRow Style="{StaticResource SettingRowStyle}"
@@ -234,7 +298,16 @@
                 </ScrollViewer>
             </TabItem>
 
-            <TabItem x:Name="AppearanceTab" Style="{StaticResource DesktopTab}" Header="{DynamicResource D_Appearance}"><ContentControl x:Name="AppearanceHost" /></TabItem>
+            <TabItem x:Name="AppearanceTab" Style="{StaticResource SettingsSection}" Header="{DynamicResource D_Appearance}">
+                <DockPanel>
+                    <StackPanel DockPanel.Dock="Top" Style="{StaticResource SettingsPageBody}">
+                        <!-- Die Einleitung des Panels steht gleich darunter - sie ist der Untertitel. -->
+                        <TextBlock Style="{StaticResource SettingsPageTitle}" Text="{DynamicResource D_Appearance}"
+                                   Margin="0,0,0,10" />
+                    </StackPanel>
+                    <ContentControl x:Name="AppearanceHost" MaxWidth="760" />
+                </DockPanel>
+            </TabItem>
  </TabControl>
 
         <TextBlock x:Name="StatusText" Grid.Row="1" Margin="0,14,0,0"

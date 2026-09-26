@@ -485,8 +485,19 @@ public partial class MainWindow : Window
         {
             "projects" => new ProjectsPage(OpenFromProjects),
             "atelier" => _atelierPage ??= new AtelierPage(_decoders, _getSettings(), next => _persist?.Invoke(next)),
-            _ => _settingsPage ??= new SettingsPage(_getSettings, _apply, _remoteState, _layout),
+            _ => _settingsPage ??= CreateSettingsPage(),
         };
+    }
+
+    /// <summary>
+    /// Die Einstellungsseite - mit der Karte der Zuschauerseite am selben Dienst, derselben
+    /// Zustimmung und demselben Protokoll wie die Kopplungstafel.
+    /// </summary>
+    private SettingsPage CreateSettingsPage()
+    {
+        var page = new SettingsPage(_getSettings, _apply, _remoteState, _layout);
+        page.ConnectWatch(_watch, _renewWatch, _setWatchCode, then => AskTerms(then), Note);
+        return page;
     }
 
     /// <summary>

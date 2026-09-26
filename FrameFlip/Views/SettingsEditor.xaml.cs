@@ -41,6 +41,9 @@ public partial class SettingsEditor : System.Windows.Controls.UserControl, IDisp
 
     private System.Windows.Threading.DispatcherTimer? _remoteTicker;
 
+    /// <summary>Die Karte der Zuschauerseite - erst, wenn ein Wirt sie mit dem Dienst verbindet.</summary>
+    private WatchCard? _watchCard;
+
     /// <param name="apply">Uebernimmt die Einstellungen. Rueckgabe: Fehlertext oder null.</param>
     public SettingsEditor(AppSettings current, Func<AppSettings, string?> apply, Func<RelayState?>? remoteState = null, Func<AppSettings>? latest = null, DesktopLayout? layout = null)
     {
@@ -86,8 +89,13 @@ public partial class SettingsEditor : System.Windows.Controls.UserControl, IDisp
         ThreadsBox.Text = current.MaxDecoderThreads.ToString(CultureInfo.InvariantCulture);
 
         UpdateThreadHint();
-        Loaded += (_, _) => { Strings.Changed += UpdateThreadHint; _remoteTicker?.Start(); };
-        Unloaded += (_, _) => { Strings.Changed -= UpdateThreadHint; _remoteTicker?.Stop(); };
+        Loaded += (_, _) => { Strings.Changed += UpdateThreadHint; _remoteTicker?.Start(); _watchCard?.Refresh(); };
+        Unloaded += (_, _) => { Strings.Changed -= UpdateThreadHint; _remoteTicker?.Stop(); _watchCard?.Detach(); };
+        SizeChanged += (_, _) => ShowNarrow();
+
+        // Ohne Wirt gibt es keinen Dienst - die Karte bleibt weg, bis ConnectWatch kommt.
+        WatchCardFrame.Visibility = Visibility.Collapsed;
+        ConnectionCards.Columns = 1;
 
         PairingStore.TryUnprotect(current.PairingSecret, out _pairing);
 
@@ -419,13 +427,96 @@ public partial class SettingsEditor : System.Windows.Controls.UserControl, IDisp
         Cancelled?.Invoke();
     }
 
+    /// <summary>
+    /// Verbindet die Karte der Zuschauerseite mit dem Dienst - dieselbe Logik wie in der
+    /// Kopplungstafel des Dashboards (<see cref="WatchCard"/>). Der Schalter wirkt sofort,
+    /// wie dort, nicht erst mit "Uebernehmen": Er baut eine Verbindung auf oder ab, und
+    /// das soll man gleich sehen. "Uebernehmen" geht vom neuesten Stand aus und dreht ihn
+    /// nicht zurueck.
+    /// </summary>
+    /// <param name="askTerms">Holt die Zustimmung ein, bevor eine Verbindung nach draussen entsteht.</param>
+    /// <param name="note">Eine Zeile ins Protokoll des Wirts.</param>
+    internal void ConnectWatch(Func<Web.WatchService?> watch, Action? renew, Action<string?>? setCode,
+                               Action<Action> askTerms, Action<string> note)
+    {
+        _watchCard = new WatchCard(
+            new WatchCard.Parts(WatchToggle, WatchToggleText, WatchCodeFrame, WatchCode, WatchAddress, WatchHint,
+                                WatchPassRow, WatchPass, WatchPassHint, WatchActions),
+            new WatchCard.Host(_latest, _apply, watch, renew, setCode, () => _layout.LightQr, () => true,
+                               askTerms, note, ShowStatus, CardAction, CopyToClipboard));
+
+        WatchCardFrame.Visibility = Visibility.Visible;
+        ShowCardColumns();
+
+        _watchCard.Refresh();
+    }
+
+    /// <summary>Ein Handgriff unter einer Karte - im Stil der Knoepfe dieser Seite.</summary>
+    private System.Windows.Controls.Button CardAction(string key, bool primary, Action click)
+    {
+        var button = new System.Windows.Controls.Button
+        {
+            Style = (Style)FindResource("DesktopButton"),
+            Content = Strings.T(key),
+            MinWidth = 120,
+            Margin = new Thickness(0, 0, 8, 8),
+        };
+
+        button.Click += (_, _) => click();
+        return button;
+    }
+
+    private void CopyToClipboard(string text)
+    {
+        try
+        {
+            Clipboard.SetText(text);
+            ShowStatus(Strings.T("S_Copied"));
+        }
+        catch (Exception)
+        {
+            // Die Zwischenablage kann von einem anderen Programm belegt sein.
+            ShowStatus(Strings.T("S_NoClipboard"));
+        }
+    }
+
+    private void OnWatchToggled(object sender, RoutedEventArgs e) => _watchCard?.Toggled();
+
+    private void OnWatchPassKey(object sender, KeyEventArgs e) => _watchCard?.PassKey(e);
+
+    private void OnWatchPassDone(object sender, RoutedEventArgs e) => _watchCard?.PassDone();
+
+    /// <summary>Beim Wechsel auf "Verbindungen" zeigt die Zuschauerkarte den neuesten Stand.</summary>
+    private void OnSectionChanged(object sender, System.Windows.Controls.SelectionChangedEventArgs e)
+    {
+        // Auch die Auswahllisten auf den Seiten melden ihre Wahl hierher - nur die der Leiste zaehlt.
+        if (!ReferenceEquals(e.OriginalSource, Tabs)) return;
+
+        if (Tabs.SelectedIndex == 3) _watchCard?.Refresh();
+    }
+
+    /// <summary>Unter dieser Breite rueckt die Leiste nach oben - daneben bliebe fuer den Inhalt zu wenig.</summary>
+    internal const double NarrowWidth = 640;
+
+    /// <summary>So breit muessen die Karten zusammen mindestens sein, um nebeneinander zu stehen.</summary>
+    internal const double CardsSideBySide = 560;
+
+    private void ShowNarrow() => Tabs.Tag = ActualWidth < NarrowWidth ? "Narrow" : null;
+
+    private void OnCardsSized(object sender, SizeChangedEventArgs e) => ShowCardColumns();
+
+    private void ShowCardColumns()
+        => ConnectionCards.Columns = WatchCardFrame.Visibility == Visibility.Visible &&
+                                     ConnectionCards.ActualWidth >= CardsSideBySide ? 2 : 1;
+
     public void SelectRemote() => Tabs.SelectedIndex = 3;
     public void SelectAppearance() => Tabs.SelectedItem = AppearanceTab;
-    public void Dispose() { _remoteTicker?.Stop(); Strings.Changed -= UpdateThreadHint; }
+    public void Dispose() { _remoteTicker?.Stop(); Strings.Changed -= UpdateThreadHint; _watchCard?.Detach(); }
     private void OnQrStyle(object sender, RoutedEventArgs e)
     {
         if (PairingCode is null || _layout is null) return;
         PairingCode.LightModules = ClassicQr.IsChecked != true;
+        WatchCode.LightModules = PairingCode.LightModules;
         if (IsLoaded) { _layout.LightQr = PairingCode.LightModules; _layout.Save(); }
     }
     private void OnBrowseBlender(object sender, RoutedEventArgs e)

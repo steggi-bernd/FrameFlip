@@ -207,6 +207,28 @@ internal static partial class Program
             Check(right <= 491, $"Settings tab {i}: apply action stays inside narrow viewport");
         }
         page.Dispose();
+
+        // Verbindungen nach Entwurf A: beide Karten nebeneinander. Ein lokal erzeugter
+        // Testschluessel, ein nie gestarteter Dienst - nichts geht ins Netz.
+        var watchKey = FrameFlip.Remote.WatchKey.Create("test1");
+        var watched = new AppSettings { TermsAccepted = AppSettings.TermsVersion, WatchEnabled = true,
+                                        WatchSecret = FrameFlip.Remote.WatchStore.Protect(watchKey) };
+        var service = new FrameFlip.Web.WatchService(watchKey, "relay.example.org", null, () => null, () => null);
+        var connections = new SettingsPage(() => watched, _ => null, () => null, new DesktopLayout());
+        typeof(SettingsPage).GetMethod("ConnectWatch", BindingFlags.Instance | BindingFlags.NonPublic)!
+            .Invoke(connections, new object?[] { new Func<FrameFlip.Web.WatchService?>(() => service), null, null,
+                                                 new Action<Action>(then => then()), new Action<string>(_ => { }) });
+        connections.SelectRemote();
+        Render(connections, 1100, 760, "settings-connections.png");
+        var connEditor = (SettingsEditor)Find<ContentControl>(connections, "EditorHost").Content;
+        var pairCard = Find<Border>(connEditor, "PairCard");
+        var watchCard = Find<Border>(connEditor, "WatchCardFrame");
+        var sideBySide = watchCard.TranslatePoint(new Point(0, 0), pairCard);
+        Check(sideBySide.X > pairCard.ActualWidth - 1 && Math.Abs(sideBySide.Y) < 1, "Connections: both cards side by side on a wide page");
+        Render(connections, 490, 900, "settings-connections-narrow.png");
+        var stacked = watchCard.TranslatePoint(new Point(0, 0), pairCard);
+        Check(Math.Abs(stacked.X) < 1 && stacked.Y >= pairCard.ActualHeight - 1, "Connections: cards stack on a narrow page");
+        connections.Dispose();
     }
     private static void TestQr()
     {

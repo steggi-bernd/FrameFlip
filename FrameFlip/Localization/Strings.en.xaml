@@ -458,6 +458,13 @@
     <sys:String x:Key="S_TabPlayback">Playback</sys:String>
     <sys:String x:Key="S_TabPerformance">Performance</sys:String>
     <sys:String x:Key="S_TabRemote">Remote</sys:String>
+    <sys:String x:Key="S_TabConnections">Connections</sys:String>
+    <sys:String x:Key="S_SectionGeneralSub">Shortcut and language.</sys:String>
+    <sys:String x:Key="S_SectionPlaybackSub">How sequences play in the preview window.</sys:String>
+    <sys:String x:Key="S_SectionPerformanceSub">Memory, prefetching and how much load FrameFlip takes.</sys:String>
+    <sys:String x:Key="S_SectionConnectionsSub">Pair your phone and invite viewers.</sys:String>
+    <sys:String x:Key="S_CardPairApp">Pair the app</sys:String>
+    <sys:String x:Key="S_CardWatch">Viewer page</sys:String>
     <sys:String x:Key="S_RemoteEnable">Send render progress to the phone</sys:String>
     <sys:String x:Key="S_RemoteHint">Nothing connects until a phone is paired. The relay only forwards bytes — it cannot read them.</sys:String>
     <sys:String x:Key="S_LibraryEnable">Let the phone see the project folders</sys:String>

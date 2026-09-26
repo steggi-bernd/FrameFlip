@@ -458,6 +458,13 @@
     <sys:String x:Key="S_TabPlayback">Wiedergabe</sys:String>
     <sys:String x:Key="S_TabPerformance">Leistung</sys:String>
     <sys:String x:Key="S_TabRemote">Fernsteuerung</sys:String>
+    <sys:String x:Key="S_TabConnections">Verbindungen</sys:String>
+    <sys:String x:Key="S_SectionGeneralSub">Tastenkürzel und Sprache.</sys:String>
+    <sys:String x:Key="S_SectionPlaybackSub">Wie Sequenzen im Vorschaufenster abgespielt werden.</sys:String>
+    <sys:String x:Key="S_SectionPerformanceSub">Arbeitsspeicher, Vorladen und wie viel Last FrameFlip sich nimmt.</sys:String>
+    <sys:String x:Key="S_SectionConnectionsSub">Handy koppeln und Zuschauer einladen.</sys:String>
+    <sys:String x:Key="S_CardPairApp">App koppeln</sys:String>
+    <sys:String x:Key="S_CardWatch">Zuschauerseite</sys:String>
     <sys:String x:Key="S_RemoteEnable">Renderfortschritt ans Handy senden</sys:String>
     <sys:String x:Key="S_RemoteHint">Ohne Kopplung wird keine Verbindung aufgebaut. Der Relais-Server reicht nur Bytes weiter – lesen kann er sie nicht.</sys:String>
     <sys:String x:Key="S_LibraryEnable">Projektordner am Handy sichtbar machen</sys:String>
