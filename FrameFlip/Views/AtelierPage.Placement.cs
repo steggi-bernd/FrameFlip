@@ -168,6 +168,7 @@ public partial class AtelierPage
         Placement.BrushAspect = Properties.BrushAspect;
         Placement.BrushAngle = Properties.BrushAngle;
         Placement.BrushFollow = Properties.BrushFollow;
+        Placement.BrushSquish = Properties.BrushSquish;
         Placement.LimitWanted = Properties.BrushObject ? ObjectLimitAt : null;
 
         Placement.InvalidateVisual();

@@ -3,6 +3,7 @@ using System.Text.Json;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Controls.Primitives;
+using System.Windows.Media;
 using System.Windows.Threading;
 using FrameFlip.Atelier;
 using FrameFlip.Configuration;
@@ -28,6 +29,8 @@ public static class BrushShapeInvariants
         OldStrokesStayRound();
         ShapesCoverWhatTheyShould();
         TheAngleFollowsTheStroke();
+        TheDirectionHoldsSteady();
+        TheDiamondReachesFurther();
         ALimitKeepsTheStrokeOut();
         EveryStrokeReplaysExactly();
         ThePageBindsToTheObject();
@@ -44,6 +47,7 @@ public static class BrushShapeInvariants
 
         Check.That(old.Shape == BrushShape.Round && old.Aspect == 1f && old.Angle == 0f && !old.Follow && old.Limit is null && old.Reach == old.Radius,
                    "ohne die neuen Felder: rund, ungestreckt, ungedreht, ungebunden");
+        Check.That(old.Version == 0 && old.Squish == 0f, "und in der Rechnung, mit der er gemalt wurde - Fassung 0, ohne Karo");
 
         // Derselbe Weg mit dem alten Tupfer von Hand gesetzt ergibt dasselbe Raster.
         var replayed = PaintedMask.For(ImageWidth, ImageHeight);
@@ -129,6 +133,141 @@ public static class BrushShapeInvariants
         Check.That(nothingYet && click.Cover()[20 * Cols + 30] == 255, "ein Klick ohne Bewegung setzt seinen Tupfer beim Loslassen");
     }
 
+    /// <summary>
+    /// Folgt der Winkel dem Strich, bleibt die Spitze ruhig: Ein zittriger Strich nach unten
+    /// malt gleichmaessig, eine Umkehr dreht die Spitze nicht, und der erste Tupfer wartet
+    /// auf eine Richtung, die mehr ist als ein Mausschritt.
+    /// </summary>
+    private static void TheDirectionHoldsSteady()
+    {
+        Check.Group("Pinsel: die Richtung bleibt ruhig");
+
+        // Eckig, 1:8, Radius 32 - halbe Laenge 8 Maskenpunkte, halbe Breite einer.
+        PaintedMask Draw(int version, float angle, IEnumerable<(float X, float Y)> path, out PaintStroke stroke)
+        {
+            var mask = PaintedMask.For(ImageWidth, ImageHeight);
+            stroke = new PaintStroke
+            {
+                Radius = 32, Hardness = 1f, Flow = 1f, Shape = BrushShape.Square, Aspect = 8f,
+                Angle = angle, Follow = true, Version = version,
+            };
+
+            bool first = true;
+            foreach (var (x, y) in path)
+            {
+                if (first) stroke.Begin(mask, x, y);
+                else stroke.To(mask, x, y);
+                first = false;
+            }
+
+            stroke.Finish(mask);
+            return mask;
+        }
+
+        // Nach unten, Bildpunkt fuer Bildpunkt, mit einem Zittern von einem Punkt zur Seite -
+        // so meldet eine Maus einen langsamen Strich.
+        var shaky = Enumerable.Range(0, 121).Select(i => (120f + (i % 2), 20f + i)).ToList();
+
+        // Wie breit die Spur im mittleren Teil ist: der aeusserste bemalte Maskenpunkt links
+        // und rechts der Mitte, ueber die Zeilen 12 bis 28.
+        int Widest(PaintedMask mask)
+        {
+            var cover = mask.Cover();
+            int widest = 0;
+
+            for (int row = 12; row <= 28; row++)
+                for (int col = 0; col < Cols; col++)
+                    if (cover[row * Cols + col] > 0) widest = Math.Max(widest, Math.Abs(col - 30));
+
+            return widest;
+        }
+
+        var before = Draw(0, 0f, shaky, out _);
+        var steady = Draw(1, 0f, shaky, out var along);
+
+        Check.That(Widest(before) >= 4, "vorher (Fassung 0): das Zittern dreht die Spitze schraeg, die Spur franst aus", $"{Widest(before)}");
+        Check.That(Widest(steady) <= 2, "jetzt: 0 Grad liegt laengs zum Weg - eine schmale, gleichmaessige Spur", $"{Widest(steady)}");
+        Check.That(Math.Abs(along.TipAngle - 90f) < 3f, "und der Ring zeigt die Spitze senkrecht, wie sie gerade malt", $"{along.TipAngle:0.#}");
+
+        // 90 Grad liegt quer: breit, und in jeder Zeile gleich breit.
+        var wide = Draw(1, 90f, shaky, out _);
+        var cover = wide.Cover();
+        bool even = Enumerable.Range(12, 17).All(row => cover[row * Cols + 30 - 7] == 255 && cover[row * Cols + 30 + 7] == 255);
+        Check.That(even, "90 Grad liegt quer: in jeder Zeile die volle Breite der Spitze");
+
+        // Hin und zurueck: Die Umkehr dreht die Spitze nicht.
+        var back = shaky.Concat(Enumerable.Range(0, 100).Select(i => (120f + (i % 2), 140f - i))).ToList();
+        Check.That(Widest(Draw(1, 0f, back, out _)) <= 2, "hin und zurueck: die Umkehr dreht die Spitze nicht");
+
+        // Ein Mausschritt ist noch keine Richtung.
+        var mask = PaintedMask.For(ImageWidth, ImageHeight);
+        var waiting = new PaintStroke { Radius = 32, Hardness = 1f, Flow = 1f, Shape = BrushShape.Square, Aspect = 8f, Follow = true, Version = 1 };
+        waiting.Begin(mask, 120, 20);
+        bool none = waiting.To(mask, 121, 21).IsEmpty && mask.Cover().All(b => b == 0);
+        waiting.To(mask, 120, 60);
+
+        Check.That(none && mask.Cover()[5 * Cols + 30] == 255 && mask.Cover()[5 * Cols + 34] == 0,
+                   "der erste Tupfer wartet auf eine Richtung - und liegt dann laengs");
+    }
+
+    /// <summary>Das Karo: zwei Ecken auseinander, zwei aufeinander zu - die Spitze kommt weiter hinaus.</summary>
+    private static void TheDiamondReachesFurther()
+    {
+        Check.Group("Pinsel: Karo");
+
+        byte At(PaintedMask m, int col, int row) => m.Cover()[row * Cols + col];
+
+        PaintedMask Dab(BrushShape shape, float squish)
+        {
+            var mask = PaintedMask.For(ImageWidth, ImageHeight);
+            mask.Stamp(120, 80, 40, 1f, 1f, 1f, 1f, new BrushTip(shape, 1f, 0f, squish), null);
+            return mask;
+        }
+
+        // Mitte (30, 20), Radius 10 Maskenpunkte. Voll gezogen reicht die lange Diagonale
+        // 14 Punkte weit, die kurze 2.
+        var square = Dab(BrushShape.Square, 0f);
+        var diamond = Dab(BrushShape.Square, 1f);
+
+        Check.That(At(diamond, 42, 32) == 255 && At(square, 42, 32) == 0 && At(diamond, 18, 8) == 255,
+                   "die lange Diagonale reicht ueber die Ecke des Quadrats hinaus - auf beiden Seiten");
+        Check.That(At(square, 38, 12) == 255 && At(diamond, 38, 12) == 0,
+                   "die kurze kommt herein: wo das Quadrat eine Ecke hat, ist beim Karo nichts");
+
+        var zero = Dab(BrushShape.Square, 0f);
+        var half = Dab(BrushShape.Square, 0.5f);
+        Check.That(zero.Cover().AsSpan().SequenceEqual(square.Cover()) && !half.Cover().AsSpan().SequenceEqual(square.Cover()),
+                   "ohne Karo das Quadrat wie bisher, halb gezogen etwas dazwischen");
+
+        Check.That(Dab(BrushShape.Round, 1f).Cover().AsSpan().SequenceEqual(Dab(BrushShape.Round, 0f).Cover()),
+                   "die runde Spitze kennt kein Karo");
+
+        var stroke = new PaintStroke { Radius = 40, Shape = BrushShape.Square, Squish = 1f };
+        Check.That(Math.Abs(stroke.Reach - 40f * MathF.Sqrt(2f) * 1.4f) < 0.01f, "die Reichweite waechst mit der langen Diagonale", $"{stroke.Reach:0.##}");
+
+        var corners = new BrushTip(BrushShape.Square, 1f, 0f, 1f).Corners(10, 10);
+        Check.That(Math.Abs(corners[0].X - 14) < 1e-4 && Math.Abs(corners[0].Y - 14) < 1e-4 &&
+                   Math.Abs(corners[1].X + 2) < 1e-4 && Math.Abs(corners[1].Y - 2) < 1e-4,
+                   "der Ring zeigt dieselben Ecken, die gemalt werden",
+                   string.Join(" ", corners.Select(c => $"({c.X:0.######}, {c.Y:0.######})")));
+    }
+
+    /// <summary>Alle Flaechen einer Zeichnung, auch in Gruppen - fuer die Probe der Vorschau.</summary>
+    private static IEnumerable<Geometry> Geometries(Drawing? drawing)
+    {
+        switch (drawing)
+        {
+            case GeometryDrawing g when g.Geometry is not null:
+                yield return g.Geometry;
+                break;
+            case DrawingGroup group:
+                foreach (var child in group.Children)
+                    foreach (var inner in Geometries(child))
+                        yield return inner;
+                break;
+        }
+    }
+
     /// <summary>Ein begrenzter Strich malt nur, so weit die Begrenzung reicht.</summary>
     private static void ALimitKeepsTheStrokeOut()
     {
@@ -184,13 +323,25 @@ public static class BrushShapeInvariants
                 Shape = random.Next(2) == 0 ? BrushShape.Round : BrushShape.Square,
                 Aspect = 1f + 5f * (float)random.NextDouble(),
                 Angle = random.Next(180),
+                Squish = random.Next(2) == 0 ? 0f : (float)random.NextDouble(),
                 Follow = random.Next(2) == 0,
                 Limit = random.Next(3) == 0 ? packed : null,
+                Version = random.Next(2),
             };
 
+            // Grosse Spruenge und kleine Zitterer - die Glaettung hat mit beiden zu tun.
             var single = PaintedMask.For(ImageWidth, ImageHeight);
-            stroke.Begin(single, random.Next(ImageWidth), random.Next(ImageHeight));
-            for (int i = 0; i < 4; i++) stroke.To(single, random.Next(ImageWidth), random.Next(ImageHeight));
+            float px = random.Next(ImageWidth), py = random.Next(ImageHeight);
+            stroke.Begin(single, px, py);
+
+            for (int i = 0; i < 12; i++)
+            {
+                if (i % 3 == 0) { px = random.Next(ImageWidth); py = random.Next(ImageHeight); }
+                else { px += random.Next(-3, 4); py += random.Next(-3, 4); }
+
+                stroke.To(single, px, py);
+            }
+
             stroke.Finish(single);
 
             var again = PaintedMask.For(ImageWidth, ImageHeight);
@@ -280,6 +431,49 @@ public static class BrushShapeInvariants
             placement.StepAngle(1);
             Check.That(placement.BrushAngle == 45f && ((Slider)properties.FindName("BrushAngleSlider")).Value == 45,
                        "ein Schritt am Rad dreht um 15 Grad - und der Regler zieht nach");
+
+            // Das Karo: nur fuer die eckige Spitze, und es kommt beim Pinsel an.
+            var squish = (Slider)properties.FindName("BrushSquishSlider");
+            var square = (ToggleButton)properties.FindName("BrushSquareToggle");
+            squish.Value = 0.5;
+            Check.That(squish.IsEnabled && placement.BrushSquish == 0.5f, "eckig: das Karo laesst sich stellen und kommt beim Pinsel an");
+
+            var made = placement.NewStroke(10, 10);
+            Check.That(made.Version == PaintStroke.CurrentVersion && made.Squish == 0.5f && made.Shape == BrushShape.Square,
+                       "ein neuer Strich traegt die heutige Rechnung und das Karo");
+
+            square.IsChecked = false;
+            Check.That(!squish.IsEnabled && placement.NewStroke(10, 10).Squish == 0f, "rund: der Regler ruht, und kein Karo im Strich");
+            square.IsChecked = true;
+
+            // Der Umriss am Zeiger: eckig, 90 Grad, 1:8 - hoch und schmal, nicht rund.
+            ((Slider)properties.FindName("BrushAngleSlider")).Value = 90;
+            ((Slider)properties.FindName("BrushAspectSlider")).Value = 8;
+            squish.Value = 0;
+
+            var outline = placement.TipOutline(new System.Windows.Point(100, 100), 40, placement.BrushAngle);
+            var box = outline.Bounds;
+            Check.That(outline is PathGeometry && Math.Abs(box.Height - 80) < 0.5 && Math.Abs(box.Width - 10) < 0.5,
+                       "der Umriss steht hochkant, 80 hoch und 10 breit", $"{box.Width:0.#} x {box.Height:0.#}");
+
+            // Die Vorschau beim Ziehen von Haerte und Abstand zeigt dieselbe Spitze - keinen Kreis.
+            bool Ellipses(PlacementAdorner.BrushKnob knob)
+            {
+                placement.BeginKnob(new System.Windows.Point(200, 200), knob);
+                var visual = new DrawingVisual();
+                using (var context = visual.RenderOpen())
+                    typeof(PlacementAdorner).GetMethod("RenderKnob", flags)!.Invoke(placement, new object[] { context });
+                placement.EndKnob();
+
+                return Geometries(visual.Drawing).Any(g => g is EllipseGeometry);
+            }
+
+            Check.That(!Ellipses(PlacementAdorner.BrushKnob.Hardness) && !Ellipses(PlacementAdorner.BrushKnob.Spacing),
+                       "Haerte und Abstand zeigen die eckige Spitze, keinen Kreis");
+
+            square.IsChecked = false;
+            ((Slider)properties.FindName("BrushAspectSlider")).Value = 1;
+            Check.That(Ellipses(PlacementAdorner.BrushKnob.Hardness), "und beim runden Pinsel den Kreis wie bisher");
         }
         finally
         {

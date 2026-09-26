@@ -113,6 +113,19 @@
                 <TextBlock x:Name="BrushAspectValue" Style="{StaticResource PanelValue}"
                            VerticalAlignment="Center" Width="36" Margin="6,0,10,0" HorizontalAlignment="Left" />
 
+                <!-- Das Karo gibt es nur fuer die eckige Spitze. -->
+                <StackPanel x:Name="BrushSquishRow" Orientation="Horizontal" VerticalAlignment="Center"
+                            IsEnabled="{Binding IsChecked, ElementName=BrushSquareToggle}">
+                    <TextBlock Text="{DynamicResource S_BrushSquish}" Style="{StaticResource PanelLabel}"
+                               VerticalAlignment="Center" Margin="0,0,6,0" ToolTip="{DynamicResource S_BrushSquishHint}" />
+                    <Slider x:Name="BrushSquishSlider" Style="{StaticResource PanelSlider}" Width="60"
+                            VerticalAlignment="Center" Minimum="0" Maximum="1" Value="0" SmallChange="0.05" LargeChange="0.25"
+                            ToolTip="{DynamicResource S_BrushSquishHint}"
+                            ValueChanged="OnBrushChanged" MouseDoubleClick="OnBrushReset" Tag="0" />
+                    <TextBlock x:Name="BrushSquishValue" Style="{StaticResource PanelValue}"
+                               VerticalAlignment="Center" Width="36" Margin="6,0,10,0" HorizontalAlignment="Left" />
+                </StackPanel>
+
                 <ToggleButton x:Name="BrushFollowToggle" Style="{StaticResource OverlayToggle}"
                               VerticalAlignment="Center" Content="↻" ToolTip="{DynamicResource S_BrushFollowHint}"
                               Checked="OnBrushToggle" Unchecked="OnBrushToggle" />

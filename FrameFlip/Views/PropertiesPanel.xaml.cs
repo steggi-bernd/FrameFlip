@@ -69,6 +69,9 @@ public partial class PropertiesPanel : UserControl
     /// <summary>Der Winkel folgt dem Strich.</summary>
     public bool BrushFollow => BrushFollowToggle.IsChecked == true;
 
+    /// <summary>Wie weit die eckige Spitze zum Karo gezogen ist, 0 bis 1.</summary>
+    public float BrushSquish => (float)BrushSquishSlider.Value;
+
     /// <summary>Der Strich bleibt auf dem Objekt, auf dem er beginnt.</summary>
     public bool BrushObject => BrushObjectToggle.IsChecked == true;
 
@@ -122,6 +125,7 @@ public partial class PropertiesPanel : UserControl
         BrushSpacingValue.Text = $"{BrushSpacingSlider.Value * 100:0} %";
         BrushAngleValue.Text = $"{BrushAngleSlider.Value:0}°";
         BrushAspectValue.Text = $"1:{BrushAspectSlider.Value:0.##}";
+        BrushSquishValue.Text = $"{BrushSquishSlider.Value * 100:0} %";
     }
 
     private float? _depth;
