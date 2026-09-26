@@ -21,7 +21,225 @@
         <TabControl x:Name="Tabs" Grid.Row="0" Style="{StaticResource SettingsSections}" Background="Transparent"
                     SelectionChanged="OnSectionChanged">
 
-            <TabItem Style="{StaticResource SettingsSection}" Header="{DynamicResource S_TabGeneral}">
+            <TabItem x:Name="OverviewTab" Style="{StaticResource SettingsSection}" Header="{DynamicResource S_TabOverview}">
+                <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" Padding="0,4,10,8">
+                    <!-- Entwurf 2: erst der Zustand, dann je Kategorie das Wichtigste zum
+                         direkten Aendern. Die Regler der Kacheln sind an dieselben Felder
+                         gebunden wie auf den Kategorieseiten - eine Einstellung, zwei Stellen,
+                         kein zweiter Stand. Die Breite waechst mit dem Fenster, siehe
+                         ShowWidths. -->
+                    <StackPanel x:Name="OverviewBody" MaxWidth="{DynamicResource SettingsOverviewWidth}">
+                        <TextBlock Style="{StaticResource SettingsPageTitle}" Text="{DynamicResource S_TabOverview}" />
+                        <TextBlock Style="{StaticResource SettingsPageSub}" Text="{DynamicResource S_SectionOverviewSub}" />
+
+                        <UniformGrid x:Name="StatusStrip" Columns="4" Margin="0,0,-10,8">
+                            <Border Style="{StaticResource SettingsStat}">
+                                <StackPanel>
+                                    <TextBlock Style="{StaticResource SettingsStatLabel}" Text="{DynamicResource S_StatusRelay}" />
+                                    <TextBlock x:Name="StatusRelay" Style="{StaticResource SettingsStatValue}" />
+                                </StackPanel>
+                            </Border>
+                            <Border Style="{StaticResource SettingsStat}">
+                                <StackPanel>
+                                    <TextBlock Style="{StaticResource SettingsStatLabel}" Text="{DynamicResource S_StatusBridge}" />
+                                    <TextBlock x:Name="StatusBridge" Style="{StaticResource SettingsStatValue}" />
+                                </StackPanel>
+                            </Border>
+                            <Border Style="{StaticResource SettingsStat}">
+                                <StackPanel>
+                                    <TextBlock Style="{StaticResource SettingsStatLabel}" Text="{DynamicResource S_StatusViewers}" />
+                                    <TextBlock x:Name="StatusViewers" Style="{StaticResource SettingsStatValue}" />
+                                </StackPanel>
+                            </Border>
+                            <Border Style="{StaticResource SettingsStat}">
+                                <StackPanel>
+                                    <TextBlock Style="{StaticResource SettingsStatLabel}" Text="{DynamicResource S_StatusMemory}" />
+                                    <TextBlock x:Name="StatusMemory" Style="{StaticResource SettingsStatValue}" />
+                                </StackPanel>
+                            </Border>
+                        </UniformGrid>
+
+                        <UniformGrid x:Name="OverviewTiles" Columns="3" Margin="0,0,-12,0">
+                            <Border x:Name="TilePlayback" Style="{StaticResource SettingsTile}">
+                                <StackPanel>
+                                    <DockPanel Cursor="Hand" Tag="PlaybackTab" MouseLeftButtonUp="OnTileOpen" Background="Transparent">
+                                        <TextBlock DockPanel.Dock="Right" Text="›" FontSize="15" Foreground="{StaticResource DesktopMuted}" VerticalAlignment="Center" />
+                                        <TextBlock Text="▶" Width="22" FontSize="13" Foreground="{StaticResource DesktopAccent}" VerticalAlignment="Center" />
+                                        <TextBlock Style="{StaticResource SettingsTileTitle}" Text="{DynamicResource S_TabPlayback}" />
+                                    </DockPanel>
+                                    <Grid Margin="0,10,0,0">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="Auto" />
+                                        </Grid.ColumnDefinitions>
+                                        <Grid.RowDefinitions>
+                                            <RowDefinition Height="Auto" />
+                                            <RowDefinition Height="Auto" />
+                                        </Grid.RowDefinitions>
+                                        <TextBlock Grid.Row="0" Style="{StaticResource SettingsTileLabel}" Text="{DynamicResource S_FrameRate}" Margin="0,4,10,4" />
+                                        <ContentControl Grid.Row="0" Grid.Column="1" Margin="0,3,0,3" HorizontalAlignment="Right" Focusable="False">
+                                            <ComboBox Style="{StaticResource DesktopCombo}" Width="120" Tag="fps" ItemsSource="{Binding ItemsSource, ElementName=FpsBox}" SelectedItem="{Binding SelectedItem, ElementName=FpsBox, Mode=TwoWay}" />
+                                        </ContentControl>
+                                        <TextBlock Grid.Row="1" Style="{StaticResource SettingsTileLabel}" Text="{DynamicResource S_LoopSeamless}" Margin="0,4,10,4" />
+                                        <ContentControl Grid.Row="1" Grid.Column="1" Margin="0,3,0,3" HorizontalAlignment="Right" Focusable="False">
+                                            <CheckBox Style="{StaticResource DesktopCheckBox}" IsChecked="{Binding IsChecked, ElementName=LoopBox, Mode=TwoWay}" />
+                                        </ContentControl>
+                                    </Grid>
+                                    <TextBlock Style="{StaticResource SettingsTileMore}" Text="{DynamicResource S_TileMore}"
+                                               Tag="PlaybackTab" MouseLeftButtonUp="OnTileOpen" />
+                                </StackPanel>
+                            </Border>
+                            <Border x:Name="TilePerformance" Style="{StaticResource SettingsTile}">
+                                <StackPanel>
+                                    <DockPanel Cursor="Hand" Tag="PerformanceTab" MouseLeftButtonUp="OnTileOpen" Background="Transparent">
+                                        <TextBlock DockPanel.Dock="Right" Text="›" FontSize="15" Foreground="{StaticResource DesktopMuted}" VerticalAlignment="Center" />
+                                        <TextBlock Text="◔" Width="22" FontSize="13" Foreground="{StaticResource DesktopAccent}" VerticalAlignment="Center" />
+                                        <TextBlock Style="{StaticResource SettingsTileTitle}" Text="{DynamicResource S_TabPerformance}" />
+                                    </DockPanel>
+                                    <Grid Margin="0,10,0,0">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="Auto" />
+                                        </Grid.ColumnDefinitions>
+                                        <Grid.RowDefinitions>
+                                            <RowDefinition Height="Auto" />
+                                            <RowDefinition Height="Auto" />
+                                        </Grid.RowDefinitions>
+                                        <TextBlock Grid.Row="0" Style="{StaticResource SettingsTileLabel}" Text="{DynamicResource S_MemoryBudget}" Margin="0,4,10,4" />
+                                        <ContentControl Grid.Row="0" Grid.Column="1" Margin="0,3,0,3" HorizontalAlignment="Right" Focusable="False">
+                                            <TextBox Style="{StaticResource DashTextBox}" Width="90" Text="{Binding Text, ElementName=BudgetBox, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+                                        </ContentControl>
+                                        <TextBlock Grid.Row="1" Style="{StaticResource SettingsTileLabel}" Text="{DynamicResource S_MaxThreads}" Margin="0,4,10,4" />
+                                        <ContentControl Grid.Row="1" Grid.Column="1" Margin="0,3,0,3" HorizontalAlignment="Right" Focusable="False">
+                                            <TextBox Style="{StaticResource DashTextBox}" Width="90" Text="{Binding Text, ElementName=ThreadsBox, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+                                        </ContentControl>
+                                    </Grid>
+                                    <TextBlock Style="{StaticResource SettingsTileMore}" Text="{DynamicResource S_TileMore}"
+                                               Tag="PerformanceTab" MouseLeftButtonUp="OnTileOpen" />
+                                </StackPanel>
+                            </Border>
+                            <Border x:Name="TileConnections" Style="{StaticResource SettingsTile}">
+                                <StackPanel>
+                                    <DockPanel Cursor="Hand" Tag="ConnectionsTab" MouseLeftButtonUp="OnTileOpen" Background="Transparent">
+                                        <TextBlock DockPanel.Dock="Right" Text="›" FontSize="15" Foreground="{StaticResource DesktopMuted}" VerticalAlignment="Center" />
+                                        <TextBlock Text="⌁" Width="22" FontSize="13" Foreground="{StaticResource DesktopAccent}" VerticalAlignment="Center" />
+                                        <TextBlock Style="{StaticResource SettingsTileTitle}" Text="{DynamicResource S_TabConnections}" />
+                                    </DockPanel>
+                                    <Grid Margin="0,10,0,0">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="Auto" />
+                                        </Grid.ColumnDefinitions>
+                                        <Grid.RowDefinitions>
+                                            <RowDefinition Height="Auto" />
+                                            <RowDefinition Height="Auto" />
+                                        </Grid.RowDefinitions>
+                                        <TextBlock Grid.Row="0" Style="{StaticResource SettingsTileLabel}" Text="{DynamicResource S_RemoteEnable}" Margin="0,4,10,4" />
+                                        <ContentControl Grid.Row="0" Grid.Column="1" Margin="0,3,0,3" HorizontalAlignment="Right" Focusable="False">
+                                            <CheckBox Style="{StaticResource DesktopCheckBox}" IsChecked="{Binding IsChecked, ElementName=RemoteBox, Mode=TwoWay}" />
+                                        </ContentControl>
+                                        <TextBlock Grid.Row="1" Style="{StaticResource SettingsTileLabel}" Text="{DynamicResource S_CardWatch}" Margin="0,4,10,4" />
+                                        <ContentControl Grid.Row="1" Grid.Column="1" Margin="0,3,0,3" HorizontalAlignment="Right" Focusable="False">
+                                            <CheckBox x:Name="TileWatch" Style="{StaticResource DesktopCheckBox}" IsChecked="{Binding IsChecked, ElementName=WatchToggle, Mode=TwoWay}" IsEnabled="False" />
+                                        </ContentControl>
+                                    </Grid>
+                                    <TextBlock Style="{StaticResource SettingsTileMore}" Text="{DynamicResource S_TileMoreConnections}"
+                                               Tag="ConnectionsTab" MouseLeftButtonUp="OnTileOpen" />
+                                </StackPanel>
+                            </Border>
+                            <Border x:Name="TilePermissions" Style="{StaticResource SettingsTile}">
+                                <StackPanel>
+                                    <DockPanel Cursor="Hand" Tag="PermissionsTab" MouseLeftButtonUp="OnTileOpen" Background="Transparent">
+                                        <TextBlock DockPanel.Dock="Right" Text="›" FontSize="15" Foreground="{StaticResource DesktopMuted}" VerticalAlignment="Center" />
+                                        <TextBlock Text="◆" Width="22" FontSize="13" Foreground="{StaticResource DesktopAccent}" VerticalAlignment="Center" />
+                                        <TextBlock Style="{StaticResource SettingsTileTitle}" Text="{DynamicResource D_Permissions}" />
+                                    </DockPanel>
+                                    <Grid Margin="0,10,0,0">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="Auto" />
+                                        </Grid.ColumnDefinitions>
+                                        <Grid.RowDefinitions>
+                                            <RowDefinition Height="Auto" />
+                                            <RowDefinition Height="Auto" />
+                                        </Grid.RowDefinitions>
+                                        <TextBlock Grid.Row="0" Style="{StaticResource SettingsTileLabel}" Text="{DynamicResource D_BlenderBridge}" Margin="0,4,10,4" />
+                                        <ContentControl Grid.Row="0" Grid.Column="1" Margin="0,3,0,3" HorizontalAlignment="Right" Focusable="False">
+                                            <CheckBox Style="{StaticResource DesktopCheckBox}" IsChecked="{Binding IsChecked, ElementName=BridgeBox, Mode=TwoWay}" />
+                                        </ContentControl>
+                                        <TextBlock Grid.Row="1" Style="{StaticResource SettingsTileLabel}" Text="{DynamicResource S_RenderEnable}" Margin="0,4,10,4" />
+                                        <ContentControl Grid.Row="1" Grid.Column="1" Margin="0,3,0,3" HorizontalAlignment="Right" Focusable="False">
+                                            <CheckBox Style="{StaticResource DesktopCheckBox}" IsChecked="{Binding IsChecked, ElementName=RenderBox, Mode=TwoWay}" />
+                                        </ContentControl>
+                                    </Grid>
+                                    <TextBlock Style="{StaticResource SettingsTileMore}" Text="{DynamicResource S_TileMore}"
+                                               Tag="PermissionsTab" MouseLeftButtonUp="OnTileOpen" />
+                                </StackPanel>
+                            </Border>
+                            <Border x:Name="TileAppearance" Style="{StaticResource SettingsTile}">
+                                <StackPanel>
+                                    <DockPanel Cursor="Hand" Tag="AppearanceTab" MouseLeftButtonUp="OnTileOpen" Background="Transparent">
+                                        <TextBlock DockPanel.Dock="Right" Text="›" FontSize="15" Foreground="{StaticResource DesktopMuted}" VerticalAlignment="Center" />
+                                        <TextBlock Text="▦" Width="22" FontSize="13" Foreground="{StaticResource DesktopAccent}" VerticalAlignment="Center" />
+                                        <TextBlock Style="{StaticResource SettingsTileTitle}" Text="{DynamicResource D_Appearance}" />
+                                    </DockPanel>
+                                    <Grid Margin="0,10,0,0">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="Auto" />
+                                        </Grid.ColumnDefinitions>
+                                        <Grid.RowDefinitions>
+                                            <RowDefinition Height="Auto" />
+                                            <RowDefinition Height="Auto" />
+                                        </Grid.RowDefinitions>
+                                        <TextBlock Grid.Row="0" Style="{StaticResource SettingsTileLabel}" Text="{DynamicResource D_UiScale}" Margin="0,4,10,4" />
+                                        <ContentControl Grid.Row="0" Grid.Column="1" Margin="0,3,0,3" HorizontalAlignment="Right" Focusable="False">
+                                            <TextBlock x:Name="TileScaleValue" FontSize="12" Foreground="{StaticResource DesktopAccent}" VerticalAlignment="Center" />
+                                        </ContentControl>
+                                        <TextBlock Grid.Row="1" Style="{StaticResource SettingsTileLabel}" Text="{DynamicResource D_UiScaleAuto}" Margin="0,4,10,4" />
+                                        <ContentControl Grid.Row="1" Grid.Column="1" Margin="0,3,0,3" HorizontalAlignment="Right" Focusable="False">
+                                            <CheckBox x:Name="TileAutoScale" Style="{StaticResource DesktopCheckBox}" Checked="OnTileAutoScale" Unchecked="OnTileAutoScale" />
+                                        </ContentControl>
+                                    </Grid>
+                                    <TextBlock Style="{StaticResource SettingsTileMore}" Text="{DynamicResource S_TileMore}"
+                                               Tag="AppearanceTab" MouseLeftButtonUp="OnTileOpen" />
+                                </StackPanel>
+                            </Border>
+                            <Border x:Name="TileGeneral" Style="{StaticResource SettingsTile}">
+                                <StackPanel>
+                                    <DockPanel Cursor="Hand" Tag="GeneralTab" MouseLeftButtonUp="OnTileOpen" Background="Transparent">
+                                        <TextBlock DockPanel.Dock="Right" Text="›" FontSize="15" Foreground="{StaticResource DesktopMuted}" VerticalAlignment="Center" />
+                                        <TextBlock Text="Aa" Width="22" FontSize="13" Foreground="{StaticResource DesktopAccent}" VerticalAlignment="Center" />
+                                        <TextBlock Style="{StaticResource SettingsTileTitle}" Text="{DynamicResource S_TabGeneral}" />
+                                    </DockPanel>
+                                    <Grid Margin="0,10,0,0">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="Auto" />
+                                        </Grid.ColumnDefinitions>
+                                        <Grid.RowDefinitions>
+                                            <RowDefinition Height="Auto" />
+                                            <RowDefinition Height="Auto" />
+                                        </Grid.RowDefinitions>
+                                        <TextBlock Grid.Row="0" Style="{StaticResource SettingsTileLabel}" Text="{DynamicResource S_Language}" Margin="0,4,10,4" />
+                                        <ContentControl Grid.Row="0" Grid.Column="1" Margin="0,3,0,3" HorizontalAlignment="Right" Focusable="False">
+                                            <ComboBox Style="{StaticResource DesktopCombo}" Width="120" ItemsSource="{Binding ItemsSource, ElementName=LanguageBox}" SelectedItem="{Binding SelectedItem, ElementName=LanguageBox, Mode=TwoWay}" />
+                                        </ContentControl>
+                                        <TextBlock Grid.Row="1" Style="{StaticResource SettingsTileLabel}" Text="{DynamicResource S_Hotkey}" Margin="0,4,10,4" />
+                                        <ContentControl Grid.Row="1" Grid.Column="1" Margin="0,3,0,3" HorizontalAlignment="Right" Focusable="False">
+                                            <TextBlock FontSize="12" FontFamily="{StaticResource MonoFont}" Foreground="{StaticResource DesktopInk}" VerticalAlignment="Center" Text="{Binding Text, ElementName=HotkeyBox}" />
+                                        </ContentControl>
+                                    </Grid>
+                                    <TextBlock Style="{StaticResource SettingsTileMore}" Text="{DynamicResource S_TileMore}"
+                                               Tag="GeneralTab" MouseLeftButtonUp="OnTileOpen" />
+                                </StackPanel>
+                            </Border>
+                        </UniformGrid>
+                    </StackPanel>
+                </ScrollViewer>
+            </TabItem>
+
+            <TabItem x:Name="GeneralTab" Style="{StaticResource SettingsSection}" Header="{DynamicResource S_TabGeneral}">
                 <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" Padding="0,4,10,8">
                     <StackPanel Style="{StaticResource SettingsPageBody}">
                         <TextBlock Style="{StaticResource SettingsPageTitle}" Text="{DynamicResource S_TabGeneral}" />
@@ -46,7 +264,7 @@
                 </ScrollViewer>
             </TabItem>
 
-            <TabItem Style="{StaticResource SettingsSection}" Header="{DynamicResource S_TabPlayback}">
+            <TabItem x:Name="PlaybackTab" Style="{StaticResource SettingsSection}" Header="{DynamicResource S_TabPlayback}">
                 <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" Padding="0,4,10,8">
                     <StackPanel Style="{StaticResource SettingsPageBody}">
                         <TextBlock Style="{StaticResource SettingsPageTitle}" Text="{DynamicResource S_TabPlayback}" />
@@ -55,7 +273,7 @@
                         <views:SettingGroup Style="{StaticResource SettingGroupStyle}">
                             <views:SettingRow Style="{StaticResource SettingRowStyle}" Header="{DynamicResource S_FrameRate}"
                                               Explain="{DynamicResource X_FrameRate}" Important="True">
-                                <ComboBox x:Name="FpsBox" Style="{StaticResource DesktopCombo}" Width="180" />
+                                <ComboBox x:Name="FpsBox" Style="{StaticResource DesktopCombo}" Width="180" Tag="fps" />
                             </views:SettingRow>
 
                             <views:SettingRow Style="{StaticResource SettingRowStyle}" Header="{DynamicResource S_LoopSeamless}">
@@ -76,7 +294,7 @@
                 </ScrollViewer>
             </TabItem>
 
-            <TabItem Style="{StaticResource SettingsSection}" Header="{DynamicResource S_TabPerformance}">
+            <TabItem x:Name="PerformanceTab" Style="{StaticResource SettingsSection}" Header="{DynamicResource S_TabPerformance}">
                 <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" Padding="0,4,10,8">
                     <StackPanel Style="{StaticResource SettingsPageBody}">
                         <TextBlock Style="{StaticResource SettingsPageTitle}" Text="{DynamicResource S_TabPerformance}" />
@@ -124,7 +342,7 @@
                 </ScrollViewer>
             </TabItem>
 
-            <TabItem Style="{StaticResource SettingsSection}" Header="{DynamicResource S_TabConnections}">
+            <TabItem x:Name="ConnectionsTab" Style="{StaticResource SettingsSection}" Header="{DynamicResource S_TabConnections}">
                 <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" Padding="0,4,10,8">
                     <StackPanel Style="{StaticResource SettingsPageBody}">
                         <TextBlock Style="{StaticResource SettingsPageTitle}" Text="{DynamicResource S_TabConnections}" />
@@ -239,7 +457,7 @@
                 </ScrollViewer>
             </TabItem>
 
-            <TabItem Style="{StaticResource SettingsSection}" Header="{DynamicResource D_Permissions}">
+            <TabItem x:Name="PermissionsTab" Style="{StaticResource SettingsSection}" Header="{DynamicResource D_Permissions}">
                 <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" Padding="0,4,10,8">
                     <StackPanel Style="{StaticResource SettingsPageBody}">
                         <TextBlock Style="{StaticResource SettingsPageTitle}" Text="{DynamicResource D_Permissions}" />

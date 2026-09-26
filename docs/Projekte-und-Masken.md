@@ -271,6 +271,34 @@ Offen: Die Seite „Arbeitsbereich“ hat ihre eigene Einleitung und eine Gruppe
 Namens. Sie bleibt, wie sie war, weil das Panel nur hier hängt und sein Umbau ein
 eigener Schritt wäre.
 
+*Nachgebessert (26. September, Rückmeldung „zu viel Platz, zu mau“, Entwurf 2):*
+
+- **Übersicht** als erster Abschnitt:
+  - Oben stehen vier Zustandsfelder: Handy, Blender-Brücke, Zuschauer und
+    Vorschau-Speicher.
+  - Darunter hat jede Kategorie eine Kachel mit dem, was man am häufigsten ändert.
+  - Die Regler der Kacheln sind an dieselben Felder gebunden wie auf den Kategorieseiten.
+    Es gibt keinen zweiten Stand, und „Übernehmen“ nimmt beides.
+  - Ein Klick auf eine Kachel öffnet ihre Kategorie.
+- **Breite wächst mit:** Die Übersicht wird bis 1320 Punkte breit, mit ein bis drei
+  Kachelspalten. Die Kategorieseiten werden bis 960 breit, weil eine Zeile mit
+  Beschriftung links und Regler rechts über mehr Breite nicht besser wird.
+- **Skalierung „Nach Bildschirm“:**
+  - 1080 Punkte Höhe ergeben 100 %, 1440 etwa 115 %, 4K mit 100 % ergibt 135 %.
+  - Sie ersetzt die eine grobe Stufe für große Fenster und folgt dem Bildschirm beim
+    Verschieben.
+  - Strg+Plus/Minus geht vom automatischen Wert aus in feste Schritte über.
+  - Ist die Automatik aus, bleibt alles wie bisher.
+- **Befunde:**
+  - Die Einheit „fps“ stand fest im Stil der Auswahllisten, also auch hinter Sprache
+    und Kanal. Behoben.
+  - Die Einstellungstests aus #32 lasen die `desktop-layout.json` des Nutzers, weil der
+    Editor ohne eigenes Layout gebaut wurde. Geschrieben haben sie nichts. Behoben: Die
+    Tests laufen in einem eigenen Ordner.
+  - Die UI-Testreihe scheitert gelegentlich an „Arrow key on the viewer advances exactly
+    one frame“, auch auf dem unveränderten Stand. Das ist ein Zeitproblem beim
+    Dekodieren. Notiert, nicht geändert.
+
 ## 5. Reihenfolge
 
 Jede Phase besteht aus eigenen Zweigen und PRs. Für die Strukturteile gelten die Regeln
@@ -435,3 +463,5 @@ Getroffen am 26. September 2026:
    Ebenenliste zu erreichen, zusammen mit den übrigen Handgriffen ihrer Maske, und über
    einen Knopf im Pinselbereich. Das Speichern des Verlaufs läuft vollständig im
    Hintergrund, weil nun fast jeder Strich einen Stand ergibt.
+10. **Einstellungen: Entwurf 2**, eine Übersicht mit Zustandsfeldern und Kacheln, dazu
+    die Skalierung nach Bildschirm.

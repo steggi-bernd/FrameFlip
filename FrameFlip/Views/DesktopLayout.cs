@@ -6,6 +6,26 @@ namespace FrameFlip.Views;
 public sealed class DesktopLayout
 {
     public double Scale { get; set; } = 1;
+
+    /// <summary>
+    /// Die Bedienskalierung folgt dem Bildschirm statt einem festen Wert - siehe
+    /// <see cref="AutoFor"/>. Strg+Plus/Minus schaltet auf einen festen Wert zurueck,
+    /// ausgehend vom automatischen.
+    /// </summary>
+    public bool AutoScale { get; set; }
+
+    /// <summary>
+    /// Die Skalierung fuer einen Bildschirm dieser wirksamen Hoehe: 1080 Punkte ergeben
+    /// 100 %, 1440 etwa 115 %, 2160 (4K mit 100 %) 135 %. Die Wurzel, weil ein doppelt so
+    /// hoher Schirm nicht doppelt so grosse Schrift braucht - er steht meist weiter weg
+    /// und ist groesser, aber nicht doppelt. In Zwanzigsteln und in den Grenzen des Reglers.
+    /// </summary>
+    public static double AutoFor(double effectiveHeight)
+    {
+        if (!double.IsFinite(effectiveHeight) || effectiveHeight <= 0) return 1;
+
+        return Math.Clamp(Math.Round(Math.Sqrt(effectiveHeight / 1080.0) * 20) / 20, .85, 1.35);
+    }
     public double NavigationWidth { get; set; } = 204;
     public double MonitorShare { get; set; } = .40;
     public double TileSize { get; set; } = 174;
@@ -45,7 +65,7 @@ public sealed class DesktopLayout
     }
     public void Reset()
     {
-        Scale = 1; NavigationWidth = 204; MonitorShare = .40; TileSize = 174;
+        Scale = 1; AutoScale = false; NavigationWidth = 204; MonitorShare = .40; TileSize = 174;
         LowerPanelHeight = 240;
         MonitorFirst = false; ReduceMotion = false; LightQr = true; Save();
     }

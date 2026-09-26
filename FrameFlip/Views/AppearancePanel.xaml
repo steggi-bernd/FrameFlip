@@ -25,6 +25,10 @@
                         <TextBlock x:Name="ScaleValue" MinWidth="52" Margin="10,0,0,0"
                                    VerticalAlignment="Center" TextAlignment="Right"
                                    Foreground="{StaticResource DesktopAccent}" FontSize="11" />
+                        <CheckBox x:Name="AutoScaleBox" Style="{StaticResource DesktopCheckBox}"
+                                  Content="{DynamicResource D_UiScaleAuto}" Margin="14,0,0,0"
+                                  VerticalAlignment="Center" ToolTip="{DynamicResource X_UiScaleAuto}"
+                                  Checked="OnChanged" Unchecked="OnChanged" />
                     </StackPanel>
                 </views:SettingRow>
 

@@ -12,6 +12,9 @@ public partial class SettingsPage : UserControl, IDisposable
 
     /// <summary>Womit die Zuschauerkarte verbunden ist - ein neu gebauter Editor bekommt es wieder.</summary>
     private Action<SettingsEditor>? _connectWatch;
+
+    /// <summary>Woher die Uebersicht den Zustand des Wirts liest - ebenso.</summary>
+    private Func<SettingsStatus>? _status;
     public SettingsPage(Func<AppSettings> current, Func<AppSettings, string?> apply, Func<RelayState?> state, DesktopLayout layout)
     { _current = current; _apply = apply; _state = state; _layout = layout; InitializeComponent(); Rebuild(); }
     private void Rebuild()
@@ -20,6 +23,7 @@ public partial class SettingsPage : UserControl, IDisposable
         _editor = new SettingsEditor(_current(), _apply, _state, _current, _layout);
         _editor.Cancelled += Rebuild; EditorHost.Content = _editor;
         _connectWatch?.Invoke(_editor);
+        if (_status is not null) _editor.ConnectStatus(_status);
     }
     public void SelectRemote() => _editor.SelectRemote();
 
@@ -30,6 +34,13 @@ public partial class SettingsPage : UserControl, IDisposable
         _connectWatch = editor => editor.ConnectWatch(watch, renew, setCode, askTerms, note);
         _connectWatch(_editor);
     }
+    /// <summary>Verbindet den Zustand fuer die Uebersicht - siehe <see cref="SettingsEditor.ConnectStatus"/>.</summary>
+    internal void ConnectStatus(Func<SettingsStatus> status)
+    {
+        _status = status;
+        _editor.ConnectStatus(status);
+    }
+
     public void SelectAppearance() => _editor.SelectAppearance();
     public void Dispose() => _editor.Dispose();
 }

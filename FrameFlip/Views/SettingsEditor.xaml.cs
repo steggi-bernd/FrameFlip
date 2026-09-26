@@ -44,6 +44,14 @@ public partial class SettingsEditor : System.Windows.Controls.UserControl, IDisp
     /// <summary>Die Karte der Zuschauerseite - erst, wenn ein Wirt sie mit dem Dienst verbindet.</summary>
     private WatchCard? _watchCard;
 
+    /// <summary>Der Dienst der Zuschauerseite - fuer die Zahl der Zuschauer in der Uebersicht.</summary>
+    private Func<Web.WatchService?>? _watchSource;
+
+    /// <summary>Was nur der Wirt weiss: ob die Bruecke lauscht, wie voll der Vorschau-Speicher ist.</summary>
+    private Func<SettingsStatus>? _status;
+
+    private AppearancePanel _appearance = null!;
+
     /// <param name="apply">Uebernimmt die Einstellungen. Rueckgabe: Fehlertext oder null.</param>
     public SettingsEditor(AppSettings current, Func<AppSettings, string?> apply, Func<RelayState?>? remoteState = null, Func<AppSettings>? latest = null, DesktopLayout? layout = null)
     {
@@ -54,7 +62,8 @@ public partial class SettingsEditor : System.Windows.Controls.UserControl, IDisp
         _remoteState = remoteState ?? (() => null);
 
         InitializeComponent();
-        AppearanceHost.Content = new AppearancePanel(_layout);
+        AppearanceHost.Content = _appearance = new AppearancePanel(_layout);
+        ShowScaleTile();
         BridgeBox.IsChecked = current.BridgeEnabled;
         BlenderPathBox.Text = current.BlenderPath;
         RenderBox.IsChecked = current.HeadlessRenderEnabled;
@@ -89,9 +98,24 @@ public partial class SettingsEditor : System.Windows.Controls.UserControl, IDisp
         ThreadsBox.Text = current.MaxDecoderThreads.ToString(CultureInfo.InvariantCulture);
 
         UpdateThreadHint();
-        Loaded += (_, _) => { Strings.Changed += UpdateThreadHint; _remoteTicker?.Start(); _watchCard?.Refresh(); };
-        Unloaded += (_, _) => { Strings.Changed -= UpdateThreadHint; _remoteTicker?.Stop(); _watchCard?.Detach(); };
+        Loaded += (_, _) =>
+        {
+            Strings.Changed += UpdateThreadHint;
+            _layout.Changed += ShowScaleTile;
+            _remoteTicker?.Start();
+            _watchCard?.Refresh();
+            ShowScaleTile();
+            UpdateStatus();
+        };
+        Unloaded += (_, _) =>
+        {
+            Strings.Changed -= UpdateThreadHint;
+            _layout.Changed -= ShowScaleTile;
+            _remoteTicker?.Stop();
+            _watchCard?.Detach();
+        };
         SizeChanged += (_, _) => ShowNarrow();
+        OverviewBody.SizeChanged += (_, _) => ShowOverviewColumns();
 
         // Ohne Wirt gibt es keinen Dienst - die Karte bleibt weg, bis ConnectWatch kommt.
         WatchCardFrame.Visibility = Visibility.Collapsed;
@@ -118,7 +142,11 @@ public partial class SettingsEditor : System.Windows.Controls.UserControl, IDisp
             Interval = TimeSpan.FromSeconds(1)
         };
 
-        _remoteTicker.Tick += (_, _) => UpdateRemoteState();
+        _remoteTicker.Tick += (_, _) =>
+        {
+            UpdateRemoteState();
+            if (Tabs.SelectedItem == OverviewTab) UpdateStatus();
+        };
 
 
         UpdateRemoteState();
@@ -439,6 +467,8 @@ public partial class SettingsEditor : System.Windows.Controls.UserControl, IDisp
     internal void ConnectWatch(Func<Web.WatchService?> watch, Action? renew, Action<string?>? setCode,
                                Action<Action> askTerms, Action<string> note)
     {
+        _watchSource = watch;
+
         _watchCard = new WatchCard(
             new WatchCard.Parts(WatchToggle, WatchToggleText, WatchCodeFrame, WatchCode, WatchAddress, WatchHint,
                                 WatchPassRow, WatchPass, WatchPassHint, WatchActions),
@@ -446,6 +476,7 @@ public partial class SettingsEditor : System.Windows.Controls.UserControl, IDisp
                                askTerms, note, ShowStatus, CardAction, CopyToClipboard));
 
         WatchCardFrame.Visibility = Visibility.Visible;
+        TileWatch.IsEnabled = true;
         ShowCardColumns();
 
         _watchCard.Refresh();
@@ -492,7 +523,86 @@ public partial class SettingsEditor : System.Windows.Controls.UserControl, IDisp
         // Auch die Auswahllisten auf den Seiten melden ihre Wahl hierher - nur die der Leiste zaehlt.
         if (!ReferenceEquals(e.OriginalSource, Tabs)) return;
 
-        if (Tabs.SelectedIndex == 3) _watchCard?.Refresh();
+        if (Tabs.SelectedItem == ConnectionsTab) _watchCard?.Refresh();
+        if (Tabs.SelectedItem == OverviewTab) UpdateStatus();
+    }
+
+    /// <summary>Eine Kachel der Uebersicht oeffnet ihre Kategorie - ueber den Namen des Reiters in Tag.</summary>
+    private void OnTileOpen(object sender, MouseButtonEventArgs e)
+    {
+        if ((sender as FrameworkElement)?.Tag is not string name || FindName(name) is not System.Windows.Controls.TabItem tab) return;
+
+        Tabs.SelectedItem = tab;
+        e.Handled = true;
+    }
+
+    /// <summary>Verbindet den Zustand, den nur der Wirt kennt - Bruecke und Vorschau-Speicher.</summary>
+    internal void ConnectStatus(Func<SettingsStatus> status)
+    {
+        _status = status;
+        UpdateStatus();
+    }
+
+    /// <summary>Die Zustandsfelder der Uebersicht - einmal je Sekunde, solange sie zu sehen ist.</summary>
+    internal void UpdateStatus()
+    {
+        StatusRelay.Text = RemoteState.Text;
+
+        var host = _status?.Invoke();
+        var settings = _latest();
+
+        StatusBridge.Text = host?.Bridge ?? Strings.T(BridgeBox.IsChecked == true ? "S_StatusOn" : "S_StatusOff");
+        StatusMemory.Text = host?.Memory ?? Strings.T("S_StatusMemoryBudget", BudgetBox.Text);
+
+        StatusViewers.Text = settings.WatchEnabled && _watchSource?.Invoke() is { } watch
+            ? Strings.T("S_StatusViewersCount", watch.Watchers, watch.MaxSeats)
+            : Strings.T("S_StatusOff");
+    }
+
+    private bool _showingScale;
+
+    /// <summary>
+    /// Die Kachel "Arbeitsbereich": die Skalierung, die gerade gilt, und ob sie dem
+    /// Bildschirm folgt. Gelesen aus dem Layout, nicht aus dem Panel - das Panel lebt auf
+    /// seinem Reiter und hoert erst zu, wenn es einmal zu sehen war.
+    /// </summary>
+    private void ShowScaleTile()
+    {
+        _showingScale = true;
+        TileAutoScale.IsChecked = _layout.AutoScale;
+        TileScaleValue.Text = $"{_appearance.EffectiveScale * 100:0} %";
+        _showingScale = false;
+    }
+
+    /// <summary>Die Automatik aus der Kachel - sofort, wie im Panel, und ohne Uebernehmen.</summary>
+    private void OnTileAutoScale(object sender, RoutedEventArgs e)
+    {
+        if (_showingScale || _layout.AutoScale == (TileAutoScale.IsChecked == true)) return;
+
+        _layout.AutoScale = TileAutoScale.IsChecked == true;
+        _layout.Save();
+        ShowScaleTile();
+    }
+
+    /// <summary>
+    /// Wie breit der Inhalt sein darf - er waechst mit der Seite. Die Kategorieseiten
+    /// bleiben lesbar schmal, weil eine Zeile mit Beschriftung links und Regler ganz rechts
+    /// auf 1200 Punkten nicht besser wird. Die Uebersicht darf breiter, sie legt Kacheln
+    /// nebeneinander.
+    /// </summary>
+    private void ShowWidths(double content)
+    {
+        Resources["SettingsBodyWidth"] = Math.Clamp(content * 0.8, 760, 960);
+        Resources["SettingsOverviewWidth"] = Math.Clamp(content, 760, 1320);
+    }
+
+    /// <summary>Kacheln in einer, zwei oder drei Spalten, die Zustandsfelder in zwei oder vier - nach der Breite.</summary>
+    private void ShowOverviewColumns()
+    {
+        double width = OverviewBody.ActualWidth;
+
+        OverviewTiles.Columns = width >= 900 ? 3 : width >= 560 ? 2 : 1;
+        StatusStrip.Columns = width >= 560 ? 4 : 2;
     }
 
     /// <summary>Unter dieser Breite rueckt die Leiste nach oben - daneben bliebe fuer den Inhalt zu wenig.</summary>
@@ -501,7 +611,14 @@ public partial class SettingsEditor : System.Windows.Controls.UserControl, IDisp
     /// <summary>So breit muessen die Karten zusammen mindestens sein, um nebeneinander zu stehen.</summary>
     internal const double CardsSideBySide = 560;
 
-    private void ShowNarrow() => Tabs.Tag = ActualWidth < NarrowWidth ? "Narrow" : null;
+    private void ShowNarrow()
+    {
+        bool narrow = ActualWidth < NarrowWidth;
+        Tabs.Tag = narrow ? "Narrow" : null;
+
+        // Die Leiste nimmt daneben gut 200 Punkte.
+        ShowWidths(narrow ? ActualWidth : ActualWidth - 208);
+    }
 
     private void OnCardsSized(object sender, SizeChangedEventArgs e) => ShowCardColumns();
 
@@ -509,7 +626,7 @@ public partial class SettingsEditor : System.Windows.Controls.UserControl, IDisp
         => ConnectionCards.Columns = WatchCardFrame.Visibility == Visibility.Visible &&
                                      ConnectionCards.ActualWidth >= CardsSideBySide ? 2 : 1;
 
-    public void SelectRemote() => Tabs.SelectedIndex = 3;
+    public void SelectRemote() => Tabs.SelectedItem = ConnectionsTab;
     public void SelectAppearance() => Tabs.SelectedItem = AppearanceTab;
     public void Dispose() { _remoteTicker?.Stop(); Strings.Changed -= UpdateThreadHint; _watchCard?.Detach(); }
     private void OnQrStyle(object sender, RoutedEventArgs e)
