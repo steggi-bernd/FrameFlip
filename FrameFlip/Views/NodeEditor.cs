@@ -88,6 +88,9 @@ public sealed class NodeEditor : FrameworkElement
     /// <summary>Das kleine Bild eines Knotens mit Vorschau - oder keines, solange noch nichts gerechnet ist.</summary>
     public Func<Node, ImageSource?>? PreviewOf { get; set; }
 
+    /// <summary>Der kurze Name einer Maske - fuer das Schild an den Ebenen, die sie begrenzt.</summary>
+    public Func<Node, string>? MaskTitle { get; set; }
+
     /// <summary>Am Knopf im Kopf eines Knotens wurde die Vorschau ein- oder ausgeschaltet.</summary>
     public event Action<Node>? PreviewToggled;
 
@@ -313,6 +316,9 @@ public sealed class NodeEditor : FrameworkElement
     private string? _wireSocket;
     private bool _wireFromInput;
     private NodeLink? _lifted;
+
+    /// <summary>Der Anschluss, an dem das Kabel gepackt wurde - dort losgelassen, war es ein Klick.</summary>
+    private (string Node, string Socket, bool Input)? _wirePressed;
     private Point _wireEnd;
     private Dictionary<(string, string, bool), string?>? _fits;
     private (Node Node, Socket Socket, bool Input)? _hover;
@@ -387,19 +393,22 @@ public sealed class NodeEditor : FrameworkElement
         var at = e.GetPosition(this);
 
         // Rechts bricht einen laufenden Zug ab - der Knoten springt zurueck, das Kabel
-        // steckt wieder, wo es war. Ohne Zug oeffnet es das Menue.
+        // steckt wieder, wo es war. Ohne Zug waehlt es den Knoten darunter; der Hub
+        // oeffnet beim Loslassen. Oeffnete er beim Druecken, landete das Loslassen in
+        // ihm - und dort sprang frueher das Windows-Menue des Suchfelds auf.
         if (e.ChangedButton == MouseButton.Right)
         {
             if (_drag != Drag.None)
             {
                 Cancel();
+                _rightPressed = false;
             }
             else
             {
                 var node = NodeAt(at);
                 if (node is not null) Select(node);
 
-                MenuWanted?.Invoke(ToGraph(at));
+                _rightPressed = true;
             }
 
             e.Handled = true;
@@ -475,6 +484,7 @@ public sealed class NodeEditor : FrameworkElement
     private void StartWire((Node Node, Socket Socket, bool Input) socket, Point at)
     {
         _lifted = null;
+        _wirePressed = (socket.Node.Id, socket.Socket.Name, socket.Input);
 
         if (socket.Input && _graph!.Into(socket.Node.Id, socket.Socket.Name) is { } link &&
             _graph.Find(link.From) is { } source)
@@ -571,9 +581,24 @@ public sealed class NodeEditor : FrameworkElement
         InvalidateVisual();
     }
 
+    /// <summary>Die rechte Taste wurde ueber dem Editor gedrueckt, ohne einen Zug abzubrechen.</summary>
+    private bool _rightPressed;
+
     protected override void OnMouseUp(MouseButtonEventArgs e)
     {
         base.OnMouseUp(e);
+
+        if (e.ChangedButton == MouseButton.Right)
+        {
+            if (_rightPressed)
+            {
+                _rightPressed = false;
+                MenuWanted?.Invoke(ToGraph(e.GetPosition(this)));
+            }
+
+            e.Handled = true;
+            return;
+        }
 
         if (_drag == Drag.None) return;
 
@@ -805,18 +830,30 @@ public sealed class NodeEditor : FrameworkElement
         // Die Liste der passenden Anschluesse VOR dem Aufraeumen festhalten - EndDrag
         // vergisst sie, und danach hiesse jeder Anschluss "passt nicht".
         var fits = _fits;
+        var pressed = _wirePressed;
 
         _warning = null;
         EndDrag();
 
-        if (target is { } t && t.Input != fromInput)
+        // Dort losgelassen, wo gepackt wurde: ein Klick, kein Zug - nichts aendert sich.
+        if (target is { } same && pressed == (same.Node.Id, same.Socket.Name, same.Input)) return;
+
+        if (target is { } t)
         {
-            string? why = fits is not null && fits.TryGetValue((t.Node.Id, t.Socket.Name, t.Input), out var reason)
-                ? reason
-                : "S_NodeWhyMissing";
+            // Auf einem Anschluss derselben Richtung - zwei Ausgaenge, zwei Eingaenge - gibt
+            // es keine Verbindung. Am eigenen Knoten heisst das: an sich selbst.
+            string? why = t.Input == fromInput
+                ? (ReferenceEquals(t.Node, node) ? "S_NodeWhySelf" : "S_NodeWhyDirection")
+                : fits is not null && fits.TryGetValue((t.Node.Id, t.Socket.Name, t.Input), out var reason)
+                    ? reason
+                    : "S_NodeWhyMissing";
 
             // An einen Anschluss, der nicht passt: nichts aendert sich, und der Grund
-            // steht oben links, bis zum naechsten Zug.
+            // steht oben links, bis zum naechsten Zug. Das gilt auch fuer ein Kabel, das
+            // von einem Eingang geloest wurde - es kommt zurueck an seinen Platz. Frueher
+            // war es dann weg: Wer einen Knoten an sich selbst stecken wollte, indem er
+            // das Kabel an seinem Eingang packte und auf seinen Ausgang zog, verlor die
+            // Verbindung, und das Bild wurde schwarz.
             if (why is not null)
             {
                 Warning = Translate?.Invoke(why) ?? why;
@@ -837,7 +874,7 @@ public sealed class NodeEditor : FrameworkElement
             return;
         }
 
-        // Ins Leere: Ein geloestes Kabel ist damit weg, ein neues war nie da.
+        // Wirklich ins Leere: Ein geloestes Kabel ist damit weg, ein neues war nie da.
         if (lifted is not null)
         {
             Editing?.Invoke();
@@ -912,7 +949,7 @@ public sealed class NodeEditor : FrameworkElement
                 e.Handled = true;
                 break;
 
-            case Key.Delete or Key.X when !control && Selected is not null and not OutputNode:
+            case Key.Delete or Key.Back or Key.X when !control && Selected is not null and not OutputNode:
                 Remove(Selected);
                 e.Handled = true;
                 break;
@@ -1013,8 +1050,19 @@ public sealed class NodeEditor : FrameworkElement
 
     // ------------------------------------------------------------ Zeichnen
 
-    /// <summary>Das Bild dahinter bleibt zu sehen, nur gedaempft - genug, um die Knoten zu lesen.</summary>
-    private static readonly Brush Dim = Frozen(new SolidColorBrush(Color.FromArgb(0x9A, 0x0C, 0x0C, 0x10)));
+    /// <summary>
+    /// Die Flaeche hinter den Knoten: durchsichtig, aber sie faengt die Maus.
+    ///
+    /// Frueher lag hier ein Schleier aus 60 % Schwarz - huebsch, und er machte die Knoten
+    /// leicht lesbar. Aber er faelschte genau das, wofuer man den Graphen offen hat: Wer
+    /// an einer Farbe dreht, sah das Bild dunkler und flauer, als es ist, und musste den
+    /// Graphen ausblenden, um es wirklich zu sehen. Jetzt steht das Bild unverfaelscht da;
+    /// die Knoten haben ihren eigenen deckenden Koerper, die Kabel einen dunklen Saum.
+    /// </summary>
+    private static readonly Brush Catch = Brushes.Transparent;
+
+    /// <summary>Der Saum unter jedem Kabel - damit es auch auf einem hellen Bild zu sehen ist.</summary>
+    private static readonly Brush Halo = Frozen(new SolidColorBrush(Color.FromArgb(0x90, 0x08, 0x08, 0x0C)));
 
     private static readonly Brush Body = Frozen(new SolidColorBrush(Color.FromArgb(0xF0, 0x23, 0x23, 0x2A)));
     private static readonly Pen Outline = Frozen(new Pen(new SolidColorBrush(Color.FromRgb(0x3A, 0x3A, 0x46)), 1));
@@ -1047,7 +1095,7 @@ public sealed class NodeEditor : FrameworkElement
     public static Color HeaderColour(Node node) => node switch
     {
         RenderNode or PictureNode or BlackNode => Color.FromRgb(0x4B, 0x50, 0x5E),
-        MaskNode => Color.FromRgb(0x68, 0x4E, 0x94),
+        MaskNode or CutoutNode => Color.FromRgb(0x68, 0x4E, 0x94),
         PlaceNode or ExposureTintNode or LayerGradeNode or RestrictNode or MixNode or FallbackNode
             => Color.FromRgb(0x2E, 0x6B, 0x60),
         ViewNode => Color.FromRgb(0x86, 0x66, 0x2A),
@@ -1074,9 +1122,11 @@ public sealed class NodeEditor : FrameworkElement
 
     protected override void OnRender(DrawingContext dc)
     {
-        dc.DrawRectangle(Dim, null, new Rect(0, 0, ActualWidth, ActualHeight));
+        dc.DrawRectangle(Catch, null, new Rect(0, 0, ActualWidth, ActualHeight));
 
         if (_graph is null) return;
+
+        _marked = MarkedBy(Selected);
 
         foreach (var link in _graph.Links)
             if (!ReferenceEquals(link, _lifted)) DrawLink(dc, link);
@@ -1206,14 +1256,27 @@ public sealed class NodeEditor : FrameworkElement
         // Das Kabel, in das ein Knoten gleich faellt, leuchtet - wie in Blender.
         bool landing = ReferenceEquals(link, _landing);
 
+        // Ein Maskenkabel hat seine eigene Farbe und ist gestrichelt - es traegt kein Bild und
+        // keinen beliebigen Wert, sondern bestimmt, wo etwas wirkt. Die Kabel der gewaehlten
+        // Maske stehen kraeftiger da.
+        bool mask = MaskUse.CarriesMask(_graph, link);
+        bool lit = mask && Selected is MaskNode chosen && link.From == chosen.Id;
+        double thickness = Math.Max(1.2, 2 * Math.Min(1, Zoom)) * (lit ? 1.6 : 1);
+
         var pen = landing
             ? new Pen(Brushes.White, Math.Max(2.5, 3.5 * Math.Min(1, Zoom)))
-            : new Pen(SocketBrush(from.Outputs[IndexOf(from.Outputs, link.Output)].Type),
-                      Math.Max(1.2, 2 * Math.Min(1, Zoom)));
+            : mask
+                ? new Pen(MaskWire, thickness) { DashStyle = MaskDash }
+                : new Pen(SocketBrush(from.Outputs[IndexOf(from.Outputs, link.Output)].Type), thickness);
         pen.Freeze();
 
-        dc.PushOpacity(landing ? 1 : from.Muted || to.Muted ? 0.35 : 0.85);
-        dc.DrawGeometry(null, pen, Path(a, b));
+        var path = Path(a, b);
+        var halo = new Pen(Halo, pen.Thickness + 3);
+        halo.Freeze();
+
+        dc.PushOpacity(landing || lit ? 1 : from.Muted || to.Muted ? 0.35 : 0.85);
+        dc.DrawGeometry(null, halo, path);
+        dc.DrawGeometry(null, pen, path);
         dc.Pop();
     }
 
@@ -1238,13 +1301,14 @@ public sealed class NodeEditor : FrameworkElement
         double radius = 5 * Zoom;
         bool selected = ReferenceEquals(node, Selected);
 
-        dc.PushOpacity(node.Muted ? 0.5 : 1);
+        dc.PushOpacity(node.Muted ? 0.6 : 1);
 
         dc.DrawRoundedRectangle(Body, selected ? Chosen : Outline, box, radius, radius);
 
         // Der Kopf: oben gerundet, unten gerade - ein zweites Rechteck deckt die untere Rundung.
+        // Ein stummer Knoten verliert seine Farbe: grau, wie abgeschaltet.
         var head = new Rect(box.X, box.Y, box.Width, Header * Zoom);
-        var headBrush = new SolidColorBrush(HeaderColour(node));
+        var headBrush = node.Muted ? MutedHead : new SolidColorBrush(HeaderColour(node));
         headBrush.Freeze();
 
         dc.DrawRoundedRectangle(headBrush, null, head, radius, radius);
@@ -1252,15 +1316,40 @@ public sealed class NodeEditor : FrameworkElement
 
         if (selected) dc.DrawRoundedRectangle(null, Chosen, box, radius, radius);
 
+        // Eine Ebene der gewaehlten Maske: in der Farbe der Maskenkabel umrandet.
+        if (_marked.Contains(node))
+        {
+            var mark = box;
+            mark.Inflate(3, 3);
+            dc.DrawRoundedRectangle(null, MaskMark, mark, radius + 2, radius + 2);
+        }
+
+        // Unter den Anschluessen und ihren Namen, damit er sie nicht durchstreicht.
+        if (node.Muted) DrawPassThrough(dc, node);
+
         bool labels = Zoom >= 0.45;
 
         if (labels)
         {
             string title = Title?.Invoke(node) ?? node.GetType().Name;
-            if (node.Muted) title += " ⊘";
+
+            // Stumm steht als Schild im Kopf - ein Wort statt eines Zeichens, das niemand
+            // deuten muss. Eine Maske sagt dort, ob sie frei ist oder geteilt.
+            double tag = 0;
+
+            foreach (var (words, back) in Tags(node))
+            {
+                var word = Label(words, 9.5 * Zoom, Text);
+                var pill = new Rect(box.Right - 30 * Zoom - tag - word.Width - 10 * Zoom, box.Y + (Header * Zoom - word.Height - 4 * Zoom) / 2,
+                                    word.Width + 10 * Zoom, word.Height + 4 * Zoom);
+
+                dc.DrawRoundedRectangle(back, null, pill, pill.Height / 2, pill.Height / 2);
+                dc.DrawText(word, new Point(pill.X + 5 * Zoom, pill.Y + 2 * Zoom));
+                tag += pill.Width + 6 * Zoom;
+            }
 
             var text = Label(title, 12 * Zoom, Text);
-            text.MaxTextWidth = Math.Max(1, box.Width - 34 * Zoom);
+            text.MaxTextWidth = Math.Max(1, box.Width - 34 * Zoom - tag);
             text.MaxLineCount = 1;
             text.Trimming = TextTrimming.CharacterEllipsis;
 
@@ -1295,9 +1384,93 @@ public sealed class NodeEditor : FrameworkElement
 
         if (_viewed is var (shown, output) && ReferenceEquals(shown, node)) DrawViewed(dc, box, output, radius);
 
+        if (labels && ChipOf(node) is var (maskSource, maskName)) DrawChip(dc, box, maskSource, maskName);
+
         if (node.Preview) DrawPreview(dc, node);
 
         dc.Pop();
+    }
+
+    // ------------------------------------------------------------ Masken
+
+    private static readonly Brush MaskWire = Frozen(new SolidColorBrush(Color.FromRgb(0xD0, 0x8C, 0xE0)));
+    private static readonly DashStyle MaskDash = Frozen(new DashStyle(new[] { 3.0, 2.0 }, 0));
+    private static readonly Pen MaskMark = Frozen(new Pen(MaskWire, 2));
+    private static readonly Brush MaskTag = Frozen(new SolidColorBrush(Color.FromArgb(0xD0, 0x3E, 0x2C, 0x5C)));
+    private static readonly Brush ChipBack = Frozen(new SolidColorBrush(Color.FromArgb(0xF0, 0x2C, 0x22, 0x3A)));
+    private static readonly Pen ChipEdge = Frozen(new Pen(new SolidColorBrush(Color.FromArgb(0xB0, 0xD0, 0x8C, 0xE0)), 1));
+
+    private IReadOnlySet<Node> _marked = new HashSet<Node>();
+
+    /// <summary>Die Ebenen, die eine gewaehlte Maske benutzen - sie werden im Graphen und in der Liste hervorgehoben.</summary>
+    internal IReadOnlySet<Node> MarkedBy(Node? selected)
+        => _graph is not null && selected is MaskNode mask ? MaskUse.Users(_graph, mask).ToHashSet<Node>() : new HashSet<Node>();
+
+    /// <summary>Die Schilder im Kopf eines Knotens - stumm, und bei einer Maske frei oder geteilt.</summary>
+    private IEnumerable<(string Words, Brush Back)> Tags(Node node)
+    {
+        if (node.Muted) yield return (Translate?.Invoke("S_NodeMutedTag") ?? "stumm", MutedTag);
+        if (TagOf(node) is { } words) yield return (words, MaskTag);
+    }
+
+    /// <summary>
+    /// Das Schild eines Maskenknotens: "frei", wenn er nirgends steckt, "-> n Ebenen", wenn
+    /// mehrere Ebenen ihn benutzen. Eine Maske an genau einer Ebene braucht keines.
+    /// </summary>
+    internal string? TagOf(Node node)
+    {
+        if (_graph is null || node is not MaskNode mask) return null;
+
+        if (MaskUse.Free(_graph, mask)) return Translate?.Invoke("S_NodeMaskFree") ?? "frei";
+
+        int users = MaskUse.Users(_graph, mask).Count;
+        return users >= 2 ? string.Format(Translate?.Invoke("S_NodeMaskShared") ?? "→ {0}", users) : null;
+    }
+
+    /// <summary>Das Maskenschild eines Mischens: was in seinem Faktor steckt, und wie es heisst.</summary>
+    internal (Node Mask, string Name)? ChipOf(Node node)
+    {
+        if (_graph is null || node is not MixNode mix || _graph.Into(mix.Id, "Faktor") is not { } link ||
+            _graph.Find(link.From) is not { } source)
+        {
+            return null;
+        }
+
+        return (source, MaskTitle?.Invoke(source) ?? Title?.Invoke(source) ?? source.GetType().Name);
+    }
+
+    /// <summary>
+    /// Das Maskenschild ueber dem Kopf eines Mischens, rechts: ein kleines Bild der Maske und
+    /// ihr Name - wie die Maske neben einer Ebene im Stapel. Ueber dem Kopf und nicht in ihm,
+    /// damit der Name der Ebene nicht noch kuerzer wird.
+    /// </summary>
+    private void DrawChip(DrawingContext dc, Rect box, Node mask, string name)
+    {
+        double h = 16 * Zoom;
+        double picture = 20 * Zoom;
+
+        var text = Label(name, 10 * Zoom, Text);
+        text.MaxTextWidth = Math.Max(1, 96 * Zoom);
+        text.MaxLineCount = 1;
+        text.Trimming = TextTrimming.CharacterEllipsis;
+
+        double width = 3 * Zoom + picture + 5 * Zoom + Math.Min(text.Width, 96 * Zoom) + 6 * Zoom;
+        var chip = new Rect(box.Right - width, box.Y - h - 3 * Zoom, width, h);
+
+        dc.DrawRoundedRectangle(ChipBack, ChipEdge, chip, 3 * Zoom, 3 * Zoom);
+
+        var frame = new Rect(chip.X + 3 * Zoom, chip.Y + 2 * Zoom, picture, h - 4 * Zoom);
+        dc.DrawRectangle(PreviewGround, null, frame);
+
+        if (PreviewOf?.Invoke(mask) is { Width: > 0, Height: > 0 } image)
+        {
+            double scale = Math.Min(frame.Width / image.Width, frame.Height / image.Height);
+            double w = image.Width * scale, ih = image.Height * scale;
+
+            dc.DrawImage(image, new Rect(frame.X + (frame.Width - w) / 2, frame.Y + (frame.Height - ih) / 2, w, ih));
+        }
+
+        dc.DrawText(text, new Point(frame.Right + 5 * Zoom, chip.Y + (h - text.Height) / 2));
     }
 
     private static readonly Pen Viewing = Frozen(new Pen(new SolidColorBrush(Color.FromRgb(0xE8, 0x9A, 0x3C)), 2));
@@ -1325,17 +1498,64 @@ public sealed class NodeEditor : FrameworkElement
     private static readonly Brush PreviewGround = Frozen(new SolidColorBrush(Color.FromRgb(0x18, 0x18, 0x1E)));
 
     /// <summary>Der Knopf fuer die Vorschau: ein Auge, offen, wenn sie gezeigt wird.</summary>
+    /// <summary>
+    /// Der Vorschauknopf im Kopf: ein kleines Bild - ein Rahmen mit einem Berg darin. An,
+    /// ist es hell und gefuellt; aus, nur ein blasser Umriss.
+    ///
+    /// Frueher war es ein Auge, bei ausgeschalteter Vorschau durchgestrichen - auf fast
+    /// jedem Knoten. Das las sich wie "ausgeblendet" und hiess doch nur "ohne Vorschau".
+    /// </summary>
     private void DrawEye(DrawingContext dc, Node node)
     {
         var eye = Eye(node);
         var centre = ToScreen(new Point(eye.X + eye.Width / 2, eye.Y + eye.Height / 2));
-        double rx = eye.Width / 2 * Zoom, ry = eye.Height / 2.6 * Zoom;
+        double w = 12 * Zoom, h = 9 * Zoom;
+        var frame = new Rect(centre.X - w / 2, centre.Y - h / 2, w, h);
 
-        var pen = node.Preview ? EyeOn : EyeOff;
-        dc.DrawEllipse(null, pen, centre, rx, ry);
+        if (node.Preview)
+        {
+            dc.DrawRoundedRectangle(PreviewOn, null, frame, 1.5 * Zoom, 1.5 * Zoom);
 
-        if (node.Preview) dc.DrawEllipse(pen.Brush, null, centre, ry * 0.7, ry * 0.7);
-        else dc.DrawLine(pen, new Point(centre.X - rx, centre.Y + ry), new Point(centre.X + rx, centre.Y - ry));
+            var hill = new StreamGeometry();
+            using (var g = hill.Open())
+            {
+                g.BeginFigure(new Point(frame.Left + 1.5 * Zoom, frame.Bottom - 1.5 * Zoom), true, true);
+                g.LineTo(new Point(frame.Left + 4.5 * Zoom, frame.Top + 3.5 * Zoom), true, false);
+                g.LineTo(new Point(frame.Left + 7 * Zoom, frame.Bottom - 3 * Zoom), true, false);
+                g.LineTo(new Point(frame.Left + 8.5 * Zoom, frame.Bottom - 4.5 * Zoom), true, false);
+                g.LineTo(new Point(frame.Right - 1.5 * Zoom, frame.Bottom - 1.5 * Zoom), true, false);
+            }
+
+            hill.Freeze();
+            dc.DrawGeometry(PreviewHill, null, hill);
+        }
+        else
+        {
+            dc.PushOpacity(0.45);
+            dc.DrawRoundedRectangle(null, EyeOff, frame, 1.5 * Zoom, 1.5 * Zoom);
+            dc.Pop();
+        }
+    }
+
+    private static readonly Brush PreviewOn = Frozen(new SolidColorBrush(Color.FromArgb(0xF0, 0xFF, 0xFF, 0xFF)));
+    private static readonly Brush PreviewHill = Frozen(new SolidColorBrush(Color.FromRgb(0x5A, 0x4A, 0x8A)));
+    private static readonly Brush MutedHead = Frozen(new SolidColorBrush(Color.FromRgb(0x4A, 0x4A, 0x52)));
+    private static readonly Brush MutedTag = Frozen(new SolidColorBrush(Color.FromArgb(0xC0, 0x1A, 0x1A, 0x20)));
+    private static readonly Pen PassThrough = Frozen(new Pen(new SolidColorBrush(Color.FromRgb(0xC8, 0x6A, 0x5A)), 2) { DashStyle = DashStyles.Dash });
+
+    /// <summary>
+    /// Bei einem stummen Knoten: der Weg, den das Bild an ihm vorbei nimmt - vom ersten
+    /// Bildeingang zum ersten Bildausgang, wie in Blender.
+    /// </summary>
+    private void DrawPassThrough(DrawingContext dc, Node node)
+    {
+        var (input, output) = NodeEdits.Through(node);
+        if (input is null || output is null) return;
+
+        int i = IndexOf(node.Inputs, input), o = IndexOf(node.Outputs, output);
+        if (i < 0 || o < 0) return;
+
+        dc.DrawLine(PassThrough, ToScreen(InputAt(node, i)), ToScreen(OutputAt(node, o)));
     }
 
     /// <summary>Das kleine Bild unter den Anschluessen - im Seitenverhaeltnis des Bildes, mittig.</summary>

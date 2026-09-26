@@ -478,7 +478,57 @@ public partial class LayerPanel : UserControl
         Grid.SetColumn(mode, 3);
         grid.Children.Add(mode);
 
-        return new ListBoxItem { Content = grid, Tag = layer };
+        var item = new ListBoxItem { Content = grid, Tag = layer };
+
+        // Rechtsklick: die Zeile waehlen und zeigen, was sich mit ihr tun laesst.
+        item.MouseRightButtonUp += (_, e) =>
+        {
+            e.Handled = true;
+            LayerList.SelectedItem = item;
+            ShowRowMenu(layer);
+        };
+
+        return item;
+    }
+
+    /// <summary>Das zuletzt geoeffnete Menue einer Zeile - fuer die Probe.</summary>
+    internal FlipMenu? RowMenu { get; private set; }
+
+    /// <summary>
+    /// Das Menue einer Zeile: dieselben Griffe wie die Knoepfe unter der Liste - und
+    /// Umbenennen, das es dort nicht gibt. Jede Zeile ruft den Weg, den auch ihr Knopf
+    /// nimmt; zwei Fassungen derselben Regel waeren zwei Gelegenheiten, eine zu vergessen.
+    /// </summary>
+    internal void ShowRowMenu(ImageLayer layer)
+    {
+        var none = new RoutedEventArgs();
+        var owner = Owner(layer);
+        int at = owner?.IndexOf(layer) ?? -1;
+
+        var menu = new FlipMenu(LayerList)
+            .Rename(Strings.T("S_LayerMenuRename"), layer.Name.Length > 0 ? layer.Name : Short(layer.Source), name =>
+            {
+                layer.Name = name;
+                Rebuild();
+                Raise(interim: false);
+            })
+            .Toggle(Strings.T("S_LayerMenuVisible"), layer.Visible, () => SetVisible(layer, !layer.Visible))
+            .Separator()
+            .Item("❐", Strings.T("S_DuplicateLayer"), () => OnDuplicateClicked(this, none), "Strg+J")
+            .Item("✕", Strings.T("S_RemoveLayer"), () => OnRemoveClicked(this, none), "Entf", enabled: Stack.All().Count() > 1)
+            .Separator()
+            .Item("▲", Strings.T("S_MoveLayerUp"), () => OnUpClicked(this, none), "Alt+↑", enabled: owner is not null && at + 1 < owner.Count)
+            .Item("▼", Strings.T("S_MoveLayerDown"), () => OnDownClicked(this, none), "Alt+↓", enabled: at > 0)
+            .Item("⇥", Strings.T("S_MoveIntoGroup"), () => OnIndentClicked(this, none), "Strg+G")
+            .Item("⇤", Strings.T("S_MoveOutOfGroup"), () => OnOutdentClicked(this, none), "Strg+Umschalt+G",
+                  enabled: owner is not null && GroupOf(owner) is not null);
+
+        // Anschneiden geht, wo es der Knopf erlaubt: nicht an der untersten Ebene.
+        if (Stack.Layers.IndexOf(layer) > 0)
+            menu.Toggle(Strings.T("S_LayerMenuClip"), layer.Clipped, () => ClipButton.IsChecked = !layer.Clipped);
+
+        RowMenu = menu;
+        menu.Open();
     }
 
     /// <summary>
@@ -738,7 +788,9 @@ public partial class LayerPanel : UserControl
             Content = LayerContent.Image,
             Source = path,
             Name = Short(path),
-            Mode = BlendMode.Normal,
+            // Glare, Bloom und was sonst auf Schwarz liegt, kommt gleich dazu - nur hier,
+            // beim Anlegen. Siehe PassRoles.
+            Mode = ImageProbe.ModeFor(path),
         });
     }
 
@@ -835,7 +887,11 @@ public partial class LayerPanel : UserControl
         {
             Source = pass?.Name ?? "",
             Name = pass?.ShortName ?? Strings.T("S_LayerColour"),
-            Mode = Stack.Layers.Count == 0 ? BlendMode.Normal : BlendMode.Add,
+            // Die unterste traegt; darueber verraet der Name, was der Pass tut - Licht
+            // kommt dazu, Verschattung und Farbe multiplizieren. Nur beim Anlegen.
+            Mode = Stack.Layers.Count == 0 ? BlendMode.Normal
+                 : pass is { } named ? PassRoles.ByName(named.Name, sceneLinear: true) ?? BlendMode.Add
+                 : BlendMode.Add,
         };
 
         Stack.Layers.Add(layer);

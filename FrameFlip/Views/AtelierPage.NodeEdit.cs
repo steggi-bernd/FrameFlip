@@ -1,6 +1,7 @@
 using System.IO;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Input;
 using FrameFlip.Decoding.Exr;
 using FrameFlip.Imaging.Grading;
 using FrameFlip.Imaging.Nodes;
@@ -28,13 +29,33 @@ public partial class AtelierPage
 
     private void SetUpNodeEditing()
     {
+        // Strg+Z gilt auf der ganzen Seite - nicht nur, solange der Editor den Fokus hat.
+        // Nach einem Klick in die Ebenenliste, den Farbstreifen oder den Hub lag er
+        // woanders, und Strg+Z tat nichts.
+        Loaded += (_, _) =>
+        {
+            if (Window.GetWindow(this) is { } window && !ReferenceEquals(window, _keyWindow))
+            {
+                if (_keyWindow is not null) _keyWindow.PreviewKeyDown -= OnWindowKey;
+                _keyWindow = window;
+                window.PreviewKeyDown += OnWindowKey;
+            }
+        };
+
+        Unloaded += (_, _) =>
+        {
+            if (_keyWindow is not null) _keyWindow.PreviewKeyDown -= OnWindowKey;
+            _keyWindow = null;
+        };
+
         NodeView.Translate = key => Strings.T(key);
         NodeView.Editing += RememberNodes;
-        NodeView.MenuWanted += ShowNodeMenu;
+        NodeView.MenuWanted += OnNodeMenuWanted;
         NodeView.SectionDropped += DropFromPalette;
         NodeView.ViewWanted += OnViewWanted;
         SetUpNodePreviews();
         SetUpNodeLayerList();
+        SetUpPictureMenu();
         NodeView.UndoWanted += () => StepNodes(back: true);
         NodeView.RedoWanted += () => StepNodes(back: false);
 
@@ -47,6 +68,66 @@ public partial class AtelierPage
         if (_graph is null) return;
 
         _undo.Add(_graph.Save());
+        if (_undo.Count > HistoryDepth) _undo.RemoveAt(0);
+
+        _redo.Clear();
+    }
+
+    private Window? _keyWindow;
+
+    /// <summary>Strg+Z, Strg+Y und Strg+Umschalt+Z im Knotenmodus - ausser in einem Textfeld, das sein eigenes hat.</summary>
+    private void OnWindowKey(object sender, KeyEventArgs e)
+    {
+        if (!IsVisible) return;
+
+        // Strg+S speichert das Projekt - in beiden Modi, nicht nur bei den Knoten.
+        if (e.Key == Key.S && (Keyboard.Modifiers & ModifierKeys.Control) != 0 &&
+            e.OriginalSource is not System.Windows.Controls.Primitives.TextBoxBase)
+        {
+            SaveProject();
+            e.Handled = true;
+            return;
+        }
+
+        if (HandleUndoKey(e.Key, Keyboard.Modifiers, e.OriginalSource)) e.Handled = true;
+    }
+
+    /// <summary>Strg+Z und Co. - getrennt vom Tastenereignis, damit die Probe es ohne Tastatur pruefen kann.</summary>
+    internal bool HandleUndoKey(Key key, ModifierKeys modifiers, object? source)
+    {
+        if (!InNodes || source is System.Windows.Controls.Primitives.TextBoxBase) return false;
+        if ((modifiers & ModifierKeys.Control) == 0) return false;
+
+        bool shift = (modifiers & ModifierKeys.Shift) != 0;
+
+        if (key == Key.Z) StepNodes(back: !shift);
+        else if (key == Key.Y) StepNodes(back: false);
+        else return false;
+
+        return true;
+    }
+
+    /// <summary>Ob gerade an einem Wert gezogen wird - der Stand davor liegt dann schon im Verlauf.</summary>
+    private bool _valueEditOpen;
+
+    /// <summary>
+    /// Vor einer Aenderung an einem Wert - Regler, Mischung, Pinselstrich, Verschieben: Der
+    /// zuletzt festgehaltene Stand kommt in den Verlauf, einmal je Zug. Der festgehaltene,
+    /// nicht der jetzige: Wenn die Meldung kommt, hat sich der Wert schon geaendert.
+    /// </summary>
+    private void RememberValueEdit()
+    {
+        if (_valueEditOpen || _graph is null || _recipe.Nodes is not { } before) return;
+
+        // Nichts geaendert - etwa ein Farbstreifen, der sich beim Waehlen eines Knotens
+        // fuellt und dabei meldet: kein Schritt im Verlauf.
+        if (_graph.Save() == before) return;
+
+        _valueEditOpen = true;
+
+        if (_undo.Count > 0 && _undo[^1] == before) return;
+
+        _undo.Add(before);
         if (_undo.Count > HistoryDepth) _undo.RemoveAt(0);
 
         _redo.Clear();
@@ -67,6 +148,7 @@ public partial class AtelierPage
 
         if (NodeGraph.Load(state) is not { } graph) return;
 
+        _valueEditOpen = false;
         to.Add(_graph.Save());
 
         _graph = graph;
@@ -87,7 +169,11 @@ public partial class AtelierPage
         ShowNodeLayers();
         ShowMissingLayers();
         KeepViewer();
-        FetchNodeSources();
+
+        // Erst grob, dann voll - wie beim Ziehen an einem Regler. Der Editor zeigt die
+        // Aenderung sofort, das Bild zieht im naechsten Bild nach, scharf nach einer Pause.
+        // Voll und sofort hielt jeder Klick die Seite an, bis das ganze Bild gerechnet war.
+        FetchNodeSources(soon: true);
     }
 
     /// <summary>Ein Hinweis im Editor, wenn der Graph kein Bild ergibt.</summary>
@@ -162,196 +248,6 @@ public partial class AtelierPage
         AfterNodeEdit();
     }
 
-    /// <summary>Legt einen neuen Knoten an eine Stelle im Graphen - frei, noch nicht verbunden.</summary>
-    private Node Place(Node node, Point at)
-    {
-        RememberNodes();
-
-        _graph!.Add(node);
-        node.X = Math.Round(at.X - NodeLayout.Width / 2);
-        node.Y = Math.Round(at.Y - NodeLayout.Header / 2);
-
-        NodeCatalog.WireData(_graph, node);
-
-        NodeView.Select(node);
-        NodeView.InvalidateVisual();
-
-        AfterNodeEdit();
-
-        return node;
-    }
-
-    /// <summary>
-    /// Das Menue im Editor: hinzufuegen nach Gruppen, und fuer den gewaehlten Knoten
-    /// stummschalten und loeschen.
-    /// </summary>
-    private void ShowNodeMenu(Point at)
-    {
-        if (_graph is null) return;
-
-        // Die Passe im Menue bekommen Miniaturen - beim ersten Oeffnen entstehen sie.
-        MakePassThumbs();
-
-        var menu = new ContextMenu();
-
-        foreach (var group in NodeCatalog.All.GroupBy(k => k.Group))
-        {
-            var item = new MenuItem { Header = Strings.T(group.Key) };
-
-            foreach (var kind in group)
-            {
-                var entry = new MenuItem { Header = Strings.T(kind.TitleKey) };
-                entry.Click += (_, _) => Place(kind.Create(), at);
-                item.Items.Add(entry);
-            }
-
-            if (group.Key == NodeCatalog.Layers)
-            {
-                item.Items.Add(new Separator());
-
-                var layer = new MenuItem { Header = Strings.T("S_NodeMenuImageLayer") };
-                layer.Click += (_, _) => AddImageLayer();
-                item.Items.Add(layer);
-
-                if (PassMenu("S_NodeMenuPassLayer", pass => AddPassLayer(pass)) is { } passLayer) item.Items.Add(passLayer);
-
-                var file = new MenuItem { Header = Strings.T("S_NodeMenuPictureFile") };
-                file.Click += (_, _) =>
-                {
-                    if (ChoosePicture() is { } path) Place(new PictureNode { Path = path, FollowSequence = false }, at);
-                };
-                item.Items.Add(file);
-            }
-
-            if (group.Key == NodeCatalog.Masks)
-            {
-                var extra = new List<object>();
-
-                if (PassMenu("S_NodeMenuPassMask", pass => Place(new MaskNode
-                    {
-                        Mask = new LayerMask { Kind = MaskKind.Pass, Source = pass },
-                    }, at)) is { } passMask)
-                {
-                    extra.Add(passMask);
-                }
-
-                foreach (var set in _cryptomattes)
-                {
-                    var crypto = new MenuItem { Header = Strings.T("S_NodeMenuCrypto", set.ShortName) };
-                    crypto.Click += (_, _) => Place(new MaskNode
-                    {
-                        Mask = new LayerMask
-                        {
-                            Kind = MaskKind.Cryptomatte,
-                            Source = set.Prefix,
-                            Levels = Cryptomatte.Levels(_passes, set.Prefix).ToList(),
-                        },
-                    }, at);
-                    extra.Add(crypto);
-                }
-
-                if (extra.Count > 0)
-                {
-                    item.Items.Add(new Separator());
-                    foreach (var entry in extra) item.Items.Add(entry);
-                }
-            }
-
-            menu.Items.Add(item);
-        }
-
-        menu.Items.Add(new Separator());
-
-        if (NodeView.Selected is { } node and not OutputNode)
-        {
-            var mute = new MenuItem { Header = Strings.T(node.Muted ? "S_NodeMenuUnmute" : "S_NodeMenuMute") };
-            mute.Click += (_, _) =>
-            {
-                RememberNodes();
-                node.Muted = !node.Muted;
-                NodeView.InvalidateVisual();
-                OnGraphChanged();
-            };
-            menu.Items.Add(mute);
-
-            var view = new MenuItem { Header = Strings.T("S_NodeMenuView") };
-            view.Click += (_, _) => OnViewWanted(node);
-            menu.Items.Add(view);
-
-            var preview = new MenuItem { Header = Strings.T(node.Preview ? "S_NodeMenuPreviewOff" : "S_NodeMenuPreviewOn") };
-            preview.Click += (_, _) => NodeView.TogglePreview(node);
-            menu.Items.Add(preview);
-
-            if (node is not RenderNode)
-            {
-                var duplicate = new MenuItem { Header = Strings.T("S_NodeMenuDuplicate") };
-                duplicate.Click += (_, _) => NodeView.Duplicate(node);
-                menu.Items.Add(duplicate);
-            }
-
-            var delete = new MenuItem { Header = Strings.T("S_NodeMenuDelete") };
-            delete.Click += (_, _) => NodeView.Remove(node);
-            menu.Items.Add(delete);
-
-            menu.Items.Add(new Separator());
-        }
-
-        if (_viewer is not null)
-        {
-            var viewOff = new MenuItem { Header = Strings.T("S_NodeMenuViewOff") };
-            viewOff.Click += (_, _) => SetViewer(null);
-            menu.Items.Add(viewOff);
-        }
-
-        var previews = new MenuItem { Header = Strings.T("S_NodeMenuPreviewAll") };
-        previews.Click += (_, _) => PreviewAllLayers();
-        menu.Items.Add(previews);
-
-        var rebuild = new MenuItem { Header = Strings.T("S_NodeMenuRebuild") };
-        rebuild.Click += (_, _) => RebuildFromStack();
-        menu.Items.Add(rebuild);
-
-        var arrange = new MenuItem { Header = Strings.T("S_NodeMenuArrange") };
-        arrange.Click += (_, _) =>
-        {
-            RememberNodes();
-            NodeLayout.Arrange(_graph);
-            NodeView.Frame();
-            KeepNodes();
-        };
-        menu.Items.Add(arrange);
-
-        var frame = new MenuItem { Header = Strings.T("S_NodeMenuFrame") };
-        frame.Click += (_, _) => NodeView.Frame();
-        menu.Items.Add(frame);
-
-        menu.PlacementTarget = NodeView;
-        menu.IsOpen = true;
-    }
-
-    /// <summary>Ein Untermenue mit den Passen der Datei - oder null, wenn sie keine hat.</summary>
-    private MenuItem? PassMenu(string titleKey, Action<string> chosen)
-    {
-        var passes = NodePasses();
-        if (passes.Count == 0) return null;
-
-        var menu = new MenuItem { Header = Strings.T(titleKey) };
-
-        foreach (var (name, label) in passes)
-        {
-            // Unterstriche waeren sonst Zugriffstasten - "Diff_Col" verloere seinen Strich.
-            var entry = new MenuItem { Header = label.Replace("_", "__") };
-
-            if (PassThumb(name) is { } thumb)
-                entry.Icon = new System.Windows.Controls.Image { Source = thumb, Width = 48, Height = 27, Stretch = System.Windows.Media.Stretch.Uniform };
-
-            entry.Click += (_, _) => chosen(name);
-            menu.Items.Add(entry);
-        }
-
-        return menu;
-    }
-
     /// <summary>
     /// Worauf eine neue Ebene kommt: auf den gewaehlten Knoten, wenn er ein Bild liefert -
     /// sonst oben auf die Ebenen, vor die Werkzeuge am Bild, wo sie im Stapel auch laege.
@@ -381,7 +277,7 @@ public partial class AtelierPage
         bool clip = LayerEdits.InClip(_graph, after);
         var picture = _graph.Add(new PictureNode { Path = path, FollowSequence = false });
 
-        if (NodeEdits.AddLayer(_graph, after, picture, "Bild", BlendMode.Normal) is not var (place, mix)) return;
+        if (NodeEdits.AddLayer(_graph, after, picture, "Bild", ImageProbe.ModeFor(path)) is not var (place, mix)) return;
 
         // In einer Schnittkette wird die neue Ebene angeschnitten wie ihre Nachbarn.
         mix.Clip = clip;
@@ -397,7 +293,8 @@ public partial class AtelierPage
     }
 
     /// <summary>
-    /// Ein Pass als Ebene - wie im Ebenenstreifen auf Addieren: Die Passe einer Datei
+    /// Ein Pass als Ebene - wie im Ebenenstreifen auf Addieren, oder auf dem, was der Name
+    /// verraet (PassRoles: AO multipliziert, Glare addiert). Die Passe einer Datei
     /// setzen das Bild zusammen, und das Licht eines Passes kommt zum Bisherigen dazu.
     /// </summary>
     private void AddPassLayer(string pass, Node? target = null)
@@ -409,7 +306,7 @@ public partial class AtelierPage
         bool clip = LayerEdits.InClip(_graph, after);
 
         if (!NodeEdits.ShowPass(_graph, file, pass, on: true) ||
-            NodeEdits.AddLayer(_graph, after, file, pass, BlendMode.Add) is not var (place, mix))
+            NodeEdits.AddLayer(_graph, after, file, pass, PassRoles.ByName(pass, sceneLinear: true) ?? BlendMode.Add) is not var (place, mix))
         {
             return;
         }

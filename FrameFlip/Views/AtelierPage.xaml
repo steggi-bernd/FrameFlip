@@ -24,6 +24,17 @@
                            Style="{StaticResource DashLabel}"
                            TextTrimming="CharacterEllipsis" MaxWidth="460"
                            Text="{DynamicResource S_NoImage}" />
+
+                <!--
+                    Das Projekt der Folge speichert sich von selbst. Der Knopf ist fuer den
+                    Moment, in dem man sicher sein will - und der Text daneben sagt, ob man
+                    es schon ist.
+                -->
+                <Button x:Name="SaveButton" Style="{StaticResource OverlayButton}" Margin="14,0,0,0"
+                        Content="{DynamicResource S_ProjectSave}" Click="OnSaveClicked" IsEnabled="False"
+                        ToolTip="{DynamicResource S_ProjectSaveHint}" />
+                <TextBlock x:Name="SaveText" VerticalAlignment="Center" Margin="8,0,0,0"
+                           Style="{StaticResource DashLabel}" FontSize="9" />
             </StackPanel>
 
             <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center">
@@ -257,6 +268,16 @@
                             VerticalAlignment="Center">
                     <TextBlock x:Name="BatchStatus" VerticalAlignment="Center" Margin="0,0,12,0"
                                Style="{StaticResource DashLabel}" FontSize="9" />
+
+                    <!--
+                        Schnell-Export: kein Dialog, kein Ziel noetig - in den Ordner FrameFlip
+                        neben den Bildern oder den gewaehlten Zielordner, unter dem naechsten
+                        freien Namen. Er ueberschreibt nie.
+                    -->
+                    <Button x:Name="QuickExportButton" Style="{StaticResource OverlayButton}"
+                            Content="{DynamicResource S_QuickExport}" Click="OnQuickExportClicked"
+                            ToolTip="{DynamicResource S_QuickExportHint}"
+                            IsEnabled="False" MinWidth="110" Margin="0,0,8,0" />
 
                     <Button x:Name="RunButton" Style="{StaticResource OverlayButton}"
                             Content="{DynamicResource S_RunBatch}" Click="OnRunClicked"

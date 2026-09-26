@@ -1,5 +1,6 @@
 using System.Windows.Input;
 using System.Windows.Media;
+using System.Windows.Threading;
 using FrameFlip.Decoding.Exr;
 using FrameFlip.Imaging;
 using FrameFlip.Imaging.Grading;
@@ -139,6 +140,8 @@ public partial class AtelierPage
     /// </summary>
     private void OnNodeSettingsChanged(bool interim)
     {
+        RememberValueEdit();
+
         if (_shownNode is LayerGradeNode grade)
         {
             grade.Adjustments = Tools.Adjustments;
@@ -163,7 +166,12 @@ public partial class AtelierPage
     /// </summary>
     private void KeepNodes()
     {
-        if (_graph is not null) _settings.AtelierNodes = _graph.Save();
+        if (_graph is null) return;
+
+        _recipe.Nodes = _graph.Save();
+
+        // Ein Zug an einem Wert ist zu Ende, wenn sein Stand festgehalten wird.
+        _valueEditOpen = false;
     }
 
     /// <summary>
@@ -185,11 +193,25 @@ public partial class AtelierPage
     }
 
     /// <summary>Wo der gewaehlte Knoten platziert - oder null, wenn er nichts platziert.</summary>
-    private (LayerTransform Place, FloatFrame Source)? NodePlacement(Node? node) => node switch
+    private (LayerTransform Place, FloatFrame Source)? NodePlacement(Node? node) => Placed(node) switch
     {
         PlaceNode place when SourceInto(place, "Bild") is { } source => (place.Place, source),
         OverlayNode overlay when SourceInto(overlay, "Ebene") is { } source => (overlay.Place, source),
+
+        // Ein ausgeschnittenes Stueck ist so gross wie die Leinwand.
+        CutoutNode cutout when _frame is not null => (cutout.Place, _frame),
         _ => null,
+    };
+
+    /// <summary>
+    /// Der Knoten, den der Rahmen bewegt: der gewaehlte selbst - oder bei einer
+    /// ausgeschnittenen Ebene, deren Mischen gewaehlt ist, ihr Ausschneiden. Wer eine
+    /// Ebene waehlt und zieht, will sie verschieben, nicht erst ihren Knoten suchen.
+    /// </summary>
+    private Node? Placed(Node? node) => node switch
+    {
+        MixNode mix when _graph?.Into(mix.Id, "Oben") is { } over && _graph.Find(over.From) is CutoutNode cutout => cutout,
+        _ => node,
     };
 
     /// <summary>Der Greifrahmen im Knotenmodus - am gewaehlten Platzieren- oder Obenauf-Knoten.</summary>
@@ -215,22 +237,27 @@ public partial class AtelierPage
     /// <summary>Der Pinsel im Knotenmodus - auf der gemalten Maske des gewaehlten Knotens.</summary>
     private void ShowNodeBrush()
     {
-        // Im Knotenmodus legt der erste Strich keine Maske an - ohne gemalte Maske am
-        // gewaehlten Knoten gibt es also nichts, worauf der Pinsel malen koennte, und er
-        // darf die Maus nicht nehmen.
-        Placement.MaskWanted = null;
+        // Wie im Stapel: Der Pinsel faengt immer. Ist eine gemalte Maske gewaehlt - oder
+        // eine Ebene, an der eine haengt -, malt er darauf; sonst legt der erste Strich
+        // eine Maskenebene an. Frueher fing er ohne gewaehlte Maske gar nichts, und mit
+        // ihm waren auch Groesse und Haerte am Bild tot.
+        Placement.MaskWanted = MakeNodeMask;
 
-        if (_frame is null || NodeView.Selected is not MaskNode { Mask.Kind: MaskKind.Painted } node)
+        if (_frame is null)
         {
-            // Ohne gemalte Maske gibt es nichts zu bemalen - die Flaeche bleibt
-            // durchlaessig, statt Klicks zu schlucken.
             Placement.Paint(null, 0, 0, false);
             Display.Cursor = null;
 
             return;
         }
 
-        var mask = node.Mask.PaintOn(_number, _frame.Width, _frame.Height);
+        var target = PaintTarget();
+        var mask = target?.Mask.PaintOn(_number, _frame.Width, _frame.Height);
+
+        if (target is not null && mask is not null) WatchMask(target, mask);
+
+        // Den Verlauf gibt es, sobald der Pinsel auf einer gemalten Maske liegt.
+        Properties.ShowBrushHistory(target is not null);
 
         Placement.Paint(mask, _frame.Width, _frame.Height, Display.Stretch == Stretch.Uniform);
         Display.Cursor = Cursors.None;
@@ -238,15 +265,83 @@ public partial class AtelierPage
         UseBrushSettings();
     }
 
+    /// <summary>
+    /// Worauf der Pinsel im Knotenmodus malt: die gewaehlte gemalte Maske - oder die, die
+    /// in den Faktor der gewaehlten Ebene fliesst. Sonst keine.
+    /// </summary>
+    private MaskNode? PaintTarget() => NodeView.Selected switch
+    {
+        MaskNode { Mask.Kind: MaskKind.Painted } mask => mask,
+        MixNode mix when _graph?.Into(mix.Id, "Faktor") is { } factor &&
+                         _graph.Find(factor.From) is MaskNode { Mask.Kind: MaskKind.Painted } mask => mask,
+        _ => null,
+    };
+
+    /// <summary>
+    /// Der erste Strich ohne Maske: eine Maskenebene - eine Einstellungsebene mit gemalter
+    /// Maske, ueber der gewaehlten Ebene oder oben auf den Ebenen. Sie aendert nichts, bis
+    /// jemand an ihrer Korrektur dreht; gewaehlt ist danach die Maske, damit weitergemalt
+    /// wird. Dasselbe, was der Stapel beim ersten Strich anlegt.
+    /// </summary>
+    private PaintedMask? MakeNodeMask()
+    {
+        if (_graph is null || _frame is null) return null;
+
+        if (PaintTarget() is { } known) return known.Mask.PaintOn(_number, _frame.Width, _frame.Height);
+
+        if (AddNodeMaskLayer(new LayerMask { Kind = MaskKind.Painted }, Strings.T("S_MaskLayerName")) is not { } made) return null;
+
+        var paint = made.Mask.PaintOn(_number, _frame.Width, _frame.Height);
+        WatchMask(made, paint);
+        Properties.ShowBrushHistory(true);
+
+        return paint;
+    }
+
+    /// <summary>
+    /// Eine Maskenebene im Graphen: eine Einstellungsebene, deren Mischen diese Maske im
+    /// Faktor hat - ueber der gewaehlten Ebene oder oben auf den Ebenen. Gewaehlt ist danach
+    /// die Maske. Fuer den ersten Pinselstrich und fuer "Objekt hier als Maske".
+    /// </summary>
+    private MaskNode? AddNodeMaskLayer(LayerMask mask, string label)
+    {
+        if (_graph is null || ListTarget() is not { } after || NodeEdits.Through(after).Output is not { } below) return null;
+
+        RememberNodes();
+
+        if (LayerEdits.AddAdjustment(_graph, after) is not var (grade, mix)) return null;
+
+        mix.Label = label;
+
+        var node = _graph.Add(new MaskNode { Mask = mask, Preview = true });
+
+        _graph.Connect(grade, "Bild", node, "Ebene");
+        _graph.Connect(after, below, node, "Untergrund");
+        _graph.Connect(node, "Maske", mix, "Faktor");
+
+        ArrangeLayer(after, after, grade, mix);
+        node.X = grade.X;
+        node.Y = grade.Y - NodeLayout.Height(node) - NodeLayout.Gap;
+
+        NodeView.Select(node);
+        NodeView.InvalidateVisual();
+        AfterNodeEdit();
+
+        return node;
+    }
+
     /// <summary>Am Rahmen wurde gezogen - im Knotenmodus bekommt der Knoten die neue Lage.</summary>
     private void OnNodePlacementDragged(LayerTransform place, bool interim)
     {
-        switch (_placingNode ?? NodeView.Selected)
+        switch (Placed(_placingNode ?? NodeView.Selected))
         {
             case PlaceNode node: node.Place = place; break;
             case OverlayNode node: node.Place = place; break;
+            case CutoutNode node: node.Place = place; break;
             default: return;
         }
+
+        RememberValueEdit();
 
         if (!interim)
         {
@@ -268,17 +363,49 @@ public partial class AtelierPage
         CompositionTarget.Rendering += OnDragFrame;
     }
 
-    /// <summary>Es wurde gemalt - im Knotenmodus auf die Maske des Knotens.</summary>
+    /// <summary>
+    /// Es wurde gemalt - im Knotenmodus auf die Maske des Knotens.
+    ///
+    /// Waehrend des Strichs nur das Noetigste: den Takt anmelden. Frueher fragte hier
+    /// jede Mausmeldung den Verlauf, ob schon ein Schritt faellig sei - und schrieb dafuer
+    /// den ganzen Graphen samt aller gemalten Masken als Text. Bei einer Maus, die
+    /// tausendmal in der Sekunde meldet, und ein paar Masken im Bild war das ein Ruckeln,
+    /// das man dem Pinsel zuschrieb. Der Schritt ist der ganze Strich; gemerkt wird er
+    /// einmal, an seinem Ende.
+    /// </summary>
     private void OnNodePainted(bool interim)
     {
         if (!interim)
         {
-            StopDragFrames();
-            Refresh(interim: false, recompose: false);
-            KeepNodes();
+            // Was seit dem letzten Takt dazukam, noch zeigen - der Strich endet sonst
+            // einen Takt zu frueh. Blieb jeder Takt ein genauer Ausschnitt, stimmt das Bild
+            // danach schon voll aufgeloest.
+            //
+            // Nur wenn dieser Strich ueberhaupt als Ausschnitt ins Bild kam: Eine Aenderung
+            // an der Maske, die der Pinsel nicht gemeldet hat, stuende sonst erst nach der
+            // Ruhepause im Bild.
+            bool exact = !_regionFailed && PaintRegion() && _regionPainted;
 
+            StopDragFrames();
+            _regionFailed = false;
+            _regionPainted = false;
+
+            RememberValueEdit();
+            RecordMaskStroke();
+
+            // Das ganze Bild - fuer die Vorschauen der Knoten und das Histogramm - erst,
+            // wenn der Pinsel ruht. Gleich nach jedem Strich hiesse bei 4K eine Fuenftel-
+            // sekunde Stillstand zwischen zwei Strichen, und genau dort setzt man wieder an.
+            // Fiel ein Takt auf das grobe Bild zurueck, muss das scharfe dagegen sofort her.
+            if (exact) SettleAfterPainting();
+            else Refresh(interim: false, recompose: false);
+
+            KeepNodes();
             return;
         }
+
+        // Ein neuer Strich: Das ganze Bild wartet, bis auch er zu Ende ist.
+        _calm?.Stop();
 
         _pendingPaint = true;
 
@@ -287,4 +414,39 @@ public partial class AtelierPage
         _dragHooked = true;
         CompositionTarget.Rendering += OnDragFrame;
     }
+
+    /// <summary>Ob in diesem Strich ein Takt keinen Ausschnitt rechnen konnte - dann ist das Bild grob.</summary>
+    private bool _regionFailed;
+
+    /// <summary>Ob in diesem Strich ein Ausschnitt ins Bild geschrieben wurde.</summary>
+    private bool _regionPainted;
+
+    /// <summary>Wartet nach dem letzten Strich, bevor das ganze Bild gerechnet wird.</summary>
+    private DispatcherTimer? _calm;
+
+    /// <summary>Wie lange der Pinsel ruhen muss - kuerzer, als man auf das Histogramm schaut.</summary>
+    private static readonly TimeSpan PaintingCalm = TimeSpan.FromMilliseconds(700);
+
+    private void SettleAfterPainting()
+    {
+        if (_calm is null)
+        {
+            _calm = new DispatcherTimer(DispatcherPriority.Background) { Interval = PaintingCalm };
+            _calm.Tick += (_, _) =>
+            {
+                _calm.Stop();
+
+                // Malt gerade jemand, kommt das ganze Bild nach seinem Strich.
+                if (_dragHooked || !InNodes) return;
+
+                Refresh(interim: false, recompose: false);
+            };
+        }
+
+        _calm.Stop();
+        _calm.Start();
+    }
+
+    /// <summary>Ob das ganze Bild nach dem Malen noch aussteht - fuer die Probe.</summary>
+    internal bool SettlingAfterPainting => _calm?.IsEnabled == true;
 }

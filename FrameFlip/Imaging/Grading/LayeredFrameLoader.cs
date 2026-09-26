@@ -54,7 +54,11 @@ public static class LayeredFrameLoader
         // Passen stammt. Das Bild selbst zu zeigen ist dann die bessere Antwort als
         // ein schwarzes Feld: Man sieht, dass die Datei in Ordnung ist, und sucht
         // den Fehler dort, wo er liegt.
-        var built = LayerComposer.Compose(layers, sources) ?? plain(path);
+        //
+        // Mit der Nummer des Bildes: Eine je Bild gemalte Maske waehlt ihren Anstrich
+        // danach. Ohne sie nahm jedes Bild des Exports den Anstrich von Bild 0 - also
+        // keinen, und die Ebene wirkte ueberall, waehrend die Vorschau sie richtig zeigte.
+        var built = LayerComposer.Compose(layers, sources, number: SequenceLink.NumberOf(path) ?? 0) ?? plain(path);
         if (built is null) return (null, Overlays.None);
 
         return (built, Grading.Overlays.Prepare(layers, sources, built.Width, built.Height));

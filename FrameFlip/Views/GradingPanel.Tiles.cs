@@ -69,6 +69,10 @@ public partial class GradingPanel
         ("S_GroupTable", "Lut", "S_Lut", "⊞"),
     };
 
+    /// <summary>Das Zeichen einer Palettenkachel - fuer den Hub im Knoteneditor, der dieselben Zeichen zeigt.</summary>
+    internal static string? GlyphOf(string section)
+        => Sections.FirstOrDefault(s => s.Prefix == section).Glyph;
+
     /// <summary>
     /// Die Kategorien, deren Werkzeuge dem GANZEN Bild gelten. An einer Ebene werden
     /// sie nie gerechnet und sind dort gesperrt.
@@ -412,6 +416,14 @@ public partial class GradingPanel
             // darin galt. Die Knoepfe melden ihren Klick selbst und markieren ihn.
             head.MouseLeftButtonUp += OnCardHeadClicked;
 
+            // Rechtsklick: dieselben Griffe wie die Knoepfe im Kopf - und Kopieren und
+            // Einfuegen, um Einstellungen zwischen Ebenen oder Knoten mitzunehmen.
+            head.MouseRightButtonUp += (_, e) =>
+            {
+                e.Handled = true;
+                ShowCardMenu(prefix, head);
+            };
+
             var host = new Border
             {
                 Padding = new Thickness(12, 2, 12, 12),
@@ -474,8 +486,11 @@ public partial class GradingPanel
     {
         if (sender is not ToggleButton { Tag: string prefix } power) return;
 
-        bool on = power.IsChecked == true;
+        SetPower(prefix, power.IsChecked == true);
+    }
 
+    private void SetPower(string prefix, bool on)
+    {
         foreach (string kind in KindsOf(prefix))
         {
             Stack.Bypassed.Remove(kind);
@@ -484,6 +499,101 @@ public partial class GradingPanel
 
         Raise(interim: false);
         ShowActive();
+    }
+
+    /// <summary>Das zuletzt geoeffnete Menue einer Karte - fuer die Probe.</summary>
+    internal FlipMenu? CardMenu { get; private set; }
+
+    /// <summary>
+    /// Was zuletzt kopiert wurde: die Karte und ihre Werte. Fuer alle Farbstreifen
+    /// gemeinsam - kopiert an einer Ebene oder einem Knoten, eingefuegt an einem anderen.
+    /// </summary>
+    private static (string Prefix, object[] Tools, ImageAdjustments? Adjust)? _copied;
+
+    /// <summary>Das Menue einer Karte: ein- und ausschalten, zuruecksetzen, kopieren, einfuegen, entfernen.</summary>
+    internal void ShowCardMenu(string prefix, UIElement target)
+    {
+        var menu = new FlipMenu(target);
+
+        if (prefix != "Basic") menu.Toggle(Strings.T("S_CardMenuOn"), !IsOff(prefix), () => SetPower(prefix, IsOff(prefix)));
+
+        menu.Item("↺", Strings.T("S_CardMenuReset"), () =>
+            {
+                ResetSection(prefix);
+                Raise(interim: false);
+                ShowActive();
+            })
+            .Item("⧉", Strings.T("S_CardMenuCopy"), () => CopySection(prefix))
+            .Item("⎘", Strings.T("S_CardMenuPaste"), () => PasteSection(prefix), enabled: _copied?.Prefix == prefix);
+
+        if (prefix != "Basic") menu.Separator().Item("✕", Strings.T("S_CardMenuRemove"), () => RemoveSection(prefix));
+
+        CardMenu = menu;
+        menu.Open();
+    }
+
+    /// <summary>Merkt sich die Werte einer Karte - als Kopien, damit spaeteres Drehen sie nicht mitnimmt.</summary>
+    private void CopySection(string prefix)
+        => _copied = (prefix, ToolsOf(prefix).Select(CloneTool).ToArray(), prefix == "Basic" ? Adjustments : null);
+
+    /// <summary>Setzt kopierte Werte auf dieselbe Karte hier - jedes Mal als frische Kopie.</summary>
+    private void PasteSection(string prefix)
+    {
+        if (_copied is not { } copied || copied.Prefix != prefix) return;
+
+        if (copied.Adjust is { } adjust) Adjustments = adjust;
+
+        foreach (var (target, source) in ToolsOf(prefix).Zip(copied.Tools))
+            CopyValues(target, CloneTool(source));
+
+        _added.Add(prefix);
+        PushToControls();
+        Raise(interim: false);
+        ShowActive();
+    }
+
+    /// <summary>Wie das Kreuz im Kopf: zuruecksetzen und die Karte wegnehmen.</summary>
+    private void RemoveSection(string prefix)
+    {
+        ResetSection(prefix);
+
+        _added.Remove(prefix);
+
+        foreach (string kind in KindsOf(prefix)) Stack.Bypassed.Remove(kind);
+
+        Raise(interim: false);
+        ShowActive();
+    }
+
+    /// <summary>
+    /// Eine Kopie eines Werkzeugs - ueber den Kopierweg des Werkzeugstapels, der jede Art
+    /// kennt und nichts teilt.
+    /// </summary>
+    private static object CloneTool(object tool) => tool switch
+    {
+        IGradingTool g => new GradingStack { Tools = { g } }.Clone().Tools[0],
+        ILocalTool l => new GradingStack { Local = { l } }.Clone().Local[0],
+        IOpticsTool o => new GradingStack { Optics = { o } }.Clone().Optics[0],
+        IGeometryTool m => new GradingStack { Geometry = { m } }.Clone().Geometry[0],
+        IDataTool d => new GradingStack { Data = { d } }.Clone().Data[0],
+        IFramePass f => new GradingStack { Frame = { f } }.Clone().Frame[0],
+        _ => tool,
+    };
+
+    /// <summary>Schreibt die Werte eines Werkzeugs in ein anderes derselben Art.</summary>
+    private static void CopyValues(object target, object source)
+    {
+        var type = target.GetType();
+        if (source.GetType() != type) return;
+
+        foreach (var property in type.GetProperties(System.Reflection.BindingFlags.Public |
+                                                    System.Reflection.BindingFlags.Instance))
+        {
+            if (!property.CanRead || !property.CanWrite) continue;
+            if (property.GetIndexParameters().Length > 0) continue;
+
+            property.SetValue(target, property.GetValue(source));
+        }
     }
 
     /// <summary>Zuruecksetzen: alle Werte auf Anfang, die Karte bleibt.</summary>

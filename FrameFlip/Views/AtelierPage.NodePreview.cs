@@ -42,11 +42,11 @@ public partial class AtelierPage
     /// her), der gespeicherte.
     /// </summary>
     private NodeGraph FreshFromStack()
-        => StackToGraph.Convert(Stack(), _settings.Adjustments ?? ImageAdjustments.Neutral,
-                                _settings.Grading ?? new GradingStack());
+        => StackToGraph.Convert(Stack(), _recipe.Adjustments ?? ImageAdjustments.Neutral,
+                                _recipe.Grading ?? new GradingStack());
 
     private LayerStack Stack()
-        => Layers.Stack.Layers.Count > 0 ? Layers.Stack : _settings.Layers ?? Layers.Stack;
+        => Layers.Stack.Layers.Count > 0 ? Layers.Stack : _recipe.Layers ?? Layers.Stack;
 
     /// <summary>
     /// Sagt in der Ebenenliste, welche ausgeblendeten Ebenen des Stapels dem Graphen fehlen.
@@ -103,6 +103,9 @@ public partial class AtelierPage
             if (layer.MaskSource is { } mask) _previews.Wanted.Add(mask.Id);
         }
 
+        // Die freien Masken haben ihr Bild im Abschnitt "Masken" der Liste.
+        foreach (var free in MaskUse.FreeMasks(_graph)) _previews.Wanted.Add(free.Id);
+
         _previews.Keep(_graph.Nodes.Select(n => n.Id));
     }
 
@@ -152,7 +155,9 @@ public partial class AtelierPage
         if (_graph is null) return;
 
         NodeLayers.Show(NodeLayerList.Of(_graph), NodeView.Selected, LayerThumb,
-                        layer => layer.MaskSource is { } mask ? PreviewImage(mask) : null);
+                        layer => layer.MaskSource is { } mask ? PreviewImage(mask) : null,
+                        NodeView.MarkedBy(NodeView.Selected),
+                        MaskUse.FreeMasks(_graph).Select(m => new FreeMask(m, NodeTitles.MaskName(m), PreviewImage(m))).ToList());
         ShowLayerCount();
     }
 
@@ -202,6 +207,7 @@ public partial class AtelierPage
         if (!_sourceThumbsBusy.Add(key) || _base is null) return null;
 
         string? path = _path;
+        long opened = _source.Opened;
         var view = ViewFor(_base);
 
         Task.Run(() => read() is { } frame ? NodePreviews.Draw(frame, view) : null)
@@ -210,7 +216,7 @@ public partial class AtelierPage
                 _sourceThumbsBusy.Remove(key);
 
                 // Waehrend gelesen wurde, kann eine andere Datei geoeffnet worden sein.
-                if (!string.Equals(path, _path, StringComparison.Ordinal)) return;
+                if (!_source.IsCurrent(opened) || !string.Equals(path, _path, StringComparison.Ordinal)) return;
                 if (!task.IsCompletedSuccessfully || task.Result is not { } thumb) return;
 
                 var image = BitmapSource.Create(thumb.Width, thumb.Height, 96, 96, PixelFormats.Bgra32, null,
@@ -322,6 +328,7 @@ public partial class AtelierPage
         if (passes.Count == 0 || signature == _passThumbsFor) return;
 
         _passThumbsBusy = true;
+        long opened = _source.Opened;
         var view = ViewFor(_base);
 
         Task.Run(() =>
@@ -340,7 +347,7 @@ public partial class AtelierPage
             _passThumbsBusy = false;
 
             // Waehrend gelesen wurde, kann eine andere Datei geoeffnet worden sein.
-            if (!string.Equals(path, _path, StringComparison.Ordinal)) return;
+            if (!_source.IsCurrent(opened) || !string.Equals(path, _path, StringComparison.Ordinal)) return;
 
             _passThumbsFor = signature;
             _passThumbs.Clear();

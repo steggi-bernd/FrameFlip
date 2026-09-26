@@ -31,16 +31,20 @@ public static class AtelierLayerInvariants
 
         try
         {
-            TheStripAppears(path);
-            TheSharedLoaderRebuilds(path);
-            APlainImageLayersToo(folder);
-            EachLayerKeepsItsOwnTools(path);
-            TheFrameOnlyGrabsWhenItShould(path);
-            TheToolDecidesWhatTheMouseDoes(path);
-            TheDockRemembersHowItStood(path);
-            ShowingALayerShowsItAtOnce(folder);
-            TheReportedSessionComesBack(folder);
-            RasterReachesTheAtelier(folder);
+            // Jede Probe beginnt ohne Projekt: Die Datei ist dieselbe, und ihr Projekt
+            // brachte sonst das Rezept der vorigen Probe mit.
+            void Fresh() => Forget(folder);
+
+            Fresh(); TheStripAppears(path);
+            Fresh(); TheSharedLoaderRebuilds(path);
+            Fresh(); APlainImageLayersToo(folder);
+            Fresh(); EachLayerKeepsItsOwnTools(path);
+            Fresh(); TheFrameOnlyGrabsWhenItShould(path);
+            Fresh(); TheToolDecidesWhatTheMouseDoes(path);
+            Fresh(); TheDockRemembersHowItStood(path);
+            Fresh(); ShowingALayerShowsItAtOnce(folder);
+            Fresh(); TheReportedSessionComesBack(folder);
+            Fresh(); RasterReachesTheAtelier(folder);
         }
         finally
         {
@@ -113,8 +117,11 @@ public static class AtelierLayerInvariants
 
             Check.That(strip.Stack.Layers.Count == 16, "der Passestapel steht",
                        $"{strip.Stack.Layers.Count}");
-            Check.That(settings.Layers is not null && settings.Layers.Layers.Count == 16,
-                       "und wird fuer das naechste Mal gemerkt");
+            // Gemerkt wird im Projekt der Folge, nicht mehr in den Einstellungen.
+            page.Flush();
+            var remembered = page.Projects.Current is { } key ? page.Projects.Store.Load(key)?.Layers : null;
+            Check.That(remembered is not null && remembered.Layers.Count == 16,
+                       "und wird fuer das naechste Mal gemerkt - im Projekt der Folge");
         }
         finally
         {
@@ -452,8 +459,8 @@ public static class AtelierLayerInvariants
 
             exposure.Value = 0.75;
 
-            Check.That(settings.Adjustments is not null, "der Regler gehoert wieder dem Bild");
-            Check.Near(settings.Adjustments!.Exposure, 0.75, 0.001, "und landet dort");
+            Check.That(page.Recipe.Adjustments is not null, "der Regler gehoert wieder dem Bild");
+            Check.Near(page.Recipe.Adjustments!.Exposure, 0.75, 0.001, "und landet dort - im Rezept des Projekts");
             Check.Near(first.Adjustments!.Exposure, -2.0, 0.001,
                        "die Ebenen bleiben davon unberuehrt");
             Check.Near(second.Adjustments!.Exposure, 1.5, 0.001, "beide");
@@ -1416,6 +1423,42 @@ public static class AtelierLayerInvariants
                        "und legt dabei keine Ebene an - erst der Strich tut das",
                        $"{strip.Stack.Layers.Count} statt {before}");
 
+            // Groesse und Haerte am Bild: Strg und ziehen. Nach rechts groesser und
+            // haerter, die Regler oben ziehen mit, und gemalt wird dabei nichts.
+            var brushPanel = (PropertiesPanel)page.FindName("Properties");
+            var centre = new System.Windows.Point(frame.ActualWidth / 2, frame.ActualHeight / 2);
+            float radius = frame.BrushRadius, hardness = frame.BrushHardness;
+
+            frame.BeginKnob(centre, PlacementAdorner.BrushKnob.Size);
+            frame.MoveKnob(centre + new System.Windows.Vector(40, 0));
+
+            Check.That(frame.BrushRadius > radius && Math.Abs(brushPanel.BrushRadius - frame.BrushRadius) < 0.01f,
+                       "Strg und nach rechts ziehen macht den Pinsel groesser - und der Regler zieht mit",
+                       $"{radius:0.0} -> {frame.BrushRadius:0.0}, Regler {brushPanel.BrushRadius:0.0}");
+
+            frame.MoveKnob(centre + new System.Windows.Vector(-100000, 0));
+
+            Check.That(frame.BrushRadius >= 1 && Math.Abs(brushPanel.BrushRadius - frame.BrushRadius) < 0.01f,
+                       "und nach links kleiner - aber nie unter einen Punkt", $"{frame.BrushRadius:0.0}");
+
+            frame.EndKnob();
+            frame.BeginKnob(centre, PlacementAdorner.BrushKnob.Hardness);
+            frame.MoveKnob(centre + new System.Windows.Vector(-60, 0));
+
+            Check.That(frame.BrushHardness < hardness && Math.Abs(brushPanel.BrushHardness - frame.BrushHardness) < 0.001f,
+                       "Strg und rechte Taste stellen die Haerte ein - ebenso mit dem Regler",
+                       $"{hardness:0.00} -> {frame.BrushHardness:0.00}");
+
+            frame.MoveKnob(centre + new System.Windows.Vector(100000, 0));
+            frame.EndKnob();
+
+            Check.That(frame.BrushHardness == 1f && frame.Knob == PlacementAdorner.BrushKnob.None &&
+                       strip.Stack.Layers.Count == before,
+                       "hoechstens ganz hart - und beim Einstellen entsteht keine Maskenebene",
+                       $"{frame.BrushHardness:0.00}, {strip.Stack.Layers.Count} Ebenen");
+
+            brushPanel.SetBrush(radius, hardness, PaintStroke.DefaultSpacing);
+
             page.HandleToolKey(System.Windows.Input.Key.V);
             page.UpdateLayout();
 
@@ -1546,6 +1589,21 @@ public static class AtelierLayerInvariants
     }
 
     /// <summary>Waehlt eine Ebene so aus, wie ein Klick in die Liste es taete.</summary>
+    /// <summary>Vergisst die Projekte im Ordner - mit dem Ordner FrameFlip, in dem sie liegen.</summary>
+    private static void Forget(string folder)
+    {
+        // Eine Seite, die gerade geschlossen wurde, schreibt ihr Projekt erst, wenn der
+        // Dispatcher ihr Unloaded zustellt - erst das abwarten, dann das Schreiben.
+        for (int i = 0; i < 5; i++)
+            System.Windows.Threading.Dispatcher.CurrentDispatcher.Invoke(() => { }, System.Windows.Threading.DispatcherPriority.ContextIdle);
+
+        Atelier.AtelierProjectStore.WaitForWrites(TimeSpan.FromSeconds(10));
+
+        string projects = Path.Combine(folder, Atelier.AtelierProjectStore.FolderName);
+        try { if (Directory.Exists(projects)) Directory.Delete(projects, recursive: true); }
+        catch (IOException) { /* ein liegengebliebener Rest faellt beim naechsten Lauf auf */ }
+    }
+
     private static void Select(LayerPanel strip, ImageLayer layer)
     {
         var list = (System.Windows.Controls.ListBox)strip.FindName("LayerList");

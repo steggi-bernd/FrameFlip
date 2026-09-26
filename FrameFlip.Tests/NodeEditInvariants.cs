@@ -43,6 +43,583 @@ public static class NodeEditInvariants
         ThePageBuildsAndUndoes();
         ThePageWiresPassesAndPicks();
         ThePageFetchesHiddenLayers();
+        ThePageSurvivesWiring();
+        ThePageHubAndMenus();
+    }
+
+    /// <summary>
+    /// Der Hub statt des alten Menues, und das Menue einer Zeile in der Ebenenliste - auf
+    /// der Seite, an der kleinen Kryptomattendatei der Probe.
+    /// </summary>
+    private static void ThePageHubAndMenus()
+    {
+        Check.Group("Knoten bauen: der Hub und das Menue einer Ebene");
+
+        string T(string key) => Localization.Strings.T(key);
+
+        string folder = Path.Combine(Path.GetTempPath(), "frameflip-hub-" + Guid.NewGuid().ToString("N")[..8]);
+        Directory.CreateDirectory(folder);
+
+        string path = Path.Combine(folder, "render_0001.exr");
+        File.WriteAllBytes(path, CryptoSample.Bytes());
+
+        var page = new AtelierPage(FrameDecoderRegistry.CreateDefault(() => null), new AppSettings(), _ => { });
+        var window = Window(page);
+
+        try
+        {
+            page.Open(path);
+
+            var size = (TextBlock)page.FindName("SourceText");
+            if (!Pump(TimeSpan.FromSeconds(10), () => size.Text.Length > 0))
+            {
+                Check.That(false, "die Datei wird geladen");
+                return;
+            }
+
+            Settle();
+            page.ConvertToNodes();
+            ((ToolColumn)page.FindName("MouseTools")).Select(AtelierTool.Nodes, notify: true);
+            Settle();
+
+            var editor = (NodeEditor)page.FindName("NodeView");
+            editor.Frame();
+            editor.UpdateLayout();
+
+            // Ein Rechtsklick auf das Kabel in die Ausgabe: Der Hub sagt, wo Neues hinkommt,
+            // und die Suche findet die Vignette.
+            var output = page.Graph!.Output!;
+            var wire = page.Graph.Into(output.Id, "Bild")!;
+            var from = page.Graph.Find(wire.From)!;
+            var middle = new Point((editor.ScreenOf(from, wire.Output, input: false).X + editor.ScreenOf(output, "Bild", input: true).X) / 2,
+                                   (editor.ScreenOf(from, wire.Output, input: false).Y + editor.ScreenOf(output, "Bild", input: true).Y) / 2);
+
+            editor.Select(null);
+            page.ShowNodeHub(editor.ToGraph(middle));
+            var hub = page.Hub;
+
+            Check.That(hub is not null && editor.NodeAt(middle) is null && editor.LinkAt(middle) == wire,
+                       "Rechtsklick auf ein Kabel oeffnet den Hub - dort, wo nur das Kabel ist");
+
+            // Im Editor geht der Hub erst beim Loslassen der rechten Taste auf - sonst
+            // landete das Loslassen in ihm (frueher sprang dort das Windows-Menue des
+            // Suchfelds auf).
+            hubPopupClose(page);
+
+            System.Windows.Input.MouseButtonEventArgs Right(RoutedEvent routed) =>
+                new(System.Windows.Input.Mouse.PrimaryDevice, 0, System.Windows.Input.MouseButton.Right) { RoutedEvent = routed };
+
+            editor.RaiseEvent(Right(System.Windows.Input.Mouse.MouseDownEvent));
+            bool openOnPress = page.Hub is not null;
+            editor.RaiseEvent(Right(System.Windows.Input.Mouse.MouseUpEvent));
+
+            Check.That(!openOnPress && page.Hub is not null, "der Hub oeffnet beim Loslassen der rechten Taste, nicht beim Druecken");
+
+            hubPopupClose(page);
+            page.ShowNodeHub(editor.ToGraph(middle));
+            hub = page.Hub;
+
+            hub!.Search("vignet");
+            Check.That(hub.Visible.Count == 1 && hub.Visible[0].Title == T("S_Vignette"), "die Suche findet die Vignette",
+                       string.Join(", ", hub.Visible.Select(v => v.Title)));
+
+            hub.ActivateHighlighted();
+            Settle();
+
+            var vignette = page.Graph!.Nodes.OfType<OpticsNode>().FirstOrDefault(n => n.Tool is VignetteTool);
+
+            Check.That(page.Hub is null && vignette is not null &&
+                       page.Graph.Into(vignette.Id, "Bild")?.From == from.Id && page.Graph.Into(output.Id, "Bild")?.From == vignette.Id,
+                       "Enter setzt sie ein - ins Kabel, auf dem der Rechtsklick war, und der Hub geht zu");
+
+            page.StepNodes(back: true);
+            Settle();
+
+            // Ebenen: die Passe der Datei - Klick als Ebene, Umschalt+Klick als Maske.
+            var passes = (IReadOnlyList<(string Name, string Label)>)Call(page, "NodePasses")!;
+            page.ShowNodeHub(editor.ToGraph(new Point(40, 40)), "layers");
+            hub = page.Hub!;
+
+            var tiles = hub.Visible.Where(v => passes.Any(p => p.Label == v.Title) && v.Alternate is not null).ToList();
+            Check.That(hub.Category == "layers" && tiles.Count == passes.Count,
+                       "bei den Ebenen stehen alle Passe der Datei als Kacheln", $"{tiles.Count} von {passes.Count}");
+
+            int mixes = page.Graph!.Nodes.OfType<MixNode>().Count();
+            tiles[0].Activate();
+            Settle();
+
+            Check.That(page.Graph!.Nodes.OfType<MixNode>().Count() == mixes + 1, "ein Klick holt den Pass als Ebene");
+
+            page.ShowNodeHub(editor.ToGraph(new Point(40, 40)), "layers");
+            var second = page.Hub!.Visible.First(v => v.Title == passes[^1].Label && v.Alternate is not null);
+            second.Alternate!();
+            Settle();
+
+            Check.That(page.Graph!.Nodes.OfType<MaskNode>().Any(m => m.Mask.Kind == MaskKind.Pass && m.Mask.Source == passes[^1].Name),
+                       "Umschalt+Klick holt ihn als Maske");
+
+            page.ShowNodeHub(editor.ToGraph(new Point(40, 40)));
+            var recent = page.Hub!.CategoryByKey("recent");
+
+            Check.That(recent is not null && recent.Groups[0].Entries.Take(2).Select(e => e.Title)
+                                                  .SequenceEqual(new[] { passes[^1].Label, passes[0].Label }),
+                       "unter Zuletzt steht, was zuletzt genommen wurde - das Neueste zuerst",
+                       string.Join(", ", recent?.Groups[0].Entries.Select(e => e.Title) ?? Array.Empty<string>()));
+
+            page.Hub!.Choose(recent);
+            Check.That(page.Hub.Category == "recent", "und der Hub oeffnet sie");
+
+            // Die Leiste unten wirkt auf den gewaehlten Knoten.
+            var light = page.Graph!.Nodes.OfType<LightNode>().FirstOrDefault() ?? (Node)page.Graph.Nodes.OfType<ViewNode>().First();
+            editor.Select(light);
+            page.ShowNodeHub(editor.ToGraph(new Point(40, 40)));
+            page.Hub!.Actions.First(a => a.Label == T("S_HubMute")).Act();
+            Settle();
+
+            Check.That(light.Muted, "Stumm in der Leiste schaltet den gewaehlten Knoten stumm");
+
+            light.Muted = false;
+
+            // Das Menue einer Zeile in der Ebenenliste.
+            var list = (NodeLayerList)page.FindName("NodeLayers");
+            var top = list.Shown.First(l => l.Mix is not null);
+
+            Call(page, "ShowLayerMenu", top);
+            var menu = page.LayerMenu!;
+
+            Check.That(new[] { "S_LayerMenuRename", "S_LayerMenuVisible", "S_LayerMenuShowInGraph", "S_LayerMenuViewAlone",
+                               "S_DuplicateLayer", "S_RemoveLayer", "S_LayerMenuClip" }.All(k => menu.Items.Contains(T(k))),
+                       "das Menue einer Ebene bietet an, was sich mit ihr tun laesst", string.Join(", ", menu.Items));
+
+            menu.Invoke(T("S_LayerMenuRename"));
+            menu.Commit("Glanz");
+
+            Check.That(top.Mix!.Label == "Glanz" && list.Shown.Any(l => l.Name == "Glanz"), "Umbenennen gibt dem Mischen den Namen",
+                       top.Mix.Label);
+
+            mixes = page.Graph!.Nodes.OfType<MixNode>().Count();
+            Call(page, "ShowLayerMenu", list.Shown.First(l => l.Mix is not null));
+            page.LayerMenu!.Invoke(T("S_DuplicateLayer"));
+            Settle();
+
+            Check.That(page.Graph!.Nodes.OfType<MixNode>().Count() == mixes + 1, "Verdoppeln verdoppelt die Ebene samt Zweig");
+
+            Call(page, "ShowLayerMenu", list.Shown.First(l => l.Mix is not null));
+            page.LayerMenu!.Invoke(T("S_LayerMenuViewAlone"));
+            Settle();
+
+            var viewed = ((NodeEditor)page.FindName("NodeView")).Viewed;
+            Check.That(viewed is not null && page.Graph.Links.Any(l => l.From == viewed.Value.Node.Id && l.To == list.Shown.First(s => s.Mix is not null).Mix!.Id && l.Input == "Oben"),
+                       "Allein im Betrachter zeigt, was in das Mischen oben hineinfliesst");
+
+            Call(page, "SetViewer", new object[] { null! });
+            Settle();
+
+            // Eine Ebene im Hub: Klick legt ihr Bild als neuen Knoten an, Umschalt springt hin.
+            var passLayer = list.Shown.First(l => l.Origin is { Node: RenderNode } && l.Mix is not null);
+            int places = page.Graph!.Nodes.OfType<PlaceNode>().Count();
+
+            page.ShowNodeHub(editor.ToGraph(new Point(40, 40)), "layers");
+            var layerTile = page.Hub!.Visible.First(v => v.Title == passLayer.Name && v.Detail?.Contains(passLayer.Detail) == true);
+            layerTile.Activate();
+            Settle();
+
+            var fresh = editor.Selected as PlaceNode;
+            Check.That(page.Graph!.Nodes.OfType<PlaceNode>().Count() == places + 1 && fresh is not null &&
+                       page.Graph.Into(fresh.Id, "Bild") is { } read && read.Output == passLayer.Origin!.Value.Output,
+                       "eine Ebene im Hub gewaehlt, kommt ihr Bild als neuer Knoten dazu - mit dem Kabel von der Datei");
+
+            page.ShowNodeHub(editor.ToGraph(new Point(40, 40)), "layers");
+            page.Hub!.Visible.First(v => v.Title == passLayer.Name && v.Detail?.Contains(passLayer.Detail) == true).Alternate!();
+            Settle();
+
+            Check.That(ReferenceEquals(editor.Selected, passLayer.Mix), "Umschalt+Klick springt zu ihr");
+
+            // Die Ruecktaste loescht den gewaehlten Knoten - wie Entf.
+            editor.Select(fresh);
+            editor.Focus();
+            editor.RaiseEvent(new System.Windows.Input.KeyEventArgs(System.Windows.Input.Keyboard.PrimaryDevice,
+                PresentationSource.FromVisual(editor)!, 0, System.Windows.Input.Key.Back)
+            {
+                RoutedEvent = System.Windows.Input.Keyboard.KeyDownEvent,
+            });
+            Settle();
+
+            Check.That(page.Graph!.Find(fresh!.Id) is null, "die Ruecktaste loescht den gewaehlten Knoten");
+
+            // Der Pinsel im Knotenmodus: Er faengt auch ohne gewaehlte Maske, und Groesse und
+            // Haerte lassen sich am Bild ziehen. Der erste Strich legt eine Maskenebene an.
+            editor.Select(null);
+            byte[] before = Pixels(page);
+            int nodes = page.Graph.Nodes.Count;
+
+            Check.That(page.HandleToolKey(System.Windows.Input.Key.B), "B nimmt den Pinsel");
+            page.UpdateLayout();
+
+            var frame = (PlacementAdorner)page.FindName("Placement");
+            Check.That(frame.Mode == AdornerMode.Paint && frame.IsHitTestVisible,
+                       "im Knotenmodus faengt der Pinsel auch ohne gewaehlte Maske");
+
+            float radius = frame.BrushRadius;
+            var centre = new Point(frame.ActualWidth / 2, frame.ActualHeight / 2);
+            frame.BeginKnob(centre, PlacementAdorner.BrushKnob.Size);
+            frame.MoveKnob(centre + new Vector(30, 0));
+            frame.EndKnob();
+
+            Check.That(frame.BrushRadius > radius, "und Strg und ziehen stellt die Groesse ein", $"{radius} -> {frame.BrushRadius}");
+
+            var paint = frame.MaskWanted!();
+            Settle();
+
+            var made = page.Graph!.Nodes.OfType<MaskNode>().LastOrDefault(m => m.Mask.Kind == MaskKind.Painted);
+            var layerMix = made is null ? null : page.Graph.Links.Where(l => l.From == made.Id && l.Input == "Faktor")
+                                                            .Select(l => page.Graph.Find(l.To)).OfType<MixNode>().FirstOrDefault();
+
+            Check.That(paint is not null && made is not null && layerMix?.Label == T("S_MaskLayerName") &&
+                       ReferenceEquals(editor.Selected, made) && page.Graph.Nodes.Count == nodes + 3,
+                       "der erste Strich legt eine Maskenebene an - Korrektur, Mischen und gemalte Maske, die Maske gewaehlt",
+                       $"{page.Graph.Nodes.Count - nodes} neue Knoten");
+            Check.That(Pixels(page).AsSpan().SequenceEqual(before), "und das Bild bleibt, wie es war - die Ebene aendert nichts, bis man dreht");
+            Check.That(ReferenceEquals(frame.MaskWanted!(), paint) && page.Graph.Nodes.Count == nodes + 3,
+                       "der naechste Strich malt auf dieselbe Maske");
+
+            editor.Select(layerMix);
+            page.UpdateLayout();
+
+            Check.That(ReferenceEquals(frame.MaskWanted!(), paint) && page.Graph.Nodes.Count == nodes + 3,
+                       "ist die Ebene gewaehlt, malt der Pinsel auf ihre Maske");
+
+            // Ein Strich auf die Maske - und Strg+Z nimmt ihn zurueck, auch wenn der Editor
+            // gerade nicht den Fokus hat.
+            float Painted() => made!.Mask.PaintOn(0, 1, 1).Cover().Sum(b => (float)b);
+            float clean = Painted();
+
+            paint!.Stroke(paint.Width / 2f, paint.Height / 2f, 10f, 1f, 1f);
+            Call(page, "OnPainted", true);
+            paint.Keep();
+            Call(page, "OnPainted", false);
+            Settle();
+
+            var painted = page.Graph!.Nodes.OfType<MaskNode>().Single(m => m.Id == made!.Id);
+            Check.That(painted.Mask.PaintOn(0, 1, 1).Cover().Sum(b => (float)b) > clean, "ein Strich traegt auf");
+
+            var list2 = (NodeLayerList)page.FindName("NodeLayers");
+            Check.That(page.HandleUndoKey(System.Windows.Input.Key.Z, System.Windows.Input.ModifierKeys.Control, list2),
+                       "Strg+Z wirkt auch mit dem Fokus in der Ebenenliste");
+            Settle();
+
+            var back = page.Graph!.Nodes.OfType<MaskNode>().Single(m => m.Id == made!.Id);
+            Check.That(Math.Abs(back.Mask.PaintOn(0, 1, 1).Cover().Sum(b => (float)b) - clean) < 1e-3, "und nimmt den Strich zurueck");
+
+            Check.That(!page.HandleUndoKey(System.Windows.Input.Key.Z, System.Windows.Input.ModifierKeys.Control, new TextBox()),
+                       "in einem Textfeld bleibt Strg+Z beim Textfeld");
+
+            ((ToolColumn)page.FindName("MouseTools")).Select(AtelierTool.Nodes, notify: true);
+            Settle();
+
+            // Nach einem Bauschritt: erst grob, dann scharf.
+            var somewhere = page.Graph!.Nodes.OfType<MixNode>().First();
+            Call(page, "OnLayerMuted", somewhere);
+
+            Check.That((bool)Field(page, "_coarse")!, "nach einem Bauschritt rechnet die Seite zuerst grob - der Klick haelt nicht an");
+            Settle();
+            Check.That(!(bool)Field(page, "_coarse")!, "und kurz danach scharf");
+
+            Call(page, "OnLayerMuted", somewhere);
+            Settle();
+
+            // Rechtsklick auf einen Knoten: sein eigenes Menue. Auf die freie Flaeche: der Hub.
+            hubPopupClose(page);
+            var view = page.Graph!.Nodes.OfType<ViewNode>().First();
+            var onNode = editor.ScreenOf(view, "Bild", input: true) + new Vector(40, 0);
+
+            Call(page, "OnNodeMenuWanted", editor.ToGraph(onNode));
+
+            Check.That(page.NodeMenu is { IsOpen: true } && page.Hub is null && ReferenceEquals(editor.Selected, view),
+                       "Rechtsklick auf einen Knoten oeffnet sein Menue - nicht den Hub");
+            Check.That(new[] { "S_LayerMenuRename", "S_NodeMenuMuted", "S_NodeMenuPreview", "S_HubViewer", "S_NodeMenuInsertAfter",
+                               "S_HubDuplicate", "S_NodeMenuUnwire", "S_HubDelete" }.All(k => page.NodeMenu!.Items.Contains(T(k))),
+                       "mit dem, was sich mit ihm tun laesst", string.Join(", ", page.NodeMenu!.Items));
+
+            string readerOfView = page.Graph.Links.First(l => l.From == view.Id).To;
+            page.NodeMenu!.Invoke(T("S_NodeMenuInsertAfter"));
+
+            Check.That(page.Hub is not null, "Dahinter einfuegen oeffnet den Hub");
+
+            page.Hub!.Search("vignet");
+            page.Hub.ActivateHighlighted();
+            Settle();
+
+            var inserted = page.Graph!.Nodes.OfType<OpticsNode>().FirstOrDefault(n => n.Tool is VignetteTool);
+            Check.That(inserted is not null && page.Graph.Into(inserted.Id, "Bild")?.From == view.Id &&
+                       page.Graph.Links.Any(l => l.From == inserted.Id && l.To == readerOfView),
+                       "und das Gewaehlte kommt hinter den Knoten - das Bild laeuft durch es weiter");
+
+            page.NodeMenu.Close();
+            Call(page, "OnNodeMenuWanted", editor.ToGraph(new Point(5, 5)));
+            Check.That(page.Hub is not null, "auf der freien Flaeche oeffnet der Rechtsklick den Hub");
+            hubPopupClose(page);
+
+            // Rechtsklick auf das Bild - bei verborgenem Graphen.
+            ((ToolColumn)page.FindName("MouseTools")).Select(AtelierTool.Move, notify: true);
+            Settle();
+
+            var sets = (IReadOnlyList<Decoding.Exr.CryptomatteSet>)Field(page, "_cryptomattes")!;
+            var shownFrame = (FloatFrame)Field(page, "_frame")!;
+
+            page.ShowPictureMenu(1, 1);
+
+            Check.That(new[] { T("S_PicMenuPick"), T("S_PicMenuCompare"), T("S_PicMenuFull") }.All(page.PictureMenu!.Items.Contains) &&
+                       sets.All(s => page.PictureMenu.Items.Contains(Localization.Strings.T("S_PicMenuObjectMask", s.ShortName))),
+                       "das Menue des Bildes: Farbe aufnehmen, je Kryptomatte das Objekt als Maske, Original, 100 %",
+                       string.Join(", ", page.PictureMenu.Items));
+
+            int maskNodes = page.Graph!.Nodes.OfType<MaskNode>().Count(m => m.Mask.Kind == MaskKind.Cryptomatte);
+            bool madeObject = false;
+
+            for (int y = 0; y < shownFrame.Height && !madeObject; y += 3)
+                for (int x = 0; x < shownFrame.Width && !madeObject; x += 3)
+                    madeObject = page.MaskObjectAt(sets[0], x, y);
+
+            Settle();
+
+            var objectMask = page.Graph!.Nodes.OfType<MaskNode>().LastOrDefault(m => m.Mask.Kind == MaskKind.Cryptomatte);
+            var objectMix = objectMask is null ? null : page.Graph.Links.Where(l => l.From == objectMask.Id && l.Input == "Faktor")
+                                                            .Select(l => page.Graph.Find(l.To)).OfType<MixNode>().FirstOrDefault();
+
+            Check.That(madeObject && page.Graph.Nodes.OfType<MaskNode>().Count(m => m.Mask.Kind == MaskKind.Cryptomatte) == maskNodes + 1 &&
+                       objectMask!.Mask.Picks.Count == 1 && objectMix is not null && objectMix.Label == objectMask.Mask.Picks[0].Name,
+                       "Objekt hier als Maske legt eine Maskenebene an, die genau dieses Objekt waehlt - benannt nach ihm",
+                       objectMix?.Label);
+
+            page.ShowPictureMenu(1, 1);
+            page.PictureMenu!.Invoke(T("S_PicMenuCompare"));
+
+            Check.That(page.ShowingOriginal, "Vergleichen zeigt das Original");
+
+            page.RaiseEvent(new System.Windows.Input.MouseButtonEventArgs(System.Windows.Input.Mouse.PrimaryDevice, 0,
+                                                                            System.Windows.Input.MouseButton.Left)
+            {
+                RoutedEvent = UIElement.PreviewMouseDownEvent,
+            });
+
+            Check.That(!page.ShowingOriginal, "bis zum naechsten Klick - dann wieder das bearbeitete Bild");
+
+            page.ShowPictureMenu(1, 1);
+            page.PictureMenu!.Invoke(T("S_PicMenuFull"));
+            Check.That(Math.Abs(page.ZoomLevel - 1) < 1e-9, "100 % zoomt hinein");
+
+            page.ShowPictureMenu(1, 1);
+            Check.That(page.PictureMenu!.Items.Contains(T("S_PicMenuFit")), "und dann heisst der Eintrag Einpassen");
+            page.PictureMenu.Invoke(T("S_PicMenuFit"));
+            Check.That(page.ZoomLevel == 0, "der wieder einpasst");
+
+            page.ShowPictureMenu(1, 1);
+            page.PictureMenu!.Invoke(T("S_PicMenuPick"));
+            Check.That(((ToolColumn)page.FindName("MouseTools")).Tool == AtelierTool.Pick, "Farbe aufnehmen nimmt die Pipette");
+        }
+        finally
+        {
+            window.Close();
+            try { Directory.Delete(folder, recursive: true); } catch (IOException) { }
+        }
+    }
+
+    /// <summary>
+    /// Kabel ziehen wie jemand, der ausprobiert: jeder Knoten an sich selbst, dann
+    /// zufaellig von irgendeinem Anschluss zu irgendeinem - auf der Seite, mit Rechnen,
+    /// Vorschauen und Ebenenliste dahinter. Nichts davon darf eine Ausnahme werfen.
+    /// </summary>
+    private static void ThePageSurvivesWiring()
+    {
+        Check.Group("Knoten bauen: Ausprobieren bringt die Seite nicht zum Absturz");
+
+        string folder = Path.Combine(Path.GetTempPath(), "frameflip-kabel-" + Guid.NewGuid().ToString("N")[..8]);
+        Directory.CreateDirectory(folder);
+
+        string path = Path.Combine(folder, "render_0001.exr");
+        File.WriteAllBytes(path, CryptoSample.Bytes());
+
+        var page = new AtelierPage(FrameDecoderRegistry.CreateDefault(() => null), new AppSettings(), _ => { });
+        var window = Window(page);
+        var crashes = new List<string>();
+
+        void Caught(object sender, DispatcherUnhandledExceptionEventArgs e)
+        {
+            crashes.Add(e.Exception.GetType().Name + ": " + e.Exception.Message);
+            e.Handled = true;
+        }
+
+        Dispatcher.CurrentDispatcher.UnhandledException += Caught;
+
+        try
+        {
+            page.Open(path);
+
+            var size = (TextBlock)page.FindName("SourceText");
+            if (!Pump(TimeSpan.FromSeconds(10), () => size.Text.Length > 0))
+            {
+                Check.That(false, "die Datei wird geladen");
+                return;
+            }
+
+            Settle();
+            page.ConvertToNodes();
+            ((ToolColumn)page.FindName("MouseTools")).Select(AtelierTool.Nodes, notify: true);
+            Settle();
+
+            var editor = (NodeEditor)page.FindName("NodeView");
+            var passes = (IReadOnlyList<(string Name, string Label)>)Call(page, "NodePasses")!;
+
+            // Etwas zum Verbinden: zwei Passe als Ebenen und eine Maske.
+            foreach (var (name, _) in passes.Take(2))
+            {
+                editor.Select(null);
+                Call(page, "AddPassLayer", name, null!);
+            }
+
+            Settle();
+            editor.Frame();
+            editor.UpdateLayout();
+
+            void Step(Action act, string what)
+            {
+                try
+                {
+                    act();
+                    Pump(TimeSpan.FromMilliseconds(60), () => false);
+                }
+                catch (Exception e)
+                {
+                    var inner = e is System.Reflection.TargetInvocationException { InnerException: { } real } ? real : e;
+                    string where = inner.StackTrace?.Split(Environment.NewLine).FirstOrDefault()?.Trim() ?? "";
+                    crashes.Add($"{what}: {inner.GetType().Name}: {inner.Message} @ {where}");
+                }
+            }
+
+            // Jeder Knoten an sich selbst - in beide Richtungen.
+            int links = page.Graph!.Links.Count;
+
+            foreach (var node in page.Graph.Nodes.ToList())
+            {
+                foreach (var output in node.Outputs)
+                {
+                    foreach (var input in node.Inputs)
+                    {
+                        Step(() =>
+                        {
+                            if (editor.BeginWire(editor.ScreenOf(node, output.Name, input: false)))
+                                editor.FinishWire(editor.ScreenOf(node, input.Name, input: true));
+                        }, $"{node.GetType().Name}.{output.Name} an sich selbst");
+
+                        Step(() =>
+                        {
+                            if (editor.BeginWire(editor.ScreenOf(node, input.Name, input: true)))
+                                editor.FinishWire(editor.ScreenOf(node, output.Name, input: false));
+                        }, $"{node.GetType().Name}.{input.Name} rueckwaerts an sich selbst");
+                    }
+                }
+            }
+
+            Check.That(crashes.Count == 0, "jeder Knoten an sich selbst - keine Ausnahme", string.Join(" | ", crashes.Take(3)));
+
+            // Wer ein Kabel am eigenen Eingang packt und es auf den eigenen Ausgang fallen
+            // laesst, hat danach nicht weniger Kabel: Ein Anschluss, der nicht passt, legt
+            // das Kabel zurueck. Nur ins Leere geworfen ist es weg.
+            Check.That(page.Graph!.Links.Count == links, "an sich selbst gesteckt, geht auch kein Kabel verloren",
+                       $"{links} vorher, {page.Graph.Links.Count} nachher");
+            Check.That(page.Graph!.Order() is not null && !page.Graph.Links.Any(l => l.From == l.To),
+                       "und keine Verbindung eines Knotens mit sich selbst",
+                       string.Join(", ", page.Graph.Links.Where(l => l.From == l.To).Select(l => $"{l.From}.{l.Output}->{l.Input}")));
+
+            // Und wenn doch einmal das Rechnen wirft - hier ein Pass, dessen Bild kuerzer ist,
+            // als es sagt, wie nach einer halb gelesenen Datei: Der Fehler steht im Editor,
+            // und die Seite rechnet weiter, sobald er weg ist. Dass es wirklich wirft, prueft
+            // erst das Modell.
+            var sourcesOnPage = (Dictionary<string, FloatFrame>)Field(page, "_sources")!;
+            string passKey = sourcesOnPage.Keys.First(k => k.Length > 0 && page.Graph!.Nodes.OfType<RenderNode>().Single().Passes.Contains(k) &&
+                                                           page.Graph.Links.Any(l => l.Output == k));
+            var intact = sourcesOnPage[passKey];
+            var torn = new FloatFrame
+            {
+                Width = intact.Width,
+                Height = intact.Height,
+                R = new float[7],
+                G = new float[7],
+                B = new float[7],
+                IsSceneReferred = intact.IsSceneReferred,
+            };
+
+            var probeSources = new Dictionary<string, FloatFrame>(sourcesOnPage, StringComparer.Ordinal) { [passKey] = torn };
+            var probeBuffer = Marshal.AllocHGlobal(sourcesOnPage[""].Width * sourcesOnPage[""].Height * 4);
+            bool throws = false;
+
+            try
+            {
+                GraphEvaluator.Render(page.Graph!, new GraphInputs { Sources = probeSources, View = View }, probeBuffer, sourcesOnPage[""].Width * 4);
+            }
+            catch (Exception)
+            {
+                throws = true;
+            }
+            finally
+            {
+                Marshal.FreeHGlobal(probeBuffer);
+            }
+
+            Check.That(throws, "ein zerrissenes Passbild wirft beim Rechnen - der Fall fuer das Netz");
+
+            sourcesOnPage[passKey] = torn;
+            Step(() => Call(page, "Refresh", false, false), "zerrissener Pass");
+            Settle();
+
+            Check.That(crashes.Count == 0 && editor.Warning is { } failed &&
+                       failed.StartsWith(Localization.Strings.T("S_NodeWarnFailed", "").Split(':')[0], StringComparison.Ordinal),
+                       "was beim Rechnen wirft, steht als Fehler im Editor - ohne dass die Seite abstuerzt",
+                       editor.Warning + " | " + string.Join(" | ", crashes.Take(2)));
+
+            sourcesOnPage[passKey] = intact;
+            Step(() => Call(page, "Refresh", false, false), "Pass wieder heil");
+            Settle();
+
+            Check.That(crashes.Count == 0 && editor.Warning is null && Pixels(page).Any(b => b != 0),
+                       "ist der Fehler weg, rechnet die Seite wieder, und die Meldung verschwindet", editor.Warning);
+
+            // Dann wild: von irgendeinem Anschluss zu irgendeinem.
+            var random = new Random(4711);
+
+            for (int step = 0; step < 80 && crashes.Count == 0; step++)
+            {
+                var sockets = page.Graph!.Nodes
+                    .SelectMany(n => n.Inputs.Select(s => (Node: n, s.Name, Input: true))
+                                     .Concat(n.Outputs.Select(s => (Node: n, s.Name, Input: false))))
+                    .ToList();
+
+                var a = sockets[random.Next(sockets.Count)];
+                var b = sockets[random.Next(sockets.Count)];
+
+                Step(() =>
+                {
+                    if (editor.BeginWire(editor.ScreenOf(a.Node, a.Name, a.Input)))
+                        editor.FinishWire(editor.ScreenOf(b.Node, b.Name, b.Input));
+                }, $"{a.Node.GetType().Name}.{a.Name} -> {b.Node.GetType().Name}.{b.Name}");
+
+                if (random.Next(8) == 0)
+                    Step(() => page.StepNodes(back: true), "Rueckgaengig");
+            }
+
+            Settle();
+
+            Check.That(crashes.Count == 0, "80 zufaellige Kabel mit Rechnen dahinter - keine Ausnahme", string.Join(" | ", crashes.Take(3)));
+            Check.That(page.Graph!.Order() is not null, "und der Graph hat keinen Kreis");
+
+        }
+        finally
+        {
+            Dispatcher.CurrentDispatcher.UnhandledException -= Caught;
+            window.Close();
+            try { Directory.Delete(folder, recursive: true); } catch (IOException) { }
+        }
     }
 
     /// <summary>
@@ -469,10 +1046,12 @@ public static class NodeEditInvariants
 
             var file = page.Graph!.Nodes.OfType<RenderNode>().Single();
 
-            Check.That(file.Passes.Contains(diffuse) && editor.Selected is MixNode { Mode: BlendMode.Add } mix &&
+            // Ein Farbpass multipliziert - das verraet sein Name (PassRoles). Frueher kam
+            // jeder Pass auf Addieren.
+            Check.That(file.Passes.Contains(diffuse) && editor.Selected is MixNode { Mode: BlendMode.Multiply } mix &&
                        page.Graph.Into(mix.Id, "Oben") is { } over && page.Graph.Find(over.From) is PlaceNode,
-                       "Pass als Ebene legt einen Ausgang, Platzieren und Mischen auf Addieren an");
-            Check.That(!Pixels(page).AsSpan().SequenceEqual(plain), "und das Bild wird heller");
+                       "Pass als Ebene legt einen Ausgang, Platzieren und Mischen an - ein Farbpass auf Multiplizieren");
+            Check.That(!Pixels(page).AsSpan().SequenceEqual(plain), "und das Bild aendert sich");
 
             // Die Ebenenliste: oben die neue Ebene, darunter das Bild der Datei - mit Miniaturen.
             var list = (NodeLayerList)page.FindName("NodeLayers");
@@ -497,7 +1076,9 @@ public static class NodeEditInvariants
 
             byte[] withLayer = Pixels(page);
             Call(page, "OnLayerMuted", top.Mix!);
-            Pump(TimeSpan.FromSeconds(3), () => !Pixels(page).AsSpan().SequenceEqual(withLayer));
+
+            // Nach einem Bauschritt kommt erst das grobe Bild, dann das scharfe.
+            Pump(TimeSpan.FromSeconds(3), () => Pixels(page).AsSpan().SequenceEqual(plain));
 
             Check.That(page.Graph!.Nodes.OfType<MixNode>().Any(m => m.Muted) && Pixels(page).AsSpan().SequenceEqual(plain),
                        "das Auge schaltet die Ebene stumm - das Bild ist wieder das ohne sie");
@@ -539,6 +1120,11 @@ public static class NodeEditInvariants
             editor.Select(null);
             Call(page, "AddPassLayer", diffuse, null!);
             var diffMix = (MixNode)editor.Selected!;
+
+            // Hier soll die Ebene Licht beitragen, dessen Wirkung von der Reihenfolge
+            // abhaengt - also auf Addieren wie ein Lichtpass. Multipliziert vertauschte sich
+            // die Belichtung darueber folgenlos mit ihr.
+            diffMix.Mode = BlendMode.Add;
 
             Call(page, "AddAdjustmentLayer", diffMix);
             var grade = (LayerGradeNode)editor.Selected!;
@@ -650,6 +1236,17 @@ public static class NodeEditInvariants
             Check.That(Math.Abs(Mix(diffMix.Id).Opacity - 0.5f) < 1e-4 && !Pixels(page).AsSpan().SequenceEqual(screened),
                        "die Deckkraft ebenso");
 
+            // Deckkraft und Mischung sind eigene Schritte im Verlauf - Rueckgaengig nimmt
+            // erst sie zurueck, dann die Ebenen.
+            page.StepNodes(back: true);
+
+            Check.That(Math.Abs(Mix(diffMix.Id).Opacity - 1f) < 1e-4 && Mix(diffMix.Id).Mode == BlendMode.Screen,
+                       "Rueckgaengig nimmt zuerst die Deckkraft zurueck", $"{Mix(diffMix.Id).Opacity}, {Mix(diffMix.Id).Mode}");
+
+            page.StepNodes(back: true);
+
+            Check.That(Mix(diffMix.Id).Mode == BlendMode.Add, "dann die Mischung", $"{Mix(diffMix.Id).Mode}");
+
             page.StepNodes(back: true);
             page.StepNodes(back: true);
             Pump(TimeSpan.FromSeconds(3), () => Pixels(page).AsSpan().SequenceEqual(plain));
@@ -715,7 +1312,7 @@ public static class NodeEditInvariants
                 },
             };
 
-            Call(page, "Place", crypto, new Point(0, 0));
+            Call(page, "PlaceAt", crypto, new Point(0, 0), null!);
 
             // Die Stufen kommen nach - gewaehlt werden kann, sobald die unterste da ist.
             var loaded = (System.Collections.IDictionary)Field(page, "_sources")!;
@@ -800,7 +1397,7 @@ public static class NodeEditInvariants
 
             foreach (var node in new Node[] { new MaskMathNode(), new MapRangeNode { Auto = false }, ramp, new MaskShapeNode() })
             {
-                Call(page, "Place", node, new Point(40, 400));
+                Call(page, "PlaceAt", node, new Point(40, 400), null!);
 
                 Check.That(ReferenceEquals(editor.Selected, node) && colourFields.Children.Count > 1,
                            $"{node.GetType().Name}: der Knoten steht da, und seine Felder auch");
@@ -829,6 +1426,11 @@ public static class NodeEditInvariants
             window.Close();
             try { Directory.Delete(folder, recursive: true); } catch (Exception) { }
         }
+    }
+
+    private static void hubPopupClose(AtelierPage page)
+    {
+        if (Field(page, "_hubPopup") is System.Windows.Controls.Primitives.Popup popup) popup.IsOpen = false;
     }
 
     private static object? Call(object target, string method, params object[] arguments)
@@ -890,12 +1492,21 @@ public static class NodeEditInvariants
             byte[] darker = Pixels(page);
             Check.That(!darker.AsSpan().SequenceEqual(plain), "die Karte wirkt auf den neuen Knoten");
 
+            // Der Zug am Regler ist ein eigener Schritt: Rueckgaengig nimmt erst ihn zurueck,
+            // dann den Knoten.
+            page.StepNodes(back: true);
+            Settle();
+
+            Check.That(page.Graph!.Nodes.OfType<OpticsNode>().SingleOrDefault()?.Tool is VignetteTool { Amount: > -0.9f },
+                       "Rueckgaengig nimmt erst den Zug am Regler zurueck");
+
             page.StepNodes(back: true);
             Settle();
 
             Check.That(!page.Graph!.Nodes.OfType<OpticsNode>().Any(), "Rueckgaengig nimmt ihn wieder heraus");
             Check.That(Pixels(page).AsSpan().SequenceEqual(plain), "und das Bild ist wieder das von vorher");
 
+            page.StepNodes(back: false);
             page.StepNodes(back: false);
             Settle();
 

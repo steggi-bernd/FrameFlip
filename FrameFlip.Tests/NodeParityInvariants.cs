@@ -48,6 +48,196 @@ public static class NodeParityInvariants
         HiddenLayers(world);
         OldGraphsGetTheirHiddenLayers(world);
         LayerMoves(world);
+        NothingBreaksIt(world);
+    }
+
+    // ------------------------------------------------------------ Nichts bringt ihn um
+
+    /// <summary>
+    /// Zufaellige Graphen, an denen zufaellig gebaut wird - verbinden, trennen, einfuegen,
+    /// loeschen, verdoppeln, stummschalten, Ebenen bewegen, der Betrachter auf irgendeinem
+    /// Ausgang. Nach jedem Schritt wird gerechnet, angeordnet und die Ebenenliste gebaut.
+    /// Nichts davon darf eine Ausnahme werfen: Im Atelier hiesse das, die App stuerzt ab.
+    ///
+    /// Und was keinen Sinn hat, darf gar nicht erst gehen: ein Knoten an sich selbst, ein
+    /// Kreis ueber mehrere Knoten.
+    /// </summary>
+    private static void NothingBreaksIt(World world)
+    {
+        Check.Group("Knoten: kein Bauschritt bringt den Auswerter zum Absturz");
+
+        int steps = 0, crashes = 0, selfAllowed = 0, loopAllowed = 0, loops = 0;
+        string first = "";
+        var kinds = FrameFlip.Views.NodeCatalog.All;
+
+        for (int seed = 1; seed <= 60; seed++)
+        {
+            var random = new Random(7000 + seed);
+            var graph = StackToGraph.Convert(world.RandomStack(random), RandomAdjust(random), RandomPicture(random));
+
+            for (int step = 0; step < 25; step++)
+            {
+                string what = "";
+
+                try
+                {
+                    var nodes = graph.Nodes.ToList();
+                    var node = nodes[random.Next(nodes.Count)];
+
+                    // Was keinen Sinn hat: an sich selbst, und rueckwaerts in einen Kreis.
+                    foreach (var output in node.Outputs)
+                        foreach (var input in node.Inputs)
+                            if (NodeEdits.CannotConnect(graph, node, output.Name, node, input.Name) is null) selfAllowed++;
+
+                    var downstream = nodes.Where(n => !ReferenceEquals(n, node) && NodeEdits.Feeds(graph, node, n)).ToList();
+
+                    foreach (var later in downstream.Take(3))
+                        foreach (var output in later.Outputs)
+                            foreach (var input in node.Inputs)
+                                if (NodeEdits.CannotConnect(graph, later, output.Name, node, input.Name) is null) loopAllowed++;
+
+                    switch (random.Next(9))
+                    {
+                        case 0:
+                        case 1:
+                        {
+                            var to = nodes[random.Next(nodes.Count)];
+                            if (node.Outputs.Count == 0 || to.Inputs.Count == 0) break;
+
+                            string output = node.Outputs[random.Next(node.Outputs.Count)].Name;
+                            string input = to.Inputs[random.Next(to.Inputs.Count)].Name;
+                            what = $"{node.GetType().Name}.{output} -> {to.GetType().Name}.{input}";
+                            NodeEdits.Connect(graph, node, output, to, input);
+                            break;
+                        }
+
+                        case 2:
+                            if (node.Inputs.Count == 0) break;
+                            what = $"trennen {node.GetType().Name}";
+                            NodeEdits.Disconnect(graph, node, node.Inputs[random.Next(node.Inputs.Count)].Name);
+                            break;
+
+                        case 3:
+                            what = $"loeschen {node.GetType().Name}";
+                            NodeEdits.Remove(graph, node, reconnect: random.Next(2) == 0);
+                            break;
+
+                        case 4:
+                            what = $"verdoppeln {node.GetType().Name}";
+                            NodeEdits.Duplicate(graph, node);
+                            break;
+
+                        case 5:
+                        {
+                            if (graph.Links.Count == 0) break;
+                            var link = graph.Links[random.Next(graph.Links.Count)];
+                            var kind = kinds[random.Next(kinds.Count)];
+                            var fresh = graph.Add(kind.Create());
+                            what = $"{fresh.GetType().Name} ins Kabel {link.From}.{link.Output} -> {link.To}.{link.Input}";
+                            if (!NodeEdits.InsertInto(graph, link, fresh)) graph.Nodes.Remove(fresh);
+                            break;
+                        }
+
+                        case 6:
+                            what = $"stumm {node.GetType().Name}";
+                            node.Muted = !node.Muted;
+                            break;
+
+                        case 7:
+                        {
+                            var chains = LayerEdits.Chains(graph);
+                            var layers = chains.SelectMany(c => c.Members).ToList();
+                            if (layers.Count < 2) break;
+
+                            var layer = layers[random.Next(layers.Count)];
+                            var target = layers[random.Next(layers.Count)];
+                            what = $"Ebene {layer.Id} zu {target.Id}";
+
+                            switch (random.Next(4))
+                            {
+                                case 0: LayerEdits.Move(graph, layer, target, random.Next(2) == 0); break;
+                                case 1: LayerEdits.Remove(graph, layer); break;
+                                case 2: LayerEdits.Duplicate(graph, layer); break;
+                                default: LayerEdits.AddAdjustment(graph, layer); break;
+                            }
+
+                            break;
+                        }
+
+                        default:
+                        {
+                            var kind = kinds[random.Next(kinds.Count)];
+                            var fresh = graph.Add(kind.Create());
+                            what = $"neu {fresh.GetType().Name} hinter {node.GetType().Name}";
+                            NodeCatalog(graph, fresh);
+                            if (!NodeEdits.InsertAfter(graph, node, fresh)) graph.Nodes.Remove(fresh);
+                            break;
+                        }
+                    }
+
+                    steps++;
+
+                    if (graph.Output is not null && graph.Order() is null)
+                    {
+                        loops++;
+                        if (first.Length == 0) first = $"Fall {seed}, Schritt {step}, {what}: ein Kreis im Graphen";
+                        break;
+                    }
+
+                    // Alles, was die Seite nach einem Schritt tut.
+                    NodeLayout.Arrange(graph);
+                    FrameFlip.Views.NodeLayerList.Of(graph);
+                    LayerEdits.Chains(graph);
+                    GraphEvaluator.Reads(graph);
+                    GraphEvaluator.Needs(graph);
+                    graph.Problems();
+
+                    RenderGraph(world, graph, random.Next(3) == 0 ? 3 : 1, random.Next(10), sixteen: random.Next(6) == 0);
+
+                    var shown = graph.Nodes[random.Next(graph.Nodes.Count)];
+                    if (shown.Outputs.Count > 0)
+                        RenderViewed(world, graph, (shown.Id, shown.Outputs[random.Next(shown.Outputs.Count)].Name));
+
+                    NodeGraph.Load(graph.Save());
+                }
+                catch (Exception e)
+                {
+                    crashes++;
+                    if (first.Length == 0) first = $"Fall {seed}, Schritt {step}, {what}: {e.GetType().Name}: {e.Message}";
+                    break;
+                }
+            }
+        }
+
+        Check.That(selfAllowed == 0, "kein Knoten laesst sich an sich selbst stecken", $"{selfAllowed} Anschluesse liessen es zu");
+        Check.That(loopAllowed == 0, "und kein Kreis ueber mehrere Knoten", $"{loopAllowed} Anschluesse liessen es zu");
+        Check.That(crashes == 0 && loops == 0, $"{steps} zufaellige Bauschritte, keiner wirft oder baut einen Kreis", first);
+    }
+
+    /// <summary>Wie die Seite einen Knoten anschliesst, der Renderdaten braucht - ohne Seite.</summary>
+    private static void NodeCatalog(NodeGraph graph, Node node) => FrameFlip.Views.NodeCatalog.WireData(graph, node);
+
+    private static void RenderViewed(World world, NodeGraph graph, (string, string) viewer)
+    {
+        var inputs = new GraphInputs
+        {
+            Sources = world.Sources,
+            Data = new Dictionary<PassNeed, FloatFrame?> { [PassNeed.Depth] = world.Depth, [PassNeed.Motion] = world.Motion, [PassNeed.Normal] = world.Normal },
+            View = View,
+            Viewer = viewer,
+            Previews = new NodePreviews(),
+        };
+
+        var buffer = Marshal.AllocHGlobal(Width * Height * 4);
+
+        try
+        {
+            GraphEvaluator.Render(graph, inputs, buffer, Width * 4);
+        }
+        finally
+        {
+            Marshal.FreeHGlobal(buffer);
+        }
     }
 
     // ------------------------------------------------------------ Ebenen bewegen

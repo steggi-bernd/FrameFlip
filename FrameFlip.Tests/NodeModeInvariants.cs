@@ -112,7 +112,10 @@ public static class NodeModeInvariants
             Settle();
 
             Check.That(page.InNodes && page.Graph is not null, "umgewandelt ist das Atelier im Knotenmodus");
-            Check.That(settings.AtelierNodes is { Length: > 0 }, "und der Graph steht in den Einstellungen");
+            // Mit Projektdateien steht der Graph im Projekt der Folge, nicht in den Einstellungen.
+            page.Flush();
+            var project = page.Projects.Current is { } key ? page.Projects.Store.Load(key) : null;
+            Check.That(project?.Nodes is not null, "und der Graph steht im Projekt der Folge");
             Check.That(nodes.Visibility == Visibility.Visible && offer.Visibility != Visibility.Visible,
                        "der Graph liegt ueber dem Bild");
             var layerList = (NodeLayerList)page.FindName("NodeLayers");
@@ -257,7 +260,13 @@ public static class NodeModeInvariants
             nodes.Select(graph.Nodes.OfType<ViewNode>().First());
             page.UpdateLayout();
 
-            Check.That(!frame.IsHitTestVisible, "ohne gemalte Maske faengt der Pinsel nichts");
+            // Ohne gemalte Maske faengt der Pinsel trotzdem - wie im Stapel legt der erste
+            // Strich eine Maskenebene an. Frueher fing er nichts, und mit ihm waren Groesse
+            // und Haerte am Bild tot.
+            int count = graph.Nodes.Count;
+
+            Check.That(frame.IsHitTestVisible && frame.MaskWanted is not null && graph.Nodes.Count == count,
+                       "ohne gemalte Maske faengt der Pinsel trotzdem - und legt erst beim Strich etwas an");
 
             page.HandleToolKey(System.Windows.Input.Key.N);
             page.UpdateLayout();

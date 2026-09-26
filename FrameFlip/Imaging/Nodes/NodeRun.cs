@@ -150,6 +150,23 @@ internal sealed class NodeContext
             if (_owned.Contains(array)) _holds[array] = _holds.GetValueOrDefault(array) + 1;
     }
 
+    /// <summary>
+    /// Nimmt ein Ergebnis auf, das nicht aus einem Knoten dieser Rechnung stammt, dessen
+    /// Felder aber aus dem Vorrat kommen - die zugeschnittenen Stuecke des
+    /// Zwischenspeichers im Ausschnitt. Einmal gehalten; <see cref="Drop"/> gibt sie
+    /// zurueck, sobald auch sonst niemand sie mehr haelt.
+    /// </summary>
+    internal void Adopt(object? value)
+    {
+        if (Pool is null) return;
+
+        foreach (var array in Fields(value))
+        {
+            _owned.Add(array);
+            _holds[array] = _holds.GetValueOrDefault(array) + 1;
+        }
+    }
+
     /// <summary>Ein Ergebnis wird nicht mehr gebraucht. Haelt niemand mehr ein Feld, geht es zurueck.</summary>
     internal void Drop(object? value)
     {

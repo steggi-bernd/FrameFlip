@@ -44,40 +44,6 @@
             </Setter>
         </Style>
 
-        <!--
-            Der Punkt links in jeder Zeile: sichtbar oder nicht.
-
-            Ein Auge waere das gewohnte Zeichen, braucht aber eine Schriftart, auf
-            die kein Verlass ist. Ein gefuellter und ein leerer Kreis sagen dasselbe
-            und stehen auf jedem Rechner gleich.
-        -->
-        <Style x:Key="LayerEye" TargetType="ToggleButton">
-            <Setter Property="Focusable" Value="False" />
-            <Setter Property="Cursor" Value="Hand" />
-            <Setter Property="Width" Value="14" />
-            <Setter Property="Height" Value="14" />
-            <Setter Property="Template">
-                <Setter.Value>
-                    <ControlTemplate TargetType="ToggleButton">
-                        <Grid Background="Transparent">
-                            <Ellipse x:Name="Ring" Width="10" Height="10" StrokeThickness="1.2"
-                                     Stroke="{StaticResource MutedBrush}" />
-                            <Ellipse x:Name="Dot" Width="10" Height="10"
-                                     Fill="{StaticResource ForegroundBrush}" Opacity="0" />
-                        </Grid>
-                        <ControlTemplate.Triggers>
-                            <Trigger Property="IsChecked" Value="True">
-                                <Setter TargetName="Dot" Property="Opacity" Value="1" />
-                            </Trigger>
-                            <Trigger Property="IsMouseOver" Value="True">
-                                <Setter TargetName="Ring" Property="Stroke"
-                                        Value="{StaticResource AccentBrush}" />
-                            </Trigger>
-                        </ControlTemplate.Triggers>
-                    </ControlTemplate>
-                </Setter.Value>
-            </Setter>
-        </Style>
     </UserControl.Resources>
 
     <Grid>

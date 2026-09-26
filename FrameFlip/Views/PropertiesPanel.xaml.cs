@@ -1,6 +1,7 @@
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Controls.Primitives;
+using FrameFlip.Imaging.Grading;
 using FrameFlip.Localization;
 
 namespace FrameFlip.Views;
@@ -29,6 +30,18 @@ public partial class PropertiesPanel : UserControl
     /// <summary>Eine Pinseleinstellung hat sich geaendert.</summary>
     public event Action? BrushChanged;
 
+    /// <summary>Der Verlauf der bemalten Maske soll aufgehen - am Knopf, der ihn will.</summary>
+    public event Action<FrameworkElement>? BrushHistoryWanted;
+
+    /// <summary>Ob der Knopf fuer den Maskenverlauf zu sehen ist - nur, wenn es einen gibt.</summary>
+    public void ShowBrushHistory(bool shown)
+        => BrushHistoryButton.Visibility = shown ? Visibility.Visible : Visibility.Collapsed;
+
+    /// <summary>Der Knopf fuer den Maskenverlauf - fuer die Probe.</summary>
+    internal Button HistoryButton => BrushHistoryButton;
+
+    private void OnBrushHistory(object sender, RoutedEventArgs e) => BrushHistoryWanted?.Invoke(BrushHistoryButton);
+
     /// <summary>Der Pinselradius in Bildpunkten.</summary>
     public float BrushRadius => (float)BrushSizeSlider.Value / 2f;
 
@@ -40,6 +53,35 @@ public partial class PropertiesPanel : UserControl
 
     /// <summary>Bis wohin ein Strich ueberhaupt auftraegt.</summary>
     public float BrushOpacity => (float)BrushOpacitySlider.Value;
+
+    /// <summary>Der Abstand der Tupfer als Anteil des Radius.</summary>
+    public float BrushSpacing => (float)BrushSpacingSlider.Value;
+
+    /// <summary>Eckige Spitze statt runder.</summary>
+    public BrushShape BrushShape => BrushSquareToggle.IsChecked == true ? BrushShape.Square : BrushShape.Round;
+
+    /// <summary>Der Winkel der Spitze in Grad.</summary>
+    public float BrushAngle => (float)BrushAngleSlider.Value;
+
+    /// <summary>Breite zu Hoehe der Spitze.</summary>
+    public float BrushAspect => (float)BrushAspectSlider.Value;
+
+    /// <summary>Der Winkel folgt dem Strich.</summary>
+    public bool BrushFollow => BrushFollowToggle.IsChecked == true;
+
+    /// <summary>Der Strich bleibt auf dem Objekt, auf dem er beginnt.</summary>
+    public bool BrushObject => BrushObjectToggle.IsChecked == true;
+
+    private void OnBrushToggle(object sender, RoutedEventArgs e)
+    {
+        if (!IsLoaded) return;
+
+        BrushChanged?.Invoke();
+    }
+
+    /// <summary>Die Spitze von aussen - wenn am Bild mit Umschalt und Rad gedreht wurde.</summary>
+    public void SetBrushAngle(float angle)
+        => BrushAngleSlider.Value = Math.Clamp(angle, BrushAngleSlider.Minimum, BrushAngleSlider.Maximum);
 
     private void OnBrushChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
     {
@@ -60,12 +102,26 @@ public partial class PropertiesPanel : UserControl
         e.Handled = true;
     }
 
+    /// <summary>
+    /// Setzt Groesse, Haerte und Abstand von aussen - wenn sie am Bild mit Strg gezogen
+    /// oder gedreht wurden. Die Regler ziehen mit, als haette man an ihnen gedreht.
+    /// </summary>
+    public void SetBrush(float radius, float hardness, float spacing)
+    {
+        BrushSizeSlider.Value = Math.Clamp(radius * 2, BrushSizeSlider.Minimum, BrushSizeSlider.Maximum);
+        BrushHardnessSlider.Value = Math.Clamp(hardness, BrushHardnessSlider.Minimum, BrushHardnessSlider.Maximum);
+        BrushSpacingSlider.Value = Math.Clamp(spacing, BrushSpacingSlider.Minimum, BrushSpacingSlider.Maximum);
+    }
+
     private void ShowBrushValues()
     {
         BrushSizeValue.Text = $"{BrushSizeSlider.Value:0}";
         BrushHardnessValue.Text = $"{BrushHardnessSlider.Value:0.00}";
         BrushFlowValue.Text = $"{BrushFlowSlider.Value:0.00}";
         BrushOpacityValue.Text = $"{BrushOpacitySlider.Value:0.00}";
+        BrushSpacingValue.Text = $"{BrushSpacingSlider.Value * 100:0} %";
+        BrushAngleValue.Text = $"{BrushAngleSlider.Value:0}°";
+        BrushAspectValue.Text = $"1:{BrushAspectSlider.Value:0.##}";
     }
 
     private float? _depth;

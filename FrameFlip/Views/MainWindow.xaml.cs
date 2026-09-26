@@ -67,8 +67,8 @@ public partial class MainWindow : Window
     private readonly Action? _renewWatch;
     private readonly Action<string?>? _setWatchCode;
 
-    /// <summary>Woran die Anzeige haengt - abgemeldet, sobald der Dienst wechselt.</summary>
-    private Web.WatchService? _watched;
+    /// <summary>Die Karte der Zuschauerseite in der Kopplungstafel - ihre Logik steht in <see cref="WatchCard"/>.</summary>
+    private WatchCard? _watchCard;
 
     private readonly FrameDecoderRegistry _decoders = FrameDecoderRegistry.CreateDefault();
     private readonly DashboardFrameController _frames;
@@ -222,6 +222,12 @@ public partial class MainWindow : Window
 
         InitializeComponent();
 
+        _watchCard = new WatchCard(
+            new WatchCard.Parts(WatchToggle, WatchToggleText, WatchCodeFrame, WatchCode, WatchAddress, WatchHint,
+                                WatchPassRow, WatchPass, WatchPassHint, WatchActions),
+            new WatchCard.Host(_getSettings, _apply, _watch, _renewWatch, _setWatchCode, () => _layout.LightQr, () => _ready,
+                               then => AskTerms(then), Note, error => PairHint.Text = error, PairAction, CopyInvite));
+
         ApplyScale();
         InitializeDashboardLayout();
 
@@ -239,7 +245,15 @@ public partial class MainWindow : Window
 
         StateChanged += (_, _) => RefreshMaximizeGlyph();
         PreviewKeyDown += OnWindowKeyDown;
-        LocationChanged += (_, _) => Remember();
+        LocationChanged += (_, _) =>
+        {
+            Remember();
+
+            // Auf einen anderen Bildschirm gezogen: dessen Groesse gilt.
+            if (_layout.AutoScale) ApplyScale();
+        };
+
+        DpiChanged += (_, _) => ApplyScale();
 
         SizeChanged += (_, _) =>
         {
@@ -251,6 +265,7 @@ public partial class MainWindow : Window
         BuildRates();
         BuildRemoteActions();
         LoadSequences();
+        FollowAtelierAtStart();
 
         // Ein Takt fuer alles, was sich langsam aendert. Der Renderzustand kommt
         // ohnehin nur im Sekundenrhythmus herein.
@@ -276,6 +291,10 @@ public partial class MainWindow : Window
 
         Closed += (_, _) =>
         {
+            // Das Projekt des Ateliers geht mit dem Fenster - vorher wird es geschrieben.
+            // Das Programm laeuft danach im Tray weiter.
+            _atelierPage?.Flush();
+
             _frames.Dispose();
             _videos.Dispose();
             Strings.Changed -= OnLanguageChanged;
@@ -388,7 +407,14 @@ public partial class MainWindow : Window
         if (width > 0 && height > 0 && !double.IsNaN(width) && !double.IsNaN(height))
             elastic = ElasticFor(width, height);
 
-        double scale = Math.Min(_layout.Scale * elastic, Math.Min(width / NeededWidth, height / NeededHeight));
+        double fit = Math.Min(width / NeededWidth, height / NeededHeight);
+
+        // Automatisch: der Wert des Bildschirms, und das Fenster verkleinert nur noch, wenn
+        // es zu klein ist. Die grosse Stufe fuer grosse Fenster entfaellt - sie war der
+        // grobe Ersatz fuer genau diese Frage.
+        double scale = _layout.AutoScale
+            ? Math.Min(DesktopLayout.AutoFor(ScreenScale.EffectiveHeight(this)) * Math.Min(1.0, elastic), fit)
+            : Math.Min(_layout.Scale * elastic, fit);
 
         // Unter einem Promille sieht niemand etwas, aber jede Zuweisung stoesst ein
         // neues Layout an - und SizeChanged feuert waehrend des Ziehens dauernd.
@@ -478,9 +504,104 @@ public partial class MainWindow : Window
         PageContent.Content = key switch
         {
             "projects" => new ProjectsPage(OpenFromProjects),
-            "atelier" => _atelierPage ??= new AtelierPage(_decoders, _getSettings(), next => _persist?.Invoke(next)),
-            _ => _settingsPage ??= new SettingsPage(_getSettings, _apply, _remoteState, _layout),
+            "atelier" => Atelier(),
+            _ => _settingsPage ??= CreateSettingsPage(),
         };
+
+        if (key == "atelier" && !_openingInAtelier) FollowDashboardIntoAtelier(_atelierPage!);
+    }
+
+    private AtelierPage Atelier()
+    {
+        if (_atelierPage is not null) return _atelierPage;
+
+        _atelierPage = new AtelierPage(_decoders, _getSettings(), next => _persist?.Invoke(next));
+        _atelierPage.ImageShown += OnAtelierImageShown;
+        return _atelierPage;
+    }
+
+    // ================================================================ Arbeitsbereich
+
+    // Uebersicht und Atelier zeigen dieselbe Folge (docs/Projekte-und-Masken.md, Punkt 7):
+    // Die Auswahl hier bestimmt, woran das Atelier arbeitet, und was das Atelier oeffnet,
+    // wird hier gezeigt. Geladen wird im Atelier erst, wenn es angezeigt wird - eine
+    // 4K-Datei im Hintergrund zu lesen, waehrend jemand nur durch Sequenzen blaettert,
+    // kostet Speicher fuer nichts.
+
+    /// <summary>Waehrend "Im Atelier oeffnen" ein bestimmtes Bild oeffnet, folgt das Atelier nicht der Uebersicht.</summary>
+    private bool _openingInAtelier;
+
+    /// <summary>Beim Start: die Folge, an der das Atelier zuletzt gearbeitet hat.</summary>
+    private void FollowAtelierAtStart()
+    {
+        if (_getSettings().AtelierImage is not { Length: > 0 } last || !File.Exists(last)) return;
+        if (Path.GetDirectoryName(last) is not { } folder) return;
+        if (_current is { } shown && SameFolder(shown.Folder, folder)) return;
+
+        if (!SelectFolder(folder)) OpenPath(last);
+    }
+
+    /// <summary>
+    /// Ins Atelier: Zeigt die Uebersicht eine andere Folge, oeffnet das Atelier das Bild, auf
+    /// dem sie steht - samt dem Projekt dieser Folge. Bei derselben Folge behaelt das
+    /// Atelier sein eigenes Bild.
+    /// </summary>
+    private void FollowDashboardIntoAtelier(AtelierPage atelier)
+    {
+        if (_current is null || FramePath(_playback.Head) is not { } frame) return;
+        if (FrameFlip.Atelier.SequenceKey.Of(frame) is not { } key || key.Equals(atelier.ProjectKey)) return;
+
+        atelier.Open(frame);
+    }
+
+    /// <summary>Das Atelier zeigt ein Bild: die Uebersicht zeigt seine Folge - und merkt sie sich.</summary>
+    private void OnAtelierImageShown(string path)
+    {
+        if (Path.GetDirectoryName(path) is not { } folder) return;
+        if (_current is { } shown && SameFolder(shown.Folder, folder)) return;
+
+        if (!SelectFolder(folder)) OpenPath(path);
+    }
+
+    private bool SelectFolder(string folder)
+    {
+        var entry = _sequences.Entries.FirstOrDefault(e => SameFolder(e.Folder, folder));
+        if (entry is null) return false;
+
+        Select(entry);
+        return true;
+    }
+
+    private static bool SameFolder(string a, string b)
+        => a.Length > 0 && b.Length > 0 &&
+           string.Equals(Path.GetFullPath(a).TrimEnd('\\', '/'), Path.GetFullPath(b).TrimEnd('\\', '/'), StringComparison.OrdinalIgnoreCase);
+
+    /// <summary>
+    /// Die Einstellungsseite - mit der Karte der Zuschauerseite am selben Dienst, derselben
+    /// Zustimmung und demselben Protokoll wie die Kopplungstafel.
+    /// </summary>
+    private SettingsPage CreateSettingsPage()
+    {
+        var page = new SettingsPage(_getSettings, _apply, _remoteState, _layout);
+        page.ConnectWatch(_watch, _renewWatch, _setWatchCode, then => AskTerms(then), Note);
+        page.ConnectStatus(SettingsStatusNow);
+        return page;
+    }
+
+    /// <summary>Was die Uebersicht der Einstellungen nur hier erfaehrt: die Bruecke und den Vorschau-Speicher.</summary>
+    private SettingsStatus SettingsStatusNow()
+    {
+        var settings = _getSettings();
+
+        string bridge = !settings.BridgeEnabled ? Strings.T("S_StatusOff")
+            : _monitor?.IsListening == true ? Strings.T("S_StatusListening")
+            : Strings.T("S_StatusNotListening");
+
+        string memory = _lastPreload is { } preload
+            ? Strings.T("S_StatusMemoryUsed", Math.Round(preload.Bytes / 1048576.0), settings.MemoryBudgetMb)
+            : Strings.T("S_StatusMemoryBudget", settings.MemoryBudgetMb);
+
+        return new SettingsStatus(bridge, memory);
     }
 
     /// <summary>
@@ -636,6 +757,12 @@ public partial class MainWindow : Window
 
         button.Checked += (_, _) => Select(entry);
         button.Click += (_, _) => button.IsChecked = true;
+
+        button.MouseRightButtonUp += (_, e) =>
+        {
+            e.Handled = true;
+            ShowSequenceMenu(button, entry);
+        };
 
         Dress(entry, meta, tag);
         return button;
@@ -1135,6 +1262,124 @@ public partial class MainWindow : Window
 
     // ================================================================ Filmstreifen
 
+    /// <summary>Das zuletzt geoeffnete Menue im Dashboard - fuer die Probe.</summary>
+    internal FlipMenu? DashboardMenu { get; private set; }
+
+    /// <summary>Der Pfad des Bildes mit dieser Nummer - oder keiner.</summary>
+    private string? FramePath(int number)
+    {
+        if (_sequence is not { Count: > 0 } sequence) return null;
+
+        int index = sequence.IndexNearestNumber(number);
+        return index >= 0 && index < sequence.Count ? sequence.Frames[index].Path : null;
+    }
+
+    /// <summary>Das Menue eines Bildes im Streifen.</summary>
+    internal void ShowFrameMenu(FrameworkElement target, string path)
+    {
+        var menu = new FlipMenu(target)
+            .Item("◧", Strings.T("D_MenuOpenInAtelier"), () => OpenInAtelier(path))
+            .Item("⌕", Strings.T("D_MenuShowInExplorer"), () => ShowInExplorer(path))
+            .Item("⧉", Strings.T("D_MenuCopyPath"), () => Clipboard.SetText(path));
+
+        DashboardMenu = menu;
+        menu.Open();
+    }
+
+    /// <summary>
+    /// Das Menue einer Sequenz in der Liste: ihr Ordner im Explorer und als Pfad - und,
+    /// wenn sie gerade gezeigt wird, ihr aktuelles Bild im Atelier.
+    /// </summary>
+    internal void ShowSequenceMenu(FrameworkElement target, DashboardSequenceEntry entry)
+    {
+        string where = entry.HasOutput ? entry.Folder : entry.BlendPath;
+        string? shown = ReferenceEquals(entry, _current) ? FramePath(_playback.Head) : null;
+
+        var menu = new FlipMenu(target)
+            .Item("◧", Strings.T("D_MenuOpenInAtelier"), () => OpenInAtelier(shown!), enabled: shown is not null)
+            .Item("⌕", Strings.T("D_MenuShowInExplorer"), () => ShowInExplorer(where), enabled: where.Length > 0)
+            .Item("⧉", Strings.T("D_MenuCopyPath"), () => Clipboard.SetText(where), enabled: where.Length > 0);
+
+        // Ein geoeffneter Ordner laesst sich wieder aus der Liste nehmen - ein Blend-Projekt
+        // gehoert der Projektseite. Die Dateien bleiben, wo sie sind.
+        if (entry.Adhoc)
+            menu.Separator().Item("✕", Strings.T("D_MenuForget"), () => ForgetSequence(entry));
+
+        DashboardMenu = menu;
+        menu.Open();
+    }
+
+    /// <summary>Nimmt einen geoeffneten Ordner aus der Liste - nicht von der Platte.</summary>
+    internal void ForgetSequence(DashboardSequenceEntry entry)
+    {
+        bool shown = ReferenceEquals(entry, _current);
+
+        if (!_sequences.Forget(entry)) return;
+
+        LoadSequenceList(keepSelection: !shown);
+    }
+
+    /// <summary>
+    /// Ordner oder Bilder, auf die Sequenzliste gezogen: Jeder wird ein Eintrag, der erste
+    /// wird gezeigt. Ein Ordner zeigt sein erstes Bild - und damit die Folge darum.
+    /// </summary>
+    private void OnSequencesDropped(object sender, DragEventArgs e)
+    {
+        if (e.Data.GetData(DataFormats.FileDrop) is not string[] dropped) return;
+
+        e.Handled = true;
+        OpenDropped(dropped);
+    }
+
+    /// <summary>Was abgelegt wurde, als Eintraege - der erste gezeigt. Ohne Maus pruefbar.</summary>
+    internal void OpenDropped(IReadOnlyList<string> dropped)
+    {
+        var images = dropped
+            .Select(path => Directory.Exists(path) ? SequenceScanner.FindFirstImage(path, _decoders) : path)
+            .OfType<string>()
+            .Where(path => File.Exists(path) && _decoders.IsSupported(Path.GetExtension(path)))
+            .ToList();
+
+        // Rueckwaerts geoeffnet: Jeder neue Eintrag kommt nach oben, und der erste soll
+        // am Ende oben stehen und gezeigt sein.
+        for (int i = images.Count - 1; i >= 0; i--) OpenPath(images[i]);
+    }
+
+    private void OnSequencesDragOver(object sender, DragEventArgs e)
+    {
+        e.Effects = e.Data.GetData(DataFormats.FileDrop) is string[] { Length: > 0 }
+            ? DragDropEffects.Copy
+            : DragDropEffects.None;
+        e.Handled = true;
+    }
+
+    /// <summary>Ein Bild ins Atelier - der Reiter wechselt, und das Atelier oeffnet es.</summary>
+    internal void OpenInAtelier(string path)
+    {
+        // Dieses Bild und nicht das, auf dem die Uebersicht steht.
+        _openingInAtelier = true;
+
+        try { NavAtelier.IsChecked = true; }
+        finally { _openingInAtelier = false; }
+
+        _atelierPage?.Open(path);
+    }
+
+    /// <summary>Der Explorer, mit der Datei markiert - oder im Ordner.</summary>
+    private static void ShowInExplorer(string path)
+    {
+        string arguments = File.Exists(path) ? $"/select,\"{path}\"" : $"\"{path}\"";
+
+        try
+        {
+            Process.Start(new ProcessStartInfo("explorer.exe", arguments) { UseShellExecute = true });
+        }
+        catch (System.ComponentModel.Win32Exception)
+        {
+            // Kein Explorer - dann eben nicht; das Menue hat nichts kaputtgemacht.
+        }
+    }
+
     /// <summary>
     /// Der Streifen bekommt genau so viele Zellen, wie nebeneinander sichtbar sind.
     /// Eine feste Zahl waere entweder zu kurz fuer ein breites Fenster oder zu lang
@@ -1163,6 +1408,15 @@ public partial class MainWindow : Window
                     Pause();
                     ShowFrame(number);
                 }
+            };
+
+            // Rechtsklick auf ein Bild des Streifens: ins Atelier, in den Explorer, der Pfad.
+            cell.MouseRightButtonUp += (s, e) =>
+            {
+                if (s is not ToggleButton { Tag: int number } button || FramePath(number) is not { } path) return;
+
+                e.Handled = true;
+                ShowFrameMenu(button, path);
             };
 
             FilmStrip.Children.Add(cell);
@@ -1530,15 +1784,19 @@ public partial class MainWindow : Window
                 e.Handled = true;
                 return;
             }
+            // Von der Automatik aus weiter in festen Schritten - ausgehend von ihrem Wert,
+            // damit nichts springt.
+            double current = _layout.AutoScale ? DesktopLayout.AutoFor(ScreenScale.EffectiveHeight(this)) : _layout.Scale;
             double? scale = e.Key switch
             {
-                Key.Add or Key.OemPlus => _layout.Scale + .05,
-                Key.Subtract or Key.OemMinus => _layout.Scale - .05,
+                Key.Add or Key.OemPlus => current + .05,
+                Key.Subtract or Key.OemMinus => current - .05,
                 Key.D0 or Key.NumPad0 => 1,
                 _ => null,
             };
             if (scale is { } requested)
             {
+                _layout.AutoScale = false;
                 _layout.Scale = requested;
                 _layout.Save();
                 e.Handled = true;
@@ -1892,206 +2150,14 @@ public partial class MainWindow : Window
 
     // ================================================================ Zusehen im Netz
 
-    /// <summary>
-    /// Der Schalter fuer die Seite im eigenen Netz.
-    ///
-    /// Einschalten oeffnet einen Port und legt ein neues Zeichen fuer die Adresse an;
-    /// Ausschalten macht beides wieder zu. Dass die alte Adresse danach nicht mehr
-    /// gilt, ist kein Nebeneffekt, sondern der Zweck.
-    /// </summary>
-    private void OnWatchToggled(object sender, RoutedEventArgs e)
-    {
-        if (!_ready || sender is not ToggleButton toggle) return;
-        // RefreshWatch bildet nur den Bestand ab; das ist kein neuer Auftrag.
-        if ((toggle.IsChecked == true) == _getSettings().WatchEnabled) return;
+    /// <summary>Der Schalter der Zuschauerseite - siehe <see cref="WatchCard.Toggled"/>.</summary>
+    private void OnWatchToggled(object sender, RoutedEventArgs e) => _watchCard?.Toggled();
 
-        // Einschalten heisst: eine Verbindung nach draussen. Vorher wird gefragt.
-        // Beim Ausschalten nicht - wer zumacht, braucht keine Zustimmung.
-        if (toggle.IsChecked == true && !_getSettings().TermsOk)
-        {
-            toggle.IsChecked = false;
-            AskTerms(() => { WatchToggle.IsChecked = true; });
-            return;
-        }
+    private void RefreshWatch() => _watchCard?.Refresh();
 
-        // Eine KOPIE aendern, nicht den Bestand: _getSettings() liefert dasselbe
-        // Objekt, das der Wirt haelt. Wer es an Ort und Stelle umschreibt, nimmt ihm
-        // die Moeglichkeit, die Aenderung zu bemerken - er vergleicht dann den neuen
-        // Stand mit sich selbst.
-        var settings = _getSettings().Clone();
+    private void OnWatchPassKey(object sender, KeyEventArgs e) => _watchCard?.PassKey(e);
 
-        settings.WatchEnabled = toggle.IsChecked == true;
-
-        if (_apply(settings) is { } error)
-        {
-            PairHint.Text = error;
-            return;
-        }
-
-        Note(Strings.T(settings.WatchEnabled ? "D_LogWatchOn" : "D_LogWatchOff"));
-
-        // Erst nachdem der Host den Server auf- oder abgebaut hat, steht die Adresse
-        // fest. Deshalb eine Runde spaeter nachsehen.
-        Dispatcher.BeginInvoke(new Action(RefreshWatch), DispatcherPriority.Background);
-    }
-
-    private void RefreshWatch()
-    {
-        if (WatchToggle is null) return;
-
-        var settings = _getSettings();
-        bool on = settings.WatchEnabled;
-
-        WatchToggle.IsChecked = on;
-        Track.SetAmount(WatchToggleText, 1);
-        Track.SetText(WatchToggleText, Strings.T(on ? "D_On" : "D_Off"));
-
-        WatchActions.Children.Clear();
-
-        var watch = _watch();
-        Follow(watch);
-
-        if (!on || watch is null)
-        {
-            WatchCodeFrame.Visibility = Visibility.Collapsed;
-            WatchPassRow.Visibility = Visibility.Collapsed;
-            WatchCode.Text = null;
-            WatchAddress.Text = string.Empty;
-
-            // Zwei verschiedene Faelle mit zwei verschiedenen Saetzen: schlicht aus -
-            // oder an, aber ohne Relay-Adresse, mit der sich etwas anfangen liesse.
-            WatchHint.Text = Strings.T(on ? "D_WatchNoRelay" : "D_WatchOff");
-
-            return;
-        }
-
-        string link = watch.Link;
-
-        WatchCodeFrame.Visibility = Visibility.Visible;
-        WatchCode.LightModules = _layout.LightQr;
-        WatchCode.Text = link;
-        WatchAddress.Text = link;
-
-        WatchHint.Text = WatchStanding(watch);
-
-        WatchPassRow.Visibility = Visibility.Visible;
-        WatchPassHint.Text = Strings.T("D_WatchPassHint");
-
-        // Nur nachtragen, wenn gerade niemand darin schreibt - sonst spraenge der
-        // Text unter den Fingern zurueck, sobald ein Zuschauer kommt oder geht.
-        if (!WatchPass.IsKeyboardFocusWithin) WatchPass.Text = CurrentWatchCode() ?? string.Empty;
-
-        WatchActions.Children.Add(PairAction("S_CopyLink", primary: false, () => CopyInvite(link)));
-        WatchActions.Children.Add(PairAction("D_WatchRenew", primary: false, RenewWatch));
-    }
-
-    /// <summary>
-    /// Wie es gerade um die Zuschauer steht - in Worten, nicht in Zahlenkolonnen.
-    ///
-    /// Dass hier ueberhaupt etwas Verlaessliches stehen kann, liegt am Entwurf: Es
-    /// wird nur gesendet, solange jemand zusieht. Zuschauer und Datenverkehr sind
-    /// dasselbe, und die Zeile ist deshalb keine Vermutung.
-    /// </summary>
-    private static string WatchStanding(Web.WatchService watch)
-    {
-        int watchers = watch.Watchers;
-
-        string who = watchers switch
-        {
-            0 => Strings.T("D_WatchNobody"),
-            1 => Strings.T("D_WatchOneViewer"),
-            _ => Strings.T("D_WatchViewers", watchers)
-        };
-
-        // MaxSeats, nicht OpenSeats: Offen ist immer nur einer mehr als besetzt, weil
-        // Raeume auf dem Leuchtturm knapp sind. Dem Benutzer davon zu erzaehlen waere
-        // verwirrend - fuer ihn zaehlt, wieviele ueberhaupt zusehen koennen.
-        string seats = Strings.T("D_WatchSeats", Math.Max(0, watch.MaxSeats - watchers), watch.MaxSeats);
-
-        string standing = Strings.T("D_WatchOn") + Environment.NewLine + Environment.NewLine + who + " " + seats;
-
-        if (watch.LockedUntilUtc is { } until && until > DateTime.UtcNow)
-        {
-            int minutes = Math.Max(1, (int)Math.Ceiling((until - DateTime.UtcNow).TotalMinutes));
-            standing += Environment.NewLine + Environment.NewLine + Strings.T("D_WatchLocked", minutes);
-        }
-
-        return standing;
-    }
-
-    /// <summary>
-    /// Meldet sich beim laufenden Dienst an, damit die Anzeige mitbekommt, wenn
-    /// jemand kommt oder geht - und beim alten ab, damit ein ausgetauschter Dienst
-    /// nicht in ein Fenster meldet, das ihn gar nicht mehr zeigt.
-    /// </summary>
-    private void Follow(Web.WatchService? watch)
-    {
-        if (ReferenceEquals(_watched, watch)) return;
-
-        if (_watched is not null) _watched.Changed -= OnWatchChanged;
-
-        _watched = watch;
-
-        if (_watched is not null) _watched.Changed += OnWatchChanged;
-    }
-
-    private void OnWatchChanged()
-        => Dispatcher.BeginInvoke(new Action(RefreshWatch), DispatcherPriority.Background);
-
-    private string? CurrentWatchCode()
-        => WatchStore.TryUnprotect(_getSettings().WatchSecret, out var key) ? key?.Code : null;
-
-    private void RenewWatch()
-    {
-        _renewWatch?.Invoke();
-        Note(Strings.T("D_WatchRenewed"));
-
-        Dispatcher.BeginInvoke(new Action(RefreshWatch), DispatcherPriority.Background);
-    }
-
-    private void OnWatchPassKey(object sender, KeyEventArgs e)
-    {
-        if (e.Key != Key.Enter) return;
-
-        e.Handled = true;
-        ApplyWatchPass();
-
-        // Den Tastaturschein abgeben, sonst bliebe der Text stehen und es sieht aus,
-        // als waere nichts geschehen.
-        Keyboard.ClearFocus();
-    }
-
-    private void OnWatchPassDone(object sender, RoutedEventArgs e) => ApplyWatchPass();
-
-    /// <summary>
-    /// Uebernimmt das Kennwort - aber nur, wenn es sich wirklich geaendert hat.
-    ///
-    /// Jedes Verlassen des Feldes als Aenderung zu werten, hiesse die Verbindungen
-    /// jedesmal neu aufzubauen, auch wenn niemand etwas getippt hat. Zuschauer flogen
-    /// dann heraus, weil jemand durchs Fenster geklickt hat.
-    /// </summary>
-    private void ApplyWatchPass()
-    {
-        if (_setWatchCode is null || WatchPass is null) return;
-
-        string typed = WatchPass.Text?.Trim() ?? string.Empty;
-        string? current = CurrentWatchCode();
-
-        if (string.Equals(typed, current ?? string.Empty, StringComparison.Ordinal)) return;
-
-        if (typed.Length > 0 && typed.Length < WatchKey.MinCodeLength)
-        {
-            Note(Strings.T("D_WatchPassShort"));
-            WatchPass.Text = current ?? string.Empty;
-            return;
-        }
-
-        _setWatchCode(typed.Length == 0 ? null : typed);
-
-        Note(Strings.T(typed.Length == 0 ? "D_WatchPassCleared" : "D_WatchPassSet"));
-
-        Dispatcher.BeginInvoke(new Action(RefreshWatch), DispatcherPriority.Background);
-    }
+    private void OnWatchPassDone(object sender, RoutedEventArgs e) => _watchCard?.PassDone();
 
     /* ----------------------------------------------------------- Zustimmung
 

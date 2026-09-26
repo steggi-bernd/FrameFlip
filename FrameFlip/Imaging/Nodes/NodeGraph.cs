@@ -55,6 +55,7 @@ public sealed class NodeLink
 [JsonDerivedType(typeof(MaskNode), MaskNode.KindName)]
 [JsonDerivedType(typeof(LayerGradeNode), LayerGradeNode.KindName)]
 [JsonDerivedType(typeof(RestrictNode), RestrictNode.KindName)]
+[JsonDerivedType(typeof(CutoutNode), CutoutNode.KindName)]
 [JsonDerivedType(typeof(MixNode), MixNode.KindName)]
 [JsonDerivedType(typeof(FallbackNode), FallbackNode.KindName)]
 [JsonDerivedType(typeof(LightNode), LightNode.KindName)]

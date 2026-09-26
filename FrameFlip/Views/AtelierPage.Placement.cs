@@ -107,6 +107,9 @@ public partial class AtelierPage
             return;
         }
 
+        // Im Stapel wird kein Verlauf aufgezeichnet - also auch kein Knopf dafuer.
+        Properties.ShowBrushHistory(false);
+
         // Im Stapel legt der erste Strich eine Maskenebene an, wenn es noch keine gibt.
         Placement.MaskWanted = MakeMaskLayer;
 
@@ -160,9 +163,22 @@ public partial class AtelierPage
         Placement.BrushHardness = Properties.BrushHardness;
         Placement.BrushFlow = Properties.BrushFlow;
         Placement.BrushOpacity = Properties.BrushOpacity;
+        Placement.BrushSpacing = Properties.BrushSpacing;
+        Placement.BrushShape = Properties.BrushShape;
+        Placement.BrushAspect = Properties.BrushAspect;
+        Placement.BrushAngle = Properties.BrushAngle;
+        Placement.BrushFollow = Properties.BrushFollow;
+        Placement.LimitWanted = Properties.BrushObject ? ObjectLimitAt : null;
 
         Placement.InvalidateVisual();
     }
+
+    /// <summary>
+    /// Strg und das Rad beim Pinsel: der Abstand der Tupfer. Der Regler in der
+    /// Eigenschaftsleiste zieht ueber <see cref="PlacementAdorner.BrushAdjusted"/> nach.
+    /// </summary>
+    private void StepBrushSpacing(double notches)
+        => Placement.StepSpacing(notches, System.Windows.Input.Mouse.GetPosition(Placement));
 
     /// <summary>
     /// Liefert die Maske fuer den ersten Strich - und legt dafuer eine EIGENE EBENE an.
@@ -184,14 +200,8 @@ public partial class AtelierPage
     {
         if (_frame is null) return null;
 
-        // Im Knotenmodus wird keine Ebene angelegt - gemalt wird auf die Maske des
-        // gewaehlten Knotens oder gar nicht.
-        if (InNodes)
-        {
-            return NodeView.Selected is MaskNode { Mask.Kind: MaskKind.Painted } node
-                ? node.Mask.PaintOn(_number, _frame.Width, _frame.Height)
-                : null;
-        }
+        // Im Knotenmodus: die Maske des gewaehlten Knotens - oder eine neue Maskenebene.
+        if (InNodes) return MakeNodeMask();
 
         var layer = Layers.Selection;
 
@@ -231,7 +241,7 @@ public partial class AtelierPage
         {
             StopDragFrames();
 
-            _settings.Layers = Layers.Stack;
+            _recipe.Layers = Layers.Stack;
             Layers.PlaceMovedOutside(false);
 
             return;
@@ -308,7 +318,7 @@ public partial class AtelierPage
         if (layer is null) return;
 
         layer.Place = place;
-        _settings.Layers = Layers.Stack;
+        _recipe.Layers = Layers.Stack;
 
         if (!interim)
         {
@@ -331,13 +341,28 @@ public partial class AtelierPage
     {
         if (_pendingPlace is null && !_pendingPaint) return;
 
+        bool placing = _pendingPlace is not null;
+
         _pendingPlace = null;
         _pendingPaint = false;
 
         // Im Knotenmodus gibt es keinen Stapel, dem man es melden muesste - der Graph
-        // rechnet gleich selbst.
-        if (InNodes) Refresh(interim: true, recompose: false);
-        else Layers.PlaceMovedOutside(true);
+        // rechnet gleich selbst. Beim Malen nur den Teil, den der Pinsel beruehrt hat,
+        // voll aufgeloest; geht das nicht, das ganze Bild grob wie bisher.
+        if (InNodes)
+        {
+            if (!placing && PaintRegion()) return;
+
+            // Einmal grob gerechnet, ist das Bild dieses Strichs grob - am Ende muss das
+            // scharfe sofort nachkommen.
+            if (!placing) _regionFailed = true;
+
+            Refresh(interim: true, recompose: false);
+        }
+        else
+        {
+            Layers.PlaceMovedOutside(true);
+        }
     }
 
     /// <summary>

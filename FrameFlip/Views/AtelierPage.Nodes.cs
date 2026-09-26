@@ -34,7 +34,11 @@ public partial class AtelierPage
     /// </summary>
     private void RestoreNodes()
     {
-        if (_settings.AtelierNodes is not { Length: > 0 } json) return;
+        // Mit Projektdateien bringt das erste Bild sein Projekt und damit seinen Graphen
+        // mit. Der Graph in den Einstellungen ist dann nur noch die Sicherung von vorher.
+        if (_settings.AtelierRecipeMoved) return;
+
+        if (_recipe.Nodes is not { Length: > 0 } json) return;
 
         var graph = NodeGraph.Load(json);
         if (graph is null || graph.Problems().Count > 0) return;
@@ -53,8 +57,8 @@ public partial class AtelierPage
     {
         if (_graph is not null) return;
 
-        _graph = StackToGraph.Convert(Layers.Stack, _settings.Adjustments ?? ImageAdjustments.Neutral,
-                                      _settings.Grading ?? new GradingStack());
+        _graph = StackToGraph.Convert(Layers.Stack, _recipe.Adjustments ?? ImageAdjustments.Neutral,
+                                      _recipe.Grading ?? new GradingStack());
 
         SaveNodes();
         EnterNodes();
@@ -73,6 +77,7 @@ public partial class AtelierPage
 
         NodeView.Graph = _graph;
         NodeView.Title = NodeTitles.For;
+        NodeView.MaskTitle = NodeTitles.MaskName;
 
         ShowNodeMode();
         ShowNodeSettings();
@@ -87,7 +92,7 @@ public partial class AtelierPage
     {
         if (_graph is null) return;
 
-        _settings.AtelierNodes = _graph.Save();
+        _recipe.Nodes = _graph.Save();
         _persist(_settings);
     }
 
@@ -95,11 +100,12 @@ public partial class AtelierPage
     /// Holt nach, was der Graph lesen will und noch nicht im Vorrat liegt - Passe,
     /// Bilddateien, Renderdaten. Derselbe Lesevorrat wie im Stapel.
     /// </summary>
-    private void FetchNodeSources()
+    /// <param name="soon">Erst grob rechnen und voll nach einer Pause - nach einem Bauschritt.</param>
+    private void FetchNodeSources(bool soon = false)
     {
         if (_graph is null || _path is null || _base is null)
         {
-            Refresh(interim: false, recompose: true);
+            Refresh(interim: soon, recompose: true);
             return;
         }
 
@@ -127,7 +133,7 @@ public partial class AtelierPage
 
         if (missing.Count == 0 && dataMissing.Count == 0)
         {
-            Refresh(interim: false, recompose: true);
+            Refresh(interim: soon, recompose: true);
             return;
         }
 
@@ -154,6 +160,12 @@ public partial class AtelierPage
     /// <summary>Die Felder der Zwischenbilder - von einer Rechnung zur naechsten wiederverwendet.</summary>
     private readonly GridPool _pool = new();
 
+    /// <summary>
+    /// Die Felder der Ausschnitte beim Malen - ein eigener Vorrat, damit ihre wechselnden
+    /// Groessen nicht die Felder des ganzen Bildes verdraengen.
+    /// </summary>
+    private readonly GridPool _regionPool = new(sizes: 16);
+
     /// <summary>Was vor dem gewaehlten Knoten gerechnet wurde - beim naechsten Zug an ihm gilt es noch.</summary>
     private readonly GraphCache _cache = new();
 
@@ -165,26 +177,115 @@ public partial class AtelierPage
     {
         if (_graph is null || _base is null) return false;
 
-        var inputs = new GraphInputs
-        {
-            Sources = _sources,
-            Data = NodeData(),
-            View = ViewFor(_base),
-            Step = _coarse ? CoarseStep : 1,
-            Number = _number,
-            Pool = _pool,
-            Cache = _cache,
-            Focus = NodeView.Selected?.Id,
-            Previews = _previews,
-            Viewer = _viewer,
-        };
+        var inputs = NodeInputs(_base, _coarse ? CoarseStep : 1);
 
         WantPreviews();
-        bool done = GraphEvaluator.Render(_graph, inputs, target, stride);
+
+        bool done;
+
+        try
+        {
+            done = GraphEvaluator.Render(_graph, inputs, target, stride);
+        }
+        catch (Exception e) when (e is not OutOfMemoryException)
+        {
+            // Ein Graph, der sich nicht rechnen laesst, darf die Seite nicht anhalten. Die
+            // App verschluckt unbehandelte Fehler - das Bild bliebe stehen, jeder weitere
+            // Zug liefe in denselben Fehler, und von aussen saehe das aus wie ein Absturz.
+            // Hier wird er benannt, und was halb gerechnet war, wird verworfen.
+            _cache.Clear();
+            _pool.Clear();
+            _regionPool.Clear();
+            _renderFailed = true;
+
+            NodeView.Warning = Strings.T("S_NodeWarnFailed", (e as AggregateException)?.InnerException?.Message ?? e.Message);
+            Configuration.SettingsStore.Trace("Knoten: " + e);
+
+            return false;
+        }
+
+        // Nach einem Fehler, der behoben ist, gilt wieder, was der Aufbau sagt.
+        if (_renderFailed)
+        {
+            _renderFailed = false;
+            ShowNodeWarning();
+        }
 
         ShowPreviews();
         return done;
     }
+
+    /// <summary>Was der Graph fuer eine Rechnung dieser Seite bekommt - fuer das ganze Bild und fuer einen Ausschnitt.</summary>
+    private GraphInputs NodeInputs(FloatFrame canvas, int step, GridPool? pool = null) => new()
+    {
+        Sources = _sources,
+        Data = NodeData(),
+        View = ViewFor(canvas),
+        Step = step,
+        Number = _number,
+        Pool = pool ?? _pool,
+        Cache = _cache,
+        Focus = NodeView.Selected?.Id,
+        Previews = _previews,
+        Viewer = _viewer,
+    };
+
+    /// <summary>
+    /// Ob die Anzeigeflaeche gerade ein ganzes, voll aufgeloestes Bild des Graphen traegt.
+    /// Nur darauf darf ein Ausschnitt geschrieben werden: auf ein grobes Bild gesetzt,
+    /// stuende ein scharfes Rechteck in einem unscharfen.
+    /// </summary>
+    private bool _wholeShown;
+
+    /// <summary>
+    /// Beim Malen: rechnet nur, was der Pinsel seit dem letzten Bild beruehrt hat, und
+    /// schreibt es an seine Stelle - siehe <see cref="GraphEvaluator.RenderRegion"/>.
+    /// False, wenn das nicht geht; dann rechnet der Aufrufer wie bisher das ganze Bild grob.
+    /// </summary>
+    private bool PaintRegion()
+    {
+        var touched = Placement.TakeTouched();
+
+        // Kein Tupfer seit dem letzten Bild - nichts zu rechnen, aber auch kein Grund,
+        // das ganze Bild grob zu zeigen.
+        if (touched.IsEmpty) return _wholeShown;
+
+        if (!_wholeShown || _surface is null || _graph is null || _base is null || _showingOriginal || _viewer is not null)
+            return false;
+
+        // Zwei Maskenpunkte Rand: Die Maske wird zwischen ihren Punkten weich gelesen, ein
+        // geaenderter Punkt wirkt also bis zu einem Maskenpunkt weit ins Bild daneben.
+        //
+        // Auf 32 Bildpunkte nach aussen gerundet: ein paar Punkte mehr zu rechnen kostet
+        // weniger, als fuer jede neue Groesse neue Felder anzulegen.
+        var region = GraphRegion.Around(touched.X0, touched.Y0, touched.X1, touched.Y1, 2 * PaintedMask.Coarse).Snapped(32);
+        if (region.Within(_surface.PixelWidth, _surface.PixelHeight) is not { } inside) return true;
+
+        _surface.Lock();
+
+        try
+        {
+            if (!GraphEvaluator.RenderRegion(_graph, NodeInputs(_base, 1, _regionPool), inside, _surface.BackBuffer, _surface.BackBufferStride))
+                return false;
+
+            _surface.AddDirtyRect(new Int32Rect(inside.X0, inside.Y0, inside.Width, inside.Height));
+            _regionPainted = true;
+            return true;
+        }
+        catch (Exception e) when (e is not OutOfMemoryException)
+        {
+            // Wie beim ganzen Bild: nicht anhalten. Das ganze Bild danach sagt, was fehlt.
+            Configuration.SettingsStore.Trace("Knoten, Ausschnitt: " + e);
+            return false;
+        }
+        finally
+        {
+            _surface.Unlock();
+        }
+    }
+
+    /// <summary>Ob die letzte Rechnung mit einem Fehler endete - dann steht er im Editor.</summary>
+    private bool _renderFailed;
 
     /// <summary>
     /// Die Verteilung im Knotenmodus: gemessen am fertig gerechneten Bild.

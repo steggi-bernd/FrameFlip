@@ -191,8 +191,11 @@
                             </Button>
                         </Grid>
 
-                        <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto"
-                                      HorizontalScrollBarVisibility="Disabled" Padding="8,0,8,10">
+                        <!-- Ordner und Bilder lassen sich hierher ziehen - sie werden Eintraege. -->
+                        <ScrollViewer x:Name="SequenceScroll" Grid.Row="1" VerticalScrollBarVisibility="Auto"
+                                      HorizontalScrollBarVisibility="Disabled" Padding="8,0,8,10"
+                                      Background="Transparent" AllowDrop="True"
+                                      Drop="OnSequencesDropped" DragOver="OnSequencesDragOver">
                             <StackPanel x:Name="SequenceList" />
                         </ScrollViewer>
 
@@ -443,7 +446,7 @@
                                 </StackPanel></Viewbox>
                                 <WrapPanel MaxWidth="{Binding ActualWidth, ElementName=TransportControls}"><WrapPanel x:Name="PlayChips" MaxWidth="{Binding ActualWidth, ElementName=TransportControls}" Margin="0,0,8,8" />
 
-                                    <ComboBox x:Name="RateBox" Style="{StaticResource DashRateBox}"
+                                    <ComboBox x:Name="RateBox" Style="{StaticResource DashRateBox}" Tag="fps"
                                               Margin="2,0,0,8" VerticalAlignment="Center"
                                               ToolTip="{DynamicResource D_RateHint}"
                                               AutomationProperties.Name="{DynamicResource D_Rate}"

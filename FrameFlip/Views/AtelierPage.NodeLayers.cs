@@ -4,6 +4,7 @@ using System.Windows.Controls.Primitives;
 using FrameFlip.Imaging.Grading;
 using FrameFlip.Imaging.Nodes;
 using FrameFlip.Localization;
+using Point = System.Windows.Point;
 
 namespace FrameFlip.Views;
 
@@ -22,21 +23,28 @@ public partial class AtelierPage
     {
         NodeLayers.CanMove = (layer, target) => _graph is not null && LayerEdits.CanMove(_graph, layer, target);
 
-        NodeLayers.MoveWanted += (layer, target, above) =>
-            LayerEdit(() => LayerEdits.Move(_graph!, layer, target, above) ? layer : null);
-
-        NodeLayers.StepWanted += (layer, up) =>
-            LayerEdit(() => LayerEdits.Step(_graph!, layer, up) ? layer : null);
-
-        NodeLayers.DuplicateWanted += layer => LayerEdit(() => LayerEdits.Duplicate(_graph!, layer));
-
-        NodeLayers.RemoveWanted += layer =>
-            LayerEdit(() => LayerEdits.Remove(_graph!, layer) ? _graph!.Output : null, arrange: false);
+        NodeLayers.MoveWanted += MoveLayer;
+        NodeLayers.StepWanted += StepLayer;
+        NodeLayers.DuplicateWanted += DuplicateLayer;
+        NodeLayers.RemoveWanted += RemoveLayer;
 
         NodeLayers.AddWanted += ShowLayerAddMenu;
+        NodeLayers.MenuWanted += ShowLayerMenu;
+        NodeLayers.MaskMenuWanted += ShowFreeMaskMenu;
         NodeLayers.ModeWanted += OnLayerMode;
         NodeLayers.OpacityWanted += OnLayerOpacity;
     }
+
+    private void MoveLayer(Node layer, Node target, bool above)
+        => LayerEdit(() => LayerEdits.Move(_graph!, layer, target, above) ? layer : null);
+
+    private void StepLayer(Node layer, bool up)
+        => LayerEdit(() => LayerEdits.Step(_graph!, layer, up) ? layer : null);
+
+    private void DuplicateLayer(Node layer) => LayerEdit(() => LayerEdits.Duplicate(_graph!, layer));
+
+    private void RemoveLayer(Node layer)
+        => LayerEdit(() => LayerEdits.Remove(_graph!, layer) ? _graph!.Output : null, arrange: false);
 
     /// <summary>
     /// Eine Aenderung an den Ebenen: Der Stand davor kommt in den Verlauf, wenn sich etwas
@@ -67,29 +75,85 @@ public partial class AtelierPage
         AfterNodeEdit();
     }
 
-    /// <summary>Das Menue am Plus der Liste - dieselben Ebenen wie im Menue des Editors.</summary>
+    /// <summary>
+    /// Das Plus der Liste oeffnet den Hub bei den Ebenen - neben der Liste, und was er
+    /// anlegt, kommt auf die gewaehlte Ebene.
+    /// </summary>
     private void ShowLayerAddMenu(FrameworkElement anchor)
     {
         if (_graph is null) return;
 
-        MakePassThumbs();
+        var middle = NodeView.ToGraph(new Point(NodeView.ActualWidth / 2, NodeView.ActualHeight / 2));
+        ShowNodeHub(middle, "layers", anchor, ListTarget);
+    }
 
-        var after = ListTarget();
-        if (after is null) return;
+    /// <summary>Das zuletzt geoeffnete Menue einer Zeile - fuer die Probe.</summary>
+    internal FlipMenu? LayerMenu { get; private set; }
 
-        var menu = new ContextMenu { PlacementTarget = anchor, Placement = PlacementMode.Bottom };
+    /// <summary>
+    /// Rechtsklick auf eine Zeile der Ebenenliste: Die Ebene wird gewaehlt, und ein Menue
+    /// bietet an, was sich mit ihr tun laesst - umbenennen, zeigen, verdoppeln, loeschen,
+    /// verschieben, anschneiden.
+    /// </summary>
+    private void ShowLayerMenu(NodeLayer layer)
+    {
+        if (_graph is null) return;
 
-        var adjustment = new MenuItem { Header = Strings.T("S_AddAdjustment") };
-        adjustment.Click += (_, _) => AddAdjustmentLayer(after);
-        menu.Items.Add(adjustment);
+        if (layer.Target is { } target) OnLayerChosen(target);
 
-        var image = new MenuItem { Header = Strings.T("S_NodeMenuImageLayer") };
-        image.Click += (_, _) => AddImageLayer(after);
-        menu.Items.Add(image);
+        var menu = new FlipMenu(NodeLayers);
+        var node = layer.Switch;
 
-        if (PassMenu("S_NodeMenuPassLayer", pass => AddPassLayer(pass, after)) is { } passes) menu.Items.Add(passes);
+        if (node is not null)
+        {
+            string current = node.Label ?? layer.Name;
 
-        menu.IsOpen = true;
+            menu.Rename(Strings.T("S_LayerMenuRename"), current, name =>
+            {
+                RememberNodes();
+                node.Label = name.Length > 0 ? name : null;
+                NodeView.InvalidateVisual();
+                AfterNodeEdit();
+            });
+
+            menu.Toggle(Strings.T("S_LayerMenuVisible"), !node.Muted, () => OnLayerMuted(node));
+        }
+
+        if (layer.Target is { } shown) menu.Item("⌖", Strings.T("S_LayerMenuShowInGraph"), () => OnLayerChosen(shown));
+
+        // Die Ebene allein: was in ihr Mischen oben hineinfliesst, im Betrachter.
+        if (layer.Mix is { } mix && _graph.Into(mix.Id, "Oben") is { } up)
+            menu.Item("◉", Strings.T("S_LayerMenuViewAlone"), () => SetViewer((up.From, up.Output)));
+
+        if (node is not null && layer.Chain is { } chain)
+        {
+            int at = chain.Members.IndexOf(node);
+
+            menu.Separator()
+                .Item("❐", Strings.T("S_DuplicateLayer"), () => DuplicateLayer(node))
+                .Item("✕", Strings.T("S_RemoveLayer"), () => RemoveLayer(node))
+                .Separator()
+                .Item("▲", Strings.T("S_MoveLayerUp"), () => StepLayer(node, true), enabled: at + 1 < chain.Members.Count)
+                .Item("▼", Strings.T("S_MoveLayerDown"), () => StepLayer(node, false), enabled: at > 0);
+
+            if (node is MixNode clipped)
+            {
+                menu.Toggle(Strings.T("S_LayerMenuClip"), clipped.Clip, () =>
+                {
+                    RememberNodes();
+                    clipped.Clip = !clipped.Clip;
+                    NodeView.InvalidateVisual();
+                    AfterNodeEdit();
+                });
+            }
+        }
+
+        // Die Maske der Ebene: dieselben Handgriffe wie an ihrem Knoten - samt Verlauf. Wer
+        // mit Masken arbeitet, klickt die Ebene in der Liste an und nicht den Knoten im Graphen.
+        if (layer.MaskSource is MaskNode mask) AddMaskItems(menu, mask, NodeLayers);
+
+        LayerMenu = menu;
+        menu.Open();
     }
 
     /// <summary>
@@ -142,6 +206,9 @@ public partial class AtelierPage
                 return;
         }
 
+        // Nach der Aenderung: Der Verlauf bekommt den festgehaltenen Stand davor.
+        RememberValueEdit();
+
         NodeView.InvalidateVisual();
         Refresh(interim: false, recompose: false);
         KeepNodes();
@@ -169,6 +236,8 @@ public partial class AtelierPage
             default:
                 return;
         }
+
+        RememberValueEdit();
 
         NodeView.InvalidateVisual();
         Refresh(interim, recompose: false);

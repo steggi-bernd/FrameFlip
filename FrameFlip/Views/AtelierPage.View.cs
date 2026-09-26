@@ -14,7 +14,7 @@ public partial class AtelierPage
     /// <summary>True, solange das Original gezeigt wird.</summary>
     private bool _showingOriginal;
 
-    /// <summary>1 heisst eingepasst; sonst der Massstab in Bildpunkten je Punkt.</summary>
+    /// <summary>0 heisst eingepasst; sonst der Massstab in Punkten je Bildpunkt.</summary>
     private double _zoom;
 
     /// <summary>
@@ -78,7 +78,12 @@ public partial class AtelierPage
             return;
         }
 
-        Display.Stretch = System.Windows.Media.Stretch.None;
+        // Eingepasst gestreckt und nicht "None": Bei "None" zeichnet das Bildelement die
+        // Bitmap in ihrer eigenen Groesse, egal wie gross das Element ist - das ging nur,
+        // solange es neben dem Einpassen allein 100 % gab. Das Element ist genau so gross
+        // wie das Bild im Massstab, also gibt es keine Raender, und die Umrechnung in
+        // ImageHit liefert den Massstab aus der Elementgroesse.
+        Display.Stretch = System.Windows.Media.Stretch.Uniform;
         Display.Width = frame.Width * _zoom;
         Display.Height = frame.Height * _zoom;
         ZoomText.Text = $"{_zoom * 100:0} %";
@@ -96,6 +101,94 @@ public partial class AtelierPage
         // Der Greifrahmen rechnet in Punkten auf dem Element - beim Massstabwechsel
         // stimmt seine Umrechnung nicht mehr.
         ShowPlacement();
+    }
+
+    private void SetUpView() => ImageScroll.PreviewMouseWheel += OnViewportWheel;
+
+    /// <summary>
+    /// Das Mausrad zoomt - beim Verschieben und beim Pinsel, sonst nicht.
+    ///
+    /// Nur dort, weil es sonst anderem gehoert: ueber dem Graphen zoomt es den Graphen,
+    /// und beim Zuschneiden, Waehlen und bei der Pipette rollt es wie bisher den
+    /// Ausschnitt. Beim Pinsel stellt Strg + Rad den Abstand der Tupfer.
+    /// </summary>
+    private void OnViewportWheel(object sender, System.Windows.Input.MouseWheelEventArgs e)
+    {
+        if (_frame is null || _tool is not (AtelierTool.Move or AtelierTool.Brush)) return;
+
+        e.Handled = true;
+
+        if (_tool == AtelierTool.Brush &&
+            (System.Windows.Input.Keyboard.Modifiers & System.Windows.Input.ModifierKeys.Control) != 0)
+        {
+            StepBrushSpacing(e.Delta / 120.0);
+            return;
+        }
+
+        // Umschalt und Rad beim Pinsel: die Spitze drehen.
+        if (_tool == AtelierTool.Brush &&
+            (System.Windows.Input.Keyboard.Modifiers & System.Windows.Input.ModifierKeys.Shift) != 0)
+        {
+            Placement.StepAngle(e.Delta / 120.0);
+            return;
+        }
+
+        WheelZoom(e.GetPosition(Display), e.GetPosition(ImageScroll), e.Delta / 120.0);
+    }
+
+    /// <summary>
+    /// Zoomt um den Punkt unter dem Zeiger: Der Bildpunkt, auf den er zeigt, steht nach
+    /// dem Schritt wieder unter ihm.
+    ///
+    /// Beim Herauszoomen rastet es an der Einpassung ein und zeigt das Bild wieder
+    /// eingepasst und mittig - dieselbe Ansicht wie nach dem Oeffnen, nicht ein Bild,
+    /// das zufaellig fast so gross ist und irgendwo liegt.
+    /// </summary>
+    /// <param name="onDisplay">Der Zeiger auf dem Bildelement.</param>
+    /// <param name="inView">Derselbe Zeiger im sichtbaren Ausschnitt.</param>
+    internal void WheelZoom(System.Windows.Point onDisplay, System.Windows.Point inView, double notches)
+    {
+        var frame = _frame;
+        if (frame is null) return;
+
+        double fit = FitScale();
+        if (fit <= 0) return;
+
+        double current = _zoom == 0 ? fit : _zoom;
+        double next = ZoomSteps.Next(current, notches, fit);
+
+        if (next <= fit * (1 + 1e-9))
+        {
+            if (_zoom == 0) return;
+
+            _zoom = 0;
+            ApplyZoom();
+            return;
+        }
+
+        if (Math.Abs(next - current) < 1e-9) return;
+
+        // Der Bildpunkt unter dem Zeiger, ungerundet - gerundet wanderte das Bild bei
+        // starkem Zoom um bis zu einen Bildpunkt je Schritt.
+        ImageHit.Exact(onDisplay.X, onDisplay.Y, Display.ActualWidth, Display.ActualHeight,
+                       frame.Width, frame.Height, Display.Stretch == System.Windows.Media.Stretch.Uniform,
+                       out double u, out double v);
+
+        _zoom = next;
+        ApplyZoom();
+
+        ImageScroll.UpdateLayout();
+        ImageScroll.ScrollToHorizontalOffset(u * next - inView.X);
+        ImageScroll.ScrollToVerticalOffset(v * next - inView.Y);
+    }
+
+    /// <summary>Der Massstab des eingepassten Bildes - so wie das Bildelement es beim Einpassen zeigt.</summary>
+    private double FitScale()
+    {
+        var frame = _frame;
+        if (frame is null || frame.Width <= 0 || frame.Height <= 0) return 0;
+
+        return Math.Min(ImageScroll.ActualWidth / frame.Width, ImageScroll.ActualHeight / frame.Height);
     }
 
     /// <summary>

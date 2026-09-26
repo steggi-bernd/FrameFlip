@@ -7,6 +7,11 @@ die laufende, noch uncommittete Arbeit an Farbbereichsmasken. Der Name im Code
 und in der Navigation ist weiterhin **Atelier**. Alle Arbeitspakete unten sind
 **geplant**, nicht in dieser Dokumentationsänderung implementiert oder getestet.
 
+**Vorgezogen am 25. September:** S0–S2 kommen vor den übrigen Schnitten, weil
+Projektzustand, Autosave und Maskenverlauf darauf aufbauen
+([Projekte, Masken und Autosave](Projekte-und-Masken.md)). S3–S6 bleiben zurückgestellt.
+Vor dem Einstieg die Befunde unten gegen den aktuellen Stand prüfen.
+
 **Zurückgestellt nach Nutzerentscheidung vom 20. September:** Dieser Bereich
 wird erst nach den übrigen Refactoring-Schritten bearbeitet. D2, D1 und der
 übrige Gesamtplan hängen nicht von S0 ab. Vor dem späteren Einstieg die
@@ -113,6 +118,39 @@ behobene oder noch offene Befunde und dokumentierte Ergebnisse beider vorhandene
 Desktop-Prüfreihen. Keine historische Zusicherungszahl als aktuellen Nachweis
 übernehmen. Sicherheits-/Verhaltenskorrekturen bleiben eigene Änderungen.
 
+### Stand S0 (25. September 2026)
+
+Auf `refactor/studio-s0`, aufgebaut auf `feature/atelier` bei `bbe0e49`, **implementiert,
+geprüft und am 26. September in `feature/atelier` gemergt** (#26, `94645dc`), noch nicht
+in `main`:
+
+1. **Maskenkennungen:** Die Zählung vom 18. bis 20. September (5 = Cryptomatte,
+   6 = Painted) hat `main` nie erreicht. Das Atelier kam erst am 24. September mit
+   PR #23, schon mit Colour = 5, Cryptomatte = 6, Painted = 7. Eine Migration entfällt
+   deshalb. `PersistedEnumInvariants` schreibt die Zahlen aller 17 Aufzählungen fest,
+   die von `AppSettings` aus gespeichert werden, einschließlich der abgeleiteten
+   Werkzeugtypen. Angehängte Werte sind erlaubt, verschobene machen die Probe rot
+   (Gegenprobe: ein eingefügter Wert vor Cryptomatte). Eine Altdatei prüft die
+   Bedeutung von 5, 6 und 7 nach Laden und erneutem Speichern. Offen und bewusst nicht
+   geändert: `config.json` schreibt weiter Zahlen. Die Projektdatei aus
+   [Projekte und Masken](Projekte-und-Masken.md) soll Namen schreiben.
+2. **Bildnummer im Export:** bestätigt und behoben (`fix:`). `LayeredFrameLoader.LoadAll`
+   setzte den Stapel ohne Nummer zusammen, also las jedes Bild die Maske von Bild 0. Eine
+   entsperrte gemalte Maske fand keinen Anstrich, und die Ebene wirkte überall. Der
+   Knotenweg gab die Nummer schon weiter. `ExportFrameNumberInvariants` exportiert zwei
+   gleiche Bilder mit links bzw. rechts gemalter Maske; der Stapelfall war vor der
+   Korrektur rot.
+3. **Überholte Öffnungen:** bestätigt und behoben (`fix:`). Ein langsames A nach einem
+   schnellen B zeigte A, hielt B für offen und merkte sich A für den nächsten Start. Jedes
+   Öffnen trägt jetzt eine Nummer. Hauptlesen, Pass-Nachladen und beide
+   Miniaturwege verwerfen Rückgaben eines abgelösten Öffnens, auch bei A → B → A. Eine
+   Lesenaht (`AtelierPage.Reader`) lässt die Probe das erste Lesen anhalten. Beide Fälle
+   waren vor der Korrektur rot.
+
+Abnahme: **4.550 Zusicherungen** in `FrameFlip.Tests` (ein Gesamtlauf, 105 Sekunden, Release).
+`FrameFlip.UiTests` läuft in der CI des PR. Nicht Teil von S0 und weiter offen: fehlende
+oder defekte Bilder und Lesefehler als eigene Abnahmefälle, sie gehören zu S1.
+
 ## S1: Öffnung und Lebenszyklus herauslösen
 
 **Nach S0; erster struktureller Studio-Schnitt.** Ausgangspunkte:
@@ -136,6 +174,28 @@ werden freigegeben. Aus-/Einblenden einer weiterhin vorhandenen Ebene bleibt ohn
 unnötiges Neulesen möglich. Rezept und Auswahl überstehen einen Seitenwechsel.
 Ressourcenpolitik beim Verbergen und Exportbesitz werden in S3/S4 vervollständigt.
 
+### Stand S1, erster Teil (25. September 2026)
+
+Auf `refactor/studio-s1-open`, aufgebaut auf `refactor/studio-s0`, **implementiert,
+geprüft und am 26. September in `feature/atelier` gemergt** (#27, `799edfa`), noch nicht
+in `main`: die Hauptbild-Öffnung.
+
+- `FrameFlip/Atelier/AtelierSourceSession` besitzt die laufende Anfrage, ihre Nummer,
+  das Lesen im Hintergrund und die Zustellung auf den Oberflächenfaden. Zugestellt wird
+  nur, was noch gilt. Ein Lesefehler kommt als unlesbares Bild an. Pass-Nachladen und
+  Miniaturen fragen die Sitzung, ob ihr Öffnen noch gilt.
+- Anzeigen, Werkzeuge, Rezept und der Vorrat gelesener Quellen bleiben bei der Seite.
+- Charakterisierung vorher (`AtelierOpenInvariants`): lesbar, unlesbar (Hinweis, leere
+  Fläche, nicht gemerkt), Lesefehler als Ausnahme, erneutes Öffnen nach einem Fehler.
+  Dazu die Rennen aus S0. Beide liefen vor und nach der Auslagerung unverändert grün.
+  `AtelierSourceSessionInvariants` prüft die Sitzung ohne Fenster: neueres Öffnen,
+  A → B → A, Lesefehler, Nummern und das Ende.
+
+Abnahme: **4.561 Zusicherungen** in `FrameFlip.Tests` (Release). Offen für die weiteren
+Teile von S1: Pass- und Bildquellen samt Vorrat in die Sitzung, Miniaturen, und der
+Endpfad am Hauptfenster. Die Sitzung wird heute nie beendet, daher liefert ein
+Schließen bei laufendem Lesen weiter eine späte Rückgabe an die Seite.
+
 ## S2: Rezept, Auswahl und Speichern trennen
 
 **Nach S0; Integration nach S1.** Zuerst `Bind`, `Snapshot`, `OnToolsChanged`
@@ -156,6 +216,34 @@ Speichern/Neuladen erhält Reihenfolge, Mischraum, Schnittmasken, Platzierung,
 Datei-/Sequenzbezüge und pro Bild gespeicherte Anstriche. Die Auswahl allein
 ändert weder Bild noch Histogramm. Ein konsistenter Änderungsweg kann später
 Undo tragen; Undo selbst gehört nicht in diesen Refactoring-PR.
+
+### Stand S2, erster Teil (25. September 2026)
+
+Auf `refactor/studio-s2-editing`, aufgebaut auf `refactor/studio-s1-open`, **implementiert,
+geprüft und am 26. September in `feature/atelier` gemergt** (#28, `7245027`), noch nicht
+in `main`: Rezept und Speichern.
+
+- `FrameFlip/Atelier/AtelierEditingSession` besitzt das Rezept: Grundregler und
+  Werkzeuge des fertigen Bildes, Ebenenstapel, Graph. Die Seite las und schrieb diese
+  Felder an rund zwanzig Stellen direkt in `AppSettings`. Jetzt läuft jeder Zugriff über
+  die Sitzung. Sie meldet jede Änderung und weiß, ob seit dem letzten festgehaltenen
+  Stand etwas dazukam (`Dirty`, `Revision`, `MarkKept`).
+- `IAtelierRecipeStore` ist der schmale Adapter. `SettingsRecipeStore` schreibt in
+  dieselben Felder wie bisher, `config.json` bleibt unverändert. Die Projektablage je
+  Sequenz ([Projekte und Masken](Projekte-und-Masken.md), Phase C) wird eine zweite
+  Ablage hinter derselben Schnittstelle.
+- Beobachtet, nicht geändert: Die Grundregler des fertigen Bildes teilt sich das Atelier
+  mit dem Vorschaufenster (`AppSettings.Adjustments`). Ob sie je Projekt gelten sollen,
+  entscheidet die Projektablage.
+- Charakterisierung vorher (`AtelierRecipeInvariants`): wo das Rezept nach Öffnen, Regler
+  am Bild, Einstellungsebene, Rückwechsel und Umwandeln in Knoten steht und wann
+  geschrieben wird. Sie lief vor und nach dem Umbau unverändert grün, ebenso
+  `AtelierLayerInvariants`. `AtelierEditingSessionInvariants` prüft die Sitzung ohne
+  Fenster.
+
+Abnahme: **4.578 Zusicherungen** in `FrameFlip.Tests` (Release). Offen für den zweiten
+Teil: Bild und Ebene als ausdrückliche Bearbeitungsziele, unabhängige Export-Snapshots
+aus der Sitzung, die Abnahmefälle oben zu allen sechs Werkzeuglisten und den Anstrichen.
 
 ## S3: Exportauftrag und Frame-Kontext vereinheitlichen
 
