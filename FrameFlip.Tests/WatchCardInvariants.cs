@@ -30,6 +30,100 @@ public static class WatchCardInvariants
         ShowsWhatIsThere();
         TogglesThroughTheHost();
         TakesThePassword();
+        TheSettingsShowTheSameCard();
+        TheSettingsLayOut();
+    }
+
+    /// <summary>
+    /// Die Einstellungen nach Entwurf A: dieselbe Karte unter "Verbindungen", am selben Dienst,
+    /// mit derselben Zustimmung - und ohne Wirt gar nicht.
+    /// </summary>
+    private static void TheSettingsShowTheSameCard()
+    {
+        Check.Group("Zuschauerkarte: in den Einstellungen");
+
+        using (var host = new Host(terms: true))
+        {
+            var window = host.Open();
+
+            var key = WatchKey.Create("geheim1");
+            host.Settings.WatchEnabled = true;
+            host.Settings.WatchSecret = WatchStore.Protect(key);
+            host.Service = new WatchService(key, "relay.example", null, () => null, () => null);
+
+            window.ShowSettingsPage();
+            var editor = host.SettingsEditor();
+
+            Check.That(editor.Find<FrameworkElement>("WatchCardFrame").Visibility == Visibility.Visible &&
+                       editor.Find<ToggleButton>("WatchToggle").IsChecked == true &&
+                       editor.Find<QrCodeView>("WatchCode").Text == host.Service.Link &&
+                       editor.Find<TextBox>("WatchPass").Text == "geheim1",
+                       "unter Verbindungen: die Zuschauerkarte am selben Dienst - Code, Link und Kennwort wie im Dashboard");
+
+            editor.Find<ToggleButton>("WatchToggle").IsChecked = false;
+            Check.That(host.Applied.Count == 1 && !host.Applied[0].WatchEnabled, "ihr Schalter wirkt sofort, ueber denselben Wirt");
+
+            // Verwerfen baut die Seite neu - die Karte bleibt verbunden.
+            host.Pump();
+            editor.Find<Button>("CancelButton").RaiseEvent(new RoutedEventArgs(ButtonBase.ClickEvent));
+            var rebuilt = host.SettingsEditor();
+
+            Check.That(!ReferenceEquals(rebuilt.Control, editor.Control) &&
+                       rebuilt.Find<FrameworkElement>("WatchCardFrame").Visibility == Visibility.Visible,
+                       "nach Verwerfen ist die Karte am neuen Editor wieder da");
+        }
+
+        using (var host = new Host(terms: false))
+        {
+            var window = host.Open();
+            window.ShowSettingsPage();
+            var editor = host.SettingsEditor();
+
+            editor.Find<ToggleButton>("WatchToggle").IsChecked = true;
+            Check.That(host.Applied.Count == 0 && editor.Find<ToggleButton>("WatchToggle").IsChecked == false &&
+                       ((FrameworkElement)window.FindName("TermsHost")).Visibility == Visibility.Visible,
+                       "ohne Zustimmung fragt auch hier zuerst die Tafel des Hauptfensters");
+        }
+
+        // Ein Editor ohne Wirt - etwa ausserhalb des Hauptfensters - kennt keinen Dienst.
+        var alone = new SettingsEditor(new AppSettings(), _ => null, () => null);
+        Check.That(((FrameworkElement)alone.FindName("WatchCardFrame")).Visibility == Visibility.Collapsed &&
+                   ((System.Windows.Controls.Primitives.UniformGrid)alone.FindName("ConnectionCards")).Columns == 1,
+                   "ohne Wirt: keine Zuschauerkarte, die Kopplung allein");
+        alone.Dispose();
+    }
+
+    /// <summary>Die Leiste links, bei schmaler Seite oben; die Karten nebeneinander, wenn sie Platz haben.</summary>
+    private static void TheSettingsLayOut()
+    {
+        Check.Group("Einstellungen: Leiste und Karten");
+
+        var editor = new SettingsEditor(new AppSettings(), _ => null, () => null);
+        editor.ConnectWatch(() => null, null, null, then => then(), _ => { });
+
+        var tabs = (TabControl)editor.FindName("Tabs");
+        var cards = (System.Windows.Controls.Primitives.UniformGrid)editor.FindName("ConnectionCards");
+
+        void Size(double width)
+        {
+            editor.Measure(new System.Windows.Size(width, 800));
+            editor.Arrange(new Rect(0, 0, width, 800));
+            editor.UpdateLayout();
+            Dispatcher.CurrentDispatcher.Invoke(() => { }, DispatcherPriority.Background);
+            editor.UpdateLayout();
+        }
+
+        tabs.SelectedIndex = 3;
+        Size(1200);
+        Check.That(tabs.Tag is null && cards.Columns == 2, "breit: Leiste links, die zwei Karten nebeneinander", $"{tabs.Tag}, {cards.Columns}");
+
+        Size(500);
+        Check.That(Equals(tabs.Tag, "Narrow") && cards.Columns == 1, "schmal: Leiste oben, die Karten untereinander", $"{tabs.Tag}, {cards.Columns}");
+
+        Check.That(tabs.Items.Count == 6 && ((TabItem)tabs.Items[3]).Header is string header && header == T("S_TabConnections"),
+                   "sechs Abschnitte, der vierte heisst Verbindungen");
+
+        editor.Dispose();
     }
 
     /// <summary>Aus, an ohne Dienst, an mit Dienst - je ein eigenes Bild.</summary>
@@ -149,6 +243,12 @@ public static class WatchCardInvariants
 
     private static string Label(Button button) => (button.Content as TextBlock)?.Text ?? "";
 
+    /// <summary>Ein Stueck Oberflaeche mit eigenem Namensraum.</summary>
+    private sealed record Part(FrameworkElement Control)
+    {
+        internal T Find<T>(string name) where T : class => (T)Control.FindName(name);
+    }
+
     /// <summary>Ein Hauptfenster mit einem Wirt, der mitschreibt.</summary>
     private sealed class Host : IDisposable
     {
@@ -192,6 +292,14 @@ public static class WatchCardInvariants
         internal List<Button> Actions => ((Panel)_window!.FindName("WatchActions")).Children.OfType<Button>().ToList();
 
         internal string Text(string name) => ((TextBlock)_window!.FindName(name)).Text;
+
+        /// <summary>Der Editor der Einstellungsseite, die gerade im Hauptfenster steht.</summary>
+        internal Part SettingsEditor()
+        {
+            Pump();
+            var page = (SettingsPage)((ContentControl)_window!.FindName("PageContent")).Content;
+            return new Part((FrameworkElement)((ContentControl)page.FindName("EditorHost")).Content);
+        }
 
         /// <summary>Was ein Schild zeigen soll - es tippt sich ein, die Absicht steht in Track.Text.</summary>
         internal string? Tracked(string name) => FrameFlip.Views.Track.GetText((TextBlock)_window!.FindName(name));

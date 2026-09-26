@@ -245,6 +245,32 @@ Karten nebeneinander. Die Seite liegt in `SettingsEditor.xaml` mit `SettingGroup
 Die zwei QR-Codes sind die App-Kopplung (heute in den Einstellungen) und die
 Zuschauerseite (heute nur im Dashboard). Vor dem Umbau `ui/shell-overhaul` abgleichen.
 
+*Umgesetzt (26. September, Phase E):*
+
+- **Abgleich mit `ui/shell-overhaul`:** Der Zweig ist weitgehend überholt.
+  Titelleiste, Bedienskalierung und ziehbare Aufteilung kamen über „Das Dashboard wird
+  die Hauptoberfläche“ schon in `feature/atelier`. Die Einstellungen berührt er nur mit
+  einer Stilzeile für die Fensterschale. Übrig ist allein der Fensterstil für Dialoge,
+  und der hat mit dieser Seite nichts zu tun.
+- **Vorbereitung (`refactor/watch-card`):** Die Logik der Zuschauerkarte zog aus dem
+  Hauptfenster in `WatchCard`, mit Charakterisierung vorher. So zeigen Dashboard und
+  Einstellungen dieselbe Karte ohne zweite Kopie.
+- **Seite (`feature/einstellungen`):**
+  - Die Abschnitte stehen als Leiste links, der Inhalt steht mittig daneben, höchstens
+    760 Punkte breit, mit Titel und Untertitel. Bei schmaler Seite rückt die Leiste
+    nach oben.
+  - „Fernsteuerung“ heißt jetzt „Verbindungen“. Oben stehen zwei gleichwertige Karten,
+    App koppeln und Zuschauerseite, nebeneinander oder bei wenig Platz untereinander.
+    Darunter folgen Relay-Server, Fernsteuerung und Bibliothek.
+  - Der Schalter der Zuschauerseite wirkt sofort, wie im Dashboard, und fragt vorher
+    nach der Zustimmung. „Übernehmen“ geht vom neuesten Stand aus und dreht ihn nicht
+    zurück.
+  - Gruppenüberschriften, die nur den Seitentitel wiederholten, sind entfallen.
+
+Offen: Die Seite „Arbeitsbereich“ hat ihre eigene Einleitung und eine Gruppe gleichen
+Namens. Sie bleibt, wie sie war, weil das Panel nur hier hängt und sein Umbau ein
+eigener Schritt wäre.
+
 ## 5. Reihenfolge
 
 Jede Phase besteht aus eigenen Zweigen und PRs. Für die Strukturteile gelten die Regeln
@@ -367,10 +393,14 @@ Entschieden beim Bauen, bitte prüfen:
   Versetzt rechnet das Malen dahinter wieder voll, weil der Knoten dann außerhalb des
   Ausschnitts liest.
 
+**Gemergt am 26. September:** Die Phasen B bis E sind in `feature/atelier`, noch nicht in
+`main`. Dazu gehören Studio S0–S2 (#26–#28), Projekte (#29), Masken (#30), `WatchCard`
+(#31) und die Einstellungen (#32). Phase A war schon vorher dort.
+
 Offen aus Phase D:
 
 - Die Maskenraster stehen weiter in der Projektdatei, nicht nach Inhalt in `.ffdata`
-  (3.4). Nur der Verlauf liegt dort.
+  (3.4). Nur der Verlauf liegt dort. **Ans Ende der Liste gestellt** (Entscheidung 7).
 - Befund, nicht geändert: Die UI-Testreihe merkt sich in ihren Testdaten die zuletzt
   geöffnete Folge (`sequences.json`). Ein zweiter Lauf in denselben Ausgabeordner beginnt
   deshalb mit geladener Folge und scheitert an „Playback controls wait for a loaded
@@ -390,3 +420,12 @@ Getroffen am 25. September 2026:
    behält ihre Maske. Damit fällt es mit Extract aus Punkt 4 zusammen.
 5. Masken-Funktionen **nur im Knotenmodus** (Empfehlung, ohne Widerspruch).
 6. **Einstellungen: Entwurf A** (Seitenleiste, zentrierter Inhalt, QR-Karten nebeneinander).
+
+Getroffen am 26. September 2026:
+
+7. **Das Auslagern der Maskenraster (3.4) kommt ans Ende der Liste.** Der Nutzen ist bei
+   den heutigen Größen klein. Das Risiko, dass Projekt und Raster auseinanderlaufen, ist
+   dagegen ein Datenverlust. Neu bewerten, wenn entsperrte Masken je Bild über lange
+   Folgen die Projektdateien groß machen.
+8. **`main` erst nach dem Ausprobieren.** Die Phasen gehen zuerst nach `feature/atelier`.
+   #25 (nach `main`) folgt, wenn der vereinte Stand an echten Projekten erprobt ist.

@@ -228,6 +228,13 @@ internal sealed class WatchCard
         Dispatcher.BeginInvoke(new Action(Refresh), DispatcherPriority.Background);
     }
 
+    /// <summary>
+    /// Meldet sich beim Dienst ab - eine Seite, die gerade nicht zu sehen ist, braucht
+    /// nicht zu erfahren, wer kommt und geht. Das naechste <see cref="Refresh"/> meldet
+    /// sie wieder an.
+    /// </summary>
+    public void Detach() => Follow(null);
+
     /// <summary>Enter im Kennwortfeld.</summary>
     public void PassKey(KeyEventArgs e)
     {

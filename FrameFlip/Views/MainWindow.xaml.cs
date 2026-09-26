@@ -490,7 +490,7 @@ public partial class MainWindow : Window
         {
             "projects" => new ProjectsPage(OpenFromProjects),
             "atelier" => Atelier(),
-            _ => _settingsPage ??= new SettingsPage(_getSettings, _apply, _remoteState, _layout),
+            _ => _settingsPage ??= CreateSettingsPage(),
         };
 
         if (key == "atelier" && !_openingInAtelier) FollowDashboardIntoAtelier(_atelierPage!);
@@ -560,6 +560,17 @@ public partial class MainWindow : Window
     private static bool SameFolder(string a, string b)
         => a.Length > 0 && b.Length > 0 &&
            string.Equals(Path.GetFullPath(a).TrimEnd('\\', '/'), Path.GetFullPath(b).TrimEnd('\\', '/'), StringComparison.OrdinalIgnoreCase);
+
+    /// <summary>
+    /// Die Einstellungsseite - mit der Karte der Zuschauerseite am selben Dienst, derselben
+    /// Zustimmung und demselben Protokoll wie die Kopplungstafel.
+    /// </summary>
+    private SettingsPage CreateSettingsPage()
+    {
+        var page = new SettingsPage(_getSettings, _apply, _remoteState, _layout);
+        page.ConnectWatch(_watch, _renewWatch, _setWatchCode, then => AskTerms(then), Note);
+        return page;
+    }
 
     /// <summary>
     /// Von aussen auf die Einstellungen schalten - der Weg, den AppHost geht, wenn
