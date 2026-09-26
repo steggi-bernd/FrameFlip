@@ -611,8 +611,8 @@ Only the alpha channel of exports changes, and only in those cases.
     - **Layer list:** free masks get a section "Masks" below the layers, with the same menu
       as on the node plus show in graph and delete.
     - **Mask history** (`MaskHistory`, `MaskHistoryKeeper`): every stroke is recorded on
-      release. A new state appears once a tenth of the mask's cells differ from the last
-      state; the same spot painted ten times counts once. At most 20 states. Every fifth
+      release. A new state appears once 1 % of the mask's cells differ from the last
+      state (a tenth at first; finer on request); the same spot painted ten times counts once. At most 20 states. Every fifth
       state is a snapshot, the others hold only their strokes, which are replayed from the
       snapshot before. On recording, the stroke is replayed on the previous mask and
       compared: if the mask changed any other way (undo, restore, a stroke in the stack),
@@ -621,6 +621,10 @@ Only the alpha channel of exports changes, and only in those cases.
       written in the background when a state appears. "Mask history ..." lists the states
       with small pictures; a click restores one as a single undo step. What changed since
       the last state is kept as a state first. Recording costs 0.9 ms on release at 4K.
+      The history is also reached from the context menu of a layer in the layer list
+      (with the other handles of its mask) and from a button in the brush panel. Since
+      almost every stroke now makes a state, the history is turned into text on the
+      background writer; states never change after they are made, so a list copy suffices.
 
     - **Moving the cut-out** (same day): `CutoutNode` has a placement of its own. The mask
       selects at the old spot, and what it selected moves; the original stays underneath.
