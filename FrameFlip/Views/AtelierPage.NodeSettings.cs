@@ -193,11 +193,25 @@ public partial class AtelierPage
     }
 
     /// <summary>Wo der gewaehlte Knoten platziert - oder null, wenn er nichts platziert.</summary>
-    private (LayerTransform Place, FloatFrame Source)? NodePlacement(Node? node) => node switch
+    private (LayerTransform Place, FloatFrame Source)? NodePlacement(Node? node) => Placed(node) switch
     {
         PlaceNode place when SourceInto(place, "Bild") is { } source => (place.Place, source),
         OverlayNode overlay when SourceInto(overlay, "Ebene") is { } source => (overlay.Place, source),
+
+        // Ein ausgeschnittenes Stueck ist so gross wie die Leinwand.
+        CutoutNode cutout when _frame is not null => (cutout.Place, _frame),
         _ => null,
+    };
+
+    /// <summary>
+    /// Der Knoten, den der Rahmen bewegt: der gewaehlte selbst - oder bei einer
+    /// ausgeschnittenen Ebene, deren Mischen gewaehlt ist, ihr Ausschneiden. Wer eine
+    /// Ebene waehlt und zieht, will sie verschieben, nicht erst ihren Knoten suchen.
+    /// </summary>
+    private Node? Placed(Node? node) => node switch
+    {
+        MixNode mix when _graph?.Into(mix.Id, "Oben") is { } over && _graph.Find(over.From) is CutoutNode cutout => cutout,
+        _ => node,
     };
 
     /// <summary>Der Greifrahmen im Knotenmodus - am gewaehlten Platzieren- oder Obenauf-Knoten.</summary>
@@ -315,10 +329,11 @@ public partial class AtelierPage
     /// <summary>Am Rahmen wurde gezogen - im Knotenmodus bekommt der Knoten die neue Lage.</summary>
     private void OnNodePlacementDragged(LayerTransform place, bool interim)
     {
-        switch (_placingNode ?? NodeView.Selected)
+        switch (Placed(_placingNode ?? NodeView.Selected))
         {
             case PlaceNode node: node.Place = place; break;
             case OverlayNode node: node.Place = place; break;
+            case CutoutNode node: node.Place = place; break;
             default: return;
         }
 

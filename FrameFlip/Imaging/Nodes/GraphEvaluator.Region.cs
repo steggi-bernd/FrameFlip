@@ -91,9 +91,13 @@ public static partial class GraphEvaluator
                                 tools.Local.Count == 0 && tools.Frame.Count == 0 &&
                                 tools.Geometry.Count == 0 && tools.Data.Count == 0,
 
+        // Ein versetztes Ausschneiden liest sein Stueck an der alten Stelle - ausserhalb des
+        // Ausschnitts. Unversetzt rechnet es jeden Punkt allein.
+        CutoutNode cutout => cutout.Place.IsNeutral,
+
         // OpticsNode: siehe IOpticsTool - dieselbe Rechnung an jedem Punkt, nur mit seinem
         // Ort und der Bildnummer.
-        RenderNode or PictureNode or BlackNode or PlaceNode or ExposureTintNode or MaskNode or RestrictNode or CutoutNode
+        RenderNode or PictureNode or BlackNode or PlaceNode or ExposureTintNode or MaskNode or RestrictNode
             or MixNode or FallbackNode or LightNode or PointToolNode or OpticsNode or ViewNode or ToneNode
             or MaskMathNode or MapRangeNode or ColorRampNode or OutputNode => true,
 

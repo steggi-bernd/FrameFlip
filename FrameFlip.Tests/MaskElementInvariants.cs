@@ -34,6 +34,7 @@ public static class MaskElementInvariants
         TheCutoutKeepsThePicture();
         TheCutoutIsALayerOfItsOwn();
         TheCutoutPaintsInRegions();
+        TheCutoutMoves();
         MasksKeepTheirId();
         TheGraphShowsMasks();
         ThePageHandlesMasks();
@@ -224,6 +225,61 @@ public static class MaskElementInvariants
         Check.That(all, "und ist Byte fuer Byte das ganze Bild");
     }
 
+    /// <summary>
+    /// Das ausgeschnittene Stueck versetzt: Was die Maske waehlt, steht Byte fuer Byte an der
+    /// neuen Stelle, und darunter bleibt das Original. Ein versetztes Stueck liest ausserhalb
+    /// des Ausschnitts - die Rechnung beim Malen lehnt es ab.
+    /// </summary>
+    private static void TheCutoutMoves()
+    {
+        Check.Group("Masken: das ausgeschnittene Stueck verschieben");
+
+        var sources = Sources();
+        var graph = Graph(BlendMode.Normal);
+        var mask = graph.Nodes.OfType<MaskNode>().Single(m => m.Mask.Kind == MaskKind.Painted);
+        var layer = LayerOf(graph, mask);
+
+        // Ein harter, voller Fleck links: Dort deckt die Maske ganz.
+        var paint = mask.Mask.PaintOn(0, Width, Height);
+        var dab = new PaintStroke { Radius = 24, Flow = 1f, Hardness = 1f };
+        dab.Begin(paint, 50, 80);
+        paint.Keep();
+
+        var (cutout, _) = LayerEdits.AddCutout(graph, layer, layer, "Bild", mask, "Maske")!.Value;
+        byte[] before = Render(graph, sources);
+
+        Check.That(GraphEvaluator.RegionSafe(cutout), "unversetzt rechnet das Ausschneiden jeden Punkt allein");
+
+        // Ein Viertel der Breite nach rechts - bei 240 Punkten genau 60.
+        cutout.Place = new LayerTransform { OffsetX = 0.25f };
+        byte[] after = Render(graph, sources);
+
+        bool landed = true, stayed = true, rest = true;
+
+        for (int y = 70; y <= 90; y++)
+        {
+            for (int x = 40; x <= 60; x++)
+            {
+                int from = (y * Width + x) * 4, to = (y * Width + x + 60) * 4;
+
+                landed &= after.AsSpan(to, 4).SequenceEqual(before.AsSpan(from, 4));
+                stayed &= after.AsSpan(from, 4).SequenceEqual(before.AsSpan(from, 4));
+            }
+        }
+
+        for (int y = 0; y < Height; y++)
+            for (int x = 180; x < Width; x++)
+                rest &= after.AsSpan((y * Width + x) * 4, 4).SequenceEqual(before.AsSpan((y * Width + x) * 4, 4));
+
+        Check.That(landed, "was die Maske waehlt, steht Byte fuer Byte 60 Punkte weiter rechts");
+        Check.That(stayed, "an der alten Stelle bleibt das Original");
+        Check.That(rest, "wohin nichts versetzt wurde, bleibt alles");
+        Check.That(!GraphEvaluator.RegionSafe(cutout), "versetzt liest es ausserhalb des Ausschnitts - beim Malen wird voll gerechnet");
+
+        var loaded = NodeGraph.Load(graph.Save())!.Nodes.OfType<CutoutNode>().Single();
+        Check.That(Math.Abs(loaded.Place.OffsetX - 0.25f) < 1e-6, "die Lage ueberlebt Speichern und Laden");
+    }
+
     /// <summary>Die Kennung einer Maske: vergeben, wenn jemand fragt, beim Kopieren behalten, beim Speichern auch.</summary>
     private static void MasksKeepTheirId()
     {
@@ -334,6 +390,31 @@ public static class MaskElementInvariants
                        graph.Into(cut.Id, "Unten")?.From == layer.Id && page.LayersOf(mask).Contains(layer) && undo.Count == steps + 1,
                        "Ausschneiden: eine neue Ebene direkt ueber der der Maske, die ihre Maske behaelt - ein Schritt im Verlauf");
             Check.That(before.Length > 0 && before.AsSpan().SequenceEqual(after), "und das Bild bleibt, wie es war", Differences(before, after));
+
+            // Verschieben: die neue Ebene gewaehlt, der Rahmen zieht ihr Stueck.
+            var tools = (ToolColumn)page.FindName("MouseTools");
+            tools.Select(AtelierTool.Move, notify: true);
+            ((NodeEditor)page.FindName("NodeView")).Select(cut);
+            Pump(TimeSpan.FromSeconds(0.2), () => false);
+
+            var placing = typeof(AtelierPage).GetField("_placingNode", flags)!.GetValue(page);
+            int beforeMove = undo.Count;
+
+            typeof(AtelierPage).GetMethod("OnNodePlacementDragged", flags)!
+                .Invoke(page, new object[] { new LayerTransform { OffsetX = 0.1f }, false });
+
+            var cutout = graph.Nodes.OfType<CutoutNode>().Single();
+            byte[] moved = Shown();
+
+            Check.That(ReferenceEquals(placing, cut) && Math.Abs(cutout.Place.OffsetX - 0.1f) < 1e-6 && undo.Count == beforeMove + 1,
+                       "mit gewaehlter Ebene zieht der Rahmen ihr Stueck - ein Schritt im Verlauf");
+            Check.That(!moved.AsSpan().SequenceEqual(after), "das Bild zeigt das Stueck an der neuen Stelle");
+
+            page.StepNodes(back: true);
+            Check.That(page.Graph!.Nodes.OfType<CutoutNode>().Single().Place.IsNeutral, "Rueckgaengig holt es zurueck");
+
+            tools.Select(AtelierTool.Nodes, notify: true);
+            Pump(TimeSpan.FromSeconds(0.2), () => false);
 
             page.StepNodes(back: true);
             Check.That(page.Graph!.Nodes.OfType<CutoutNode>().Count() == 0, "Rueckgaengig nimmt sie wieder weg");
