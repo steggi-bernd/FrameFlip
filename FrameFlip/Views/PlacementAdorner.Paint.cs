@@ -65,6 +65,37 @@ public sealed partial class PlacementAdorner
     /// <summary>Der Abstand zweier Tupfer als Anteil des Radius - siehe <see cref="PaintStroke.Spacing"/>.</summary>
     public float BrushSpacing { get; set; } = PaintStroke.DefaultSpacing;
 
+    /// <summary>Rund oder eckig.</summary>
+    public BrushShape BrushShape { get; set; } = BrushShape.Round;
+
+    /// <summary>Breite zu Hoehe der Spitze.</summary>
+    public float BrushAspect { get; set; } = 1f;
+
+    /// <summary>Der Winkel der Spitze in Grad.</summary>
+    public float BrushAngle { get; set; }
+
+    /// <summary>Der Winkel folgt dem Strich.</summary>
+    public bool BrushFollow { get; set; }
+
+    /// <summary>
+    /// Woran ein Strich gebunden wird, der an dieser Stelle des Bildes beginnt - die
+    /// gepackte Deckung eines Objekts, oder null fuer ungebunden. Beim Ansetzen gefragt.
+    /// </summary>
+    public Func<float, float, string?>? LimitWanted { get; set; }
+
+    /// <summary>
+    /// Umschalt und das Rad am Bild: dreht die Spitze in Schritten von 15 Grad. Die Regler
+    /// ziehen ueber <see cref="BrushAdjusted"/> nach.
+    /// </summary>
+    internal void StepAngle(double notches)
+    {
+        float angle = BrushAngle + (float)Math.Round(notches) * 15f;
+        BrushAngle = ((angle % 180f) + 180f) % 180f;
+
+        BrushAdjusted?.Invoke();
+        InvalidateVisual();
+    }
+
     /// <summary>Der zuletzt beendete Zug - fuer die Probe.</summary>
     internal PaintStroke? LastStroke { get; private set; }
 
@@ -348,8 +379,23 @@ public sealed partial class PlacementAdorner
         var at = Mouse.GetPosition(this);
         double radius = BrushRadius * ReachOnScreen;
 
-        context.DrawEllipse(null, Shadow, at, radius + 1, radius + 1);
-        context.DrawEllipse(null, new Pen(Ring, 1), at, radius, radius);
+        if (BrushShape == BrushShape.Round && BrushAspect <= 1f)
+        {
+            context.DrawEllipse(null, Shadow, at, radius + 1, radius + 1);
+            context.DrawEllipse(null, new Pen(Ring, 1), at, radius, radius);
+            return;
+        }
+
+        // Eckig oder gestreckt: der Umriss der Spitze, gedreht - so, wie sie auftraegt.
+        double halfW = radius, halfH = Math.Max(0.5, radius / Math.Max(1f, BrushAspect));
+        Geometry tip = BrushShape == BrushShape.Square
+            ? new RectangleGeometry(new Rect(at.X - halfW, at.Y - halfH, halfW * 2, halfH * 2))
+            : new EllipseGeometry(at, halfW, halfH);
+
+        tip.Transform = new RotateTransform(BrushAngle, at.X, at.Y);
+
+        context.DrawGeometry(null, Shadow, tip);
+        context.DrawGeometry(null, new Pen(Ring, 1), tip);
     }
 
     /// <summary>
@@ -543,6 +589,11 @@ public sealed partial class PlacementAdorner
             Opacity = BrushOpacity,
             Spacing = BrushSpacing,
             Erase = _erasing,
+            Shape = BrushShape,
+            Aspect = BrushAspect,
+            Angle = BrushAngle,
+            Follow = BrushFollow,
+            Limit = LimitWanted?.Invoke(x, y),
         };
 
         Touched(_stroke.Begin(_mask, x, y));
@@ -601,6 +652,13 @@ public sealed partial class PlacementAdorner
 
         _painting = false;
         ReleaseMouseCapture();
+
+        // Ein Klick ohne Bewegung mit einem Winkel, der dem Strich folgt: Sein Tupfer kommt jetzt.
+        if (_mask is not null && _stroke?.Finish(_mask) is { IsEmpty: false } last)
+        {
+            Touched(last);
+            Painted?.Invoke(true);
+        }
 
         LastStroke = _stroke;
         _stroke = null;

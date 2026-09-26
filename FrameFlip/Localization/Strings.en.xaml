@@ -1207,6 +1207,13 @@
     <sys:String x:Key="S_BrushFlow">Flow</sys:String>
     <sys:String x:Key="S_BrushOpacity">Opacity</sys:String>
     <sys:String x:Key="S_BrushSpacing">Spacing</sys:String>
+    <sys:String x:Key="S_BrushSquareHint">Square tip instead of round – gets cleanly into corners and along straight edges.</sys:String>
+    <sys:String x:Key="S_BrushAngle">Angle</sys:String>
+    <sys:String x:Key="S_BrushAngleHint">Rotation of the tip – on the picture also with Shift and the mouse wheel.</sys:String>
+    <sys:String x:Key="S_BrushAspect">Stretch</sys:String>
+    <sys:String x:Key="S_BrushAspectHint">Width to height of the tip. Round and stretched is an ellipse, square and stretched a rectangle.</sys:String>
+    <sys:String x:Key="S_BrushFollowHint">The angle follows the stroke – a flat tip turns into every curve like a broad nib.</sys:String>
+    <sys:String x:Key="S_BrushObjectHint">Paint only on the object the stroke starts on – from the file's Cryptomatte.</sys:String>
     <sys:String x:Key="S_BrushSpacingHint">How far apart the dabs of a stroke lie, measured against the radius. 25 % is a smooth stroke, at 200 % the dabs just touch, above that gaps appear. Ctrl and the mouse wheel over the picture set it too.</sys:String>
     <sys:String x:Key="S_BrushHint">Flow and opacity are not the same: one says how much a SINGLE stroke lays down, the other where even ten strokes stop. At opacity 0.3 the mask stays just under a third however often you go over it. Hold Alt to erase.</sys:String>
     <sys:String x:Key="S_ProjectSave">Save</sys:String>

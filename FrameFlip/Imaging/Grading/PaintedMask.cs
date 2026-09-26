@@ -157,15 +157,41 @@ public sealed class PaintedMask
     {
         if (_cover is null) return;
 
+        Data = Pack(_cover);
+        Kept = true;
+    }
+
+    /// <summary>Ein Feld von Deckungen gepackt und in Text gefasst - wie <see cref="Data"/>.</summary>
+    public static string Pack(byte[] cover)
+    {
         using var output = new MemoryStream();
 
         using (var pack = new DeflateStream(output, CompressionLevel.Optimal, leaveOpen: true))
         {
-            pack.Write(_cover, 0, _cover.Length);
+            pack.Write(cover, 0, cover.Length);
         }
 
-        Data = Convert.ToBase64String(output.ToArray());
-        Kept = true;
+        return Convert.ToBase64String(output.ToArray());
+    }
+
+    /// <summary>Entpackt ein Feld - oder null, wenn es nicht passt. Kein halbes Feld.</summary>
+    public static byte[]? Unpack(string data, int count)
+    {
+        try
+        {
+            using var input = new MemoryStream(Convert.FromBase64String(data));
+            using var unpack = new DeflateStream(input, CompressionMode.Decompress);
+            using var output = new MemoryStream();
+
+            unpack.CopyTo(output);
+
+            var bytes = output.ToArray();
+            return bytes.Length == count ? bytes : null;
+        }
+        catch (Exception e) when (e is FormatException or InvalidDataException)
+        {
+            return null;
+        }
     }
 
     /// <summary>
@@ -220,6 +246,92 @@ public sealed class PaintedMask
 
                 int at = y * Width + x;
                 float want = value * Math.Clamp(opacity, 0f, 1f) * 255f;
+
+                cover[at] = value > 0.5f
+                    ? (byte)MathF.Max(cover[at], cover[at] + (want - cover[at]) * strength)
+                    : (byte)MathF.Min(cover[at], cover[at] + (want - cover[at]) * strength);
+            }
+        }
+    }
+
+    /// <summary>
+    /// Ein Tupfer mit einer Pinselspitze: rund oder eckig, gestreckt, gedreht - und
+    /// wahlweise begrenzt durch ein Feld (<paramref name="limit"/>, gleich gross wie die
+    /// Maske), etwa die Deckung eines Objekts aus der Kryptomatte.
+    ///
+    /// Eine schlichte runde Spitze ohne Begrenzung nimmt den alten Weg
+    /// (<see cref="Stroke"/>) - Byte fuer Byte wie vorher, damit alte Striche im
+    /// Maskenverlauf genau so nachspielen, wie sie gemalt wurden.
+    ///
+    /// Der Abstand zur Kante wird im gedrehten Rahmen der Spitze gemessen: bei einer
+    /// runden Spitze als Ellipse, bei einer eckigen als Rechteck (der groessere der beiden
+    /// Achsenanteile). Er laeuft von 0 in der Mitte bis zum Radius am Rand, und darauf
+    /// wirkt die Haerte wie beim runden Pinsel.
+    /// </summary>
+    public void Stamp(float imageX, float imageY, float imageRadius, float value, float flow,
+                      float hardness, float opacity, in BrushTip tip, byte[]? limit)
+    {
+        if (tip.IsPlainRound && limit is null)
+        {
+            Stroke(imageX, imageY, imageRadius, value, flow, hardness, opacity);
+            return;
+        }
+
+        var cover = Cover();
+        Kept = false;
+
+        if (limit is not null && limit.Length != cover.Length) limit = null;
+
+        float cx = imageX / Coarse;
+        float cy = imageY / Coarse;
+        float radius = MathF.Max(0.75f, imageRadius / Coarse);
+
+        // Halbe Breite und Hoehe der Spitze; gestreckt wird die Hoehe schmaler.
+        float aspect = Math.Clamp(tip.Aspect, 1f, 16f);
+        float halfW = radius;
+        float halfH = MathF.Max(0.5f, radius / aspect);
+
+        // Ein gedrehtes Rechteck passt immer in den Kreis um seine Ecke.
+        float reach = MathF.Sqrt(halfW * halfW + halfH * halfH);
+
+        int x0 = Math.Max(0, (int)MathF.Floor(cx - reach));
+        int x1 = Math.Min(Width - 1, (int)MathF.Ceiling(cx + reach));
+        int y0 = Math.Max(0, (int)MathF.Floor(cy - reach));
+        int y1 = Math.Min(Height - 1, (int)MathF.Ceiling(cy + reach));
+
+        float radians = tip.Angle * MathF.PI / 180f;
+        float cos = MathF.Cos(radians), sin = MathF.Sin(radians);
+
+        float inner = radius * Math.Clamp(hardness, 0f, 1f);
+        float want = value * Math.Clamp(opacity, 0f, 1f) * 255f;
+
+        for (int y = y0; y <= y1; y++)
+        {
+            for (int x = x0; x <= x1; x++)
+            {
+                float dx = x + 0.5f - cx;
+                float dy = y + 0.5f - cy;
+
+                // In den Rahmen der Spitze gedreht.
+                float u = dx * cos + dy * sin;
+                float v = -dx * sin + dy * cos;
+
+                float nu = MathF.Abs(u) / halfW;
+                float nv = MathF.Abs(v) / halfH;
+
+                float away = (tip.Shape == BrushShape.Square ? MathF.Max(nu, nv) : MathF.Sqrt(nu * nu + nv * nv)) * radius;
+
+                if (away > radius) continue;
+
+                float edge = away <= inner
+                    ? 1f
+                    : 1f - (away - inner) / MathF.Max(1e-4f, radius - inner);
+
+                int at = y * Width + x;
+
+                float strength = Math.Clamp(edge * flow, 0f, 1f);
+                if (limit is not null) strength *= limit[at] / 255f;
+                if (strength <= 0f) continue;
 
                 cover[at] = value > 0.5f
                     ? (byte)MathF.Max(cover[at], cover[at] + (want - cover[at]) * strength)
