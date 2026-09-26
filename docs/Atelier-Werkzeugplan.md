@@ -32,8 +32,12 @@ Getroffen am 26. September 2026:
    ist, erkennt das Atelier selbst. Nur bei einer Folge steht am Ende der Werkzeugzeile
    ein unauffälliges Symbol: Filmstreifen für die ganze Folge, ein Bild für „nur dieses
    Bild“. Ein Ebenen-Symbol wird bewusst nicht verwendet, es wäre mit den Ebenen zu
-   verwechseln. Auf „nur dieses Bild“ umgestellt, wirken Änderungen nur auf das aktuelle
-   Bild der Folge (Abschnitt 3.2).
+   verwechseln.
+8. **„Nur dieses Bild“ löst das Bild heraus** (entschieden am 27. September 2026, statt
+   einer Ausnahme im Projekt der Folge). Im Quellordner entsteht ein Ordner mit dem Namen
+   des Bildes. Darin liegen eine Kopie des Originals, die FrameFlip-Daten (ein eigenes
+   Projekt, beginnend mit dem Stand der Folge) und später die Ausgabe. Die Folge bleibt,
+   wie sie ist.
 
 ## 2. Reihenfolge
 
@@ -102,22 +106,9 @@ Ganz rechts in der Werkzeugzeile steht dann ein kleines Symbol:
 
 Ist ein **Einzelbild** offen, fehlt das Symbol, denn es gibt nichts zu unterscheiden.
 
-„Nur dieses Bild“ heißt im Datenmodell: Die Änderung wird eine **Ausnahme für dieses
-Bild** im Projekt der Folge.
-
-- Für gemalte Masken gibt es das schon: Eine entsperrte Maske hält ihre Deckung je Bild
-  (`LayerMask.PaintFrames`).
-- Für alle anderen Einstellungen ist es neu. Es liegt nahe an den Schlüsselbildern aus
-  W9: Eine Ausnahme ist ein Schlüsselbild, das nur auf seinem eigenen Bild gilt, ohne
-  Übergang zu den Nachbarn.
-- Beides sollte deshalb **ein Modell** teilen. Die Ausnahme kommt mit Phase U, die
-  Übergänge mit W9.
-- Eine Ausnahme muss sichtbar sein: Ein Bild mit Ausnahmen trägt in der Folgeleiste eine
-  Marke, und die betroffenen Regler zeigen, dass sie hier vom Rest der Folge abweichen.
-
-Dafür bekommt jedes Werkzeug eine Beschreibung als Daten: Kategorie, Art im
-Knotensystem, Zeitverhalten, Zeichen und Suchwörter. Die Leiste, die Suche, der Hub im
-Knotenmodus und die Einstellungen lesen alle aus derselben Liste.
+„Nur dieses Bild“ löst das Bild heraus (Entscheidung 8): ein eigener Ordner im
+Quellordner mit Kopie, Projekt und Ausgabe. Eine Ausnahme im Projekt der Folge gibt es
+nicht. Die Schlüsselbilder aus W9 bekommen ihr eigenes Modell.
 
 ## 4. Pinsel (W1) im Einzelnen
 
@@ -273,13 +264,13 @@ der Kategorie „Malen“.
 In drei Schnitten:
 
 1. **U1 – Leiste und Katalog** (`feature/werkzeugleiste`): Kategorienband, Werkzeugzeile, Suche.
-2. **U2 – „nur dieses Bild“**: das Symbol am Ende der Werkzeugzeile und die Ausnahme je Bild
-   im Projekt der Folge (Entscheidung 7, Abschnitt 3.2).
+2. **U2 – „nur dieses Bild“**: das Symbol am Ende der Werkzeugzeile; das Bild wird ein eigenes
+   Einzelbild in einem Ordner im Quellordner (Entscheidungen 7 und 8).
 3. **U3 – Pinselleiste verschlanken**: Form, Winkel, Karo, Druck, Bindung, Flächen und Stempel
    stehen heute alle in einer Zeile. Was ein eigenes Werkzeug ist, wandert in die
    Werkzeugzeile; die Pinselleiste behält die Regler.
 
-**U1 (`feature/werkzeugleiste`):**
+**U1 (PR #48, gemergt):**
 
 - Unter der Kopfzeile stehen die Kategorien als Band: Auswahl, Malen, Tonwert, Farbe,
   Details, Optik, Licht, Glitch. Darunter die Werkzeuge der gewählten, rechts die Suche
@@ -299,6 +290,21 @@ In drei Schnitten:
 - Beim Bauen gefunden: Ein doppelter Schlüssel im Wörterbuch ließ es im Testlauf still nicht
   laden, alle Texte blieben Schlüssel. Die Probe prüft jetzt, dass jeder Name übersetzt
   ankommt.
+
+**U2 (`feature/nur-dieses-bild`):**
+
+- Am Ende der Werkzeugzeile steht bei einer Folge der Umschalter: Filmstreifen oder Bild,
+  als gezeichnete Zeichen. Bei einem gewöhnlichen Einzelbild erscheint er nicht.
+- **„Nur dieses Bild“** (`FrameDetach`):
+  - Im Quellordner entsteht ein Ordner mit dem Namen des Bildes (`render_0047/`). Darin
+    liegen die Kopie des Originals und ein eigenes Projekt, beginnend mit dem Stand der
+    Folge, samt Maskenverlauf.
+  - Projekt und Schnell-Exporte liegen wie immer im Ordner `FrameFlip` daneben.
+  - Gibt es das Einzelbild schon, wird es geöffnet, nicht überschrieben.
+  - Kopiert wird im Hintergrund und erst unter anderem Namen, damit eine halbe Kopie nie
+    als fertiges Bild dasteht.
+- **Zurück:** Das Einzelbild merkt sich seine Herkunft im Projekt (`Origin`). Der
+  Filmstreifen führt zurück auf das Bild der Folge, aus dem es kam.
 
 ## 5. KI-Werkzeuge: Last, Größe, Lizenz
 
