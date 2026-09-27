@@ -33,6 +33,7 @@ public static class SwitchLeftoverInvariants
         ObjectLimitReadsTheOpenFile();
         LevelsPickEndsWithTheImage();
         PreviewsBelongToTheProject();
+        ViewerEndsWithTheProject();
     }
 
     /// <summary>Ein Strich ueber die echten Tasten des Rahmens, nach einem Projektwechsel.</summary>
@@ -176,6 +177,40 @@ public static class SwitchLeftoverInvariants
             var left = ids.Where(id => previews.For(id) is not null).ToList();
             Check.That(left.Count == 0, "nach dem Wechsel steht keine Vorschau des alten Projekts mehr unter seinen Knotennamen",
                        string.Join(", ", left));
+        });
+    }
+
+    private static void ViewerEndsWithTheProject()
+    {
+        Check.Group("Wechsel: der Betrachter und sein Schild enden mit dem Projekt");
+
+        WithPage((page, root) =>
+        {
+            string first = Png(root, "eins", "render_0001.png");
+            string second = Png(root, "zwei", "shot_0001.png");
+            string third = Png(root, "drei", "take_0001.png");
+            var badge = (Border)page.FindName("ViewerBadge");
+
+            Show(page, first);
+            page.ConvertToNodes();
+            Pump(() => page.InNodes);
+            Show(page, second);
+            page.ConvertToNodes();
+            Pump(() => page.InNodes);
+
+            var file = page.Graph!.Nodes.OfType<RenderNode>().First();
+            page.SetViewer((file.Id, file.Outputs[0].Name));
+            Check.That(badge.Visibility == Visibility.Visible, "Vorbereitung: der Betrachter zeigt einen Knoten, das Schild steht da");
+
+            Show(page, first);
+            Check.That(page.InNodes && badge.Visibility != Visibility.Visible,
+                       "ein anderes Projekt mit Knoten: kein Schild eines Betrachters, den es nicht mehr gibt");
+
+            file = page.Graph!.Nodes.OfType<RenderNode>().First();
+            page.SetViewer((file.Id, file.Outputs[0].Name));
+            Show(page, third);
+            Check.That(!page.InNodes && badge.Visibility != Visibility.Visible,
+                       "ein Projekt ohne Knoten: ebenso");
         });
     }
 

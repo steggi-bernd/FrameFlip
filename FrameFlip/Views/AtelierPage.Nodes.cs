@@ -88,6 +88,9 @@ public partial class AtelierPage
         ShowPlacement();
         ShowNodeLayers();
         ShowMissingLayers();
+
+        // Ein neuer Graph hat keinen Betrachter - auch das Schild eines alten darf nicht bleiben.
+        ShowViewer();
     }
 
     /// <summary>Schreibt den Graphen in die Einstellungen.</summary>
