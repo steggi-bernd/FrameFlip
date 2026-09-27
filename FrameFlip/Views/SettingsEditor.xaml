@@ -370,10 +370,12 @@
                                     <TextBlock x:Name="RoomText" Margin="0,10,0,0" HorizontalAlignment="Center"
                                                Foreground="{StaticResource DesktopFaint}" FontSize="10"
                                                FontFamily="{StaticResource MonoFont}" />
+                                    <!-- Der Hinweis richtet sich nach dem Zustand (UpdatePairing): Er sagt
+                                         "abfotografieren", sobald ein Code dasteht, und sonst, was dazu
+                                         fehlt. Ein fester Satz darunter stand mit ihm doppelt da - und
+                                         ohne Code bat er darum, etwas abzufotografieren, das es nicht gab. -->
                                     <TextBlock x:Name="PairingHint" Margin="0,8,0,0" TextWrapping="Wrap" TextAlignment="Center"
                                                Foreground="{StaticResource DesktopMuted}" FontSize="11" />
-                                    <TextBlock Text="{DynamicResource S_ScanHint}" Margin="0,6,0,0" TextWrapping="Wrap"
-                                               TextAlignment="Center" Foreground="{StaticResource DesktopFaint}" FontSize="10.5" />
 
                                     <WrapPanel Margin="0,14,0,0" HorizontalAlignment="Center">
                                         <Button x:Name="CopyLinkButton" Style="{StaticResource DesktopButton}"
