@@ -338,8 +338,9 @@ In drei Schnitten:
 Der Rahmen nach Entscheidung 9, in vier Schnitten:
 
 1. **R1 – Rahmen** (`feature/atelier-rahmen`): wo was steht.
-2. **R2 – Einstellungsleiste und Zeichen:** die Einstellungen in beschrifteten Gruppen;
-   Zeichen aus Tabler Icons (MIT) für Chips und Werkzeugleiste. Das Knotensymbol bleibt.
+2. **R2 – Einstellungsleiste und Zeichen** (`feature/einstellungsleiste`): die Einstellungen
+   in beschrifteten Gruppen; gezeichnete Zeichen nach dem Vorbild von Tabler Icons für Chips
+   und Werkzeugleiste. Das Knotensymbol bleibt.
 3. **R3 – Ebenen:**
    - Zeilen wie heute, die Vorschau etwas kleiner.
    - Rechts in der Zeile Chips für Effekte und Maske, unten „+ Ebene“, „Einstellung“ und
@@ -371,7 +372,34 @@ Der Rahmen nach Entscheidung 9, in vier Schnitten:
   waren nie zu sehen. Die Probe prüfte nur den Schalter der Gruppe, jetzt prüft sie, ob
   die Regler wirklich zu sehen sind.
 
-Danach R2 bis R4, dann laut Reihenfolge W2 Tonwert.
+**R2 (`feature/einstellungsleiste`):**
+
+- Die Leiste des Pinsels steht in Gruppen wie im Entwurf, jede mit einem feinen Strich davor
+  und ihrem Namen klein vorn:
+  - **Spitze:** rund oder eckig, Größe, Härte. Beim Stempel statt rund oder eckig seine
+    Spitze, Zufall und Streuung.
+  - **Form:** Winkel, Streckung, Karo (nur eckig), „folgt dem Strich“.
+  - **Auftrag:** Stärke, Deckkraft, Abstand.
+  - **Bindung:** Objekt oder Fläche, mit der Toleranz nur bei der Fläche.
+  - **Druck:** worauf der Druck des Stifts wirkt.
+- Umgebrochen wird nur zwischen Gruppen. Breit stehen oben Spitze und Form, darunter
+  Auftrag, Bindung und Druck. Beim Füllen (Rechteck, Ellipse, Lasso) bleibt eine Zeile mit
+  Deckkraft und Bindung.
+- **Zeichen:** Umrisse auf einem Raster von 24 mit runden Enden, nach dem Vorbild von Tabler
+  Icons, selbst gezeichnet (`Icons`, `IconLabel`). Sie übernehmen die Farbe ihres Knopfs.
+  - Verwendet für die Chips der Leiste, die Werkzeuge der Zeile „Malen“ und „Bild öffnen“.
+  - Die übrigen Werkzeuge behalten ihr Schriftzeichen, bis ihre Phase sie anfasst.
+  - Das Knotensymbol der Spalte links bleibt.
+- Proben:
+  - Jedes Zeichen ist lesbar und bleibt im Raster.
+  - Jedes Werkzeug unter „Malen“ hat ein Zeichen.
+  - Rund und eckig schließen sich aus, rund lässt sich nicht abschalten.
+  - Der Stempel ersetzt rund oder eckig.
+  - Beim Füllen fehlen Stärke und Form.
+  - Die UI-Reihe zeichnet die Leiste breit, schmal und beim Rechteck. Sie prüft, dass keine
+    Gruppe mitten durch bricht.
+
+Danach R3 und R4, dann laut Reihenfolge W2 Tonwert.
 
 ## 5. KI-Werkzeuge: Last, Größe, Lizenz
 
