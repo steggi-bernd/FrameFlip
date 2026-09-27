@@ -79,6 +79,11 @@ public sealed class DockLayout
         {
             new DockGroup { Panels = { "histogram" }, Active = "histogram", Weight = 1 },
             new DockGroup { Panels = { "colour", "layers" }, Active = "colour", Weight = 4 },
+
+            // Die Ausgabe unten rechts, und bei einer Anordnung von frueher kommt sie von selbst
+            // hierher (siehe Normalise). Ihre Hoehe richtet sich nach dem Inhalt (DockHost.
+            // FitsContent) - das Gewicht zaehlt erst, wenn sie mit anderen Feldern eine Gruppe teilt.
+            new DockGroup { Panels = { "export" }, Active = "export", Weight = 0.8 },
         },
     };
 

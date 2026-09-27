@@ -11,6 +11,20 @@ namespace FrameFlip.Views;
 /// </summary>
 public partial class AtelierPage
 {
+    /// <summary>"Bild oeffnen" - vorn in der Werkzeugleiste, vor den Kategorien.</summary>
+    private System.Windows.Controls.Button OpenButton()
+    {
+        var button = new System.Windows.Controls.Button
+        {
+            Style = (Style)FindResource("OverlayButton"),
+            Margin = new Thickness(0, 0, 8, 0),
+        };
+
+        button.SetResourceReference(System.Windows.Controls.ContentControl.ContentProperty, "S_OpenImage");
+        button.Click += OnOpenClicked;
+        return button;
+    }
+
     /// <summary>Strg+K: die Suche der Werkzeugleiste.</summary>
     public void OpenToolSearch() => ToolBand.OpenSearch();
 

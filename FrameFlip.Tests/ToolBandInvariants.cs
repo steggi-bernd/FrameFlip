@@ -131,15 +131,28 @@ public static class ToolBandInvariants
             var properties = (PropertiesPanel)page.FindName("Properties");
             bool Shown(string name) => ((FrameworkElement)properties.FindName(name)).Visibility == Visibility.Visible;
 
+            // Was wirklich zu sehen ist - nicht nur der eigene Schalter, sondern auch der der
+            // Gruppe, in der es steht. Eine falsch geschachtelte Gruppe versteckt sonst still
+            // die Regler einer anderen.
+            bool Seen(string name) => ((UIElement)properties.FindName(name)).IsVisible;
+
             Check.That(band.Active == "rectangle" && !Shown("BrushTipRow") && !Shown("BrushShapeRow") && !Shown("BrushPressureRow") &&
                        !Shown("BrushModeRow"),
                        "Rechteck: gedrueckt in der Zeile, und keine Spitze, kein Abstand, kein Druck in der Pinselleiste");
+            Check.That(Seen("BrushOpacitySlider") && Seen("BrushObjectToggle") && !Seen("BrushSizeSlider") && !Seen("BrushSpacingSlider"),
+                       "Rechteck: Deckkraft und Bindung stehen wirklich da, Groesse und Abstand nicht");
 
             page.UseTool(ToolCatalog.All.Single(e => e.Key == "brush"));
             Pump();
             Check.That(placement.BrushArea == PaintArea.None, "Pinsel aus der Leiste: wieder Zuege");
             Check.That(band.Active == "brush" && Shown("BrushTipRow") && Shown("BrushShapeRow") && !Shown("BrushSquishRow") && !Shown("BrushStampRow"),
                        "Pinsel: die Spitze ist wieder da - das Karo nur eckig, der Stempel nur als Stempel");
+            Check.That(new[] { "BrushSizeSlider", "BrushHardnessSlider", "BrushFlowSlider", "BrushOpacitySlider",
+                               "BrushSpacingSlider", "BrushSquareToggle", "BrushAngleSlider", "BrushAspectSlider",
+                               "BrushFollowToggle", "BrushPressureBox" }.All(Seen),
+                       "Pinsel: Groesse, Haerte, Staerke, Deckkraft, Abstand, Spitze und Druck stehen wirklich da",
+                       string.Join(", ", new[] { "BrushSizeSlider", "BrushHardnessSlider", "BrushFlowSlider", "BrushSpacingSlider",
+                                                 "BrushAngleSlider", "BrushPressureBox" }.Where(n => !Seen(n))));
 
             ((System.Windows.Controls.Primitives.ToggleButton)properties.FindName("BrushSquareToggle")).IsChecked = true;
             Check.That(Shown("BrushSquishRow"), "eckig: jetzt gibt es das Karo");

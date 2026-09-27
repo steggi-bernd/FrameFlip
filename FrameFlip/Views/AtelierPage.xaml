@@ -15,70 +15,19 @@
             <ColumnDefinition Width="*" />
         </Grid.ColumnDefinitions>
 
-        <!-- Kopfzeile: was offen ist, und womit gerechnet wird -->
-        <Grid Grid.Row="0" Grid.ColumnSpan="4" Margin="0,0,0,10">
-            <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                <Button x:Name="OpenButton" Style="{StaticResource OverlayButton}"
-                        Content="{DynamicResource S_OpenImage}" Click="OnOpenClicked" />
+        <!--
+            Oben: Bild oeffnen und die Werkzeugleiste in einem - Kategorien und Suche, darunter
+            die Werkzeuge der gewaehlten. Was frueher eine eigene Kopfzeile trug - Datei,
+            Speicherstand, Vergleich, Zoom -, steht jetzt unten in der Statuszeile.
+        -->
+        <!-- "Bild oeffnen" setzt der Code vorn hinein (ToolBand.Leading) - benennen laesst es sich hier nicht. -->
+        <local:ToolBand x:Name="ToolBand" Grid.Row="0" Grid.ColumnSpan="2" Margin="0,0,0,8" />
 
-                <TextBlock x:Name="FileText" VerticalAlignment="Center" Margin="12,0,0,0"
-                           Style="{StaticResource DashLabel}"
-                           TextTrimming="CharacterEllipsis" MaxWidth="460"
-                           Text="{DynamicResource S_NoImage}" />
-
-                <!--
-                    Das Projekt der Folge speichert sich von selbst. Der Knopf ist fuer den
-                    Moment, in dem man sicher sein will - und der Text daneben sagt, ob man
-                    es schon ist.
-                -->
-                <Button x:Name="SaveButton" Style="{StaticResource OverlayButton}" Margin="14,0,0,0"
-                        Content="{DynamicResource S_ProjectSave}" Click="OnSaveClicked" IsEnabled="False"
-                        ToolTip="{DynamicResource S_ProjectSaveHint}" />
-                <TextBlock x:Name="SaveText" VerticalAlignment="Center" Margin="8,0,0,0"
-                           Style="{StaticResource DashLabel}" FontSize="9" />
-            </StackPanel>
-
-            <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center">
-                <!--
-                    Gedrueckt halten zeigt das Original. Als Knopf und nicht als
-                    Schalter, weil der Vergleich ein Blick ist und kein Zustand -
-                    wer umschaltet, vergisst zurueckzuschalten und beurteilt dann
-                    minutenlang das falsche Bild.
-                -->
-                <Button x:Name="CompareButton" Style="{StaticResource OverlayButton}"
-                        Content="{DynamicResource S_ShowOriginal}" Margin="0,0,10,0"
-                        PreviewMouseLeftButtonDown="OnCompareDown"
-                        PreviewMouseLeftButtonUp="OnCompareUp"
-                        MouseLeave="OnCompareUp"
-                        IsEnabled="False"
-                        ToolTip="{DynamicResource S_ShowOriginalHint}" />
-
-                <Button x:Name="ZoomButton" Style="{StaticResource LinkButton}"
-                        Margin="0,0,14,0" MinWidth="52" Click="OnZoomClicked"
-                        ToolTip="{DynamicResource S_ZoomHint}">
-                    <TextBlock x:Name="ZoomText" FontSize="9" TextAlignment="Right" Text="Fit" />
-                </Button>
-
-                <TextBlock x:Name="SourceText" VerticalAlignment="Center" Margin="0,0,14,0"
-                           Style="{StaticResource DashLabel}" FontSize="9" />
-                <TextBlock x:Name="ViewText" VerticalAlignment="Center"
-                           Style="{StaticResource DashLabel}" FontSize="9" />
-
-                <!--
-                    Was die Pipette zuletzt gelesen hat. In der Kopfzeile und nicht
-                    als Wolke am Zeiger: Ein Wert, den man ablesen will, will man
-                    meistens mit einem zweiten vergleichen, und dafuer muss der
-                    erste stehenbleiben.
-                -->
-                <TextBlock x:Name="PickText" VerticalAlignment="Center" Margin="14,0,0,0"
-                           Style="{StaticResource DashLabel}" FontSize="9"
-                           Foreground="{StaticResource AccentBrush}"
-                           Visibility="Collapsed" />
-            </StackPanel>
-        </Grid>
-
-        <!-- Die Werkzeugleiste: Kategorien als Band, darunter ihre Werkzeuge (Entwurf B). -->
-        <local:ToolBand x:Name="ToolBand" Grid.Row="1" Grid.ColumnSpan="2" Margin="0,0,0,10" />
+        <!--
+            Die Einstellungen des gewaehlten Werkzeugs - als Leiste unter der Werkzeugzeile,
+            ueber die ganze Breite, und nicht mehr ueber dem Bild.
+        -->
+        <local:PropertiesPanel x:Name="Properties" Grid.Row="1" Grid.ColumnSpan="2" Margin="0,0,0,8" />
 
         <!--
             Die Werkzeugspalte: was die Maus im Bild tut.
@@ -116,8 +65,6 @@
                         <RowDefinition Height="Auto" />
                         <RowDefinition Height="*" />
                     </Grid.RowDefinitions>
-
-                    <local:PropertiesPanel x:Name="Properties" Grid.Row="0" Margin="0,0,0,8" />
 
                     <Border Grid.Row="1" Background="#FF101010" CornerRadius="4"
                             ClipToBounds="True"
@@ -237,67 +184,142 @@
             <ContentControl x:Name="HistogramSlot"
                             local:DockHost.PanelId="histogram"
                             local:DockHost.TitleKey="S_Distribution" />
-        </local:DockHost>
+            <!--
+                Die Ausgabe: Format, Ziel, der Schnell-Export und der Lauf ueber die Folge. Als
+                Feld der Andockflaeche - in der Grundanordnung unten rechts, und wer mag, zieht
+                es woanders hin.
+            -->
+            <Border x:Name="ExportBar"
+                    local:DockHost.PanelId="export"
+                    local:DockHost.TitleKey="S_SectionExport"
+                    local:DockHost.FitsContent="True"
+                    Padding="10,8" Visibility="Collapsed">
+                <StackPanel>
+                    <!-- Format und Ziel in einer Zeile, darunter wohin es geht. -->
+                    <DockPanel>
+                        <Button x:Name="TargetButton" DockPanel.Dock="Right" Margin="6,0,0,0"
+                                Style="{StaticResource OverlayButton}"
+                                Content="{DynamicResource S_ChooseTarget}" Click="OnChooseTargetClicked" />
+                        <ComboBox x:Name="FormatBox" Style="{StaticResource OverlayCombo}"
+                                  HorizontalAlignment="Stretch" SelectionChanged="OnFormatChanged"
+                                  ToolTip="{DynamicResource S_OutputFormat}" />
+                    </DockPanel>
 
-        <!-- Die Sequenz ausgeben -->
-        <Border x:Name="ExportBar" Grid.Row="3" Grid.ColumnSpan="2" Margin="0,12,0,0"
-                Background="{StaticResource PanelBackground}"
-                BorderBrush="{StaticResource PanelBorder}" BorderThickness="1" CornerRadius="4"
-                Padding="12,10" Visibility="Collapsed">
-            <Grid>
-                <Grid.RowDefinitions>
-                    <RowDefinition Height="Auto" />
-                    <RowDefinition Height="Auto" />
-                </Grid.RowDefinitions>
-
-                <StackPanel Grid.Row="0" Orientation="Horizontal" VerticalAlignment="Center">
-                    <TextBlock x:Name="SequenceText" VerticalAlignment="Center"
-                               Style="{StaticResource DashLabel}" MinWidth="150" />
-
-                    <ComboBox x:Name="FormatBox" Style="{StaticResource OverlayCombo}"
-                              Width="150" Margin="14,0,0,0"
-                              SelectionChanged="OnFormatChanged"
-                              ToolTip="{DynamicResource S_OutputFormat}" />
-
-                    <Button x:Name="TargetButton" Style="{StaticResource OverlayButton}"
-                            Margin="8,0,0,0" Content="{DynamicResource S_ChooseTarget}"
-                            Click="OnChooseTargetClicked" />
-
-                    <TextBlock x:Name="TargetText" VerticalAlignment="Center" Margin="10,0,0,0"
+                    <TextBlock x:Name="TargetText" Margin="0,4,0,0"
                                Style="{StaticResource DashLabel}" FontSize="9"
-                               TextTrimming="CharacterEllipsis" MaxWidth="320" />
-                </StackPanel>
-
-                <StackPanel Grid.Row="0" Orientation="Horizontal" HorizontalAlignment="Right"
-                            VerticalAlignment="Center">
-                    <TextBlock x:Name="BatchStatus" VerticalAlignment="Center" Margin="0,0,12,0"
-                               Style="{StaticResource DashLabel}" FontSize="9" />
+                               TextTrimming="CharacterEllipsis"
+                               ToolTip="{Binding Text, RelativeSource={RelativeSource Self}}" />
 
                     <!--
                         Schnell-Export: kein Dialog, kein Ziel noetig - in den Ordner FrameFlip
                         neben den Bildern oder den gewaehlten Zielordner, unter dem naechsten
                         freien Namen. Er ueberschreibt nie.
                     -->
-                    <Button x:Name="QuickExportButton" Style="{StaticResource OverlayButton}"
-                            Content="{DynamicResource S_QuickExport}" Click="OnQuickExportClicked"
-                            ToolTip="{DynamicResource S_QuickExportHint}"
-                            IsEnabled="False" MinWidth="110" Margin="0,0,8,0" />
+                    <UniformGrid Columns="2" Margin="0,6,0,0">
+                        <Button x:Name="QuickExportButton" Style="{StaticResource OverlayButton}" Margin="0,0,4,0"
+                                Content="{DynamicResource S_QuickExport}" Click="OnQuickExportClicked"
+                                ToolTip="{DynamicResource S_QuickExportHint}" IsEnabled="False" />
+                        <Button x:Name="RunButton" Style="{StaticResource OverlayButton}" Margin="4,0,0,0"
+                                Content="{DynamicResource S_RunBatch}" Click="OnRunClicked" IsEnabled="False" />
+                    </UniformGrid>
 
-                    <Button x:Name="RunButton" Style="{StaticResource OverlayButton}"
-                            Content="{DynamicResource S_RunBatch}" Click="OnRunClicked"
-                            IsEnabled="False" MinWidth="120" />
+                    <Button x:Name="StopButton" Style="{StaticResource OverlayButton}" Margin="0,6,0,0"
+                            Content="{DynamicResource S_Stop}" Click="OnStopClicked" Visibility="Collapsed" />
 
-                    <Button x:Name="StopButton" Style="{StaticResource OverlayButton}"
-                            Margin="8,0,0,0" Content="{DynamicResource S_Stop}"
-                            Click="OnStopClicked" Visibility="Collapsed" MinWidth="90" />
+                    <!-- Leer braucht der Stand keinen Platz - die Gruppe ist so hoch wie ihr Inhalt. -->
+                    <TextBlock x:Name="BatchStatus" Margin="0,6,0,0" TextWrapping="Wrap" FontSize="9">
+                        <TextBlock.Style>
+                            <Style TargetType="TextBlock" BasedOn="{StaticResource DashLabel}">
+                                <Style.Triggers>
+                                    <Trigger Property="Text" Value="">
+                                        <Setter Property="Visibility" Value="Collapsed" />
+                                    </Trigger>
+                                </Style.Triggers>
+                            </Style>
+                        </TextBlock.Style>
+                    </TextBlock>
+
+                    <ProgressBar x:Name="BatchProgress" Height="3" Margin="0,6,0,0"
+                                 Visibility="Collapsed" Minimum="0" Maximum="1"
+                                 Background="{StaticResource PanelBorder}"
+                                 Foreground="{StaticResource DesktopAccent}"
+                                 BorderThickness="0" />
+                </StackPanel>
+            </Border>
+        </local:DockHost>
+
+        <!--
+            Unten eine niedrige Zeile fuer das, was man ablesen will: welche Folge und welches
+            Bild, welche Datei, wie gross, was die Pipette las - und rechts Vergleich, Zoom und
+            ob gespeichert ist.
+        -->
+        <Border x:Name="StatusBar" Grid.Row="3" Grid.ColumnSpan="2" Margin="0,8,0,0"
+                Background="{StaticResource PanelBackground}" BorderBrush="{StaticResource PanelBorder}"
+                BorderThickness="1" CornerRadius="6" Padding="8,1">
+            <DockPanel LastChildFill="True">
+                <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" VerticalAlignment="Center">
+                    <!--
+                        Gedrueckt halten zeigt das Original. Als Knopf und nicht als
+                        Schalter, weil der Vergleich ein Blick ist und kein Zustand -
+                        wer umschaltet, vergisst zurueckzuschalten und beurteilt dann
+                        minutenlang das falsche Bild.
+                    -->
+                    <Button x:Name="CompareButton" Style="{StaticResource LinkButton}"
+                            Margin="0,0,12,0" FontSize="10"
+                            Content="{DynamicResource S_ShowOriginal}"
+                            PreviewMouseLeftButtonDown="OnCompareDown"
+                            PreviewMouseLeftButtonUp="OnCompareUp"
+                            MouseLeave="OnCompareUp"
+                            IsEnabled="False"
+                            ToolTip="{DynamicResource S_ShowOriginalHint}" />
+
+                    <Button x:Name="ZoomButton" Style="{StaticResource LinkButton}"
+                            Margin="0,0,12,0" MinWidth="40" Click="OnZoomClicked"
+                            ToolTip="{DynamicResource S_ZoomHint}">
+                        <TextBlock x:Name="ZoomText" FontSize="10" TextAlignment="Right" Text="Fit" />
+                    </Button>
+
+                    <!--
+                        Das Projekt speichert sich von selbst. Der Text sagt, ob es das schon
+                        hat; der Knopf daneben ist fuer den Moment, in dem man sicher sein will.
+                    -->
+                    <TextBlock x:Name="SaveText" VerticalAlignment="Center"
+                               Style="{StaticResource DashLabel}" FontSize="9" />
+                    <Button x:Name="SaveButton" Style="{StaticResource LinkButton}" Margin="8,0,0,0" FontSize="10"
+                            Content="{DynamicResource S_ProjectSave}" Click="OnSaveClicked" IsEnabled="False"
+                            ToolTip="{DynamicResource S_ProjectSaveHint}" />
                 </StackPanel>
 
-                <ProgressBar x:Name="BatchProgress" Grid.Row="1" Height="3" Margin="0,10,0,0"
-                             Visibility="Collapsed" Minimum="0" Maximum="1"
-                             Background="{StaticResource PanelBorder}"
-                             Foreground="{StaticResource DesktopAccent}"
-                             BorderThickness="0" />
-            </Grid>
+                <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                    <Button x:Name="PreviousFrameButton" Style="{StaticResource LinkButton}" FontSize="11"
+                            Content="◂" Click="OnPreviousFrame" Visibility="Collapsed"
+                            ToolTip="{DynamicResource S_PreviousFrameHint}" />
+                    <TextBlock x:Name="SequenceText" VerticalAlignment="Center" Margin="4,0,4,0"
+                               Style="{StaticResource DashLabel}" FontSize="9" />
+                    <Button x:Name="NextFrameButton" Style="{StaticResource LinkButton}" FontSize="11"
+                            Content="▸" Click="OnNextFrame" Visibility="Collapsed"
+                            ToolTip="{DynamicResource S_NextFrameHint}" />
+
+                    <TextBlock x:Name="FileText" VerticalAlignment="Center" Margin="12,0,0,0"
+                               Style="{StaticResource DashLabel}" FontSize="9"
+                               TextTrimming="CharacterEllipsis" MaxWidth="360"
+                               Text="{DynamicResource S_NoImage}" />
+                    <TextBlock x:Name="SourceText" VerticalAlignment="Center" Margin="12,0,0,0"
+                               Style="{StaticResource DashLabel}" FontSize="9" />
+                    <TextBlock x:Name="ViewText" VerticalAlignment="Center" Margin="12,0,0,0"
+                               Style="{StaticResource DashLabel}" FontSize="9" />
+
+                    <!--
+                        Was die Pipette zuletzt gelesen hat - stehend, damit sich ein zweiter
+                        Wert daneben vergleichen laesst.
+                    -->
+                    <TextBlock x:Name="PickText" VerticalAlignment="Center" Margin="12,0,0,0"
+                               Style="{StaticResource DashLabel}" FontSize="9"
+                               Foreground="{StaticResource AccentBrush}"
+                               Visibility="Collapsed" />
+                </StackPanel>
+            </DockPanel>
         </Border>
+
     </Grid>
 </UserControl>

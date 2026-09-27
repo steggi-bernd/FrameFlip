@@ -1160,10 +1160,16 @@ public static class AtelierLayerInvariants
             // Gemessen an der Spalte, nicht in Pixeln: Auf einem Bildschirm mit 768
             // Zeilen (so der CI-Rechner) stutzt Windows das 900 hohe Fenster, und die
             // Spalte ist kuerzer. Hier sind es rund drei Viertel, beim alten Fehler
-            // war es ein Drittel.
-            Check.That(colourHeight > dock.ActualHeight * 0.6,
+            // war es ein Drittel. Die Ausgabe darunter hat ihre eigene, feste Hoehe
+            // (so hoch wie ihr Inhalt) - gemessen wird an dem, was die Spalte uebrig hat.
+            var output = (FrameworkElement)page.FindName("ExportBar");
+            double column = output.IsVisible
+                ? output.TranslatePoint(new System.Windows.Point(0, 0), dock).Y
+                : dock.ActualHeight;
+
+            Check.That(colourHeight > column * 0.6,
                        "und die ist fast die ganze Spalte, nicht ein Drittel davon",
-                       $"{colourHeight:0} von {dock.ActualHeight:0}");
+                       $"{colourHeight:0} von {column:0}");
 
             // Und nun der Grund fuer das Andocken: die Ebenen nach links, als eigenes
             // Feld. Danach stehen Farbe UND Ebenen gleichzeitig da.
@@ -1204,6 +1210,31 @@ public static class AtelierLayerInvariants
                        dock.Layout.Find("histogram") is { Zone: DockZone.Right, Group: 0 },
                        "und wer sich verzogen hat, kommt zur Grundanordnung zurueck");
 
+            // Die Ausgabe unten rechts ist so hoch wie ihr Inhalt: Ein Anteil der Zone
+            // schnitte ihre Knoepfe in einem kleinen Fenster ab und liesse in einem grossen
+            // leere Flaeche stehen. Ohne Bild ist sie leer - darum hier sichtbar gemacht.
+            var export = (FrameworkElement)page.FindName("ExportBar");
+            export.Visibility = Visibility.Visible;
+            page.UpdateLayout();
+
+            double ExportTop() => export.TranslatePoint(new System.Windows.Point(0, 0), dock).Y;
+            double ExportGap() => dock.ActualHeight - (ExportTop() + export.ActualHeight);
+
+            Check.That(ExportGap() is > -0.5 and < 4, "die Ausgabe steht ganz unten, vollstaendig und ohne Luft darunter",
+                       $"Abstand zum Rand {ExportGap():0.0}, Hoehe {export.ActualHeight:0}");
+
+            double top = ExportTop();
+            var heavy = dock.Layout.Clone();
+            heavy.Right[2].Weight = 20;
+            dock.Load(heavy);
+            page.UpdateLayout();
+
+            Check.Near(ExportTop(), top, 0.5, "ein Gewicht macht sie nicht groesser - ihre Hoehe ist die ihres Inhalts");
+
+            export.Visibility = Visibility.Collapsed;
+            dock.ResetLayout();
+            page.UpdateLayout();
+
             // Nun dieselben Wege mit der Zielsuche, die auch die Maus nimmt - an
             // Punkten, die aus den Feldern selbst gerechnet sind. Die Geometrie der
             // Ziele ist, was beim Ziehen schiefgehen kann.
@@ -1215,7 +1246,8 @@ public static class AtelierLayerInvariants
             Check.That(dock.DropAt("layers", In(colour, 0.5, 0.97)), "am unteren Rand der Farbe ist ein Ziel");
             page.UpdateLayout();
 
-            Check.That(dock.Layout.Right.Count == 3 &&
+            // Die Ausgabe steht als eigene Gruppe unten rechts - eine Gruppe mehr.
+            Check.That(dock.Layout.Right.Count == 4 &&
                        dock.Layout.Right[1].Panels.SequenceEqual(new[] { "colour" }) &&
                        dock.Layout.Right[2].Panels.SequenceEqual(new[] { "layers" }),
                        "ein Reiter an den eigenen Rand gezogen teilt die Gruppe",
@@ -1228,7 +1260,7 @@ public static class AtelierLayerInvariants
             Check.That(dock.DropAt("histogram", In(strip, 0.5, -12)), "die Reiterleiste ist ein Ziel");
             page.UpdateLayout();
 
-            Check.That(dock.Layout.Right.Count == 2 &&
+            Check.That(dock.Layout.Right.Count == 3 &&
                        dock.Layout.Right[1].Panels.SequenceEqual(new[] { "layers", "histogram" }) &&
                        dock.Layout.Right[1].Active == "histogram",
                        "auf die Reiterleiste gezogen wird es ein Reiter - und liegt vorn",
@@ -1275,6 +1307,7 @@ public static class AtelierLayerInvariants
                        $"{histogramHigh:0} -> {slot.ActualHeight:0}");
 
             dock.Toggle("histogram");
+            dock.Toggle("export");
             page.UpdateLayout();
 
             Check.That(centre.ActualWidth > pictureWide + 250,

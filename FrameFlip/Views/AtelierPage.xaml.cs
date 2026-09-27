@@ -153,6 +153,7 @@ public sealed partial class AtelierPage : UserControl
         Placement.MaskWanted = MakeMaskLayer;
         Properties.BrushChanged += UseBrushSettings;
         ToolBand.Chosen += UseTool;
+        ToolBand.Leading = OpenButton();
         ToolBand.FrameModeWanted += single => _ = UseFrameMode(single);
         Properties.BrushHistoryWanted += anchor =>
         {
