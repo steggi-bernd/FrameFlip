@@ -92,6 +92,7 @@ static int RunAll()
     PassRoleInvariants.Run();
     RegionRenderInvariants.Run();
     MaskElementInvariants.Run();
+    ObjectMaskInvariants.Run();
     MaskHistoryInvariants.Run();
     MaskEditInvariants.Run();
     BrushShapeInvariants.Run();

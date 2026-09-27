@@ -30,6 +30,7 @@ public partial class AtelierPage
 
         NodeLayers.AddWanted += ShowLayerAddMenu;
         NodeLayers.AdjustmentWanted += () => { if (ListTarget() is { } after) AddAdjustmentLayer(after); };
+        NodeLayers.ObjectMaskWanted += () => StartObjectMask(ChosenLayer());
         NodeLayers.EffectWanted += layer =>
         {
             if (_graph is not null && layer.Mix is { } mix && _graph.Into(mix.Id, "Oben") is { } up) ShowLayerEffects(mix, up);

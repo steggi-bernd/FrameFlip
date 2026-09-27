@@ -1087,6 +1087,13 @@
     <sys:String x:Key="S_NodeLayerMask">Die Maske der Ebene</sys:String>
     <sys:String x:Key="S_NodeLayerHidden">ausgeblendet</sys:String>
     <sys:String x:Key="S_NodeLayerOnTop">obenauf</sys:String>
+    <sys:String x:Key="S_NodeLayerObjectChip">Objektmaske</sys:String>
+    <sys:String x:Key="S_NodeLayerObjectHint">Objektmaske für die gewählte Ebene: danach ein Objekt im Bild anklicken – aus der Kryptomatte entsteht ihre Maske. Weitere Klicks nehmen Objekte hinzu oder wieder heraus.</sys:String>
+    <sys:String x:Key="S_NodeLayerObjectNone">Diese Datei führt keine Kryptomatte – Objektmasken gibt es nur mit einem Kryptomatte-Pass aus Blender.</sys:String>
+    <sys:String x:Key="S_ObjectPickLayer">Objekt im Bild anklicken – es wird die Maske von „{0}“. Ein zweiter Klick nimmt es wieder heraus.</sys:String>
+    <sys:String x:Key="S_ObjectPickNew">Objekt im Bild anklicken – es wird eine eigene Maskenebene. Weitere Klicks nehmen Objekte hinzu.</sys:String>
+    <sys:String x:Key="S_ObjectPickDone">Fertig</sys:String>
+    <sys:String x:Key="S_PicMenuObjectOnLayer">Objekt hier als Maske von „{1}“ ({0})</sys:String>
     <sys:String x:Key="S_NodeLayerAddChip">Ebene</sys:String>
     <sys:String x:Key="S_NodeLayerAdjustChip">Einstellung</sys:String>
     <sys:String x:Key="S_NodeLayerAdjustHint">Eine Einstellungsebene über der gewählten – sie korrigiert, was darunter liegt.</sys:String>

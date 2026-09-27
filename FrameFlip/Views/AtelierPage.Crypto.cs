@@ -61,6 +61,14 @@ public partial class AtelierPage
         if (_tool != AtelierTool.Select) return;
         if (!PixelAt(e.GetPosition(Display), out int x, out int y)) return;
 
+        // Der Chip "Objektmaske" wartet auf ein Objekt: Es kommt in die Maske der Ebene.
+        if (_objectPick is not null)
+        {
+            ObjectMaskAt(x, y);
+            e.Handled = true;
+            return;
+        }
+
         if (PickAt(x, y)) e.Handled = true;
     }
 

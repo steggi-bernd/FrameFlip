@@ -1087,6 +1087,13 @@
     <sys:String x:Key="S_NodeLayerMask">The layer's mask</sys:String>
     <sys:String x:Key="S_NodeLayerHidden">hidden</sys:String>
     <sys:String x:Key="S_NodeLayerOnTop">on top</sys:String>
+    <sys:String x:Key="S_NodeLayerObjectChip">Object mask</sys:String>
+    <sys:String x:Key="S_NodeLayerObjectHint">Object mask for the chosen layer: then click an object in the image – its mask comes from the Cryptomatte. Further clicks add objects or take them out again.</sys:String>
+    <sys:String x:Key="S_NodeLayerObjectNone">This file carries no Cryptomatte – object masks need a Cryptomatte pass from Blender.</sys:String>
+    <sys:String x:Key="S_ObjectPickLayer">Click an object in the image – it becomes the mask of “{0}”. A second click takes it out again.</sys:String>
+    <sys:String x:Key="S_ObjectPickNew">Click an object in the image – it becomes a mask layer of its own. Further clicks add objects.</sys:String>
+    <sys:String x:Key="S_ObjectPickDone">Done</sys:String>
+    <sys:String x:Key="S_PicMenuObjectOnLayer">Object here as mask of “{1}” ({0})</sys:String>
     <sys:String x:Key="S_NodeLayerAddChip">Layer</sys:String>
     <sys:String x:Key="S_NodeLayerAdjustChip">Adjustment</sys:String>
     <sys:String x:Key="S_NodeLayerAdjustHint">An adjustment layer above the chosen one – it corrects what lies below.</sys:String>
