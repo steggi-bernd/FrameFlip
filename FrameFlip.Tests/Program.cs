@@ -129,6 +129,7 @@ static int RunAll()
     ImageHitInvariants.Run();
     SortInvariants.Run();
     DockLayoutInvariants.Run();
+    DockToolInvariants.Run();
     AtelierLayerInvariants.Run();
     GradeBatchInvariants.Run();
     GradeVideoInvariants.Run();
