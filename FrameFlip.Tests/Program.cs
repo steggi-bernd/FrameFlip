@@ -109,6 +109,7 @@ static int RunAll()
     AtelierEditingSessionInvariants.Run();
     AtelierProjectInvariants.Run();
     AtelierProjectPageInvariants.Run();
+    SwitchLeftoverInvariants.Run();
     SequenceFolderInvariants.Run();
     WorkspaceInvariants.Run();
     QuickExportInvariants.Run();

@@ -257,6 +257,10 @@ public sealed partial class AtelierPage : UserControl
         // Ein anderes Bild: Das Waehlen fuer eine Objektmaske galt dem alten Graphen.
         EndObjectMask();
 
+        // Ebenso eine wartende Pipette des Tonwerts. Sie hielte das Werkzeug des alten Rezepts,
+        // und ihr Klick aenderte etwas, das nicht mehr gerechnet wird.
+        LeaveLevelsPick();
+
         _path = path;
 
         // Die Bildnummer aus dem Dateinamen. Sie ist der Wurf fuer das Filmkorn,

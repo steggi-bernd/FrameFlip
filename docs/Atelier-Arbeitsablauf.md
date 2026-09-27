@@ -386,3 +386,33 @@ Skala hat.
 - Für die CI bleiben die Proben synthetisch.
 - Die EXR ist für Proben unter einer Minute zu groß, sie dient nur für einzelne
   Messungen von Hand.
+
+## 10. Stand der Umsetzung
+
+### A1: Rückwege beim Wechsel (`fix/wechsel-rueckwege`)
+
+Die drei Lücken aus 4.1 sind geschlossen, jede mit eigenem Commit:
+
+- **Objektgebundener Pinsel:** Die gemerkte Deckung trägt jetzt die Datei im Schlüssel.
+  Ein zweiter Render derselben Szene bekommt die Deckung seines eigenen Objekts.
+- **Tonwert-Pipette:** Öffnen eines anderen Bildes beendet sie. Die Maus geht zu dem
+  Werkzeug zurück, das sie vor der Pipette hatte, wie nach einem Klick ins Bild.
+- **Knotenvorschauen:** Ein Projektwechsel leert sie. Ein Knoten des neuen Projekts zeigt
+  keine Vorschau seines Namensvetters im alten mehr.
+
+**Proben** (`SwitchLeftoverInvariants`):
+
+- Ein Pinselstrich über die echten Tasten des Rahmens, nach einem Wechsel aus dem
+  Knotenmodus und aus dem Stapel. Er landet im neuen Projekt, und nichts vom alten kommt
+  mit. Das war schon vorher richtig und bleibt als Schutz stehen.
+- Zwei Renders mit derselben Kugel, einmal links, einmal rechts. Vorher bekam der zweite
+  die Deckung von links.
+- Eine wartende Pipette, dann ein anderes Bild. Vorher wartete sie weiter.
+- Vorschauen nach dem Projektwechsel. Vorher stand die des alten `n1` noch da.
+
+Vor der Behebung schlugen vier der dreizehn Zusicherungen fehl, danach keine. Die
+Nachbargruppen (Tonwert, Pinsel, Knotenmodus, Projekte, Objektmaske, Knoten bearbeiten)
+liefen mit 328 Zusicherungen grün.
+
+Fehler 1 selbst ließ sich damit nicht belegen. Die Lücke beim objektgebundenen Pinsel ist
+aber die, die am besten zum Bericht passt.
