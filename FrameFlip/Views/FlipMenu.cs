@@ -153,6 +153,13 @@ public sealed class FlipMenu
     /// <summary>Ein Schalter: Das Zeichen sagt, wie er steht.</summary>
     public FlipMenu Toggle(string text, bool on, Action act) => Item(on ? "☑" : "☐", text, act);
 
+    /// <summary>Eine Ueberschrift - sagt, wofuer das Menue gilt. Tut nichts beim Klick.</summary>
+    public FlipMenu Heading(string text)
+    {
+        _rows.Children.Add(FlipUi.Caption(text));
+        return this;
+    }
+
     public FlipMenu Separator()
     {
         _rows.Children.Add(new Border { Height = 1, Background = FlipUi.Edge, Margin = new Thickness(4) });
