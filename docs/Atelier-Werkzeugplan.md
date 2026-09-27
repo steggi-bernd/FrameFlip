@@ -341,7 +341,7 @@ Der Rahmen nach Entscheidung 9, in vier Schnitten:
 2. **R2 – Einstellungsleiste und Zeichen** (`feature/einstellungsleiste`): die Einstellungen
    in beschrifteten Gruppen; gezeichnete Zeichen nach dem Vorbild von Tabler Icons für Chips
    und Werkzeugleiste. Das Knotensymbol bleibt.
-3. **R3 – Ebenen:**
+3. **R3 – Ebenen** (`feature/ebenen-knoepfe`):
    - Zeilen wie heute, die Vorschau etwas kleiner.
    - Rechts in der Zeile Chips für Effekte und Maske, unten „+ Ebene“, „Einstellung“ und
      „Objektmaske“.
@@ -399,7 +399,34 @@ Der Rahmen nach Entscheidung 9, in vier Schnitten:
   - Die UI-Reihe zeichnet die Leiste breit, schmal und beim Rechteck. Sie prüft, dass keine
     Gruppe mitten durch bricht.
 
-Danach R3 und R4, dann laut Reihenfolge W2 Tonwert.
+**R3 (`feature/ebenen-knoepfe`), zuerst im Knotenmodus:**
+
+- **Ein Effekt nur auf die gewählte Ebene:**
+  - Wer eine Ebene in der Liste wählt und dann einen Effekt aus der Werkzeugleiste nimmt,
+    bekommt ihn in den Zweig der Ebene. Er landet im Kabel, das oben in ihr Mischen führt,
+    und wirkt nur auf sie.
+  - Vorher kam er hinter das Mischen und wirkte auf alles darunter.
+  - Wer das Mischen im Graphen wählt, meint weiterhin „dahinter“. Jede andere Wahl vergisst
+    die Ebene aus der Liste.
+  - Das Menü einer Zeile bietet „Effekt nur auf diese Ebene …“: der Hub bei den Effekten,
+    und was man nimmt, kommt in ihren Zweig.
+- **Zeilen:**
+  - Wie bisher: Punkt, Miniatur, Maske, Name, Mischung.
+  - Die Miniatur ist etwas kleiner (56 × 32 statt 64 × 36).
+  - Rechts stehen Marken: „fx“ (mit Zahl ab zwei) für eigene Effekte der Ebene, „⬢“ für eine
+    Objektmaske aus der Kryptomatte. Ein Klick zeigt den obersten Effekt oder die Maske.
+  - Platzieren und Belichtung zählen nicht als Effekt, sie gehören zur Ebene wie ihre
+    Deckkraft.
+- **Unter der Liste** Chips mit Zeichen: „+ Ebene“ (der Hub bei den Ebenen) und
+  „Einstellung“ (eine Einstellungsebene über der gewählten). Darunter bleiben die kleinen
+  Griffe: verdoppeln, löschen, hoch, runter.
+- Der Ebenenstreifen im Stapel bleibt vorerst, wie er ist.
+- Proben: Der Chip legt eine Einstellungsebene an. In der Liste gewählt, kommt die Vignette in
+  den Zweig. Im Graphen gewählt, kommt sie dahinter. Die Ebene zählt ihren Effekt. Die UI-Reihe
+  zeichnet die Liste, prüft „fx“ nur an der Ebene mit eigenem Effekt und „⬢“ an der Ebene mit
+  Kryptomatte.
+
+Danach R4, dann laut Reihenfolge W2 Tonwert.
 
 ## 5. KI-Werkzeuge: Last, Größe, Lizenz
 
