@@ -46,6 +46,9 @@ public partial class AtelierPage
         {
             _tool = tool;
 
+            // Ein anderes Werkzeug beendet das Waehlen fuer eine Objektmaske.
+            if (tool != AtelierTool.Select) EndObjectMask();
+
             // "Auswaehlen" IST der Auswahlmodus des Maskenbereichs. Wer das
             // Werkzeug wechselt, verlaesst ihn damit auch dort - sonst bliebe im
             // Streifen ein Haken stehen fuer eine Betriebsart, die nicht mehr gilt.

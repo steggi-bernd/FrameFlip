@@ -152,6 +152,8 @@ public partial class AtelierPage
     /// <summary>Die Ebenenliste im Reiter der Ebenen - mit dem gewaehlten Knoten hervorgehoben.</summary>
     private void ShowNodeLayers()
     {
+        NodeLayers.ObjectMasksAvailable = _cryptomattes.Count > 0;
+
         if (_graph is null) return;
 
         NodeLayers.Show(NodeLayerList.Of(_graph), NodeView.Selected, LayerThumb,

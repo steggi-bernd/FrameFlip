@@ -157,6 +157,27 @@
                                 </StackPanel>
                             </Border>
 
+                            <!--
+                                Die Objektmaske wartet auf einen Klick (R4): was er bewirkt, und
+                                wie man aufhoert. Oben und nicht ueber dem Bild, wo man klicken will.
+                            -->
+                            <Border x:Name="ObjectBadge" Visibility="Collapsed"
+                                    HorizontalAlignment="Center" VerticalAlignment="Top" Margin="12"
+                                    Background="{StaticResource PanelBackground}"
+                                    BorderBrush="{StaticResource AccentBrush}" BorderThickness="1"
+                                    CornerRadius="6" Padding="10,6">
+                                <StackPanel Orientation="Horizontal">
+                                    <local:IconLabel Icon="object" Margin="0,0,8,0"
+                                                     TextElement.Foreground="{StaticResource AccentBrush}" />
+                                    <TextBlock x:Name="ObjectBadgeText" VerticalAlignment="Center" FontSize="12"
+                                               MaxWidth="520" TextWrapping="Wrap" Margin="0,0,10,0"
+                                               Foreground="{StaticResource ForegroundBrush}" />
+                                    <Button Style="{StaticResource OverlayButton}"
+                                            Content="{DynamicResource S_ObjectPickDone}"
+                                            Click="OnObjectPickDone" />
+                                </StackPanel>
+                            </Border>
+
                             <Border x:Name="BusyBadge" Visibility="Collapsed"
                                     HorizontalAlignment="Center" VerticalAlignment="Center"
                                     Background="{StaticResource BadgeBackground}" CornerRadius="4" Padding="12,7">

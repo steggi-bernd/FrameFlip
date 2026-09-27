@@ -254,6 +254,9 @@ public sealed partial class AtelierPage : UserControl
     /// <summary>Oeffnet ein Bild - der Weg, den auch die Projektseite nehmen kann.</summary>
     public void Open(string path)
     {
+        // Ein anderes Bild: Das Waehlen fuer eine Objektmaske galt dem alten Graphen.
+        EndObjectMask();
+
         _path = path;
 
         // Die Bildnummer aus dem Dateinamen. Sie ist der Wurf fuer das Filmkorn,

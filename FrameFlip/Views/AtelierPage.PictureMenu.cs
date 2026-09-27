@@ -42,6 +42,18 @@ public partial class AtelierPage
                 ReadAt(x, y);
             }, "I");
 
+        // Im Knotenmodus mit gewaehlter Ebene zuerst: das Objekt als Maske DIESER Ebene (R4).
+        if (InNodes && ChosenLayer() is { } chosen)
+        {
+            foreach (var set in _cryptomattes)
+            {
+                menu.Item("⬢", Strings.T("S_PicMenuObjectOnLayer", set.ShortName, LayerName(chosen)), () =>
+                {
+                    if (StartObjectMask(chosen, set)) ObjectMaskAt(x, y);
+                });
+            }
+        }
+
         // Je Kryptomatte der Datei eine Zeile - meist Objekt und Material.
         foreach (var set in _cryptomattes)
         {

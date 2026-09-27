@@ -117,6 +117,22 @@ public sealed class NodeLayerList : Border
     /// <summary>Ein Effekt nur fuer diese Ebene - fx an einer Ebene ohne eigene Effekte.</summary>
     public event Action<NodeLayer>? EffectWanted;
 
+    /// <summary>Eine Objektmaske fuer die gewaehlte Ebene - der Chip unter der Liste (R4).</summary>
+    public event Action? ObjectMaskWanted;
+
+    /// <summary>
+    /// Ob die Datei eine Kryptomatte fuehrt. Ohne sie ist der Chip "Objektmaske" aus, und sein
+    /// Hinweis sagt, warum - statt dass er fehlt und gesucht wird.
+    /// </summary>
+    public bool ObjectMasksAvailable
+    {
+        set
+        {
+            _object.IsEnabled = value;
+            _object.ToolTip = Strings.T(value ? "S_NodeLayerObjectHint" : "S_NodeLayerObjectNone");
+        }
+    }
+
     public event Action<Node, BlendMode>? ModeWanted;
 
     /// <summary>Die Deckkraft der gewaehlten Ebene - mit true, solange noch gezogen wird.</summary>
@@ -134,7 +150,7 @@ public sealed class NodeLayerList : Border
     private readonly ScrollViewer _scroller;
     private readonly Border _dropLine;
 
-    private readonly Button _add, _adjust, _duplicate, _remove, _up, _down;
+    private readonly Button _add, _adjust, _object, _duplicate, _remove, _up, _down;
 
     private readonly StackPanel _controls = new() { Margin = new Thickness(0, 8, 0, 0) };
     private readonly ComboBox _mode = new() { HorizontalAlignment = HorizontalAlignment.Stretch };
@@ -242,6 +258,8 @@ public sealed class NodeLayerList : Border
         // eine Ebene, eine Einstellungsebene. Darunter die kleinen Griffe fuer die gewaehlte.
         _add = Chip("plus", "S_NodeLayerAddChip", "S_NodeLayerAdd");
         _adjust = Chip("adjustment", "S_NodeLayerAdjustChip", "S_NodeLayerAdjustHint");
+        _object = Chip("object", "S_NodeLayerObjectChip", "S_NodeLayerObjectHint");
+        ToolTipService.SetShowOnDisabled(_object, true);
         _duplicate = Tool("❐", "S_NodeLayerDuplicate");
         _remove = Tool("✕", "S_NodeLayerRemove");
         _up = Tool("▲", "S_MoveLayerUp");
@@ -249,6 +267,7 @@ public sealed class NodeLayerList : Border
 
         _add.Click += (_, _) => AddWanted?.Invoke(_add);
         _adjust.Click += (_, _) => AdjustmentWanted?.Invoke();
+        _object.Click += (_, _) => ObjectMaskWanted?.Invoke();
         _duplicate.Click += (_, _) => { if (_chosen?.Switch is { } layer) DuplicateWanted?.Invoke(layer); };
         _remove.Click += (_, _) => { if (_chosen?.Switch is { } layer) RemoveWanted?.Invoke(layer); };
         _up.Click += (_, _) => { if (_chosen?.Switch is { } layer) StepWanted?.Invoke(layer, true); };
@@ -257,6 +276,7 @@ public sealed class NodeLayerList : Border
         var chips = new WrapPanel { Margin = new Thickness(0, 6, 0, 0) };
         chips.Children.Add(_add);
         chips.Children.Add(_adjust);
+        chips.Children.Add(_object);
 
         var left = new StackPanel { Orientation = Orientation.Horizontal };
         left.Children.Add(_duplicate);
@@ -319,7 +339,7 @@ public sealed class NodeLayerList : Border
     }
 
     /// <summary>Die Chips unter der Liste - fuer die Probe.</summary>
-    internal (Button Add, Button Adjust) Chips => (_add, _adjust);
+    internal (Button Add, Button Adjust, Button Object) Chips => (_add, _adjust, _object);
 
     /// <summary>Mischung und Deckkraft der gewaehlten Ebene - wie unter dem Ebenenstreifen.</summary>
     private void BuildControls()
