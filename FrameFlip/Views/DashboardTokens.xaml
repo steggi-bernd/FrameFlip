@@ -664,10 +664,14 @@
                             BorderBrush="Transparent" BorderThickness="2,0,0,0"
                             Padding="{TemplateBinding Padding}">
                         <Grid>
+                            <!-- Die Spalte der Bedienelemente ist in einer Gruppe ueberall gleich
+                                 breit (SharedSizeGroup, der Bereich ist die Gruppe). Sonst schob ein
+                                 breites Feld sein (i) nach links, und die Zeichen einer Gruppe
+                                 standen je nach Bedienelement an anderer Stelle. -->
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition Width="*" />
                                 <ColumnDefinition Width="Auto" />
-                                <ColumnDefinition Width="Auto" MinWidth="150" />
+                                <ColumnDefinition Width="Auto" MinWidth="150" SharedSizeGroup="SettingControl" />
                             </Grid.ColumnDefinitions>
                             <Grid.RowDefinitions>
                                 <RowDefinition Height="Auto" />   <!-- Bezeichnung, (i), Bedienelement -->
@@ -759,6 +763,10 @@
          eine Ueberschrift sagt, worum es im Abschnitt geht. -->
     <Style x:Key="SettingGroupStyle" TargetType="{x:Type views:SettingGroup}">
         <Setter Property="Margin" Value="0,0,0,14" />
+        <!-- Die Gruppe ist der Bereich, in dem die Zeilen ihre Spalte der Bedienelemente teilen.
+             An der Gruppe selbst und nicht in ihrer Vorlage: Die Zeilen erben ueber ihren
+             logischen Elternteil, und der ist die Gruppe. -->
+        <Setter Property="Grid.IsSharedSizeScope" Value="True" />
         <Setter Property="Template">
             <Setter.Value>
                 <ControlTemplate TargetType="{x:Type views:SettingGroup}">

@@ -22,7 +22,7 @@
                     SelectionChanged="OnSectionChanged">
 
             <TabItem x:Name="OverviewTab" Style="{StaticResource SettingsSection}" Header="{DynamicResource S_TabOverview}">
-                <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" Padding="0,4,10,8">
+                <ScrollViewer VerticalScrollBarVisibility="Visible" HorizontalScrollBarVisibility="Disabled" Padding="0,4,10,8">
                     <!-- Entwurf 2: erst der Zustand, dann je Kategorie das Wichtigste zum
                          direkten Aendern. Die Regler der Kacheln sind an dieselben Felder
                          gebunden wie auf den Kategorieseiten - eine Einstellung, zwei Stellen,
@@ -240,7 +240,7 @@
             </TabItem>
 
             <TabItem x:Name="GeneralTab" Style="{StaticResource SettingsSection}" Header="{DynamicResource S_TabGeneral}">
-                <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" Padding="0,4,10,8">
+                <ScrollViewer VerticalScrollBarVisibility="Visible" HorizontalScrollBarVisibility="Disabled" Padding="0,4,10,8">
                     <StackPanel Style="{StaticResource SettingsPageBody}">
                         <TextBlock Style="{StaticResource SettingsPageTitle}" Text="{DynamicResource S_TabGeneral}" />
                         <TextBlock Style="{StaticResource SettingsPageSub}" Text="{DynamicResource S_SectionGeneralSub}" />
@@ -265,7 +265,7 @@
             </TabItem>
 
             <TabItem x:Name="PlaybackTab" Style="{StaticResource SettingsSection}" Header="{DynamicResource S_TabPlayback}">
-                <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" Padding="0,4,10,8">
+                <ScrollViewer VerticalScrollBarVisibility="Visible" HorizontalScrollBarVisibility="Disabled" Padding="0,4,10,8">
                     <StackPanel Style="{StaticResource SettingsPageBody}">
                         <TextBlock Style="{StaticResource SettingsPageTitle}" Text="{DynamicResource S_TabPlayback}" />
                         <TextBlock Style="{StaticResource SettingsPageSub}" Text="{DynamicResource S_SectionPlaybackSub}" />
@@ -296,7 +296,7 @@
             </TabItem>
 
             <TabItem x:Name="PerformanceTab" Style="{StaticResource SettingsSection}" Header="{DynamicResource S_TabPerformance}">
-                <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" Padding="0,4,10,8">
+                <ScrollViewer VerticalScrollBarVisibility="Visible" HorizontalScrollBarVisibility="Disabled" Padding="0,4,10,8">
                     <StackPanel Style="{StaticResource SettingsPageBody}">
                         <TextBlock Style="{StaticResource SettingsPageTitle}" Text="{DynamicResource S_TabPerformance}" />
                         <TextBlock Style="{StaticResource SettingsPageSub}" Text="{DynamicResource S_SectionPerformanceSub}" />
@@ -345,7 +345,7 @@
             </TabItem>
 
             <TabItem x:Name="ConnectionsTab" Style="{StaticResource SettingsSection}" Header="{DynamicResource S_TabConnections}">
-                <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" Padding="0,4,10,8">
+                <ScrollViewer VerticalScrollBarVisibility="Visible" HorizontalScrollBarVisibility="Disabled" Padding="0,4,10,8">
                     <StackPanel Style="{StaticResource SettingsPageBody}">
                         <TextBlock Style="{StaticResource SettingsPageTitle}" Text="{DynamicResource S_TabConnections}" />
                         <TextBlock Style="{StaticResource SettingsPageSub}" Text="{DynamicResource S_SectionConnectionsSub}" />
@@ -462,7 +462,7 @@
             </TabItem>
 
             <TabItem x:Name="PermissionsTab" Style="{StaticResource SettingsSection}" Header="{DynamicResource D_Permissions}">
-                <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" Padding="0,4,10,8">
+                <ScrollViewer VerticalScrollBarVisibility="Visible" HorizontalScrollBarVisibility="Disabled" Padding="0,4,10,8">
                     <StackPanel Style="{StaticResource SettingsPageBody}">
                         <TextBlock Style="{StaticResource SettingsPageTitle}" Text="{DynamicResource D_Permissions}" />
                         <TextBlock Style="{StaticResource SettingsPageSub}" Text="{DynamicResource D_PermissionsIntro}" />
@@ -521,14 +521,13 @@
             </TabItem>
 
             <TabItem x:Name="AppearanceTab" Style="{StaticResource SettingsSection}" Header="{DynamicResource D_Appearance}">
-                <DockPanel>
-                    <StackPanel DockPanel.Dock="Top" Style="{StaticResource SettingsPageBody}">
-                        <!-- Die Einleitung des Panels steht gleich darunter - sie ist der Untertitel. -->
-                        <TextBlock Style="{StaticResource SettingsPageTitle}" Text="{DynamicResource D_Appearance}"
-                                   Margin="0,0,0,10" />
+                <ScrollViewer VerticalScrollBarVisibility="Visible" HorizontalScrollBarVisibility="Disabled" Padding="0,4,10,8">
+                    <StackPanel Style="{StaticResource SettingsPageBody}">
+                        <TextBlock Style="{StaticResource SettingsPageTitle}" Text="{DynamicResource D_Appearance}" />
+                        <TextBlock Style="{StaticResource SettingsPageSub}" Text="{DynamicResource D_AppearanceIntro}" />
+                        <ContentControl x:Name="AppearanceHost" />
                     </StackPanel>
-                    <ContentControl x:Name="AppearanceHost" MaxWidth="760" />
-                </DockPanel>
+                </ScrollViewer>
             </TabItem>
  </TabControl>
 
