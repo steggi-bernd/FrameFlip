@@ -29,6 +29,7 @@ public partial class AtelierPage
         NodeLayers.RemoveWanted += RemoveLayer;
 
         NodeLayers.AddWanted += ShowLayerAddMenu;
+        NodeLayers.AdjustmentWanted += () => { if (ListTarget() is { } after) AddAdjustmentLayer(after); };
         NodeLayers.MenuWanted += ShowLayerMenu;
         NodeLayers.MaskMenuWanted += ShowFreeMaskMenu;
         NodeLayers.ModeWanted += OnLayerMode;
@@ -123,7 +124,12 @@ public partial class AtelierPage
 
         // Die Ebene allein: was in ihr Mischen oben hineinfliesst, im Betrachter.
         if (layer.Mix is { } mix && _graph.Into(mix.Id, "Oben") is { } up)
+        {
             menu.Item("◉", Strings.T("S_LayerMenuViewAlone"), () => SetViewer((up.From, up.Output)));
+
+            // Ein Effekt nur fuer diese Ebene: in ihren Zweig, vor ihr Mischen.
+            menu.Item("ƒ", Strings.T("S_LayerMenuEffect"), () => ShowLayerEffects(mix, up));
+        }
 
         if (node is not null && layer.Chain is { } chain)
         {
@@ -154,6 +160,47 @@ public partial class AtelierPage
 
         LayerMenu = menu;
         menu.Open();
+    }
+
+    /// <summary>Die Ebene, die zuletzt in der Liste gewaehlt wurde - ihr Mischen.</summary>
+    private MixNode? _layerFocus;
+
+    /// <summary>
+    /// Das Kabel in "Oben" der Ebene, die in der Liste gewaehlt ist - solange ihr Mischen noch
+    /// gewaehlt ist. Ein Effekt gehoert dann in dieses Kabel und wirkt nur auf sie; hinter
+    /// dem Mischen wirkte er auf alles, was darunter liegt. Wer das Mischen im Graphen waehlt,
+    /// meint weiterhin dahinter - jede andere Wahl vergisst die Ebene (OnNodeSelected).
+    /// </summary>
+    private NodeLink? LayerBranch()
+        => _graph is not null && _layerFocus is { } mix && ReferenceEquals(NodeView.Selected, mix)
+            ? _graph.Into(mix.Id, "Oben")
+            : null;
+
+    /// <summary>
+    /// Setzt einen Effekt in den Zweig einer Ebene - gleich hinter das, was bisher oben in ihr
+    /// Mischen floss. Der Editor schafft dahinter Platz.
+    /// </summary>
+    private void AddIntoLayer(Node node, NodeLink branch)
+    {
+        if (_graph?.Find(branch.From) is not { } from) return;
+
+        PlaceAt(node, BehindOf(from), branch);
+    }
+
+    /// <summary>Die Stelle rechts neben einem Knoten, als Mitte fuer einen neuen.</summary>
+    private static Point BehindOf(Node node)
+        => new(node.X + NodeLayout.ColumnStep + NodeLayout.Width / 2, node.Y + NodeLayout.Header / 2);
+
+    /// <summary>
+    /// Der Hub bei den Effekten, und was man darin nimmt, kommt in den Zweig dieser Ebene -
+    /// aus ihrem Menue in der Liste.
+    /// </summary>
+    private void ShowLayerEffects(MixNode layer, NodeLink branch)
+    {
+        if (_graph?.Find(branch.From) is not { } from) return;
+
+        OnLayerChosen(layer);
+        ShowNodeHub(BehindOf(from), "S_GroupBasics", NodeLayers, into: branch);
     }
 
     /// <summary>

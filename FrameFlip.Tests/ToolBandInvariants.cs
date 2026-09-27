@@ -235,6 +235,54 @@ public static class ToolBandInvariants
             Pump();
             Check.That(page.Graph!.Nodes.OfType<MaskNode>().Any(m => m.Mask.Kind == MaskKind.Luminance),
                        "eine Maske aus der Leiste: ein Maskenknoten");
+
+            // R3: Der Chip "Einstellung" unter der Ebenenliste legt eine Einstellungsebene an.
+            var layerList = (NodeLayerList)page.FindName("NodeLayers");
+            var editor = (NodeEditor)page.FindName("NodeView");
+            var mixesBefore = page.Graph!.Nodes.OfType<MixNode>().ToList();
+
+            Check.That(layerList.Chips.Add.Content is IconLabel && layerList.Chips.Adjust.Content is IconLabel,
+                       "unter der Liste: Ebene und Einstellung als Chips mit Zeichen und Namen");
+
+            layerList.Chips.Adjust.RaiseEvent(new RoutedEventArgs(System.Windows.Controls.Primitives.ButtonBase.ClickEvent));
+            Pump();
+
+            var layerMix = page.Graph!.Nodes.OfType<MixNode>().Except(mixesBefore).SingleOrDefault();
+            string? grade = layerMix is null ? null : page.Graph.Into(layerMix.Id, "Oben")?.From;
+
+            Check.That(grade is not null && page.Graph.Find(grade) is LayerGradeNode { Adjustment: true },
+                       "der Chip Einstellung legt eine Einstellungsebene an");
+
+            if (layerMix is not null && grade is not null)
+            {
+                // In der Liste gewaehlt: Die Vignette kommt in den Zweig der Ebene, vor ihr
+                // Mischen - sie wirkt nur auf diese Ebene, nicht auf alles darunter.
+                typeof(AtelierPage).GetMethod("OnLayerChosen", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic)!
+                    .Invoke(page, new object[] { layerMix });
+                Pump();
+
+                page.UseTool(vignette);
+                Pump();
+
+                var into = page.Graph.Into(layerMix.Id, "Oben");
+                var inserted = into is null ? null : page.Graph.Find(into.From);
+
+                Check.That(inserted is OpticsNode { Tool: VignetteTool } &&
+                           page.Graph.Into(inserted.Id, NodeEdits.Through(inserted).Input!)?.From == grade,
+                           "in der Liste gewaehlt: die Vignette kommt in den Zweig der Ebene, vor ihr Mischen");
+                Check.That(NodeLayerList.Of(page.Graph).Single(l => ReferenceEquals(l.Mix, layerMix)).Effects == 1,
+                           "und die Ebene zaehlt einen eigenen Effekt - die Zeile zeigt fx");
+
+                // Im Graphen gewaehlt: wie bisher dahinter.
+                editor.Select(layerMix);
+                Pump();
+                page.UseTool(vignette);
+                Pump();
+
+                Check.That(page.Graph.Into(layerMix.Id, "Oben")?.From == inserted!.Id &&
+                           page.Graph.Links.Any(l => l.From == layerMix.Id && page.Graph.Find(l.To) is OpticsNode { Tool: VignetteTool }),
+                           "im Graphen gewaehlt: der Effekt kommt wie bisher hinter das Mischen");
+            }
         }
         finally
         {
