@@ -76,13 +76,21 @@ public partial class AtelierPage
         LevelsAuto.Pick(pick.Tool, pick.Kind, r, g, b);
         Tools.LevelsChangedOutside();
 
+        LeaveLevelsPick();
+
+        return true;
+    }
+
+    /// <summary>Beendet eine wartende Pipette, und die Maus geht zu ihrem vorigen Werkzeug zurueck.</summary>
+    private void LeaveLevelsPick()
+    {
+        if (_levelsPick is null) return;
+
         var back = _beforeLevelsPick;
         EndLevelsPick();
 
         MouseTools.Select(back);
         OnToolChanged(back);
-
-        return true;
     }
 
     /// <summary>Ob eine Pipette des Tonwerts wartet - fuer die Probe.</summary>
