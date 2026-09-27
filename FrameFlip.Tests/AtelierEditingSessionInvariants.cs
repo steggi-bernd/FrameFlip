@@ -2,6 +2,7 @@ using FrameFlip.Atelier;
 using FrameFlip.Configuration;
 using FrameFlip.Imaging;
 using FrameFlip.Imaging.Grading;
+using FrameFlip.Imaging.Nodes;
 
 namespace FrameFlip.Tests;
 
@@ -14,6 +15,8 @@ public static class AtelierEditingSessionInvariants
 {
     public static void Run()
     {
+        TheTargetLivesBesideTheRecipe();
+
         Check.Group("Bearbeitungssitzung: Rezept, Meldung, ungespeichert");
 
         var settings = new AppSettings();
@@ -57,5 +60,43 @@ public static class AtelierEditingSessionInvariants
 
         session.Grading = new GradingStack();
         Check.That(session.Dirty, "die naechste Aenderung macht es wieder ungespeichert");
+    }
+
+    /// <summary>
+    /// Das Bearbeitungsziel (docs/Atelier-Arbeitsablauf.md, Phase B): beginnt beim Bild, meldet
+    /// jeden Wechsel einmal, ist kein Teil des Rezepts und faellt mit einem neuen Rezept aufs
+    /// Bild zurueck.
+    /// </summary>
+    private static void TheTargetLivesBesideTheRecipe()
+    {
+        Check.Group("Bearbeitungssitzung: das Ziel neben dem Rezept");
+
+        var session = new AtelierEditingSession(new SettingsRecipeStore(new AppSettings()));
+        int moved = 0, changed = 0;
+        session.TargetChanged += () => moved++;
+        session.Changed += () => changed++;
+
+        Check.That(ReferenceEquals(session.Target, EditingTarget.Picture), "eine neue Sitzung arbeitet am Bild");
+
+        var layer = new ImageLayer { Content = LayerContent.Adjustment };
+        session.Focus(new EditingTarget.StackLayer(layer, Tools: true));
+        session.Focus(new EditingTarget.StackLayer(layer, Tools: true));
+
+        Check.That(session.Target is EditingTarget.StackLayer { Tools: true } chosen && ReferenceEquals(chosen.Layer, layer) && moved == 1,
+                   "eine Ebene gewaehlt: das Ziel wechselt, dasselbe Ziel noch einmal meldet nichts");
+        Check.That(changed == 0 && !session.Dirty, "das Ziel ist kein Teil des Rezepts - es macht nichts ungespeichert");
+
+        // Knoten stehen als Objekt im Ziel: Derselbe Name in einem anderen Graphen ist ein anderer Knoten.
+        var first = new LightNode { Id = "n1" };
+        var twin = new LightNode { Id = "n1" };
+        session.Focus(new EditingTarget.GraphNode(first, FromLayerList: false));
+        session.Focus(new EditingTarget.GraphNode(twin, FromLayerList: false));
+
+        Check.That(session.Target is EditingTarget.GraphNode { Node: var node } && ReferenceEquals(node, twin) && moved == 3,
+                   "ein Knoten gleichen Namens aus einem anderen Graphen ist ein neues Ziel");
+
+        session.Switch(new SettingsRecipeStore(new AppSettings()));
+        Check.That(ReferenceEquals(session.Target, EditingTarget.Picture) && moved == 4,
+                   "ein neues Rezept: das Ziel faellt aufs Bild zurueck und meldet es");
     }
 }

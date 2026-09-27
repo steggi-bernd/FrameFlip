@@ -88,6 +88,31 @@ internal sealed class AtelierEditingSession
         _store = store;
         Revision++;
         Dirty = false;
+
+        // Ein anderes Rezept: Was im alten gewaehlt war, gibt es in diesem nicht.
+        Focus(EditingTarget.Picture);
+    }
+
+    /// <summary>
+    /// Woran gerade gearbeitet wird - siehe <see cref="EditingTarget"/>. Die Auswahl in
+    /// Ebenenstreifen, Knoteneditor und Ebenenliste setzt es; wer wissen muss, wohin ein Regler,
+    /// ein Strich oder ein neuer Effekt geht, liest es hier.
+    /// </summary>
+    public EditingTarget Target { get; private set; } = EditingTarget.Picture;
+
+    /// <summary>Das Bearbeitungsziel hat gewechselt.</summary>
+    public event Action? TargetChanged;
+
+    /// <summary>
+    /// Setzt das Bearbeitungsziel. Das Ziel ist kein Teil des Rezepts: Es macht nichts
+    /// ungespeichert und zaehlt keine Aenderung.
+    /// </summary>
+    public void Focus(EditingTarget target)
+    {
+        if (Equals(Target, target)) return;
+
+        Target = target;
+        TargetChanged?.Invoke();
     }
 
     /// <summary>Die Grundregler des fertigen Bildes.</summary>

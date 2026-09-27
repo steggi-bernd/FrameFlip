@@ -23,14 +23,40 @@ public partial class AtelierPage
     /// <summary>Der Knoten, dessen Einstellungen der Farbstreifen gerade zeigt.</summary>
     private Node? _shownNode;
 
+    /// <summary>
+    /// Der Knoten, an dem gerade gearbeitet wird - aus dem Bearbeitungsziel der Sitzung, das der
+    /// Wahl im Editor folgt (<see cref="OnNodeSelected"/>). Wohin ein Regler, ein Strich, ein
+    /// Klick ins Bild oder ein neuer Knoten geht, richtet sich danach. Die Markierung in der
+    /// Ebenenliste zeigt weiter, was im Editor gewaehlt ist.
+    /// </summary>
+    private Node? SelectedNode => _recipe.Target is Atelier.EditingTarget.GraphNode { Node: var node } ? node : null;
+
+    /// <summary>
+    /// Tauscht den Graphen im Editor aus, ohne die Ansicht zu verlassen - Rueckgaengig, ein
+    /// Neuaufbau. Der Editor waehlt denselben Knoten im neuen Graphen und meldet das. Gibt es
+    /// ihn dort nicht mehr, waehlt er still ab; das Ziel folgt dann hier, sonst zeigte es auf
+    /// einen Knoten, der nicht mehr im Graphen steht.
+    /// </summary>
+    private void ShowGraph(NodeGraph graph)
+    {
+        NodeView.Replace(graph);
+
+        if (NodeView.Selected is null) _recipe.Focus(Atelier.EditingTarget.Picture);
+    }
+
     /// <summary>Der Knoten, dem der Greifrahmen gehoert - gemerkt, solange ein Zug laeuft.</summary>
     private Node? _placingNode;
 
     private void OnNodeSelected()
     {
-        // Etwas anderes gewaehlt als die Ebene aus der Liste: Sie gilt nicht mehr als gewaehlte
-        // Ebene - auch nicht, wenn man danach ihr Mischen im Graphen anklickt.
-        if (!ReferenceEquals(NodeView.Selected, _layerFocus)) _layerFocus = null;
+        // Das Ziel folgt der Wahl im Editor. Die Ebene aus der Liste gilt weiter, solange genau
+        // ihr Mischen gewaehlt bleibt. Etwas anderes gewaehlt, und sie gilt nicht mehr als
+        // gewaehlte Ebene - auch nicht, wenn man danach ihr Mischen im Graphen anklickt.
+        var chosen = NodeView.Selected;
+        bool asLayer = _recipe.Target is Atelier.EditingTarget.GraphNode { FromLayerList: true } focus &&
+                       ReferenceEquals(focus.Node, chosen);
+
+        _recipe.Focus(chosen is null ? Atelier.EditingTarget.Picture : new Atelier.EditingTarget.GraphNode(chosen, asLayer));
 
         ShowNodeSettings();
         ShowPlacement();
@@ -38,7 +64,7 @@ public partial class AtelierPage
 
         // Gewaehlt wird im Bild, und das geht, bevor die Maske irgendwo steckt - ihre
         // Stufen muessen also schon da sein, wenn sie nur gewaehlt ist.
-        if (NodeView.Selected is MaskNode { Mask: { Kind: MaskKind.Cryptomatte } mask } &&
+        if (SelectedNode is MaskNode { Mask: { Kind: MaskKind.Cryptomatte } mask } &&
             mask.Levels.Any(level => !_sources.ContainsKey(level)))
         {
             FetchNodeSources();
@@ -80,7 +106,7 @@ public partial class AtelierPage
             return;
         }
 
-        var node = NodeView.Selected;
+        var node = SelectedNode;
         _shownNode = node;
 
         // Im Knotenmodus gibt es kein "Ebene oder Bild" - das Ziel ist der Knoten, und
@@ -221,7 +247,7 @@ public partial class AtelierPage
     /// <summary>Der Greifrahmen im Knotenmodus - am gewaehlten Platzieren- oder Obenauf-Knoten.</summary>
     private void ShowNodePlacement()
     {
-        var node = _dragHooked ? _placingNode : NodeView.Selected;
+        var node = _dragHooked ? _placingNode : SelectedNode;
 
         if (_frame is null || _showingOriginal || _tool is not (AtelierTool.Move or AtelierTool.Crop) ||
             NodePlacement(node) is not var (place, source))
@@ -273,7 +299,7 @@ public partial class AtelierPage
     /// Worauf der Pinsel im Knotenmodus malt: die gewaehlte gemalte Maske - oder die, die
     /// in den Faktor der gewaehlten Ebene fliesst. Sonst keine.
     /// </summary>
-    private MaskNode? PaintTarget() => NodeView.Selected switch
+    private MaskNode? PaintTarget() => SelectedNode switch
     {
         MaskNode { Mask.Kind: MaskKind.Painted } mask => mask,
         MixNode mix when _graph?.Into(mix.Id, "Faktor") is { } factor &&
@@ -337,7 +363,7 @@ public partial class AtelierPage
     /// <summary>Am Rahmen wurde gezogen - im Knotenmodus bekommt der Knoten die neue Lage.</summary>
     private void OnNodePlacementDragged(LayerTransform place, bool interim)
     {
-        switch (Placed(_placingNode ?? NodeView.Selected))
+        switch (Placed(_placingNode ?? SelectedNode))
         {
             case PlaceNode node: node.Place = place; break;
             case OverlayNode node: node.Place = place; break;

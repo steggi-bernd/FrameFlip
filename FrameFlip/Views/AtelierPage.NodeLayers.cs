@@ -167,9 +167,6 @@ public partial class AtelierPage
         menu.Open();
     }
 
-    /// <summary>Die Ebene, die zuletzt in der Liste gewaehlt wurde - ihr Mischen.</summary>
-    private MixNode? _layerFocus;
-
     /// <summary>
     /// Das Kabel in "Oben" der Ebene, die in der Liste gewaehlt ist - solange ihr Mischen noch
     /// gewaehlt ist. Ein Effekt gehoert dann in dieses Kabel und wirkt nur auf sie; hinter
@@ -177,7 +174,7 @@ public partial class AtelierPage
     /// meint weiterhin dahinter - jede andere Wahl vergisst die Ebene (OnNodeSelected).
     /// </summary>
     private NodeLink? LayerBranch()
-        => _graph is not null && _layerFocus is { } mix && ReferenceEquals(NodeView.Selected, mix)
+        => _graph is not null && _recipe.Target is Atelier.EditingTarget.GraphNode { FromLayerList: true, Node: MixNode mix }
             ? _graph.Into(mix.Id, "Oben")
             : null;
 
@@ -217,7 +214,7 @@ public partial class AtelierPage
     {
         if (_graph is null) return null;
 
-        if (NodeView.Selected is MixNode mix && LayerEdits.ChainOf(LayerEdits.Chains(_graph), mix) is not null) return mix;
+        if (SelectedNode is MixNode mix && LayerEdits.ChainOf(LayerEdits.Chains(_graph), mix) is not null) return mix;
 
         return NodeEdits.LayerTop(_graph);
     }

@@ -153,7 +153,7 @@ public partial class AtelierPage
         to.Add(_graph.Save());
 
         _graph = graph;
-        NodeView.Replace(graph);
+        ShowGraph(graph);
 
         AfterNodeEdit();
     }
@@ -198,7 +198,7 @@ public partial class AtelierPage
     {
         if (_graph is null || NodeCatalog.ForSection(section) is not { } kind) return;
 
-        var after = NodeView.Selected is { } chosen && chosen is not OutputNode &&
+        var after = SelectedNode is { } chosen && chosen is not OutputNode &&
                     NodeEdits.Through(chosen).Output is not null
             ? chosen
             : _graph.Output is { } output && _graph.Into(output.Id, "Bild") is { } last
@@ -257,7 +257,7 @@ public partial class AtelierPage
     {
         if (_graph is null) return null;
 
-        if (NodeView.Selected is { } chosen && chosen is not OutputNode && NodeEdits.Through(chosen).Output is not null)
+        if (SelectedNode is { } chosen && chosen is not OutputNode && NodeEdits.Through(chosen).Output is not null)
             return chosen;
 
         return NodeEdits.LayerTop(_graph);

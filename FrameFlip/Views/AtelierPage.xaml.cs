@@ -97,8 +97,12 @@ public sealed partial class AtelierPage : UserControl
     /// <summary>
     /// Die Ebene, deren Werkzeuge der Streifen gerade zeigt. Null heisst: das
     /// fertige Bild.
+    ///
+    /// Aus dem Bearbeitungsziel der Sitzung (<see cref="Atelier.EditingTarget"/>), das
+    /// <see cref="Bind"/> setzt - kein eigenes Feld mehr, das neben ihm herlaufen koennte.
     /// </summary>
-    private ImageLayer? _editing;
+    private ImageLayer? ToolsLayer
+        => !InNodes && _recipe.Target is Atelier.EditingTarget.StackLayer { Tools: true } target ? target.Layer : null;
 
     /// <summary>
     /// Die Korrektur des fertigen Bildes - unabhaengig davon, was der Streifen
@@ -465,14 +469,17 @@ public sealed partial class AtelierPage : UserControl
         // der Ebenenstreifen beim Oeffnen einer Datei eine Ebene waehlt.
         if (InNodes)
         {
-            _editing = null;
             ShowNodeSettings();
             return;
         }
 
         Tools.LeaveNodes();
 
-        _editing = layer;
+        // Das Ziel: die gewaehlte Ebene - und ob der Streifen ihr gilt oder dem Bild.
+        _recipe.Focus(Layers.Selection is { } chosen
+            ? new Atelier.EditingTarget.StackLayer(chosen, layer is not null)
+            : Atelier.EditingTarget.Picture);
+
         ShowPlacement();
 
         if (layer is null)
@@ -552,11 +559,11 @@ public sealed partial class AtelierPage : UserControl
             return;
         }
 
-        bool layer = _editing is not null;
+        var edited = ToolsLayer;
 
-        if (layer)
+        if (edited is not null)
         {
-            _editing!.Adjustments = Tools.Adjustments;
+            edited.Adjustments = Tools.Adjustments;
 
             // Und der Stapel dazu - genau wie beim ganzen Bild eine Zeile tiefer.
             //
@@ -569,7 +576,7 @@ public sealed partial class AtelierPage : UserControl
             // Sichtbar war das auf die verwirrendste Art, die es gibt: Saettigung und
             // Belichtung wirkten, Farbbereiche und Zonen nicht. Die einen stehen in
             // Adjustments - das wurde geschrieben -, die anderen im Stapel.
-            _editing.Tools = Snapshot();
+            edited.Tools = Snapshot();
 
             _recipe.Layers = Layers.Stack;
         }
@@ -603,7 +610,7 @@ public sealed partial class AtelierPage : UserControl
         //
         // Geprueft wird erst beim Loslassen: Waehrend des Zuges darf keine Datei im
         // Weg liegen, und die Frage kostet einen Durchgang durch die Werkzeugliste.
-        if (!interim && !layer && DataPasses().Any(name => !_sources.ContainsKey(name)))
+        if (!interim && edited is null && DataPasses().Any(name => !_sources.ContainsKey(name)))
         {
             OnLayersChanged(interim: false);
             return;
@@ -611,7 +618,7 @@ public sealed partial class AtelierPage : UserControl
 
         // Eine Einstellungsebene sitzt IM Stapel - was sie aendert, aendert das
         // zusammengesetzte Bild und nicht erst die Korrektur am Ende.
-        Refresh(interim, recompose: layer);
+        Refresh(interim, recompose: edited is not null);
     }
 
     /// <summary>

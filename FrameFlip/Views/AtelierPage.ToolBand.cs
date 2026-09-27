@@ -80,7 +80,7 @@ public partial class AtelierPage
             return;
         }
 
-        if (NodeView.Selected is { } after and not OutputNode &&
+        if (SelectedNode is { } after and not OutputNode &&
             NodeEdits.Through(after).Output is not null && NodeEdits.Through(node).Input is not null)
         {
             InsertAfterNode(after, node);

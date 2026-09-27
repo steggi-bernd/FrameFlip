@@ -79,7 +79,7 @@ public partial class AtelierPage
         NodeLayout.Arrange(_graph);
 
         _cache.Clear();
-        NodeView.Replace(_graph);
+        ShowGraph(_graph);
         NodeView.Frame();
 
         AfterNodeEdit();
@@ -247,7 +247,7 @@ public partial class AtelierPage
         _graph = FreshFromStack();
         _cache.Clear();
 
-        NodeView.Replace(_graph);
+        ShowGraph(_graph);
         NodeView.Frame();
 
         AfterNodeEdit();
@@ -269,8 +269,10 @@ public partial class AtelierPage
         NodeView.Select(node);
 
         // In der Liste gewaehlt: Was jetzt aus der Werkzeugleiste kommt, gilt dieser Ebene.
-        // Erst nach dem Waehlen - das Waehlen selbst vergisst die vorige.
-        _layerFocus = node as MixNode;
+        // Erst nach dem Waehlen - das Waehlen selbst vergisst die vorige. Und nur, wenn der
+        // Editor sie auch gewaehlt hat.
+        if (ReferenceEquals(NodeView.Selected, node))
+            _recipe.Focus(new Atelier.EditingTarget.GraphNode(node, node is MixNode));
         NodeView.Reveal(node);
         ShowNodeLayers();
     }
@@ -369,7 +371,7 @@ public partial class AtelierPage
                 }
             }
 
-            if (NodeView.Selected is RenderNode) ShowNodeSettings();
+            if (SelectedNode is RenderNode) ShowNodeSettings();
         }));
     }
 }

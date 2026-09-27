@@ -84,7 +84,7 @@ public partial class AtelierPage
     /// </summary>
     internal bool PickAt(int x, int y)
     {
-        var node = InNodes ? NodeView.Selected as MaskNode : null;
+        var node = InNodes ? SelectedNode as MaskNode : null;
 
         string? level = InNodes
             ? node?.Mask is { Kind: MaskKind.Cryptomatte, Levels.Count: > 0 } mask ? mask.Levels[0] : null
