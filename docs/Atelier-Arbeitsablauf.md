@@ -416,3 +416,48 @@ liefen mit 328 Zusicherungen grün.
 
 Fehler 1 selbst ließ sich damit nicht belegen. Die Lücke beim objektgebundenen Pinsel ist
 aber die, die am besten zum Bericht passt.
+
+### A2: Einstellungen, Texte und Ordnung (`fix/einstellungen-texte`)
+
+Punkte 15 und 16. Durchgesehen wurden alle sieben Seiten, als Textliste und als Bild mit
+synthetischer Konfiguration (lokal erzeugte Schlüssel, `relay.example.org`, kein Netz).
+
+- **Doppelter Satz unter dem App-Code:** Der Hinweis richtet sich nach dem Zustand und sagt
+  „Mit der App abfotografieren …“ schon, sobald ein Code dasteht. Ein fester Satz darunter
+  wiederholte ihn, und ohne Code bat er darum, etwas abzufotografieren, das es nicht gab.
+  Er ist weg.
+- **Hinweise nennen den Schalter, wie er heißt:** „Fernsteuerung aktivieren“ meinte den
+  Schalter „Renderfortschritt ans Handy senden“. Kopplung, Render und Austauschordner nennen
+  ihn jetzt wörtlich.
+- **Gruppe und Zeile mit demselben Namen:** „Dynamische Last“ (Zeile jetzt „Automatisch
+  anpassen“), „Blender“ („Programm“), „Austauschordner“ („Ordner“), dazu die erste Gruppe
+  der Seite „Arbeitsbereich“, die wie ihre Seite hieß („Größen und Aufteilung“). Das ältere
+  Kopplungsfenster behält seine Beschriftungen.
+- **Falscher Verweis:** Der Hinweis zum Annehmen von Dateien sprach vom „Austauschordner
+  unten“. In den Einstellungen steht er oben, im Kopplungsfenster unten. Der Hinweis nennt
+  jetzt keinen Ort mehr.
+- **Tonlage:** Der Untertitel von „Blender & Dateien“ duzte und sagte „PC“. Er spricht jetzt
+  wie die anderen Seiten und sagt „Rechner“.
+- **Jede Zeile erklärt sich:** „Nahtlos von vorn“ und „Puffer zurück“ hatten kein
+  Info-Zeichen.
+- **Abstände:**
+  - Die Info-Zeichen einer Gruppe stehen untereinander. Die Spalte der Bedienelemente ist
+    je Gruppe gleich breit (`SharedSizeGroup`), vorher schob ein breites Feld sein Zeichen
+    nach links.
+  - Jede Seite beginnt an derselben Kante. „Arbeitsbereich“ war mit eigener Breite
+    eingerückt. „Verbindungen“ rutschte um die halbe Breite des Rollbalkens nach links,
+    weil nur sie lang genug für einen ist. Jetzt halten alle Seiten den Platz frei, und die
+    Spur bleibt leer, solange nichts zu rollen ist.
+- **Adresse der Zuschauerseite (15):** Sie ist selbst der Knopf, der sie kopiert, mit
+  Kopier-Zeichen, Tooltip und über die Tastatur erreichbar, in den Einstellungen und im
+  Dashboard. An ihrer Stelle steht danach gut eine Sekunde lang „✓ Kopiert“, auch nach
+  „Link kopieren“. Ist die Zwischenablage belegt, behauptet die Karte nichts.
+
+**Proben:**
+
+- `SettingsTextInvariants`: sechs Zusicherungen über alle Seiten. Vorher schlugen alle
+  sechs fehl, unter dem App-Code stand der Satz zweimal.
+- `WatchCardInvariants.TheAddressCopies`: Klick, Bestätigung, Rückkehr zur Adresse, „Link
+  kopieren“, belegte Zwischenablage. Kopiert wird über einen Wirt, der nur mitschreibt.
+- **Echte Instanz:** Debug-Build mit eigener Konfiguration. Alle sieben Seiten lassen sich
+  wählen, das Protokoll enthält keine Ausnahme, der Kopplungshinweis zeigt den neuen Text.
