@@ -708,3 +708,7 @@ Punkt 4.
     HEX, HSV und „Quelle“, und der Knopf schaltet.
 - **Offen, C4:** Die Weißabgleich-Pipette braucht die Umkehrung von Farbtemperatur und
   Tönung: aus einer Farbe, die grau sein soll, die beiden Reglerwerte. Die gibt es noch nicht.
+- **Offen, C4:** Punkt 4 nennt auch die Farbwähler der Filter. Die einzigen sind die
+  Farbräder (Lift, Gamma, Gain und die Tönung einer Ebene). Für sie ist offen, was ein Klick
+  heißen soll: die Farbe übernehmen (Tönung) oder sie neutralisieren (Lift/Gamma/Gain, wie
+  der Weißabgleich). Das wird vor dem Bauen nachgefragt.
