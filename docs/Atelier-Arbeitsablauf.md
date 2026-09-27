@@ -581,3 +581,34 @@ anderes sagen als das, wohin der nächste Regler geht.
     auf die Ebene, ein umbenanntes Mischen.
 - **Echte Instanz:** Debug-Build mit eigener Konfiguration und synthetischer Folge. Die
   Zeile steht samt Hinweis da, ohne Ausnahme.
+
+### C2a: Aktionen am Ziel (`feature/ziel-aktionen`)
+
+Punkte 6, 11 und 12 für Einzelziele. Ein Effekt richtet sich im Knotenmodus nach dem
+Bearbeitungsziel. Das gilt für die Werkzeugleiste, die Suche und die neuen Knöpfe
+„+ Korrektur“ und „+ Effekt …“ rechts in der Zielzeile.
+
+| Ziel | Wohin der Effekt geht | Vorher |
+|---|---|---|
+| Gesamtbild (nichts gewählt) | an seine Stelle in der Kette des Bildes, wie der Stapel rechnet | frei in die Mitte, ohne Kabel |
+| Ebene aus der Liste | in ihren Zweig, vor ihr Mischen | ebenso |
+| Maske einer Ebene | in den Zweig der Ebene; die Maske begrenzt ihn schon | frei in die Mitte, ohne Kabel |
+| ein Knoten mit Bildausgang | direkt dahinter | ebenso |
+
+- **`GlobalChain`:** Kennt die Rechenordnung, in der `StackToGraph` das fertige Bild
+  anlegt: Licht, Szenen-Werkzeuge, Objektiv, Geometrie, Renderdaten, frühe lokale
+  Werkzeuge, Film, Sichtumwandlung, Tonwerte, Anzeige-Werkzeuge, späte lokale Werkzeuge,
+  Wasserzeichen, Durchgänge. Ein neuer Knoten kommt hinter den letzten, der vor ihm dran
+  ist. Hat er keinen Platz darin, kommt er vor die Ausgabe, verbunden.
+- **Eine Zuordnung für beides:** Zielzeile und Einfügestelle fragen dieselbe Frage
+  (`TargetPath.OwnerOf`), damit ein Effekt dorthin geht, wo die Zeile es sagt.
+- **Im Stapel:** Beide Knöpfe nehmen den Weg der Werkzeugleiste. „+ Korrektur“ zeigt die
+  Grundkarte des Ziels, „+ Effekt …“ öffnet die Suche.
+- **Probe** (`TargetActionInvariants`, 11 Zusicherungen):
+  - Die Kette und die Einfügestellen ohne Fenster.
+  - Auf der Seite: Vignette, Pixel Sort und Korrektur am Gesamtbild, Filmkorn an der Maske
+    einer Ebene, dazu die beiden Knöpfe.
+- **Echte Instanz:** Debug-Build, beide Knöpfe in der Zeile, ohne Ausnahme.
+- **Offen:** C2b, mehrere Ebenen (Entscheidung 4: eine gemeinsame Korrektur darüber).
+  Dafür braucht es erst eine Mehrfachauswahl in Ebenenliste und Ebenenstreifen. Die
+  Kryptomatte-Auswahl als Ziel kommt mit C3.
