@@ -37,6 +37,7 @@ public partial class AtelierPage
         };
         NodeLayers.MenuWanted += ShowLayerMenu;
         NodeLayers.MaskMenuWanted += ShowFreeMaskMenu;
+        NodeLayers.IsolateWanted += (layer, mask) => Isolate(layer, mask);
         NodeLayers.ModeWanted += OnLayerMode;
         NodeLayers.OpacityWanted += OnLayerOpacity;
     }

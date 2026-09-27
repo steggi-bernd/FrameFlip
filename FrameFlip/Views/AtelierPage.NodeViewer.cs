@@ -1,4 +1,5 @@
 using System.Windows;
+using System.Windows.Input;
 using FrameFlip.Imaging.Nodes;
 using FrameFlip.Localization;
 
@@ -93,9 +94,59 @@ public partial class AtelierPage
             return;
         }
 
-        string output = NodeTitles.Socket(_viewer!.Value.Output);
-        ViewerText.Text = Strings.T("S_ViewerShowing", NodeTitles.For(node) + " · " + output);
+        string output = _viewer!.Value.Output;
+
+        // Zeigt der Betrachter genau das, was eine Ebene oben oder im Faktor bekommt, heisst
+        // es "isoliert" - abgeleitet aus dem Betrachter, kein eigener Zustand (C6).
+        ViewerText.Text = IsolationOf(node, output) switch
+        {
+            (var layer, false) => Strings.T("S_IsolatedLayer", layer.Name),
+            (var layer, true) => Strings.T("S_IsolatedMask", layer.Name),
+            _ => Strings.T("S_ViewerShowing", NodeTitles.For(node) + " · " + NodeTitles.Socket(output)),
+        };
+
         ViewerBadge.Visibility = Visibility.Visible;
+    }
+
+    /// <summary>Welche Ebene der Betrachter allein zeigt - oder deren Maske. Null: nichts davon.</summary>
+    private (NodeLayer Layer, bool Mask)? IsolationOf(Node node, string output)
+    {
+        if (_graph is null) return null;
+
+        foreach (var layer in NodeLayerList.Of(_graph))
+        {
+            if (layer.Mix is not { } mix) continue;
+
+            if (_graph.Into(mix.Id, "Oben") is { } up && up.From == node.Id && up.Output == output) return (layer, false);
+            if (_graph.Into(mix.Id, "Faktor") is { } factor && factor.From == node.Id && factor.Output == output) return (layer, true);
+        }
+
+        return null;
+    }
+
+    /// <summary>
+    /// Eine Ebene allein zeigen - oder ihre Maske: der Betrachter auf das, was oben oder im
+    /// Faktor in ihr Mischen fliesst. Der Aufbau bleibt, wie er ist. Ein zweites Mal beendet es.
+    /// </summary>
+    internal bool Isolate(NodeLayer layer, bool mask)
+    {
+        if (_graph is null || layer.Mix is not { } mix || _graph.Into(mix.Id, mask ? "Faktor" : "Oben") is not { } link) return false;
+
+        (string, string) wanted = (link.From, link.Output);
+        SetViewer(_viewer == wanted ? null : wanted);
+        return true;
+    }
+
+    /// <summary>
+    /// Esc beendet, was der Betrachter zeigt - aber nur, wenn niemand sonst Esc braucht: kein
+    /// Zug mit der Maus, keine Objektwahl. Die haben Vorrang.
+    /// </summary>
+    private bool EndViewer()
+    {
+        if (_viewer is null || _objectPick is not null || Mouse.Captured is not null) return false;
+
+        SetViewer(null);
+        return true;
     }
 
     private void OnViewerClosed(object sender, RoutedEventArgs e) => SetViewer(null);

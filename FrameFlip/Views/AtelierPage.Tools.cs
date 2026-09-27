@@ -104,6 +104,8 @@ public partial class AtelierPage
     /// </summary>
     public bool HandleToolKey(Key key)
     {
+        if (key == Key.Escape) return EndViewer();
+
         var wanted = key switch
         {
             Key.V => AtelierTool.Move,

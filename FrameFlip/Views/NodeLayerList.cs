@@ -89,6 +89,12 @@ public sealed class NodeLayerList : Border
     /// <summary>Das Auge einer Ebene wurde angeklickt - ihr Mischen oder ihr Wasserzeichen.</summary>
     public event Action<Node>? MuteWanted;
 
+    /// <summary>
+    /// Alt+Klick auf das Auge oder die Maske einer Ebene: sie allein zeigen - die Ebene, oder
+    /// mit <c>true</c> ihre Maske (C6).
+    /// </summary>
+    public event Action<NodeLayer, bool>? IsolateWanted;
+
     /// <summary>Die fehlenden ausgeblendeten Ebenen sollen in den Graphen - oder, wenn das nicht geht, der Graph neu.</summary>
     public event Action<bool>? MissingWanted;
 
@@ -618,8 +624,18 @@ public sealed class NodeLayerList : Border
 
             eye.Click += (_, e) =>
             {
-                MuteWanted?.Invoke(mix);
                 e.Handled = true;
+
+                // Alt+Klick: die Ebene allein, wie in Photoshop und Blender - ohne sie
+                // auszublenden. Das Auge bleibt, wie es stand.
+                if ((Keyboard.Modifiers & ModifierKeys.Alt) != 0 && layer.Mix is not null)
+                {
+                    eye.IsChecked = !muted;
+                    IsolateWanted?.Invoke(layer, false);
+                    return;
+                }
+
+                MuteWanted?.Invoke(mix);
             };
 
             Grid.SetColumn(eye, 0);
@@ -651,6 +667,15 @@ public sealed class NodeLayerList : Border
                 Margin = new Thickness(0, 0, 6, 0),
                 ToolTip = Strings.T("S_NodeLayerMask"),
                 Child = new Image { Source = maskThumb, Stretch = Stretch.UniformToFill },
+            };
+
+            // Alt+Klick: die Maske allein, grau im Bild. Ohne Alt waehlt der Klick die Ebene, wie bisher.
+            mask.MouseLeftButtonUp += (_, e) =>
+            {
+                if ((Keyboard.Modifiers & ModifierKeys.Alt) == 0) return;
+
+                IsolateWanted?.Invoke(layer, true);
+                e.Handled = true;
             };
 
             Grid.SetColumn(mask, 2);

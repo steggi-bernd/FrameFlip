@@ -116,6 +116,7 @@ static int RunAll()
     PipetteInvariants.Run();
     PropertiesFollowInvariants.Run();
     QuickPanelInvariants.Run();
+    IsolationInvariants.Run();
     AtelierProjectInvariants.Run();
     AtelierProjectPageInvariants.Run();
     SwitchLeftoverInvariants.Run();
