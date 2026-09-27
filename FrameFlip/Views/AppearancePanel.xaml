@@ -12,7 +12,7 @@
             <TextBlock Text="{DynamicResource D_AppearanceIntro}" TextWrapping="Wrap"
                        Foreground="{StaticResource DesktopMuted}" FontSize="11.5" Margin="0,0,0,14" />
 
-            <views:SettingGroup Style="{StaticResource SettingGroupStyle}" Header="{DynamicResource D_Appearance}">
+            <views:SettingGroup Style="{StaticResource SettingGroupStyle}" Header="{DynamicResource D_AppearanceSizes}">
                 <views:SettingRow Style="{StaticResource SettingRowStyle}"
                                   Header="{DynamicResource D_UiScale}"
                                   Explain="{DynamicResource X_UiScale}" Important="True">

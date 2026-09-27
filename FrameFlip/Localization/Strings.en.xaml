@@ -403,6 +403,7 @@
     <sys:String x:Key="S_HotkeyNote">At least one modifier. Esc aborts the capture.</sys:String>
     <sys:String x:Key="S_PrefetchBehind">Prefetch behind</sys:String>
     <sys:String x:Key="S_AdaptiveLoad">Adaptive load</sys:String>
+    <sys:String x:Key="S_AdaptiveLoadAuto">Adjust automatically</sys:String>
     <sys:String x:Key="S_AdaptiveLoadHint">Adapt resources to CPU, GPU and RAM load</sys:String>
     <sys:String x:Key="S_LoadInterval">Sampling interval (s)</sys:String>
     <sys:String x:Key="S_MaxThreads">Max decoder threads</sys:String>
@@ -677,6 +678,7 @@
     <sys:String x:Key="S_RenderEnable">Start renders on this machine</sys:String>
     <sys:String x:Key="S_RenderHint">The app may then have a shared .blend file rendered. Output goes only into a folder FrameFlip creates for it – nothing is overwritten. A render starts a program on this machine; that is why this stands apart.</sys:String>
     <sys:String x:Key="S_BlenderLabel">Blender</sys:String>
+    <sys:String x:Key="S_BlenderProgram">Program</sys:String>
     <sys:String x:Key="S_AddBlender">Other version …</sys:String>
     <sys:String x:Key="S_PickBlender">Choose blender.exe</sys:String>
     <sys:String x:Key="S_NoBlender">No version found</sys:String>
@@ -685,8 +687,9 @@
 
     <!-- ================================================================ Dateien annehmen -->
     <sys:String x:Key="S_PushEnable">Accept files from the phone</sys:String>
-    <sys:String x:Key="S_PushHint">The app may store .blend files – in the exchange folder below or in a shared project folder. Every accepted file gets “_exchanged” in its name: you see at once which one came from outside, and an existing file is never overwritten.</sys:String>
+    <sys:String x:Key="S_PushHint">The app may store .blend files – in the exchange folder or in a shared project folder. Every accepted file gets “_exchanged” in its name: you see at once which one came from outside, and an existing file is never overwritten.</sys:String>
     <sys:String x:Key="S_ExchangeFolder">Exchange folder</sys:String>
+    <sys:String x:Key="S_ExchangeFolderPath">Folder</sys:String>
     <sys:String x:Key="S_PickExchange">Choose the exchange folder</sys:String>
     <sys:String x:Key="S_NoFolderSet">no folder chosen</sys:String>
     <sys:String x:Key="S_ChooseFolder">Choose …</sys:String>
@@ -732,11 +735,12 @@
     <sys:String x:Key="D_Apply">Apply</sys:String>
     <sys:String x:Key="D_ClassicQr">Classic QR code (dark on light)</sys:String>
     <sys:String x:Key="D_Permissions">Blender &amp; files</sys:String>
-    <sys:String x:Key="D_PermissionsIntro">Choose how Blender connects and what your paired device can do on this PC.</sys:String>
+    <sys:String x:Key="D_PermissionsIntro">How Blender connects and what the paired phone may do on this machine.</sys:String>
     <sys:String x:Key="D_BlenderBridge">Enable FrameFlip bridge for render status</sys:String>
     <sys:String x:Key="D_FileRead">Allow reading files in the exchange folder</sys:String>
     <sys:String x:Key="D_WorkspaceBehaviour">Behaviour</sys:String>
     <sys:String x:Key="D_Appearance">Workspace</sys:String>
+    <sys:String x:Key="D_AppearanceSizes">Sizes and layout</sys:String>
     <sys:String x:Key="D_AppearanceIntro">These adjustments apply and save immediately. Panels automatically stack when space is limited.</sys:String>
     <sys:String x:Key="D_UiScale">Interface scale</sys:String>
     <sys:String x:Key="D_UiScaleAuto">Follow screen</sys:String>
@@ -747,9 +751,9 @@
     <sys:String x:Key="D_MonitorFirst">Show metrics on the left</sys:String>
     <sys:String x:Key="D_ReduceMotion">Reduce motion</sys:String>
     <sys:String x:Key="D_ResetLayout">Restore default layout</sys:String>
-    <sys:String x:Key="D_SaveToPair">Enable remote control and apply to display the pairing code.</sys:String>
-    <sys:String x:Key="D_BlenderRequired">Enable remote control and select an existing blender.exe.</sys:String>
-    <sys:String x:Key="D_FolderRequired">Enable remote control and select an existing exchange folder.</sys:String>
+    <sys:String x:Key="D_SaveToPair">Turn on “Send render progress to the phone” and apply, then the pairing code appears here.</sys:String>
+    <sys:String x:Key="D_BlenderRequired">Turn on “Send render progress to the phone” and select an existing blender.exe.</sys:String>
+    <sys:String x:Key="D_FolderRequired">Turn on “Send render progress to the phone” and select an existing exchange folder.</sys:String>
     <sys:String x:Key="D_ReadRequired">Reading access must also be enabled to receive files.</sys:String>
     <sys:String x:Key="D_Saved">Settings applied.</sys:String>
     <sys:String x:Key="D_Preview">UI PREVIEW</sys:String>

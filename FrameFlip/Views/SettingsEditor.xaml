@@ -317,7 +317,7 @@
                         </views:SettingGroup>
 
                         <views:SettingGroup Style="{StaticResource SettingGroupStyle}" Header="{DynamicResource S_AdaptiveLoad}">
-                            <views:SettingRow Style="{StaticResource SettingRowStyle}" Header="{DynamicResource S_AdaptiveLoad}"
+                            <views:SettingRow Style="{StaticResource SettingRowStyle}" Header="{DynamicResource S_AdaptiveLoadAuto}"
                                               Explain="{DynamicResource X_AdaptiveLoad}" Important="True">
                                 <CheckBox x:Name="AdaptiveBox" Style="{StaticResource DesktopCheckBox}" />
                             </views:SettingRow>
@@ -473,7 +473,7 @@
                             </views:SettingRow>
 
                             <views:SettingRow Style="{StaticResource SettingRowStyle}"
-                                              Header="{DynamicResource S_BlenderLabel}"
+                                              Header="{DynamicResource S_BlenderProgram}"
                                               Explain="{DynamicResource X_BlenderPath}">
                                 <DockPanel Width="300">
                                     <Button DockPanel.Dock="Right" Content="…" Style="{StaticResource DesktopButton}"
@@ -492,7 +492,7 @@
 
                         <views:SettingGroup Style="{StaticResource SettingGroupStyle}" Header="{DynamicResource S_ExchangeFolder}">
                             <views:SettingRow Style="{StaticResource SettingRowStyle}"
-                                              Header="{DynamicResource S_ExchangeFolder}"
+                                              Header="{DynamicResource S_ExchangeFolderPath}"
                                               Explain="{DynamicResource X_ExchangeFolder}" Important="True">
                                 <DockPanel Width="300">
                                     <Button DockPanel.Dock="Right" Content="…" Style="{StaticResource DesktopButton}"
