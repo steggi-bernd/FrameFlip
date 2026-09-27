@@ -11,8 +11,42 @@ internal static partial class Program
     /// mit gezeichneten Zeichen, breit und schmal - und beim Rechteck nur, was zum Fuellen
     /// gehoert. Nur die Leiste selbst, keine Medien.
     /// </summary>
+    /// <summary>
+    /// Die Tonwertkorrektur im Farbstreifen (W2): eine synthetische Verteilung, Schwarz- und
+    /// Weisspunkt nach innen gezogen, die Mitten etwas aufgehellt.
+    /// </summary>
+    private static void TestLevelsCard()
+    {
+        var panel = new GradingPanel();
+        var stack = new GradingStack();
+        stack.Tools.Add(new LevelsTool { Master = new LevelsChannel { InBlack = 0.12f, Gamma = 1.25f, InWhite = 0.86f } });
+        panel.Load(null, stack);
+
+        var histogram = new FrameFlip.Imaging.Histogram();
+        for (int i = 0; i < 256; i++)
+        {
+            int bell = (int)(4000 * Math.Exp(-Math.Pow((i - 120) / 38.0, 2)));
+            histogram.Luma[i] = bell;
+            histogram.Red[i] = bell;
+            histogram.Green[i] = bell;
+            histogram.Blue[i] = bell;
+        }
+
+        panel.ShowHistogram(histogram);
+
+        var host = new Border { Background = new SolidColorBrush(Color.FromRgb(0x1B, 0x1A, 0x23)), Child = panel, Width = 340 };
+        host.Measure(new Size(340, double.PositiveInfinity));
+        Render(host, 340, 1100, "Farbe-Tonwert.png");
+
+        var values = (TextBlock)panel.FindName("LevelsValues");
+        Check(values.Text.Contains("31") && values.Text.Contains("219") && values.Text.Contains("1"),
+              $"Tonwert-Karte: die Werte stehen als Zahlen darunter ({values.Text})");
+    }
+
     private static void TestToolBar()
     {
+        TestLevelsCard();
+
         // Die Hinweise im Stil der Oberflaeche: dunkel, gerundet, und ein langer Satz bricht um.
         var tip = new ToolTip { Content = string.Join(" ", Enumerable.Repeat("Ein langer Hinweis, der umbrechen muss.", 12)) };
         tip.Style = (Style)Application.Current.FindResource(typeof(ToolTip));

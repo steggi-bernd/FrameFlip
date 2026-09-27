@@ -11,6 +11,9 @@
     <sys:String x:Key="S_BufferAhead">How far the ring buffer reaches ahead. Once this number gets small, playback is about to stall – a smaller decode size helps.</sys:String>
     <sys:String x:Key="S_Adjusted">The display is corrected – the files are untouched</sys:String>
     <sys:String x:Key="S_FloatPath">The correction is working on the file’s float values – exposure recovers detail from the highlights</sys:String>
+    <sys:String x:Key="S_Levels">Levels</sys:String>
+    <sys:String x:Key="S_LevelsHint">The handles below the histogram: black, grey and white of the input, below them the output range. What lies left of the black point or right of the white point is clipped. Double-click resets a handle.</sys:String>
+    <sys:String x:Key="S_LevelsValues">Input {0} · {1} · {2}    Output {3} – {4}</sys:String>
     <sys:String x:Key="S_Curves">Curves</sys:String>
     <sys:String x:Key="S_CurveHint">Click to add a point, drag to move it, right-click to remove it.</sys:String>
     <sys:String x:Key="S_ShowOriginal">Original</sys:String>

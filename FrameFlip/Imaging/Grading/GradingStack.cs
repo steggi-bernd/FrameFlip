@@ -295,6 +295,7 @@ public sealed class GradingStack
     private static IGradingTool Copy(IGradingTool tool) => tool switch
     {
         CurvesTool curves => curves.Clone(),
+        LevelsTool levels => levels.Clone(),
         LiftGammaGainTool lgg => lgg.Clone(),
         WhiteBalanceTool wb => new WhiteBalanceTool { Kelvin = wb.Kelvin, Tint = wb.Tint },
         VibranceTool vibrance => new VibranceTool { Amount = vibrance.Amount },

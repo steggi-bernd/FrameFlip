@@ -112,7 +112,7 @@
 
 
             <ToggleButton x:Name="GroupBasic" Style="{StaticResource SectionHeader}"
-                          Margin="0,18,0,2" IsChecked="True" Tag="Basic,Curve,WhiteBalance,Zones,Bands"
+                          Margin="0,18,0,2" IsChecked="True" Tag="Basic,Levels,Curve,WhiteBalance,Zones,Bands"
                           Content="{DynamicResource S_GroupBasics}"
                           Checked="OnGroupToggled" Unchecked="OnGroupToggled" />
             <!-- Grundkorrektur -->
@@ -190,6 +190,48 @@
                         Background="{StaticResource TrackVibrance}"
                         Minimum="-1" Maximum="1" Value="0" SmallChange="0.02" LargeChange="0.1"
                         ValueChanged="OnChanged" MouseDoubleClick="OnSliderReset" Tag="0" />
+            </StackPanel>
+
+            <!--
+                Tonwert (W2): Schwarz, Grau und Weiss des Eingangs und der Bereich des Ausgangs,
+                an Anfassern unter dem Histogramm - gemeinsam oder je Kanal.
+            -->
+            <Grid x:Name="LevelsHead" Margin="0,16,0,6">
+                <TextBlock Text="{DynamicResource S_Levels}" Style="{StaticResource PanelHeading}" />
+                <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+                    <Button Style="{StaticResource LinkButton}" Margin="0,0,10,0"
+                            Content="{DynamicResource S_Reset}" Click="OnResetLevelsClicked" />
+                    <Button Style="{StaticResource LinkButton}" Content="−"
+                            Tag="LevelsBody" Click="OnSectionToggled" />
+                </StackPanel>
+            </Grid>
+
+            <StackPanel x:Name="LevelsBody">
+                <Grid Margin="0,0,0,6">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="*" />
+                    </Grid.ColumnDefinitions>
+                    <ToggleButton x:Name="LevelsMasterButton" Grid.Column="0" Style="{StaticResource OverlayToggle}"
+                                  Margin="0,0,2,0" Content="RGB" IsChecked="True" Tag="0"
+                                  Checked="OnLevelsChannelPicked" />
+                    <ToggleButton x:Name="LevelsRedButton" Grid.Column="1" Style="{StaticResource OverlayToggle}"
+                                  Margin="2,0,2,0" Content="R" Tag="1" Checked="OnLevelsChannelPicked" />
+                    <ToggleButton x:Name="LevelsGreenButton" Grid.Column="2" Style="{StaticResource OverlayToggle}"
+                                  Margin="2,0,2,0" Content="G" Tag="2" Checked="OnLevelsChannelPicked" />
+                    <ToggleButton x:Name="LevelsBlueButton" Grid.Column="3" Style="{StaticResource OverlayToggle}"
+                                  Margin="2,0,0,0" Content="B" Tag="3" Checked="OnLevelsChannelPicked" />
+                </Grid>
+
+                <local:LevelsEditor x:Name="LevelsField" />
+
+                <TextBlock x:Name="LevelsValues" Margin="0,6,0,0" Style="{StaticResource PanelValue}"
+                           HorizontalAlignment="Left" FontSize="10" />
+
+                <TextBlock Margin="0,4,0,0" FontSize="10" Foreground="{StaticResource MutedBrush}"
+                           TextWrapping="Wrap" Text="{DynamicResource S_LevelsHint}" />
             </StackPanel>
 
             <!-- Kurven -->

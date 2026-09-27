@@ -18,6 +18,7 @@ public static class NodeTitles
     private static readonly Dictionary<string, (string Section, string Key)> Tools = new(StringComparer.Ordinal)
     {
         [CurvesTool.KindName] = ("Curve", "S_Curves"),
+        [LevelsTool.KindName] = ("Levels", "S_Levels"),
         [WhiteBalanceTool.KindName] = ("WhiteBalance", "S_WhiteBalance"),
         [LiftGammaGainTool.KindName] = ("Zones", "S_Zones"),
         [HslTool.KindName] = ("Bands", "S_ColourBands"),
