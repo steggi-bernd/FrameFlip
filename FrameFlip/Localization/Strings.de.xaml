@@ -1179,6 +1179,12 @@
     <sys:String x:Key="S_NodeViewerTag">Betrachter</sys:String>
     <sys:String x:Key="S_ViewerShowing">Betrachter: {0}</sys:String>
     <sys:String x:Key="S_ViewerBack">Zurück zur Ausgabe</sys:String>
+    <sys:String x:Key="S_TargetPicture">Gesamtbild</sys:String>
+    <sys:String x:Key="S_TargetLayer">Ebene: {0}</sys:String>
+    <sys:String x:Key="S_TargetMask">Maske: {0}</sys:String>
+    <sys:String x:Key="S_TargetNode">Knoten: {0}</sys:String>
+    <sys:String x:Key="S_TargetColourOnPicture">Farbstreifen wirkt aufs Gesamtbild</sys:String>
+    <sys:String x:Key="S_TargetHint">Woran gerade gearbeitet wird. Ein Klick auf ein Glied wählt es.</sys:String>
     <sys:String x:Key="S_NodeMenuView">Im Betrachter zeigen (Strg+Umschalt+Klick)</sys:String>
     <sys:String x:Key="S_NodeMenuViewOff">Betrachter aus – wieder die Ausgabe zeigen</sys:String>
     <sys:String x:Key="S_NodeLayerName">Name der Ebene</sys:String>

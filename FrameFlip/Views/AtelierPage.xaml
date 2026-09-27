@@ -66,6 +66,18 @@
                         <RowDefinition Height="*" />
                     </Grid.RowDefinitions>
 
+                    <!-- Woran gerade gearbeitet wird (docs/Atelier-Arbeitsablauf.md, C1) - aus dem
+                         Bearbeitungsziel der Sitzung, siehe ShowTargetPath. Die Glieder baut der Code. -->
+                    <DockPanel x:Name="TargetStrip" Grid.Row="0" Margin="2,0,2,6" Visibility="Collapsed"
+                               Background="Transparent" ToolTip="{DynamicResource S_TargetHint}">
+                        <TextBlock x:Name="TargetNote" DockPanel.Dock="Right" VerticalAlignment="Center"
+                                   Margin="12,0,0,0" FontSize="11" TextTrimming="CharacterEllipsis"
+                                   Foreground="{StaticResource MutedBrush}" />
+                        <local:IconLabel DockPanel.Dock="Left" Icon="target" Margin="0,0,8,0"
+                                         TextElement.Foreground="{StaticResource MutedBrush}" />
+                        <WrapPanel x:Name="TargetPathPanel" VerticalAlignment="Center" />
+                    </DockPanel>
+
                     <Border Grid.Row="1" Background="#FF101010" CornerRadius="4"
                             ClipToBounds="True"
                             AllowDrop="True" Drop="OnImageFilesDropped" DragOver="OnImageFilesDragOver">

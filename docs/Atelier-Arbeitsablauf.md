@@ -554,3 +554,30 @@ und Abnahme stehen im [Refactoring-Studio](Refactoring-Studio.md), S2 zweiter Te
   eine Stelle statt vieler.
 - Im Stapel lesen Rahmen und Pinsel noch die Auswahl des Ebenenstreifens. Sie ziehen mit C
   um.
+
+### C1: Die Zielzeile (`feature/zielzeile`)
+
+Punkt 5. Über dem Bild steht, woran gerade gearbeitet wird. Die Zeile ist aus dem
+Bearbeitungsziel abgeleitet (B) und wird nicht zusätzlich gepflegt. Sie kann deshalb nichts
+anderes sagen als das, wohin der nächste Regler geht.
+
+- **Knotenmodus:**
+  - „Ebene: Licht“ – die Ebene aus der Liste oder ihr Mischen.
+  - „Ebene: Licht › Maske: Auto, Rad“ – ihre Maske; eine Kryptomatte nennt die gewählten
+    Objekte.
+  - „Ebene: Licht › Knoten: Korrektur“ – ein Knoten in ihrem Zweig.
+  - „Gesamtbild › Knoten: Tonwert“ – ein Knoten hinter allen Ebenen.
+  - „Gesamtbild“ – nichts gewählt.
+- **Zuordnung:** Ein Knoten gehört zur innersten Ebene, in deren Zweig er liegt. Zur Maske
+  zählt nur, was ausschließlich in sie fließt. Masken lesen das Bild der Ebene als Eingang,
+  die Korrektur der Ebene bleibt trotzdem ein Knoten der Ebene.
+- **Stapel:** „Ebene: Name“. Rechts steht „Farbstreifen wirkt aufs Gesamtbild“, wenn die
+  Ebene gewählt ist, die Regler aber dem Bild gelten.
+- **Klick:** Ein Glied, das nicht selbst das Ziel ist, wählt, wofür es steht. Die Ebene
+  wird gewählt wie in der Liste, „Gesamtbild“ wählt ab. Ebenenliste und Editor gehen mit.
+- **Probe** (`TargetPathInvariants`, 15 Zusicherungen):
+  - Ohne Fenster: alle Fälle der Zuordnung.
+  - Auf der Seite: sichtbar nur mit Bild, der Hinweis im Stapel, Klick auf „Gesamtbild“ und
+    auf die Ebene, ein umbenanntes Mischen.
+- **Echte Instanz:** Debug-Build mit eigener Konfiguration und synthetischer Folge. Die
+  Zeile steht samt Hinweis da, ohne Ausnahme.

@@ -171,6 +171,9 @@ public partial class AtelierPage
         ShowMissingLayers();
         KeepViewer();
 
+        // Namen und Aufbau koennen sich geaendert haben, ohne dass das Ziel wechselte.
+        ShowTargetPath();
+
         // Erst grob, dann voll - wie beim Ziehen an einem Regler. Der Editor zeigt die
         // Aenderung sofort, das Bild zieht im naechsten Bild nach, scharf nach einer Pause.
         // Voll und sofort hielt jeder Klick die Seite an, bis das ganze Bild gerechnet war.
