@@ -29,7 +29,8 @@ internal sealed class WatchCard
         FrameworkElement PassRow,
         TextBox Pass,
         TextBlock PassHint,
-        Panel Actions);
+        Panel Actions,
+        ButtonBase AddressCopy);
 
     /// <summary>Was der Wirt beitraegt.</summary>
     /// <param name="Settings">Der Bestand - das Objekt, das der Wirt haelt.</param>
@@ -40,7 +41,7 @@ internal sealed class WatchCard
     /// <param name="Note">Eine Zeile ins Protokoll.</param>
     /// <param name="ShowError">Ein Fehler beim Uebernehmen - dort, wo die Karte Hinweise zeigt.</param>
     /// <param name="MakeAction">Baut einen Handgriff: Textschluessel, ob er der wichtigste ist, und was er tut.</param>
-    /// <param name="Copy">Legt einen Link in die Zwischenablage.</param>
+    /// <param name="Copy">Legt einen Link in die Zwischenablage. Rueckgabe: ob es geklappt hat.</param>
     internal sealed record Host(
         Func<AppSettings> Settings,
         Func<AppSettings, string?> Apply,
@@ -53,7 +54,7 @@ internal sealed class WatchCard
         Action<string> Note,
         Action<string> ShowError,
         Func<string, bool, Action, Button> MakeAction,
-        Action<string> Copy);
+        Func<string, bool> Copy);
 
     private readonly Parts _parts;
     private readonly Host _host;
@@ -61,10 +62,18 @@ internal sealed class WatchCard
     /// <summary>Woran die Anzeige haengt - abgemeldet, sobald der Dienst wechselt.</summary>
     private Web.WatchService? _watched;
 
+    /// <summary>Die gezeigte Adresse - oder null, solange keine gilt.</summary>
+    private string? _link;
+
+    /// <summary>Wie lange "Kopiert" an Stelle der Adresse steht.</summary>
+    private DispatcherTimer? _copied;
+
     public WatchCard(Parts parts, Host host)
     {
         _parts = parts;
         _host = host;
+
+        parts.AddressCopy.Click += (_, _) => CopyAddress();
     }
 
     private Dispatcher Dispatcher => _parts.Toggle.Dispatcher;
@@ -136,6 +145,8 @@ internal sealed class WatchCard
             p.PassRow.Visibility = Visibility.Collapsed;
             p.Code.Text = null;
             p.Address.Text = string.Empty;
+            p.AddressCopy.Visibility = Visibility.Collapsed;
+            _link = null;
 
             // Zwei verschiedene Faelle mit zwei verschiedenen Saetzen: schlicht aus -
             // oder an, aber ohne Relay-Adresse, mit der sich etwas anfangen liesse.
@@ -149,7 +160,12 @@ internal sealed class WatchCard
         p.CodeFrame.Visibility = Visibility.Visible;
         p.Code.LightModules = _host.LightQr();
         p.Code.Text = link;
-        p.Address.Text = link;
+        p.AddressCopy.Visibility = Visibility.Visible;
+        _link = link;
+
+        // Waehrend "Kopiert" dasteht, bleibt es stehen - ein Zuschauer, der kommt oder geht,
+        // ruft Refresh, und die Bestaetigung waere weg, bevor man sie gelesen hat.
+        if (_copied is not { IsEnabled: true }) p.Address.Text = link;
 
         p.Hint.Text = Standing(watch);
 
@@ -160,8 +176,31 @@ internal sealed class WatchCard
         // Text unter den Fingern zurueck, sobald ein Zuschauer kommt oder geht.
         if (!p.Pass.IsKeyboardFocusWithin) p.Pass.Text = CurrentCode() ?? string.Empty;
 
-        p.Actions.Children.Add(_host.MakeAction("S_CopyLink", false, () => _host.Copy(link)));
+        p.Actions.Children.Add(_host.MakeAction("S_CopyLink", false, CopyAddress));
         p.Actions.Children.Add(_host.MakeAction("D_WatchRenew", false, Renew));
+    }
+
+    /// <summary>
+    /// Kopiert die Adresse - per Klick auf sie selbst oder ueber "Link kopieren".
+    ///
+    /// Die Bestaetigung steht dort, wo geklickt wurde: an Stelle der Adresse, eine gute
+    /// Sekunde lang. Vorher kam sie in der Statuszeile am Fuss der Einstellungen an, weit
+    /// weg vom Blick, und im Dashboard gar nicht dort, wo die Adresse steht.
+    /// </summary>
+    internal void CopyAddress()
+    {
+        if (_link is not { Length: > 0 } link || !_host.Copy(link)) return;
+
+        _parts.Address.Text = Strings.T("S_CopiedAddress");
+
+        _copied?.Stop();
+        _copied = new DispatcherTimer(DispatcherPriority.Background, Dispatcher) { Interval = TimeSpan.FromSeconds(1.6) };
+        _copied.Tick += (_, _) =>
+        {
+            _copied?.Stop();
+            _parts.Address.Text = _link ?? string.Empty;
+        };
+        _copied.Start();
     }
 
     /// <summary>

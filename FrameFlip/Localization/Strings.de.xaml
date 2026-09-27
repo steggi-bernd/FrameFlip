@@ -508,6 +508,9 @@
     <sys:String x:Key="S_NewKeyHint">Trennt alle bisher gekoppelten Geräte.</sys:String>
     <sys:String x:Key="S_CopyLink">Link kopieren</sys:String>
     <sys:String x:Key="S_Copied">Kopiert.</sys:String>
+    <sys:String x:Key="S_CopyAddress">Adresse kopieren</sys:String>
+    <sys:String x:Key="S_CopyAddressHint">Klicken, um die Adresse zu kopieren</sys:String>
+    <sys:String x:Key="S_CopiedAddress">✓ Kopiert</sys:String>
     <sys:String x:Key="S_RoomLabel">Raum {0}</sys:String>
 
     <sys:String x:Key="S_HotkeyTaken">Der Hotkey {0} ist belegt. Bitte in den Einstellungen ändern.</sys:String>

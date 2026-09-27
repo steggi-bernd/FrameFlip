@@ -31,6 +31,7 @@ public static class WatchCardInvariants
         TogglesThroughTheHost();
         TakesThePassword();
         TheSettingsShowTheSameCard();
+        Isolated(TheAddressCopies);
         Isolated(TheSettingsLayOut);
         Isolated(TheOverviewMirrorsTheSections);
         ScreensScaleTheSurface();
@@ -255,6 +256,62 @@ public static class WatchCardInvariants
                    ((System.Windows.Controls.Primitives.UniformGrid)alone.FindName("ConnectionCards")).Columns == 1,
                    "ohne Wirt: keine Zuschauerkarte, die Kopplung allein");
         alone.Dispose();
+    }
+
+    /// <summary>
+    /// Die Adresse ist ein Knopf (docs/Atelier-Arbeitsablauf.md, Punkt 15): Ein Klick kopiert
+    /// sie, und an ihrer Stelle steht kurz "Kopiert". Kopiert wird ueber den Wirt - hier einer,
+    /// der nur mitschreibt; die Zwischenablage des Rechners bleibt unberuehrt.
+    /// </summary>
+    private static void TheAddressCopies()
+    {
+        Check.Group("Zuschauerkarte: die Adresse kopiert sich per Klick");
+
+        var key = WatchKey.Create("geheim1");
+        var settings = new AppSettings { TermsAccepted = AppSettings.TermsVersion, WatchEnabled = true, WatchSecret = WatchStore.Protect(key) };
+        var service = new WatchService(key, "relay.example", null, () => null, () => null);
+
+        var copied = new List<string>();
+        bool clipboardFree = true;
+
+        var address = new TextBlock();
+        var button = new Button();
+        var actions = new StackPanel();
+
+        var card = new WatchCard(
+            new WatchCard.Parts(new ToggleButton(), new TextBlock(), new Border(), new QrCodeView(), address, new TextBlock(),
+                                new StackPanel(), new TextBox(), new TextBlock(), actions, button),
+            new WatchCard.Host(() => settings, _ => null, () => service, null, null, () => false, () => true, then => then(),
+                               _ => { }, _ => { },
+                               (_, _, act) => { var made = new Button(); made.Click += (_, _) => act(); return made; },
+                               text => { if (clipboardFree) copied.Add(text); return clipboardFree; }));
+
+        void Click(ButtonBase target) => target.RaiseEvent(new RoutedEventArgs(ButtonBase.ClickEvent));
+
+        card.Refresh();
+        Check.That(button.Visibility == Visibility.Visible && address.Text == service.Link, "mit Adresse: der Knopf steht da und zeigt sie");
+
+        Click(button);
+        Check.That(copied.SequenceEqual(new[] { service.Link }) && address.Text == T("S_CopiedAddress"),
+                   "ein Klick kopiert die Adresse, und an ihrer Stelle steht \"Kopiert\"", address.Text);
+
+        card.Refresh();
+        Check.That(address.Text == T("S_CopiedAddress"), "ein Zuschauer, der kommt oder geht, nimmt die Bestaetigung nicht vorzeitig weg");
+
+        Pump(2.0);
+        Check.That(address.Text == service.Link, "nach gut einer Sekunde steht wieder die Adresse da");
+
+        Click((Button)actions.Children[0]);
+        Check.That(copied.Count == 2 && address.Text == T("S_CopiedAddress"), "\"Link kopieren\" nimmt denselben Weg und sagt es an derselben Stelle");
+        Pump(2.0);
+
+        clipboardFree = false;
+        Click(button);
+        Check.That(copied.Count == 2 && address.Text == service.Link, "ist die Zwischenablage belegt, behauptet die Karte nicht, kopiert zu haben");
+
+        settings.WatchEnabled = false;
+        card.Refresh();
+        Check.That(button.Visibility == Visibility.Collapsed, "ohne Adresse kein Knopf");
     }
 
     /// <summary>Die Leiste links, bei schmaler Seite oben; die Karten nebeneinander, wenn sie Platz haben.</summary>

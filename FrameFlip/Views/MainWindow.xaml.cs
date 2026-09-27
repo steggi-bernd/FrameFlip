@@ -224,7 +224,7 @@ public partial class MainWindow : Window
 
         _watchCard = new WatchCard(
             new WatchCard.Parts(WatchToggle, WatchToggleText, WatchCodeFrame, WatchCode, WatchAddress, WatchHint,
-                                WatchPassRow, WatchPass, WatchPassHint, WatchActions),
+                                WatchPassRow, WatchPass, WatchPassHint, WatchActions, WatchAddressCopy),
             new WatchCard.Host(_getSettings, _apply, _watch, _renewWatch, _setWatchCode, () => _layout.LightQr, () => _ready,
                                then => AskTerms(then), Note, error => PairHint.Text = error, PairAction, CopyInvite));
 
@@ -2510,17 +2510,19 @@ public partial class MainWindow : Window
         RefreshLink();
     }
 
-    private void CopyInvite(string text)
+    private bool CopyInvite(string text)
     {
         try
         {
             Clipboard.SetText(text);
             PairHint.Text = Strings.T("S_Copied");
+            return true;
         }
         catch (Exception)
         {
             // Die Zwischenablage kann von einem anderen Programm belegt sein.
             PairHint.Text = Strings.T("S_NoClipboard");
+            return false;
         }
     }
 

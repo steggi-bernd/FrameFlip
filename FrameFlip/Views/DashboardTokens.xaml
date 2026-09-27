@@ -759,6 +759,33 @@
     </Style>
 
 
+    <!-- Ein Text, der sich per Klick kopieren laesst - die Adresse der Zuschauerseite. Ohne
+         Flaeche, bis die Maus darauf steht; mit Rahmen, wenn die Tastatur ihn erreicht. -->
+    <Style x:Key="CopyField" TargetType="Button">
+        <Setter Property="Cursor" Value="Hand" />
+        <Setter Property="Foreground" Value="{StaticResource DesktopInk}" />
+        <Setter Property="Padding" Value="8,5" />
+        <Setter Property="FocusVisualStyle" Value="{x:Null}" />
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="Button">
+                    <Border x:Name="Chrome" Background="Transparent" CornerRadius="6"
+                            BorderBrush="Transparent" BorderThickness="1" Padding="{TemplateBinding Padding}">
+                        <ContentPresenter />
+                    </Border>
+                    <ControlTemplate.Triggers>
+                        <Trigger Property="IsMouseOver" Value="True">
+                            <Setter TargetName="Chrome" Property="Background" Value="{StaticResource DesktopSubtle}" />
+                        </Trigger>
+                        <Trigger Property="IsKeyboardFocused" Value="True">
+                            <Setter TargetName="Chrome" Property="BorderBrush" Value="{StaticResource DesktopAccent}" />
+                        </Trigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
     <!-- Eine Gruppe ersetzt die Trennlinien. Eine Linie sagt "hier ist ein Schnitt";
          eine Ueberschrift sagt, worum es im Abschnitt geht. -->
     <Style x:Key="SettingGroupStyle" TargetType="{x:Type views:SettingGroup}">

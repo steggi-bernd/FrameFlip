@@ -508,6 +508,9 @@
     <sys:String x:Key="S_NewKeyHint">Disconnects every device paired so far.</sys:String>
     <sys:String x:Key="S_CopyLink">Copy link</sys:String>
     <sys:String x:Key="S_Copied">Copied.</sys:String>
+    <sys:String x:Key="S_CopyAddress">Copy address</sys:String>
+    <sys:String x:Key="S_CopyAddressHint">Click to copy the address</sys:String>
+    <sys:String x:Key="S_CopiedAddress">✓ Copied</sys:String>
     <sys:String x:Key="S_RoomLabel">Room {0}</sys:String>
 
     <sys:String x:Key="S_HotkeyTaken">The hotkey {0} is taken. Please change it in the settings.</sys:String>
