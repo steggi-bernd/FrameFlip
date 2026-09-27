@@ -738,3 +738,42 @@ Punkt 8: „Node auswählen → Einstellungen sofort sichtbar.“
   Seite, Objektmaske, Zielzeile, Aktionen, Auswahl, Pipette) liefen mit 379 Zusicherungen grün.
   Das Warten auf das Loslassen der Maus prüft die Probe nicht, denn sie kann keine gedrückte
   Maus vortäuschen.
+
+### C5b: Schnellfeld am Knoten (`feature/schnellfeld`)
+
+Punkt 7: „Doppelklick auf einen Node → kleines Panel daneben“.
+
+- **Öffnen:** Ein Doppelklick auf einen Knoten wählt ihn und öffnet an der Maus ein kleines
+  Feld. Oben steht, für welchen Knoten es gilt. Der Knoten bleibt dabei liegen, es beginnt
+  kein Zug.
+- **An einem Knoten mit Bild und an der Maske einer Ebene:**
+  - „Korrektur“, „Belichtung & Sättigung“, „Tonwert“ und „Effekt suchen …“.
+  - Sie gehen über die Werkzeugleiste und landen dort, wo auch „+ Korrektur“ der Zielzeile
+    sie hinsetzt: direkt hinter den Knoten, oder bei einer Maske in den Zweig ihrer Ebene.
+  - Das Neue ist danach gewählt, die Eigenschaften zeigen es (C5a).
+  - Rückgängig nimmt es in einem Schritt zurück.
+- **An einer freien Maske:** „Korrektur mit dieser Maske“. Hinter einer Maske gibt es kein
+  Bild. Deshalb entsteht eine neue Einstellungsebene über der gewählten oder oben auf den
+  Ebenen, mit dieser Maske im Faktor, und ihre Korrektur ist gewählt. Das ist das Beispiel
+  aus Punkt 7: „Kryptomatte → Korrektur → bestehende Ausgabe“.
+- **Kryptomatte-Maske:** „Objekte wählen“ schaltet auf Auswählen. Die Maske bleibt das
+  Ziel, ein Klick ins Bild nimmt Objekte auf oder heraus (C3b).
+- **Ebene ohne Maske**, wenn die Datei eine Kryptomatte hat: „Objekt als Maske“, die
+  Objektmaske aus R4.
+- **Überall mit Ausgang:** „Betrachter“. An der Ausgabe öffnet sich kein Feld, denn dort
+  täte keiner der Einträge etwas.
+- **Nicht dabei:**
+  - „Weichzeichnen“: Ein Werkzeug dafür gibt es nicht, nur die weiche Kante einer Maske.
+  - „Isolieren“ kommt mit C6 in dieses Feld.
+  - „Auswahl verwenden“ steckt in „Objekte wählen“. Eine vorläufige Auswahl endet, sobald
+    ein Knoten gewählt wird (C3b), und lässt sich deshalb nicht erst danach verwenden.
+- **Probe** (`QuickPanelInvariants`, 14 Zusicherungen):
+  - Die Einträge je Knotenart: Ebenenkorrektur, Maske einer Ebene, freie
+    Kryptomatte-Maske, Ausgabe.
+  - Tonwert hinter der Korrektur samt Rückgängig, Korrektur in den Zweig der Ebene.
+  - Korrektur mit freier Maske: neue Ebene, Maske im Faktor, in der Ebenenliste, Rückgängig
+    in einem Schritt.
+  - „Objekte wählen“, kein „Objekt als Maske“ ohne Kryptomatte.
+  - Den Doppelklick selbst täuscht die Probe nicht vor. Sie prüft, dass der Editor mit dem
+    Feld verbunden ist.
+  - Die Nachbargruppen liefen mit 356 Zusicherungen grün.

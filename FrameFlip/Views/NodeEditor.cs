@@ -130,6 +130,9 @@ public sealed class NodeEditor : FrameworkElement
     /// <summary>Ein Menue zum Hinzufuegen ist gewuenscht - an dieser Stelle im Graphen.</summary>
     public event Action<Point>? MenuWanted;
 
+    /// <summary>Doppelklick auf einen Knoten: das Schnellfeld daneben (C5b).</summary>
+    public event Action<Node>? QuickWanted;
+
     /// <summary>
     /// Ein Effekt aus der Palette wurde hereingezogen: welcher, wohin (die linke obere
     /// Ecke des Knotens im Graphen) und in welches Kabel er fallen soll - oder in keines.
@@ -450,6 +453,14 @@ public sealed class NodeEditor : FrameworkElement
 
         var hit = NodeAt(at);
         Select(hit);
+
+        // Doppelklick auf einen Knoten: das Schnellfeld - und kein Zug, der Knoten bleibt liegen.
+        if (hit is not null && e.ClickCount == 2 && QuickWanted is not null)
+        {
+            QuickWanted(hit);
+            e.Handled = true;
+            return;
+        }
 
         if (hit is null)
         {

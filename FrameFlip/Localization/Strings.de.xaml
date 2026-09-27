@@ -1191,6 +1191,11 @@
     <sys:String x:Key="S_TargetAddCorrectionHint">Eine Korrektur für das, was links steht – angelegt und verbunden.</sys:String>
     <sys:String x:Key="S_TargetAddEffect">+ Effekt …</sys:String>
     <sys:String x:Key="S_TargetAddEffectHint">Einen Effekt suchen – er kommt dorthin, was links steht.</sys:String>
+    <sys:String x:Key="S_QuickTitle">Schnellfeld: {0}</sys:String>
+    <sys:String x:Key="S_QuickEffect">Effekt suchen …</sys:String>
+    <sys:String x:Key="S_QuickCorrectWithMask">Korrektur mit dieser Maske</sys:String>
+    <sys:String x:Key="S_QuickSelectObjects">Objekte wählen</sys:String>
+    <sys:String x:Key="S_QuickObjectMask">Objekt als Maske</sys:String>
     <sys:String x:Key="S_SelectSet">Kryptomatte: {0}</sys:String>
     <sys:String x:Key="S_SelectUnder">Unter dem Zeiger:</sys:String>
     <sys:String x:Key="S_SelectNoTarget">Kein Kryptomatte-Ziel – die Objekte werden nur angezeigt.</sys:String>
