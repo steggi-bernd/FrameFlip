@@ -470,8 +470,29 @@ Der Rahmen nach Entscheidung 9, in vier Schnitten:
   Leiste leer.
 - Breit passt die Leiste des Pinsels jetzt in eine Zeile, vorher waren es zwei.
 
-Danach die Einstellungen als Andockfeld (zweiter Teil von Entscheidung 10), dann R4, dann
-laut Reihenfolge W2 Tonwert.
+**Andockfeld (`feature/werkzeug-andockfeld`), zweiter Teil von Entscheidung 10:**
+
+- **Obere Zone:** Die Andockfläche hat eine obere Zone (`DockZone.Top`) über die ganze
+  Breite. Dort liegen die Gruppen nebeneinander, wie unten.
+  - Liegen dort nur Felder, die so hoch sind wie ihr Inhalt, ist die Zone genau so hoch.
+  - Sonst gilt eine eigene Höhe mit Griff (`TopHeight`).
+- **Werkzeugeinstellungen als Feld** („Werkzeug“, `tool`): In der Grundanordnung oben. Eine
+  Anordnung von früher bekommt es beim Laden dort dazu (`Normalise` setzt Fehlendes jetzt in
+  die Zone der Grundanordnung, nicht immer nach rechts).
+- **Griff statt Reiter:** Oben ist der Reiter ein schmaler Griff aus sechs Punkten, der Name
+  steht im Hinweis. Ein gedrehter Name hätte mit seiner Länge die Höhe der Leiste bestimmt.
+- **An der Seite** brechen die Gruppen in sich um, Zeichen, Regler und Wert bleiben
+  zusammen. Der Name des Werkzeugs steht dann über den Gruppen.
+- **Breite oben und unten:** Nebeneinander zählt „so hoch wie der Inhalt“ nur für die Höhe.
+  In der Breite teilen sich die Gruppen den Platz. Sonst ragte eine Leiste, so breit wie ihr
+  Inhalt in einer Zeile, aus dem Fenster.
+- **Proben:**
+  - Oben über die ganze Breite, ganz zu sehen und über dem Bild.
+  - An die Seite gezogen, stehen die Gruppen untereinander, und nichts ragt heraus.
+  - Eine Anordnung von früher bekommt das Feld oben, die obere Zone übersteht das Speichern.
+  - Die UI-Reihe zeichnet das leere Atelier mit der Leiste oben und an der rechten Seite.
+
+Danach R4, dann laut Reihenfolge W2 Tonwert.
 
 ## 5. KI-Werkzeuge: Last, Größe, Lizenz
 
