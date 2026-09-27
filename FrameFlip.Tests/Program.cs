@@ -109,6 +109,7 @@ static int RunAll()
     AtelierRecipeInvariants.Run();
     AtelierEditingSessionInvariants.Run();
     EditingTargetInvariants.Run();
+    TargetPathInvariants.Run();
     AtelierProjectInvariants.Run();
     AtelierProjectPageInvariants.Run();
     SwitchLeftoverInvariants.Run();

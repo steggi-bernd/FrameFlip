@@ -105,6 +105,9 @@ public partial class AtelierPage
 
         ShowLayerCount();
 
+        // Eine umbenannte Ebene heisst auch in der Zielzeile so.
+        if (!interim) ShowTargetPath();
+
         string? path = _path;
 
         // Beim Ziehen steht alles schon bereit - hier darf nichts gelesen werden,

@@ -1179,6 +1179,12 @@
     <sys:String x:Key="S_NodeViewerTag">Viewer</sys:String>
     <sys:String x:Key="S_ViewerShowing">Viewer: {0}</sys:String>
     <sys:String x:Key="S_ViewerBack">Back to the output</sys:String>
+    <sys:String x:Key="S_TargetPicture">Whole picture</sys:String>
+    <sys:String x:Key="S_TargetLayer">Layer: {0}</sys:String>
+    <sys:String x:Key="S_TargetMask">Mask: {0}</sys:String>
+    <sys:String x:Key="S_TargetNode">Node: {0}</sys:String>
+    <sys:String x:Key="S_TargetColourOnPicture">Colour tools act on the whole picture</sys:String>
+    <sys:String x:Key="S_TargetHint">What you are working on. Click a step to select it.</sys:String>
     <sys:String x:Key="S_NodeMenuView">Show in the viewer (Ctrl+Shift+Click)</sys:String>
     <sys:String x:Key="S_NodeMenuViewOff">Viewer off – show the output again</sys:String>
     <sys:String x:Key="S_NodeLayerName">Layer name</sys:String>

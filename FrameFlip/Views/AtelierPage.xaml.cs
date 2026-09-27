@@ -200,6 +200,7 @@ public sealed partial class AtelierPage : UserControl
         SetUpBatch();
         SetUpView();
         SetUpProjects();
+        SetUpTargetPath();
 
         _settle.Tick += (_, _) =>
         {
@@ -328,6 +329,7 @@ public sealed partial class AtelierPage : UserControl
             CompareButton.IsEnabled = false;
             _frame = null;
             _base = null;
+            ShowTargetPath();
             ShowLayers(false);
             UpdateBatchBar();
             return;
@@ -396,6 +398,7 @@ public sealed partial class AtelierPage : UserControl
         _recipe.Layers = Layers.Stack;
 
         _frame = loaded;
+        ShowTargetPath();
 
         UpdateSourceText();
         FindSequence(path);
