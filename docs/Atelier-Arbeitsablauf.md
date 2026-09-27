@@ -641,3 +641,30 @@ Punkt 3, sichtbarer Teil. Mit dem Werkzeug „Auswählen“ gibt es jetzt:
 - **Offen, C3b:** Im Knotenmodus ohne gewählten Maskenknoten entsteht noch keine
   vorläufige Auswahl. Dazu kommen Klick ersetzt / Umschalt fügt hinzu / Alt nimmt heraus
   und „+ Korrektur“ auf die Auswahl.
+
+### C3b: Auswahl als Ziel (`feature/krypto-auswahl`)
+
+Punkt 3, zweiter Teil, und der Kern von Punkt 12: „Auswahl → Aktion → Ergebnis“.
+
+- **Vorläufige Auswahl:** Mit „Auswählen“ legt ein Klick ohne Kryptomatte-Maske im Ziel
+  eine vorläufige Auswahl an der Objekt-Kryptomatte an (`EditingTarget.CryptoSelection`).
+  Im Knotenmodus tat ein Klick ohne gewählten Maskenknoten vorher still nichts.
+  - Die Zielzeile sagt „Auswahl: Kugel, Rad“ und dazu, dass es noch keine Maske gibt.
+  - Das Bild zeigt den Umriss, die Chips lassen sich einzeln entfernen.
+  - Ein einfacher Klick auf den Hintergrund leert sie.
+- **Tasten:** Klick ersetzt, Umschalt fügt hinzu, Alt nimmt heraus. Ein Klick auf das
+  einzige gewählte Objekt nimmt es heraus, zweimal klicken heißt also weiterhin „weg“.
+  Das gilt jetzt auch an einer bestehenden Kryptomatte-Maske. **Verhaltensänderung:**
+  Vorher schaltete dort jeder Klick um, ein zweites Objekt kam also ohne Taste dazu.
+- **Aktion:**
+  - „+ Korrektur“ macht aus der Auswahl eine Maskenebene mit genau dieser Kryptomatte,
+    benannt nach den Objekten, und wählt ihre Korrektur. Es gibt keine zweite Korrektur
+    dahinter.
+  - Ein Effekt aus Werkzeugleiste oder Suche legt dieselbe Ebene an und kommt in ihren
+    Zweig.
+  - Das gilt im Stapel wie im Knotenmodus.
+- **Probe** (`CryptoSelectionInvariants`, 12 Zusicherungen): Auswahl, Umriss, die drei
+  Tasten und das Abwählen des einzigen Objekts. Dazu „+ Korrektur“ und ein Effekt im
+  Knotenmodus, „+ Korrektur“ im Stapel und Umschalt an der bestehenden Maske. Die
+  Nachbargruppen liefen mit 611 Zusicherungen grün, darunter die Knotenprobe „ein zweiter
+  Klick nimmt es heraus, Rückgängig holt es zurück“.

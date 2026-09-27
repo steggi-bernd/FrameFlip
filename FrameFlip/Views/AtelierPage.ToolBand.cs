@@ -46,6 +46,10 @@ public partial class AtelierPage
         switch (entry.Action)
         {
             case ToolAction.Effect or ToolAction.Mask:
+                // Auf eine Auswahl im Bild (C3b): erst die Maskenebene aus ihr, dann gilt der
+                // Effekt ihr - "Auswahl -> Aktion -> Ergebnis".
+                MaterialiseSelection();
+
                 // Im Knotenmodus ein Knoten - hinter den gewaehlten, wenn er einen Ausgang hat,
                 // sonst frei in die Mitte der Ansicht. Im Stapel die Karte im Farbstreifen.
                 if (InNodes && entry.Kind is { } kind) AddKind(kind);

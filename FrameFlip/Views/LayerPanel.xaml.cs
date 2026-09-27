@@ -1524,6 +1524,18 @@ public partial class LayerPanel : UserControl
         Raise(interim: false);
     }
 
+    /// <summary>Setzt die gewaehlten Objekte der Kryptomatte-Maske - fuer das Waehlen im Bild mit Umschalt und Alt (C3b).</summary>
+    public void SetPicks(IEnumerable<CryptoPick> picks)
+    {
+        if (_selected is null || _selected.Mask.Kind != MaskKind.Cryptomatte) return;
+
+        _selected.Mask.Picks = picks.Select(p => p.Clone()).ToList();
+
+        ShowPicks();
+        Rebuild();
+        Raise(interim: false);
+    }
+
     private void OnCryptoPickToggled(object sender, RoutedEventArgs e)
     {
         bool on = CryptoPickButton.IsChecked == true;

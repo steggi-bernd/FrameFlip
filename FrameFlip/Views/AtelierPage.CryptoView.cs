@@ -56,6 +56,20 @@ public partial class AtelierPage
     /// </summary>
     private (LayerMask Mask, CryptomatteSet Set)? CryptoTarget()
     {
+        // Eine vorlaeufige Auswahl (C3b): wie eine Maske, die es noch nicht gibt.
+        if (_recipe.Target is Atelier.EditingTarget.CryptoSelection selection)
+        {
+            var chosen = _cryptomattes.FirstOrDefault(s => s.Prefix == selection.Set);
+
+            return chosen is null ? null : (new LayerMask
+            {
+                Kind = MaskKind.Cryptomatte,
+                Source = selection.Set,
+                Levels = Cryptomatte.Levels(_passes, selection.Set).ToList(),
+                Picks = selection.Picks.ToList(),
+            }, chosen);
+        }
+
         var mask = InNodes
             ? (SelectedNode as MaskNode)?.Mask
             : Layers.Selection?.Mask;
@@ -275,6 +289,14 @@ public partial class AtelierPage
     /// <summary>Das Kreuz an einem Chip: das Objekt aus der Auswahl nehmen.</summary>
     private void RemovePick(CryptoPick pick)
     {
+        if (_recipe.Target is Atelier.EditingTarget.CryptoSelection selection)
+        {
+            var rest = selection.Picks.Where(p => p.Id != pick.Id).ToList();
+            _recipe.Focus(rest.Count == 0 ? Atelier.EditingTarget.Picture : selection with { Picks = rest });
+            ShowCryptoView();
+            return;
+        }
+
         if (CryptoTarget() is not var (mask, _)) return;
 
         if (InNodes)

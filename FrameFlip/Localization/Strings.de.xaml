@@ -1183,6 +1183,8 @@
     <sys:String x:Key="S_TargetLayer">Ebene: {0}</sys:String>
     <sys:String x:Key="S_TargetMask">Maske: {0}</sys:String>
     <sys:String x:Key="S_TargetNode">Knoten: {0}</sys:String>
+    <sys:String x:Key="S_TargetSelection">Auswahl: {0}</sys:String>
+    <sys:String x:Key="S_TargetSelectionNote">noch ohne Maske – „+ Korrektur“ oder „+ Effekt …“ legt eine an</sys:String>
     <sys:String x:Key="S_TargetColourOnPicture">Farbstreifen wirkt aufs Gesamtbild</sys:String>
     <sys:String x:Key="S_TargetHint">Woran gerade gearbeitet wird. Ein Klick auf ein Glied wählt es.</sys:String>
     <sys:String x:Key="S_TargetAddCorrection">+ Korrektur</sys:String>
@@ -1209,8 +1211,8 @@
     <sys:String x:Key="S_ToolHand">Hand</sys:String>
     <sys:String x:Key="S_ToolPick">Pipette</sys:String>
     <sys:String x:Key="S_ToolMoveShort">Zieht die gewählte Ebene im Bild. An den Ecken größer und kleiner, am Griff darüber gedreht. Doppelklick stellt sie wieder mittig. Das Mausrad zoomt um den Zeiger.</sys:String>
-    <sys:String x:Key="S_ToolSelectShort">Ein Klick auf ein Objekt legt eine Kryptomatte an. Die Einstellungen dazu stehen beim Maskenbereich der Ebene.</sys:String>
-    <sys:String x:Key="S_ToolSelectNodesShort">Ein Klick auf ein Objekt nimmt es in den gewählten Kryptomatte-Knoten auf – ein zweiter nimmt es wieder heraus.</sys:String>
+    <sys:String x:Key="S_ToolSelectShort">Ein Klick wählt das Objekt, Umschalt fügt hinzu, Alt nimmt heraus. Ohne Kryptomatte-Maske entsteht eine Auswahl – „+ Korrektur“ oder „+ Effekt …“ macht daraus eine Maskenebene.</sys:String>
+    <sys:String x:Key="S_ToolSelectNodesShort">Ein Klick wählt das Objekt, Umschalt fügt hinzu, Alt nimmt heraus – im gewählten Kryptomatte-Knoten oder als Auswahl, aus der „+ Korrektur“ eine Maskenebene macht.</sys:String>
     <sys:String x:Key="S_ToolCropShort">Zieht die Schnittkanten der gewählten Ebene. Der gedämpfte Rahmen zeigt, wovon abgeschnitten wird. Doppelklick nimmt den Schnitt zurück.</sys:String>
     <sys:String x:Key="S_ToolHandShort">Schiebt den Ausschnitt. Die mittlere Maustaste tut überall dasselbe, ohne das Werkzeug zu wechseln.</sys:String>
     <sys:String x:Key="S_ToolPickShort">Liest den Wert unter dem Zeiger ab — und die Entfernung, wenn die Datei einen Tiefenpass führt.</sys:String>
