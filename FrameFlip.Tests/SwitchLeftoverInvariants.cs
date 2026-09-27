@@ -67,6 +67,11 @@ public static class SwitchLeftoverInvariants
             Show(page, second);
             Check.That(!page.InNodes, "Vorbereitung: das neue Bild rechnet im Stapel");
 
+            // Die alte Maske vor dem neuen Strich festhalten. Gegen null zu pruefen hiess, den
+            // weichen Rand des ersten Strichs mitzumessen: Wie weit der reicht, haengt davon ab,
+            // wie gross der Pinsel beim ersten Strich in Bildpunkten war - und das vom Layout.
+            var oldBefore = nodeMask?.Mask.PaintFor(1)?.Cover();
+
             Stroke(frame, 180, 120, 210, 130);
             Pump(() => false, 0.3);
 
@@ -74,7 +79,8 @@ public static class SwitchLeftoverInvariants
             Check.That(paint.Count == 1 && paint[0].At(195, 125) > 0.5f,
                        "der Strich im neuen Bild landet in einer Maskenebene des neuen Projekts", $"{paint.Count} gemalte Masken");
             Check.That(paint.All(p => p.At(40, 32) < 0.01f), "die Maske des alten Projekts ist nicht mitgekommen");
-            Check.That(nodeMask?.Mask.PaintFor(1) is not { } old || old.At(195, 125) < 0.01f,
+            Check.That(nodeMask?.Mask.PaintFor(1)?.Cover() is not { } oldAfter ||
+                       (oldBefore is not null && oldAfter.AsSpan().SequenceEqual(oldBefore)),
                        "und der neue Strich ist nicht in die Maske des alten Projekts gegangen");
 
             // Dasselbe aus dem Stapel heraus: eine gemalte Maskenebene, dann ein neues Bild.
