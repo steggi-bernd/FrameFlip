@@ -1185,6 +1185,10 @@
     <sys:String x:Key="S_TargetNode">Knoten: {0}</sys:String>
     <sys:String x:Key="S_TargetColourOnPicture">Farbstreifen wirkt aufs Gesamtbild</sys:String>
     <sys:String x:Key="S_TargetHint">Woran gerade gearbeitet wird. Ein Klick auf ein Glied wählt es.</sys:String>
+    <sys:String x:Key="S_TargetAddCorrection">+ Korrektur</sys:String>
+    <sys:String x:Key="S_TargetAddCorrectionHint">Eine Korrektur für das, was links steht – angelegt und verbunden.</sys:String>
+    <sys:String x:Key="S_TargetAddEffect">+ Effekt …</sys:String>
+    <sys:String x:Key="S_TargetAddEffectHint">Einen Effekt suchen – er kommt dorthin, was links steht.</sys:String>
     <sys:String x:Key="S_NodeMenuView">Im Betrachter zeigen (Strg+Umschalt+Klick)</sys:String>
     <sys:String x:Key="S_NodeMenuViewOff">Betrachter aus – wieder die Ausgabe zeigen</sys:String>
     <sys:String x:Key="S_NodeLayerName">Name der Ebene</sys:String>

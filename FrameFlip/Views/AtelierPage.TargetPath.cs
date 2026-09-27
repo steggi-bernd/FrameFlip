@@ -81,6 +81,16 @@ public partial class AtelierPage
     }
 
     /// <summary>
+    /// "+ Korrektur": eine Korrektur fuer das, was die Zeile nennt - ueber denselben Weg wie die
+    /// Werkzeugleiste. Im Stapel die Grundkarte des Ziels, im Graphen ein Knoten an seiner Stelle.
+    /// </summary>
+    private void OnTargetCorrect(object sender, RoutedEventArgs e)
+        => UseTool(ToolCatalog.All.Single(entry => entry.TitleKey == "S_Correction"));
+
+    /// <summary>"+ Effekt ...": die Suche der Werkzeugleiste - was darin gewaehlt wird, geht dorthin, wo die Zeile zeigt.</summary>
+    private void OnTargetEffect(object sender, RoutedEventArgs e) => ToolBand.OpenSearch();
+
+    /// <summary>
     /// Ein Glied der Zielzeile wurde angeklickt. Gewaehlt wird ueber die Wege, die auch Liste und
     /// Editor nehmen - das Ziel folgt dann von selbst, und beide zeigen dieselbe Wahl.
     /// </summary>

@@ -71,19 +71,40 @@ public partial class AtelierPage
         if (_graph is null) return;
 
         var node = kind.Create();
+        bool takesPicture = NodeEdits.Through(node).Input is not null;
 
         // Eine Ebene in der Liste gewaehlt: Der Effekt wirkt nur auf sie - er kommt in ihren
         // Zweig, vor ihr Mischen, und nicht dahinter auf alles, was darunter liegt.
-        if (NodeEdits.Through(node).Input is not null && LayerBranch() is { } branch)
+        if (takesPicture && LayerBranch() is { } branch)
         {
             AddIntoLayer(node, branch);
             return;
         }
 
+        // Etwas in der Maske einer Ebene gewaehlt: Der Effekt gilt der Ebene - die Maske begrenzt
+        // ihn schon. Hinter einer Maske gaebe es kein Bild, an das er sich haengen koennte, und er
+        // kam frei und ohne Kabel in die Mitte.
+        if (takesPicture && SelectedNode is { } inMask &&
+            TargetPath.OwnerOf(inMask, _graph) is (NodeLayer { Mix: { } masked }, true) &&
+            _graph.Into(masked.Id, "Oben") is { } maskedBranch)
+        {
+            AddIntoLayer(node, maskedBranch);
+            return;
+        }
+
         if (SelectedNode is { } after and not OutputNode &&
-            NodeEdits.Through(after).Output is not null && NodeEdits.Through(node).Input is not null)
+            NodeEdits.Through(after).Output is not null && takesPicture)
         {
             InsertAfterNode(after, node);
+            return;
+        }
+
+        // Nichts gewaehlt: das Gesamtbild. Der Effekt kommt an seine Stelle in dessen Kette -
+        // dorthin, wo der Stapel ihn rechnen wuerde (GlobalChain). Vorher kam er frei in die
+        // Mitte der Ansicht, ohne Kabel, und tat nichts.
+        if (takesPicture && SelectedNode is null && GlobalChain.After(_graph, node) is { } spot)
+        {
+            InsertAfterNode(spot, node);
             return;
         }
 
