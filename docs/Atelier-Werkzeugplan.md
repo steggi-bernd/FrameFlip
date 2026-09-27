@@ -522,6 +522,50 @@ Der Rahmen nach Entscheidung 9, in vier Schnitten:
 
 **Phase R ist damit abgeschlossen.** Als Nächstes laut Reihenfolge: W2 Tonwert.
 
+## 4c. W2 Tonwert im Einzelnen
+
+In sechs Schnitten, nach Nutzen und Abhängigkeit:
+
+1. **W2a – Tonwertkorrektur am Histogramm** (`feature/tonwert`): Schwarz, Grau und Weiß des
+   Eingangs, Bereich des Ausgangs, gemeinsam und je Kanal.
+2. **W2b – Auto und Pipetten:** Auto-Tonwert, Auto-Kontrast, Auto-Farbe; Pipetten für
+   Schwarz, Grau und Weiß. Beides braucht das Bild so, wie es beim Tonwert ankommt, nicht
+   das fertige. Im Stapel heißt das: gemessen mit den Werkzeugen davor. Im Knotenmodus: am
+   Eingang des Knotens.
+3. **W2c – Clipping und Falschfarben, Kurvenpunkt aus dem Bild:** eine Ansicht, nicht im
+   Export; Strg+Klick ins Bild setzt einen Kurvenpunkt beim Ton dieser Stelle.
+4. **W2d – Messgeräte:** Waveform, RGB-Parade, Vektorskop, Histogramm logarithmisch.
+5. **W2e – Ausgleichen, CLAHE, Tonwerttrennung nach Quantilen.**
+6. **W2f – Farbe angleichen und Deflicker:** Deflicker braucht die Statistik der ganzen Folge
+   und läuft im Hintergrund.
+
+**W2a (`feature/tonwert`):**
+
+- **Rechnung** (`LevelsTool`, Kennung `levels`, Anzeigeseite wie die Kurven): erst die
+  gemeinsame Einstellung, dann je Kanal.
+  - Eingang von Schwarz bis Weiß auf 0 bis 1 gestreckt, außerhalb abgeschnitten.
+  - Das Gamma hebt die Mitten (größer als 1 hellt auf, wie in Photoshop).
+  - Danach der Bereich des Ausgangs.
+  - Grundstellung rechnet nichts.
+- **Karte „Tonwert“** in der Grundkorrektur vor den Kurven:
+  - Oben das Histogramm des gewählten Kanals, abgeschnittene Bereiche abgedunkelt.
+  - Darunter die Anfasser für Schwarz, Grau und Weiß, ein Verlauf und die beiden Anfasser des
+    Ausgangs (`LevelsEditor`).
+  - Der Grauregler steht zwischen Schwarz und Weiß; seine Lage dort ist das Gamma.
+  - Doppelklick setzt einen Anfasser zurück.
+  - Die Werte stehen als Zahlen darunter, 0 bis 255 wie gewohnt.
+- **Platz im Stapel:** vor den Kurven, auch in einem Stapel von früher, der den Tonwert nicht
+  kennt. Angehängt käme er hinter Kurven und LUT.
+- **Knoten und Leiste:** ein Knoten im Hub (Grundkorrektur) und in der Werkzeugzeile unter
+  „Tonwert“. Die Karte steht auch bei einer Ebenenkorrektur.
+- **Proben:**
+  - Rechnung, Grauregler und Gamma umkehrbar, Ausgang, Reihenfolge der Kanäle.
+  - Speichern mit Typ, Kopie unabhängig.
+  - Platz vor den Kurven in altem und frischem Stapel.
+  - Anfasser: ziehen, Schwarz nicht hinter Weiß, Grau als Gamma, Zurücksetzen.
+  - Zeichnen in allen Größen.
+  - Die UI-Reihe zeichnet die Karte mit synthetischer Verteilung.
+
 ## 5. KI-Werkzeuge: Last, Größe, Lizenz
 
 **Laufzeit.** ONNX Runtime (MIT-Lizenz) mit DirectML auf jeder Grafikkarte unter

@@ -31,6 +31,10 @@ public partial class GradingPanel : UserControl
     private bool _localOnImage = true;
 
     private CurvesTool _curves = new();
+    private LevelsTool _levels = new();
+
+    /// <summary>Welcher Kanal der Tonwertkorrektur bearbeitet wird: 0 gemeinsam, 1 bis 3 R, G, B.</summary>
+    private int _levelsChannel;
     private WhiteBalanceTool _whiteBalance = new();
     private LiftGammaGainTool _zones = new();
     private HslTool _bands = new();
@@ -90,6 +94,17 @@ public partial class GradingPanel : UserControl
         CurveField.LineColour = CurveColours[0];
         CurveField.Changed += () => Raise(interim: true);
         CurveField.Released += () => Raise(interim: false);
+
+        LevelsField.Changed += () =>
+        {
+            ShowLevelsValues();
+            Raise(interim: true);
+        };
+        LevelsField.Released += () =>
+        {
+            ShowLevelsValues();
+            Raise(interim: false);
+        };
 
         foreach (var wheel in new[] { LiftWheel, GammaWheel, GainWheel })
         {
@@ -355,6 +370,20 @@ public partial class GradingPanel : UserControl
         // die dort niemand angelegt hat.
         _added.Clear();
 
+        // Der Tonwert steht vor den Kurven - auch in einem Stapel von frueher, der ihn noch
+        // nicht kennt. Angehaengt kaeme er hinter Kurven und LUT, und dieselbe Einstellung
+        // wirkte in einem alten Projekt anders als in einem neuen.
+        _levels = Stack.Tools.OfType<LevelsTool>().FirstOrDefault() ?? InsertLevels();
+
+        LevelsTool InsertLevels()
+        {
+            var created = new LevelsTool();
+            int curves = Stack.Tools.FindIndex(t => t is CurvesTool);
+
+            Stack.Tools.Insert(curves < 0 ? Stack.Tools.Count : curves, created);
+            return created;
+        }
+
         _curves = Take<CurvesTool>();
         _whiteBalance = Take<WhiteBalanceTool>();
         _zones = Take<LiftGammaGainTool>();
@@ -471,6 +500,16 @@ public partial class GradingPanel : UserControl
                               : histogram.Luma;
 
         CurveField.InvalidateVisual();
+
+        LevelsField.Background = _levelsChannel switch
+        {
+            1 => histogram.Red,
+            2 => histogram.Green,
+            3 => histogram.Blue,
+            _ => histogram.Luma,
+        };
+        LevelsField.InvalidateVisual();
+
         UpdateClipText(histogram);
     }
 
@@ -484,6 +523,7 @@ public partial class GradingPanel : UserControl
         set
         {
             CurveBody.IsEnabled = value;
+            LevelsBody.IsEnabled = value;
             WhiteBalanceBody.IsEnabled = value;
             ZonesBody.IsEnabled = value;
             BandsBody.IsEnabled = value;
@@ -640,6 +680,11 @@ public partial class GradingPanel : UserControl
 
     private void PushToControls()
     {
+        // Nach dem Laden oder Zuruecksetzen kann der Kanal ein neues Objekt sein.
+        _levels.Prepare();
+        LevelsField.Channel = _levels.Channel(_levelsChannel);
+        ShowLevelsValues();
+
         _filling = true;
 
         try
@@ -1317,6 +1362,62 @@ public partial class GradingPanel : UserControl
 
         CurveField.LineColour = CurveColours[Math.Clamp(channel, 0, 3)];
         CurveField.InvalidateVisual();
+    }
+
+    private static readonly Color[] LevelsColours =
+    {
+        Color.FromArgb(0x60, 0xFF, 0xFF, 0xFF),
+        Color.FromArgb(0x70, 0xE8, 0x5A, 0x5A),
+        Color.FromArgb(0x70, 0x5A, 0xD0, 0x6E),
+        Color.FromArgb(0x70, 0x5A, 0x8C, 0xF0),
+    };
+
+    private void OnLevelsChannelPicked(object sender, RoutedEventArgs e)
+    {
+        if (sender is not ToggleButton picked || picked.Tag is not string tag) return;
+        if (!int.TryParse(tag, out int channel)) return;
+
+        // Beim Laden kommt das Checked des ersten Knopfs, bevor die anderen stehen.
+        if (LevelsBlueButton is null || LevelsField is null) return;
+
+        foreach (var button in new[] { LevelsMasterButton, LevelsRedButton, LevelsGreenButton, LevelsBlueButton })
+            if (!ReferenceEquals(button, picked)) button.IsChecked = false;
+
+        _levelsChannel = Math.Clamp(channel, 0, 3);
+        LevelsField.Channel = _levels.Channel(_levelsChannel);
+        LevelsField.HistogramColour = LevelsColours[_levelsChannel];
+        LevelsField.InvalidateVisual();
+        ShowLevelsValues();
+    }
+
+    private void OnResetLevelsClicked(object sender, RoutedEventArgs e)
+    {
+        foreach (int channel in new[] { 0, 1, 2, 3 })
+        {
+            var levels = _levels.Channel(channel);
+            levels.InBlack = 0;
+            levels.InWhite = 1;
+            levels.Gamma = 1;
+            levels.OutBlack = 0;
+            levels.OutWhite = 1;
+        }
+
+        _levels.Prepare();
+        LevelsField.InvalidateVisual();
+        ShowLevelsValues();
+        Raise(interim: false);
+    }
+
+    /// <summary>Die Werte des bearbeiteten Kanals als Zahlen - auf der Skala 0 bis 255, wie man sie kennt.</summary>
+    private void ShowLevelsValues()
+    {
+        var levels = _levels.Channel(_levelsChannel);
+
+        static string Byte(float value) => Math.Round(value * 255).ToString("0", System.Globalization.CultureInfo.CurrentCulture);
+
+        LevelsValues.Text = Strings.T("S_LevelsValues", Byte(levels.InBlack),
+                                      levels.Gamma.ToString("0.00", System.Globalization.CultureInfo.CurrentCulture),
+                                      Byte(levels.InWhite), Byte(levels.OutBlack), Byte(levels.OutWhite));
     }
 
     private void OnBandModePicked(object sender, RoutedEventArgs e)

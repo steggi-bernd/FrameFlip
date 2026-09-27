@@ -11,6 +11,9 @@
     <sys:String x:Key="S_BufferAhead">Wie weit der Ringpuffer vorausreicht. Wird die Zahl klein, stockt die Wiedergabe gleich – dann hilft eine kleinere Dekodiergröße.</sys:String>
     <sys:String x:Key="S_Adjusted">Die Anzeige ist korrigiert – die Dateien bleiben unverändert</sys:String>
     <sys:String x:Key="S_FloatPath">Die Korrektur rechnet auf den Gleitkommawerten der Datei – Belichtung holt Zeichnung aus den Lichtern zurück</sys:String>
+    <sys:String x:Key="S_Levels">Tonwert</sys:String>
+    <sys:String x:Key="S_LevelsHint">Die Anfasser unter dem Histogramm: Schwarz, Grau und Weiß des Eingangs, darunter der Bereich der Ausgabe. Was links vom Schwarzpunkt und rechts vom Weißpunkt liegt, wird abgeschnitten. Doppelklick setzt einen Anfasser zurück.</sys:String>
+    <sys:String x:Key="S_LevelsValues">Eingang {0} · {1} · {2}    Ausgabe {3} – {4}</sys:String>
     <sys:String x:Key="S_Curves">Kurven</sys:String>
     <sys:String x:Key="S_CurveHint">Klicken setzt einen Punkt, Ziehen verschiebt ihn, rechte Maustaste entfernt ihn.</sys:String>
     <sys:String x:Key="S_ShowOriginal">Original</sys:String>

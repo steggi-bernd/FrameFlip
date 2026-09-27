@@ -69,7 +69,7 @@ public partial class AtelierPage
     }, PassThumb);
 
     /// <summary>Die Werkzeuge, die eine Ebene haben kann - die Karten einer Ebenenkorrektur.</summary>
-    private static readonly string[] LayerSections = { "Basic", "Curve", "WhiteBalance", "Zones", "Bands", "Lut" };
+    private static readonly string[] LayerSections = { "Basic", "Levels", "Curve", "WhiteBalance", "Zones", "Bands", "Lut" };
 
     /// <summary>Zeigt im Farbstreifen, was sich am gewaehlten Knoten einstellen laesst.</summary>
     private void ShowNodeSettings()

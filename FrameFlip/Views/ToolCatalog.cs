@@ -107,7 +107,7 @@ public static class ToolCatalog
         ["S_MaskGradient"] = Select, ["S_NodeMaskShape"] = Select, ["S_NodeMaskMath"] = Select, ["S_NodeCutout"] = Select,
         ["S_MaskPainted"] = Paint,
 
-        ["S_Correction"] = Tone, ["S_Curves"] = Tone, ["S_Zones"] = Tone, ["S_NodeTone"] = Tone, ["S_NodeMapRange"] = Tone,
+        ["S_Correction"] = Tone, ["S_Levels"] = Tone, ["S_Curves"] = Tone, ["S_Zones"] = Tone, ["S_NodeTone"] = Tone, ["S_NodeMapRange"] = Tone,
 
         ["S_WhiteBalance"] = Colour, ["S_ColourBands"] = Colour, ["S_Vibrance"] = Colour, ["S_NodeColorRamp"] = Colour, ["S_Lut"] = Colour,
 

@@ -42,6 +42,7 @@ public partial class GradingPanel
     private static readonly (string Tab, string Prefix, string Key, string Glyph)[] Sections =
     {
         ("S_GroupBasics", "Basic", "S_Correction", "☀"),
+        ("S_GroupBasics", "Levels", "S_Levels", "⊿"),
         ("S_GroupBasics", "Curve", "S_Curves", "∿"),
         ("S_GroupBasics", "WhiteBalance", "S_WhiteBalance", "◑"),
         ("S_GroupBasics", "Zones", "S_Zones", "◐"),
@@ -676,6 +677,7 @@ public partial class GradingPanel
     private IEnumerable<object> ToolsOf(string prefix) => prefix switch
     {
         "Basic" => new object[] { _vibrance },
+        "Levels" => new object[] { _levels },
         "Curve" => new object[] { _curves },
         "WhiteBalance" => new object[] { _whiteBalance },
         "Zones" => new object[] { _zones },
@@ -775,6 +777,7 @@ public partial class GradingPanel
     private bool Doing(string prefix) => prefix switch
     {
         "Basic" => !Adjustments.IsNeutral || !_vibrance.IsNeutral,
+        "Levels" => !_levels.IsNeutral,
         "Curve" => !_curves.IsNeutral,
         "WhiteBalance" => !_whiteBalance.IsNeutral,
         "Zones" => !_zones.IsNeutral,

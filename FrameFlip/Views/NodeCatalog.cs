@@ -51,6 +51,7 @@ public static class NodeCatalog
         new(Picture, "S_NodeTone", () => new ToneNode()),
 
         new("S_GroupBasics", "S_Correction", () => new LayerGradeNode { Tools = new GradingStack() }, "Basic"),
+        new("S_GroupBasics", "S_Levels", () => new PointToolNode { Tool = new LevelsTool() }, "Levels"),
         new("S_GroupBasics", "S_Curves", () => new PointToolNode { Tool = new CurvesTool() }, "Curve"),
         new("S_GroupBasics", "S_WhiteBalance", () => new PointToolNode { Tool = new WhiteBalanceTool() }, "WhiteBalance"),
         new("S_GroupBasics", "S_Zones", () => new PointToolNode { Tool = new LiftGammaGainTool() }, "Zones"),

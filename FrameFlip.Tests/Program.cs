@@ -74,6 +74,7 @@ static int RunAll()
     GradingBandInvariants.Run();
     CurveEditingInvariants.Run();
     CurveRenderInvariants.Run();
+    LevelsInvariants.Run();
     AtelierPageInvariants.Run();
     PanelPolishInvariants.Run();
     ColourWheelInvariants.Run();
