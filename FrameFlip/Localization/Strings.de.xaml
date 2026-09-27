@@ -1195,6 +1195,10 @@
     <sys:String x:Key="S_SelectUnder">Unter dem Zeiger:</sys:String>
     <sys:String x:Key="S_SelectNoTarget">Kein Kryptomatte-Ziel – die Objekte werden nur angezeigt.</sys:String>
     <sys:String x:Key="S_SelectRemovePick">Aus der Auswahl nehmen</sys:String>
+    <sys:String x:Key="S_PickSource">Quelle</sys:String>
+    <sys:String x:Key="S_PickSourceHint">Gedrückt: liest die Quelle vor allen Korrekturen – sonst die angezeigte Farbe.</sys:String>
+    <sys:String x:Key="S_PickForColourRange">Pipette für: Farbbereich „{0}“ – Klick setzt den Farbton, Umschalt erweitert</sys:String>
+    <sys:String x:Key="S_PickReadOnly">Pipette: liest nur ab</sys:String>
     <sys:String x:Key="S_NodeMenuView">Im Betrachter zeigen (Strg+Umschalt+Klick)</sys:String>
     <sys:String x:Key="S_NodeMenuViewOff">Betrachter aus – wieder die Ausgabe zeigen</sys:String>
     <sys:String x:Key="S_NodeLayerName">Name der Ebene</sys:String>

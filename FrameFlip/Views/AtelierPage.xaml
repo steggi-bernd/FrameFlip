@@ -136,6 +136,29 @@
 
                             <!-- Der Name des Objekts am Zeiger (C3). Ohne Treffer fuer die Maus. -->
                             <Canvas x:Name="CryptoHoverLayer" IsHitTestVisible="False">
+                                <!-- Die Lupe der Pipette (C4): elf mal elf Bildpunkte, die Farbe in der
+                                     Mitte und ihre Werte, dazu wofuer die Pipette gerade liest. -->
+                                <Border x:Name="PickLoupe" Visibility="Collapsed"
+                                        Background="{StaticResource PanelBackground}"
+                                        BorderBrush="{StaticResource PanelBorder}" BorderThickness="1"
+                                        CornerRadius="6" Padding="8">
+                                    <StackPanel>
+                                        <UniformGrid x:Name="LoupeGrid" Rows="11" Columns="11" Width="88" Height="88" />
+                                        <StackPanel Orientation="Horizontal" Margin="0,6,0,0">
+                                            <Border x:Name="LoupeSwatch" Width="16" Height="16" CornerRadius="3"
+                                                    BorderThickness="1" BorderBrush="{StaticResource PanelBorder}" Margin="0,0,6,0" />
+                                            <TextBlock x:Name="LoupeHex" FontSize="11" VerticalAlignment="Center"
+                                                       FontFamily="{StaticResource MonoFont}"
+                                                       Foreground="{StaticResource ForegroundBrush}" />
+                                        </StackPanel>
+                                        <TextBlock x:Name="LoupeValues" FontSize="10" Margin="0,4,0,0"
+                                                   FontFamily="{StaticResource MonoFont}"
+                                                   Foreground="{StaticResource MutedBrush}" />
+                                        <TextBlock x:Name="LoupeFor" FontSize="10" Margin="0,4,0,0" MaxWidth="160"
+                                                   TextWrapping="Wrap" Foreground="{StaticResource AccentBrush}" />
+                                    </StackPanel>
+                                </Border>
+
                                 <Border x:Name="CryptoHoverName" Visibility="Collapsed"
                                         Background="{StaticResource PanelBackground}"
                                         BorderBrush="{StaticResource PanelBorder}" BorderThickness="1"

@@ -89,6 +89,9 @@ public partial class AtelierPage
         // Beim Waehlen: was gewaehlt ist und was unter dem Zeiger liegt - sonst nichts davon.
         ShowCryptoView();
 
+        // Die Lupe gehoert der Pipette.
+        if (tool != AtelierTool.Pick) HidePipette();
+
         if (tool == AtelierTool.Nodes && InNodes) NodeView.Focus();
     }
 
@@ -190,28 +193,6 @@ public partial class AtelierPage
     /// Programm vergleichen. Eine davon wegzulassen hiesse, sich auf eine der beiden
     /// Fragen festzulegen, die jemand haben koennte.
     /// </summary>
-    private void ReadAt(int x, int y)
-    {
-        var frame = _frame;
-        if (frame is null) return;
-
-        int i = y * frame.Width + x;
-
-        if (i < 0 || i >= frame.R.Length) return;
-
-        float r = frame.R[i], g = frame.G[i], b = frame.B[i];
-
-        int br = (int)MathF.Round(Math.Clamp(Srgb.Encode(r), 0f, 1f) * 255f);
-        int bg = (int)MathF.Round(Math.Clamp(Srgb.Encode(g), 0f, 1f) * 255f);
-        int bb = (int)MathF.Round(Math.Clamp(Srgb.Encode(b), 0f, 1f) * 255f);
-
-        string label = (string)(TryFindResource("S_PickReadout") ?? "read");
-
-        PickText.Text = $"{label}  {x},{y}   {br}/{bg}/{bb}   {r:0.###} {g:0.###} {b:0.###}";
-        PickText.Visibility = Visibility.Visible;
-
-        Properties.Read(x, y, br, bg, bb, r, g, b, DepthAt(i));
-    }
 
     /// <summary>
     /// Die Entfernung an einer Stelle - null, wenn die Datei keine fuehrt.

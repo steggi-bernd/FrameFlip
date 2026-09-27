@@ -150,6 +150,15 @@ public partial class AtelierPage
     /// <summary>Die Maus ueber dem Bild, mit dem Werkzeug "Auswaehlen": Name und Hervorhebung des Objekts darunter.</summary>
     private void OnCryptoHover(object sender, MouseEventArgs e)
     {
+        // Mit der Pipette zeigt dieselbe Bewegung die Lupe (C4).
+        if (_tool == AtelierTool.Pick && _frame is not null)
+        {
+            if (PixelAt(e.GetPosition(Display), out int px, out int py)) PipetteAt(px, py, e.GetPosition(CryptoHoverLayer));
+            else HidePipette();
+
+            return;
+        }
+
         if (_tool != AtelierTool.Select || _frame is null) return;
 
         if (!PixelAt(e.GetPosition(Display), out int x, out int y))
@@ -225,7 +234,11 @@ public partial class AtelierPage
     /// <summary>Der Name, der gerade am Zeiger steht - fuer die Probe.</summary>
     internal string? HoverText => CryptoHoverName.Visibility == Visibility.Visible ? CryptoHoverText.Text : null;
 
-    private void OnCryptoHoverLeft(object sender, MouseEventArgs e) => HideCryptoHover();
+    private void OnCryptoHoverLeft(object sender, MouseEventArgs e)
+    {
+        HideCryptoHover();
+        HidePipette();
+    }
 
     private void HideCryptoHover()
     {

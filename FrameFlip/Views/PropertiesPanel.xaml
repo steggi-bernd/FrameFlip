@@ -330,6 +330,14 @@
                 <TextBlock x:Name="PickByte" Style="{StaticResource PanelValue}"
                            VerticalAlignment="Center" Margin="0,0,16,0" />
 
+                <!-- HEX und HSV der angezeigten Farbe (C4) - zum Vergleichen mit anderen Programmen. -->
+                <Border x:Name="PickSwatch" Width="14" Height="14" CornerRadius="3" VerticalAlignment="Center"
+                        Margin="0,0,6,0" BorderThickness="1" BorderBrush="{StaticResource PanelBorder}" />
+                <TextBlock x:Name="PickHex" Style="{StaticResource PanelValue}"
+                           VerticalAlignment="Center" Margin="0,0,12,0" />
+                <TextBlock x:Name="PickHsv" Style="{StaticResource PanelValue}"
+                           VerticalAlignment="Center" Margin="0,0,16,0" />
+
                 <!--
                     Beide Zahlen, und das ist Absicht: Nur der Lichtwert beantwortet
                     "wie hell ist das wirklich", und nur der Anzeigewert laesst sich
@@ -352,6 +360,11 @@
                     Tiefenschaerfe verlangt eine Entfernung in Szeneneinheiten, und ein
                     Klick auf das, was scharf sein soll, ist die ehrliche Antwort.
                 -->
+                <!-- Was gelesen wird: das angezeigte Ergebnis oder die Quelle. -->
+                <ToggleButton x:Name="PickFromSource" Style="{StaticResource OverlayToggle}" Margin="0,0,10,0"
+                              VerticalAlignment="Center" Content="{DynamicResource S_PickSource}"
+                              ToolTip="{DynamicResource S_PickSourceHint}" />
+
                 <Button x:Name="FocusButton" Style="{StaticResource OverlayButton}"
                         VerticalAlignment="Center" IsEnabled="False"
                         Content="{DynamicResource S_UseAsFocus}" Click="OnUseAsFocus"

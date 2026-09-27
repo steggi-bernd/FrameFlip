@@ -1195,6 +1195,10 @@
     <sys:String x:Key="S_SelectUnder">Under the pointer:</sys:String>
     <sys:String x:Key="S_SelectNoTarget">No cryptomatte target – objects are only shown.</sys:String>
     <sys:String x:Key="S_SelectRemovePick">Remove from the selection</sys:String>
+    <sys:String x:Key="S_PickSource">Source</sys:String>
+    <sys:String x:Key="S_PickSourceHint">Pressed: reads the source before any correction – otherwise the shown colour.</sys:String>
+    <sys:String x:Key="S_PickForColourRange">Eyedropper for: colour range “{0}” – click sets the hue, Shift widens</sys:String>
+    <sys:String x:Key="S_PickReadOnly">Eyedropper: reads only</sys:String>
     <sys:String x:Key="S_NodeMenuView">Show in the viewer (Ctrl+Shift+Click)</sys:String>
     <sys:String x:Key="S_NodeMenuViewOff">Viewer off – show the output again</sys:String>
     <sys:String x:Key="S_NodeLayerName">Layer name</sys:String>
