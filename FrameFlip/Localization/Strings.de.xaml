@@ -35,6 +35,7 @@
     <sys:String x:Key="S_OutputFormat">Ausgabeformat</sys:String>
     <sys:String x:Key="S_FormatPng16">PNG · 16 Bit</sys:String>
     <sys:String x:Key="S_FormatPng8">PNG · 8 Bit</sys:String>
+    <sys:String x:Key="S_EightBitOnly">Pixel Sort und Fehlerdiffusion rechnen in 8 Bit und fehlen in diesem Format. PNG · 8 Bit, JPG oder ein Video nehmen sie mit.</sys:String>
     <sys:String x:Key="S_FormatTiff16">TIFF · 16 Bit</sys:String>
     <sys:String x:Key="S_FormatJpeg">JPEG</sys:String>
     <sys:String x:Key="S_ChooseTarget">Zielordner …</sys:String>
@@ -157,7 +158,7 @@
     <sys:String x:Key="S_SortCross">Kreuzweise</sys:String>
     <sys:String x:Key="S_SortCrossHint">Nach dem ersten Durchgang ein zweiter, um 90 Grad gedreht - wie Kim Asendorf, erst Spalten, dann Zeilen. Das Bild zerlaeuft in beide Richtungen.</sys:String>
     <sys:String x:Key="S_SortKeyHint">Wonach verglichen wird - und was die Schwelle bedeutet. Helligkeit macht aus Laeufen Verlaeufe von dunkel nach hell, Farbton macht Baender, Saettigung trennt Blasses von Kraeftigem und laesst die Form stehen.</sys:String>
-    <sys:String x:Key="S_SortHint">Umsortiert werden nur Punkte ZWISCHEN den beiden Schwellen - das Fenster ist der Staerkeregler. Geschlossen geschieht nichts; aufgezogen zerfaellt das Bild in Laeufe, dazwischen bleibt alles stehen. Laeuft wie das Rastern erst beim Loslassen.</sys:String>
+    <sys:String x:Key="S_SortHint">Umsortiert werden nur Punkte ZWISCHEN den beiden Schwellen - das Fenster ist der Staerkeregler. Neu hinzugefuegt steht es offen; ganz geschlossen geschieht nichts. Aufgezogen zerfaellt das Bild in Laeufe, dazwischen bleibt alles stehen. Laeuft wie das Rastern erst beim Loslassen, und nur in 8-Bit-Ausgaben - PNG 16 Bit und TIFF lassen es weg.</sys:String>
     <sys:String x:Key="S_Grain">Filmkorn</sys:String>
     <sys:String x:Key="S_GrainAmount">Stärke</sys:String>
     <sys:String x:Key="S_GrainSize">Korngröße</sys:String>

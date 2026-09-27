@@ -284,8 +284,19 @@ public partial class GradingPanel
     {
         if (!_cards.TryGetValue(prefix, out var card)) return;
 
+        // Neu hinzugefuegt, ein Effekt kommt mit sichtbarem Startwert (EffectStart) - nur wenn er
+        // noch nichts tut. Bei einer Karte mit zwei Werkzeugen (Rastern: Raster und Diffusion auf
+        // demselben Regler) bekommt ihn nur das erste, das die Karte in Grundstellung zeigt.
+        bool fresh = !_added.Contains(prefix) && !Doing(prefix);
+
         _added.Add(prefix);
         _folded.Remove(prefix);
+
+        if (fresh && ToolsOf(prefix).FirstOrDefault() is { } first && EffectStart.Apply(first))
+        {
+            PushToControls();
+            Raise(interim: false);
+        }
 
         ShowActive();
 

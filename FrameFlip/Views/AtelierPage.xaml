@@ -243,6 +243,13 @@
                                TextTrimming="CharacterEllipsis"
                                ToolTip="{Binding Text, RelativeSource={RelativeSource Self}}" />
 
+                    <!-- Pixel Sort und Fehlerdiffusion laufen nur in acht Bit. In einem 16-Bit-Format
+                         fehlten sie in der Ausgabe, waehrend die Vorschau sie zeigt - siehe
+                         ShowEightBitNote. -->
+                    <TextBlock x:Name="EightBitNote" Margin="0,4,0,0" FontSize="9" TextWrapping="Wrap"
+                               Foreground="{StaticResource AppWarn}" Visibility="Collapsed"
+                               Text="{DynamicResource S_EightBitOnly}" />
+
                     <!--
                         Schnell-Export: kein Dialog, kein Ziel noetig - in den Ordner FrameFlip
                         neben den Bildern oder den gewaehlten Zielordner, unter dem naechsten

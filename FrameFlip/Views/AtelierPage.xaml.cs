@@ -665,6 +665,9 @@ public sealed partial class AtelierPage : UserControl
 
         Draw(recompose);
         Measure();
+
+        // Nach jeder endgueltigen Aenderung: Wirkt jetzt ein Durchgang, den das Ausgabeformat weglaesst?
+        ShowEightBitNote();
     }
 
     /// <summary>Ein Durchgang je Bildwiederholung - mehr sieht ohnehin niemand.</summary>

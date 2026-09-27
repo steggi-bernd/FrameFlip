@@ -111,9 +111,34 @@ public partial class AtelierPage
         // Der Schnell-Export braucht kein Ziel: ohne gewaehltes schreibt er in den Ordner
         // FrameFlip neben den Bildern, und er ueberschreibt nie.
         QuickExportButton.IsEnabled = _path is not null && _running is null;
+
+        ShowEightBitNote();
     }
 
     private void OnFormatChanged(object sender, SelectionChangedEventArgs e) => UpdateBatchBar();
+
+    /// <summary>
+    /// Ob im Rezept ein Durchgang ueber das fertige Bild wirkt - Pixel Sort oder Fehlerdiffusion.
+    /// Beide rechnen in acht Bit und laufen in einer 16-Bit-Ausgabe nicht (siehe
+    /// <see cref="FloatFrameProcessor.ApplyRgba64"/>).
+    /// </summary>
+    internal bool FramePassesActive()
+        => InNodes
+            ? _graph!.Nodes.OfType<Imaging.Nodes.FramePassNode>().Any(node => !node.Muted && node.Pass is { IsNeutral: false })
+            : _finalGrading.Frame.Length > 0;
+
+    /// <summary>
+    /// Sagt an der Ausgabe, wenn das gewaehlte Format einen solchen Durchgang weglaesst. Die
+    /// Vorschau zeigt ihn - ohne diesen Satz fehlte er in der Datei, und niemand wuesste warum.
+    /// </summary>
+    private void ShowEightBitNote()
+    {
+        bool sixteen = Selected.Image is GradeOutputFormat.Png16 or GradeOutputFormat.Tiff16;
+
+        EightBitNote.Visibility = sixteen && _frame is not null && FramePassesActive()
+            ? Visibility.Visible
+            : Visibility.Collapsed;
+    }
 
     /// <summary>Wo das offene Bild in seiner Folge steht - oder -1.</summary>
     private int FrameIndex()
