@@ -336,7 +336,7 @@
                 Der Satz zum Werkzeug, am Ende: Er nimmt, was an Platz uebrig bleibt,
                 und steht beim Pinsel hinter den Reglern statt davor.
             -->
-            <TextBlock x:Name="ToolHint" FontSize="10" VerticalAlignment="Center"
+            <TextBlock x:Name="ToolHint" FontSize="10" VerticalAlignment="Center" Visibility="Collapsed"
                        Margin="16,0,0,0" TextTrimming="CharacterEllipsis"
                        Foreground="{StaticResource MutedBrush}" />
         </DockPanel>

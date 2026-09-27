@@ -1388,4 +1388,33 @@
         </Setter>
     </Style>
 
+    <!--
+        Hinweise beim Darueberfahren im Stil der Oberflaeche - dunkel, mit feinem Rand und
+        runden Ecken - statt des hellen Windows-Kaestchens, das aus jedem Feld herausfiel.
+        Lange Saetze brechen um: Seit die Beschreibungen aus den Leisten in die Hinweise
+        gewandert sind, stehen dort ganze Absaetze.
+    -->
+    <Style TargetType="ToolTip">
+        <Setter Property="OverridesDefaultStyle" Value="True" />
+        <Setter Property="HasDropShadow" Value="False" />
+        <Setter Property="Foreground" Value="{StaticResource ForegroundBrush}" />
+        <Setter Property="FontSize" Value="11" />
+        <Setter Property="MaxWidth" Value="340" />
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="ToolTip">
+                    <Border Background="{StaticResource PanelBackground}" BorderBrush="{StaticResource PanelBorder}"
+                            BorderThickness="1" CornerRadius="6" Padding="9,6">
+                        <Border.Resources>
+                            <DataTemplate DataType="{x:Type sys:String}">
+                                <TextBlock Text="{Binding}" TextWrapping="Wrap" />
+                            </DataTemplate>
+                        </Border.Resources>
+                        <ContentPresenter />
+                    </Border>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
 </ResourceDictionary>

@@ -520,6 +520,11 @@ public partial class MainWindow : Window
         }
 
         AnimatePageChange();
+
+        // Das Atelier braucht die Flaeche fuer das Bild: weniger Rand, vor allem unten, wo
+        // sonst unter seiner Statuszeile noch einmal ein Streifen Leere bis zur Fensterzeile lag.
+        PageContent.Margin = key == "atelier" ? new Thickness(20, 14, 20, 8) : new Thickness(28, 22, 28, 22);
+
         PageContent.Content = key switch
         {
             "projects" => new ProjectsPage(OpenFromProjects),

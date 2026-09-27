@@ -22,7 +22,7 @@ public partial class AtelierPage
         bool detached = _projects.Origin is { Length: > 0 };
         bool sequence = _sequence is { Count: > 1 };
 
-        ToolBand.ShowFrameSwitch(detached || sequence, detached);
+        ToolBand.ShowFrameSwitch(single: detached || !sequence, inSequence: detached || sequence);
     }
 
     /// <summary>

@@ -135,10 +135,12 @@ public static class FrameDetachInvariants
             window.Show();
 
             Show(lone);
-            Check.That(!band.FrameSwitchShown, "ein gewoehnliches Einzelbild: kein Umschalter - nichts zu unterscheiden");
+            Check.That(band.FrameSwitchShown && band.SingleFrame && !band.FrameAllEnabled,
+                       "ein gewoehnliches Einzelbild: der Umschalter steht da, auf nur diesem Bild - die ganze Folge ist aus");
 
             Show(frame);
-            Check.That(band.FrameSwitchShown && !band.SingleFrame, "ein Bild einer Folge: der Umschalter steht auf der ganzen Folge");
+            Check.That(band.FrameSwitchShown && !band.SingleFrame && band.FrameAllEnabled,
+                       "ein Bild einer Folge: der Umschalter steht auf der ganzen Folge");
 
             var exposure = (Slider)((GradingPanel)page.FindName("Tools")).FindName("ExposureSlider");
             exposure.Value = 0.8;
