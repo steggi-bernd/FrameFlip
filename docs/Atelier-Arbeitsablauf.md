@@ -461,3 +461,20 @@ synthetischer Konfiguration (lokal erzeugte Schlüssel, `relay.example.org`, kei
   kopieren“, belegte Zwischenablage. Kopiert wird über einen Wirt, der nur mitschreibt.
 - **Echte Instanz:** Debug-Build mit eigener Konfiguration. Alle sieben Seiten lassen sich
   wählen, das Protokoll enthält keine Ausnahme, der Kopplungshinweis zeigt den neuen Text.
+
+### A3: Einträge aus „Zuletzt geöffnet“ nehmen (`feature/zuletzt-entfernen`)
+
+Punkt 14. „Liste leeren“ gab es schon. Jetzt hat jede Kachel unter „Zuletzt geöffnet“ ein
+Kontextmenü:
+
+- **„Aus der Liste nehmen“:** mit denselben Worten wie die Sequenzliste im Dashboard.
+  Vergessen wird nur der Eintrag, der Ordner und seine Bilder bleiben.
+- **„Im Explorer zeigen“:** solange der Ordner da ist.
+
+Auch ein Eintrag, dessen Ordner verschwunden ist, lässt sich so austragen. Gerade der
+sollte gehen können, ohne die ganze Liste zu leeren.
+
+**Probe** (`RecentForgetInvariants`, eigene Konfiguration): drei Einträge, einer davon mit
+gelöschtem Ordner. Ein Eintrag geht, die anderen bleiben in ihrer Reihenfolge. Der Ordner
+ist unberührt, die Seite zeigt ihn nicht mehr, und der verschwundene lässt sich ebenso
+austragen.
