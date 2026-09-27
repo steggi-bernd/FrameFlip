@@ -28,11 +28,11 @@ public partial class ToolBand : UserControl
 
         foreach (string category in ToolCatalog.Shown)
         {
+            // Nur der Name, wie im Entwurf - die Zeichen stehen an den Werkzeugen darunter.
             var button = new ToggleButton
             {
-                Style = (Style)FindResource("OverlayToggle"),
-                Margin = new Thickness(0, 0, 4, 0),
-                Content = ToolCatalog.GlyphOf(category) + " " + Strings.T(category),
+                Style = (Style)FindResource("CategoryTab"),
+                Content = Strings.T(category),
                 Tag = category,
             };
 
@@ -44,6 +44,13 @@ public partial class ToolBand : UserControl
         // Malen zuerst: Dort ist in jedem Modus etwas zu tun. Die Auswahl steht zwar vorn im
         // Band, ist im Stapel aber ganz gedaempft - als Anfang saehe das aus wie eine kaputte Leiste.
         Choose(ToolCatalog.Paint);
+    }
+
+    /// <summary>Was links neben der Suche steht - im Atelier Original, Zoom und Speichern.</summary>
+    public object? Trailing
+    {
+        get => TrailingSlot.Content;
+        set => TrailingSlot.Content = value;
     }
 
     /// <summary>Was vor den Kategorien steht - im Atelier der Knopf "Bild oeffnen".</summary>
@@ -148,16 +155,24 @@ public partial class ToolBand : UserControl
     /// <summary>Ob gerade "nur dieses Bild" gilt.</summary>
     internal bool SingleFrame => _single;
 
+    /// <summary>Ob "ganze Folge" waehlbar ist - fuer die Probe.</summary>
+    internal bool FrameAllEnabled => FrameAll.IsEnabled;
+
     /// <summary>
-    /// Zeigt den Umschalter - nur bei einer Folge oder einem daraus herausgeloesten Bild - und
-    /// welche Seite gilt. Bei einem gewoehnlichen Einzelbild gibt es nichts zu unterscheiden.
+    /// Zeigt den Umschalter und welche Seite gilt. Er steht bei jedem offenen Bild an seinem
+    /// Platz - so gewuenscht, statt bei einem Einzelbild zu fehlen und dann gesucht zu werden.
+    /// Gehoert das Bild zu keiner Folge, gilt "nur dieses Bild", und "ganze Folge" ist aus,
+    /// mit dem Grund im Hinweis.
     /// </summary>
-    public void ShowFrameSwitch(bool visible, bool single)
+    /// <param name="inSequence">Ob das Bild zu einer Folge gehoert - oder aus einer herausgeloest ist.</param>
+    public void ShowFrameSwitch(bool single, bool inSequence)
     {
-        _single = single;
-        FrameSwitch.Visibility = visible ? Visibility.Visible : Visibility.Collapsed;
-        FrameAll.IsChecked = !single;
-        FrameOne.IsChecked = single;
+        _single = single || !inSequence;
+        FrameSwitch.Visibility = Visibility.Visible;
+        FrameAll.IsEnabled = inSequence;
+        FrameAll.SetResourceReference(ToolTipProperty, inSequence ? "S_FrameAllHint" : "S_FrameNoSequence");
+        FrameAll.IsChecked = !_single;
+        FrameOne.IsChecked = _single;
     }
 
     // Die Knoepfe zeigen, was gilt, und melden nur den Wunsch: Umgeschaltet ist erst, wenn die

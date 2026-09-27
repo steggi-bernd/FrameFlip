@@ -114,6 +114,9 @@ public sealed class NodeLayerList : Border
     /// <summary>Eine Einstellungsebene ueber der gewaehlten - der Chip unter der Liste.</summary>
     public event Action? AdjustmentWanted;
 
+    /// <summary>Ein Effekt nur fuer diese Ebene - fx an einer Ebene ohne eigene Effekte.</summary>
+    public event Action<NodeLayer>? EffectWanted;
+
     public event Action<Node, BlendMode>? ModeWanted;
 
     /// <summary>Die Deckkraft der gewaehlten Ebene - mit true, solange noch gezogen wird.</summary>
@@ -658,8 +661,15 @@ public sealed class NodeLayerList : Border
         // Klick zeigt es im Graphen - den obersten Effekt, die Maske.
         var badges = new StackPanel { Orientation = Orientation.Horizontal, VerticalAlignment = VerticalAlignment.Center };
 
-        if (layer.Effects > 0 && layer.Source is { } effect)
-            badges.Children.Add(Badge(layer.Effects > 1 ? $"fx {layer.Effects}" : "fx", "S_NodeLayerFx", () => Chosen?.Invoke(effect)));
+        // fx steht an jeder Ebene mit Mischen: ohne eigene Effekte gedaempft - ein Klick setzt
+        // einen nur auf sie -, mit eigenen hell und mit ihrer Zahl - ein Klick zeigt den obersten.
+        if (layer.Mix is not null)
+        {
+            if (layer.Effects > 0 && layer.Source is { } effect)
+                badges.Children.Add(Badge(layer.Effects > 1 ? $"fx {layer.Effects}" : "fx", "S_NodeLayerFx", () => Chosen?.Invoke(effect)));
+            else
+                badges.Children.Add(Badge("fx", "S_NodeLayerFxAdd", () => EffectWanted?.Invoke(layer), quiet: true));
+        }
 
         if (layer.MaskSource is MaskNode { Mask.Kind: MaskKind.Cryptomatte } objectMask)
             badges.Children.Add(Badge("⬢", "S_NodeLayerObject", () => Chosen?.Invoke(objectMask)));
@@ -713,14 +723,19 @@ public sealed class NodeLayerList : Border
 
     private static readonly Brush BadgeLine = new SolidColorBrush(Color.FromRgb(0x4A, 0x4A, 0x58));
     private static readonly Brush BadgeText = new SolidColorBrush(Color.FromRgb(0xC8, 0xC8, 0xD4));
+    private static readonly Brush BadgeQuietLine = new SolidColorBrush(Color.FromRgb(0x33, 0x33, 0x3E));
+    private static readonly Brush BadgeQuietText = new SolidColorBrush(Color.FromRgb(0x7A, 0x7A, 0x88));
 
-    /// <summary>Eine kleine Marke am rechten Rand einer Zeile - anklickbar, ohne die Zeile zu waehlen.</summary>
-    private static Border Badge(string text, string tipKey, Action click)
+    /// <summary>
+    /// Eine kleine Marke am rechten Rand einer Zeile - anklickbar, ohne die Zeile zu waehlen.
+    /// Gedaempft (<paramref name="quiet"/>): ein Angebot, noch nichts, was die Ebene traegt.
+    /// </summary>
+    private static Border Badge(string text, string tipKey, Action click, bool quiet = false)
     {
         var badge = new Border
         {
-            Child = new TextBlock { Text = text, FontSize = 9.5, Foreground = BadgeText },
-            BorderBrush = BadgeLine,
+            Child = new TextBlock { Text = text, FontSize = 9.5, Foreground = quiet ? BadgeQuietText : BadgeText },
+            BorderBrush = quiet ? BadgeQuietLine : BadgeLine,
             BorderThickness = new Thickness(1),
             CornerRadius = new CornerRadius(4),
             Padding = new Thickness(5, 0, 5, 1),

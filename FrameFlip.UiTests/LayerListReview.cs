@@ -13,6 +13,16 @@ internal static partial class Program
     /// Miniatur, rechts die Marken - fx fuer eigene Effekte, ⬢ fuer eine Objektmaske -, und
     /// unter der Liste die Chips. Ein synthetischer Graph ohne Bilder.
     /// </summary>
+    private static IEnumerable<DependencyObject> Descendants(DependencyObject root)
+    {
+        for (int i = 0; i < VisualTreeHelper.GetChildrenCount(root); i++)
+        {
+            var child = VisualTreeHelper.GetChild(root, i);
+            yield return child;
+            foreach (var deeper in Descendants(child)) yield return deeper;
+        }
+    }
+
     private static void TestLayerList()
     {
         var graph = StackToGraph.Convert(new LayerStack
@@ -47,5 +57,13 @@ internal static partial class Program
               "Ebenenliste: fx nur an der Ebene mit eigenem Effekt - Platzieren zaehlt nicht");
         Check(layers.Single(l => l.Name == "Licht").MaskSource is MaskNode { Mask.Kind: MaskKind.Cryptomatte },
               "Ebenenliste: die Ebene mit Kryptomatte traegt die Objektmaske");
+
+        // fx steht an jeder Ebene mit Mischen - gedaempft als Angebot, hell mit eigenen Effekten.
+        var badges = Descendants(list).OfType<Border>()
+            .Where(b => b.Child is TextBlock && b.Cursor == System.Windows.Input.Cursors.Hand)
+            .Select(b => ((TextBlock)b.Child).Text)
+            .ToList();
+        Check(badges.Count(b => b.StartsWith("fx")) == layers.Count(l => l.Mix is not null) && badges.Contains("⬢"),
+              $"Ebenenliste: fx an jeder Ebene, ⬢ an der Objektmaske ({string.Join(" ", badges)})");
     }
 }

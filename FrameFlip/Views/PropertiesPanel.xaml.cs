@@ -343,10 +343,9 @@ public partial class PropertiesPanel : UserControl
             _ => "S_ToolMoveShort",
         });
 
-        // Die Leiste kuerzt den Satz, wenn der Platz nicht reicht - ganz steht er im
-        // Hinweis. Ein Satz, der mitten im Wort aufhoert und nirgends vollstaendig zu
-        // lesen ist, waere schlimmer als keiner.
-        ToolHint.ToolTip = ToolHint.Text;
+        // Der Satz steht nicht mehr in der Leiste, sondern im Hinweis am Namen des Werkzeugs -
+        // die Leiste war mit ihm ueberladen (Entscheidung 9, Feinschliff).
+        ToolName.ToolTip = ToolHint.Text;
 
         PickBody.Visibility = tool == AtelierTool.Pick ? Visibility.Visible : Visibility.Collapsed;
 

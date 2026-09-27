@@ -249,6 +249,44 @@
         </local:DockHost>
 
         <!--
+            Original, Zoom und Speichern - oben rechts neben der Suche (ToolBand.Trailing). Sie
+            stehen hier nur, weil benannte Knoepfe nicht als Inhalt der Werkzeugleiste im XAML
+            stehen duerfen (MC3093); der Konstruktor setzt sie dorthin.
+        -->
+        <ContentControl x:Name="ViewControlsHome" Grid.Row="0" Visibility="Collapsed" Focusable="False">
+            <StackPanel x:Name="ViewControls" Orientation="Horizontal" VerticalAlignment="Center" Margin="0,0,6,0">
+                <!--
+                    Gedrueckt halten zeigt das Original. Als Knopf und nicht als
+                    Schalter, weil der Vergleich ein Blick ist und kein Zustand -
+                    wer umschaltet, vergisst zurueckzuschalten und beurteilt dann
+                    minutenlang das falsche Bild.
+                -->
+                <Button x:Name="CompareButton" Style="{StaticResource OverlayButton}" Margin="0,0,4,0"
+                        PreviewMouseLeftButtonDown="OnCompareDown"
+                        PreviewMouseLeftButtonUp="OnCompareUp"
+                        MouseLeave="OnCompareUp"
+                        IsEnabled="False"
+                        AutomationProperties.Name="{DynamicResource S_ShowOriginal}"
+                        ToolTip="{DynamicResource S_ShowOriginalHint}">
+                    <local:IconLabel Icon="eye" Text="{DynamicResource S_ShowOriginal}" />
+                </Button>
+
+                <Button x:Name="ZoomButton" Style="{StaticResource OverlayButton}" Margin="0,0,4,0"
+                        MinWidth="48" Click="OnZoomClicked"
+                        ToolTip="{DynamicResource S_ZoomHint}">
+                    <TextBlock x:Name="ZoomText" TextAlignment="Center" Text="Fit" />
+                </Button>
+
+                <Button x:Name="SaveButton" Style="{StaticResource OverlayButton}" Margin="0,0,4,0"
+                        Click="OnSaveClicked" IsEnabled="False"
+                        AutomationProperties.Name="{DynamicResource S_ProjectSave}"
+                        ToolTip="{DynamicResource S_ProjectSaveHint}">
+                    <local:IconLabel Icon="save" Text="{DynamicResource S_ProjectSave}" />
+                </Button>
+            </StackPanel>
+        </ContentControl>
+
+        <!--
             Unten eine niedrige Zeile fuer das, was man ablesen will: welche Folge und welches
             Bild, welche Datei, wie gross, was die Pipette las - und rechts Vergleich, Zoom und
             ob gespeichert ist.
@@ -257,38 +295,12 @@
                 Background="{StaticResource PanelBackground}" BorderBrush="{StaticResource PanelBorder}"
                 BorderThickness="1" CornerRadius="6" Padding="8,1">
             <DockPanel LastChildFill="True">
-                <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" VerticalAlignment="Center">
-                    <!--
-                        Gedrueckt halten zeigt das Original. Als Knopf und nicht als
-                        Schalter, weil der Vergleich ein Blick ist und kein Zustand -
-                        wer umschaltet, vergisst zurueckzuschalten und beurteilt dann
-                        minutenlang das falsche Bild.
-                    -->
-                    <Button x:Name="CompareButton" Style="{StaticResource LinkButton}"
-                            Margin="0,0,12,0" FontSize="10"
-                            Content="{DynamicResource S_ShowOriginal}"
-                            PreviewMouseLeftButtonDown="OnCompareDown"
-                            PreviewMouseLeftButtonUp="OnCompareUp"
-                            MouseLeave="OnCompareUp"
-                            IsEnabled="False"
-                            ToolTip="{DynamicResource S_ShowOriginalHint}" />
-
-                    <Button x:Name="ZoomButton" Style="{StaticResource LinkButton}"
-                            Margin="0,0,12,0" MinWidth="40" Click="OnZoomClicked"
-                            ToolTip="{DynamicResource S_ZoomHint}">
-                        <TextBlock x:Name="ZoomText" FontSize="10" TextAlignment="Right" Text="Fit" />
-                    </Button>
-
-                    <!--
-                        Das Projekt speichert sich von selbst. Der Text sagt, ob es das schon
-                        hat; der Knopf daneben ist fuer den Moment, in dem man sicher sein will.
-                    -->
-                    <TextBlock x:Name="SaveText" VerticalAlignment="Center"
-                               Style="{StaticResource DashLabel}" FontSize="9" />
-                    <Button x:Name="SaveButton" Style="{StaticResource LinkButton}" Margin="8,0,0,0" FontSize="10"
-                            Content="{DynamicResource S_ProjectSave}" Click="OnSaveClicked" IsEnabled="False"
-                            ToolTip="{DynamicResource S_ProjectSaveHint}" />
-                </StackPanel>
+                <!--
+                    Das Projekt speichert sich von selbst - hier steht, ob es das schon hat. Der
+                    Knopf fuer den Moment, in dem man sicher sein will, steht oben rechts.
+                -->
+                <TextBlock x:Name="SaveText" DockPanel.Dock="Right" VerticalAlignment="Center"
+                           Style="{StaticResource DashLabel}" FontSize="9" />
 
                 <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
                     <Button x:Name="PreviousFrameButton" Style="{StaticResource LinkButton}" FontSize="11"

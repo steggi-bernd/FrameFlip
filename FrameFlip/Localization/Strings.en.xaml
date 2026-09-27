@@ -1223,6 +1223,8 @@
     <sys:String x:Key="S_BrushFlow">Flow</sys:String>
     <sys:String x:Key="S_BrushOpacity">Opacity</sys:String>
     <sys:String x:Key="S_BrushSpacing">Spacing</sys:String>
+    <sys:String x:Key="S_FrameNoSequence">This image is not part of a sequence – it stands on its own.</sys:String>
+    <sys:String x:Key="S_NodeLayerFxAdd">Effect on this layer only – click to open the effects.</sys:String>
     <sys:String x:Key="S_FrameAllHint">Whole sequence: what you change applies to every frame of the sequence.</sys:String>
     <sys:String x:Key="S_FrameOneHint">Only this frame: the frame becomes its own single image – a folder with its name in the source folder, holding a copy of the original, its project (starting from the sequence's state) and later its output. The sequence stays as it is.</sys:String>
     <sys:String x:Key="S_FrameOriginMissing">The sequence frame this one came from is gone.</sys:String>

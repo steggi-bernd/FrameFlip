@@ -154,6 +154,7 @@ public sealed partial class AtelierPage : UserControl
         Properties.BrushChanged += UseBrushSettings;
         ToolBand.Chosen += UseTool;
         ToolBand.Leading = OpenButton();
+        ToolBand.Trailing = TakeViewControls();
         ToolBand.FrameModeWanted += single => _ = UseFrameMode(single);
         Properties.BrushHistoryWanted += anchor =>
         {

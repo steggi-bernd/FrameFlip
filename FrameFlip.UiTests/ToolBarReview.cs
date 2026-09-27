@@ -13,6 +13,30 @@ internal static partial class Program
     /// </summary>
     private static void TestToolBar()
     {
+        // Die Hinweise im Stil der Oberflaeche: dunkel, gerundet, und ein langer Satz bricht um.
+        var tip = new ToolTip { Content = string.Join(" ", Enumerable.Repeat("Ein langer Hinweis, der umbrechen muss.", 12)) };
+        tip.Style = (Style)Application.Current.FindResource(typeof(ToolTip));
+        tip.ApplyTemplate();
+
+        // Ein Hinweis darf in keinem anderen Element stecken - gemessen und gezeichnet wird er allein.
+        tip.Measure(new Size(1000, double.PositiveInfinity));
+        Render(tip, (int)Math.Ceiling(tip.DesiredSize.Width), (int)Math.Ceiling(tip.DesiredSize.Height), "Hinweis.png");
+
+        var frame = System.Windows.Media.VisualTreeHelper.GetChildrenCount(tip) > 0
+            ? System.Windows.Media.VisualTreeHelper.GetChild(tip, 0) as Border
+            : null;
+        Check(frame is { CornerRadius.TopLeft: 6 } && tip.ActualWidth <= 341 && tip.ActualHeight > 40,
+              $"Hinweis: im Stil der Oberflaeche, hoechstens 340 breit, der lange Satz bricht um ({tip.ActualWidth:0} x {tip.ActualHeight:0})");
+
+        // Die Werkzeugleiste: Kategorien nur als Name, die gewaehlte gerahmt; die Werkzeuge in
+        // ihrem eigenen Balken, rechts der Umschalter fuer Folge und Bild.
+        var band = new ToolBand { Width = 1200 };
+        band.ShowFrameSwitch(single: true, inSequence: false);
+        var bandHost = new Border { Background = new SolidColorBrush(Color.FromRgb(0x14, 0x13, 0x1A)), Padding = new Thickness(8), Child = band };
+        bandHost.Measure(new Size(1216, double.PositiveInfinity));
+        Render(bandHost, 1216, (int)Math.Ceiling(bandHost.DesiredSize.Height), "Werkzeugleiste.png");
+        Check(((FrameworkElement)band.FindName("FrameSwitch")).Visibility == Visibility.Visible && !((UIElement)band.FindName("FrameAll")).IsEnabled, "Werkzeugleiste: der Umschalter steht auch beim Einzelbild da");
+
         foreach (var (area, width, name) in new[]
                  {
                      (PaintArea.None, 1500, "Leiste-Pinsel-breit.png"),

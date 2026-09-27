@@ -2,6 +2,43 @@
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
 
+    <UserControl.Resources>
+        <!--
+            Eine Kategorie im Band wie im Entwurf: nur ihr Name, ohne Kasten. Die gewaehlte
+            bekommt einen Rahmen - acht gerahmte Knoepfe nebeneinander sahen aus wie acht
+            Werkzeuge, und man suchte das gewaehlte.
+        -->
+        <Style x:Key="CategoryTab" TargetType="ToggleButton">
+            <Setter Property="Focusable" Value="False" />
+            <Setter Property="Foreground" Value="{StaticResource MutedBrush}" />
+            <Setter Property="FontSize" Value="12" />
+            <Setter Property="Height" Value="26" />
+            <Setter Property="Margin" Value="0,0,2,0" />
+            <Setter Property="Cursor" Value="Hand" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="ToggleButton">
+                        <Grid>
+                            <Border x:Name="Frame" Background="Transparent" BorderBrush="Transparent"
+                                    BorderThickness="1" CornerRadius="6" />
+                            <ContentPresenter Margin="10,0" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                        </Grid>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter Property="Foreground" Value="{StaticResource ForegroundBrush}" />
+                            </Trigger>
+                            <Trigger Property="IsChecked" Value="True">
+                                <Setter Property="Foreground" Value="{StaticResource ForegroundBrush}" />
+                                <Setter TargetName="Frame" Property="Background" Value="{StaticResource ControlBrush}" />
+                                <Setter TargetName="Frame" Property="BorderBrush" Value="{StaticResource PanelBorder}" />
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+    </UserControl.Resources>
+
     <!--
         Die Werkzeugleiste (docs/Atelier-Werkzeugplan.md, Entscheidung 6): oben die Kategorien
         als Band, darunter die Werkzeuge der gewaehlten. Rechts die Suche mit Strg+K.
@@ -14,20 +51,29 @@
                     <Run Text="⌕ " /><Run Text="{DynamicResource S_ToolSearch}" /><Run Text="  Strg+K" Foreground="{StaticResource MutedBrush}" />
                 </TextBlock>
             </Button>
+            <!-- Neben der Suche, was die Seite dort haben will - im Atelier Original, Zoom, Speichern. -->
+            <ContentControl x:Name="TrailingSlot" DockPanel.Dock="Right" VerticalAlignment="Center" Focusable="False" />
             <!-- Vorn, was die Seite hier haben will - im Atelier "Bild oeffnen". -->
             <ContentControl x:Name="LeadingSlot" DockPanel.Dock="Left" VerticalAlignment="Center" Focusable="False" />
             <WrapPanel x:Name="CategoryRow" Orientation="Horizontal" VerticalAlignment="Center" />
         </DockPanel>
 
-        <DockPanel Margin="0,6,0,0" LastChildFill="True">
+        <!--
+            Die Werkzeuge der gewaehlten Kategorie in einem eigenen Balken, wie im Entwurf -
+            er setzt die Zeile vom Band darueber ab.
+        -->
+        <Border x:Name="ToolStrip" Margin="0,6,0,0" Padding="6,5,6,1" CornerRadius="8"
+                Background="{StaticResource PanelBackground}" BorderBrush="{StaticResource PanelBorder}" BorderThickness="1">
+        <DockPanel LastChildFill="True">
             <!--
                 Ganze Folge oder nur dieses Bild (Entscheidung 7): unauffaellig am Ende der Zeile,
                 nur bei einer Folge oder einem daraus herausgeloesten Bild. Ein Filmstreifen und
                 ein Bild - kein Ebenen-Zeichen, das waere mit den Ebenen zu verwechseln.
             -->
             <StackPanel x:Name="FrameSwitch" DockPanel.Dock="Right" Orientation="Horizontal" VerticalAlignment="Top"
-                        Visibility="Collapsed">
+                        Margin="8,0,0,4" Visibility="Collapsed">
                 <ToggleButton x:Name="FrameAll" Style="{StaticResource OverlayToggle}" Padding="6,3"
+                              ToolTipService.ShowOnDisabled="True"
                               ToolTip="{DynamicResource S_FrameAllHint}" Click="OnFrameAll">
                     <Path Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=ToggleButton}}" StrokeThickness="1.2"
                           Data="M1,1.5 H17 V12.5 H1 Z M5,1.5 V12.5 M13,1.5 V12.5 M2.3,3.5 H3.7 M2.3,6.5 H3.7 M2.3,9.5 H3.7 M14.3,3.5 H15.7 M14.3,6.5 H15.7 M14.3,9.5 H15.7" />
@@ -41,6 +87,7 @@
 
             <WrapPanel x:Name="ToolRow" Orientation="Horizontal" />
         </DockPanel>
+        </Border>
 
         <Popup x:Name="SearchPopup" PlacementTarget="{Binding ElementName=SearchButton}" Placement="Bottom"
                StaysOpen="False" AllowsTransparency="True">

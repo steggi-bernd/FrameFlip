@@ -30,6 +30,13 @@ public partial class AtelierPage
         return button;
     }
 
+    /// <summary>Original, Zoom und Speichern aus ihrem Platzhalter - fuer oben rechts neben der Suche.</summary>
+    private FrameworkElement TakeViewControls()
+    {
+        ViewControlsHome.Content = null;
+        return ViewControls;
+    }
+
     /// <summary>Strg+K: die Suche der Werkzeugleiste.</summary>
     public void OpenToolSearch() => ToolBand.OpenSearch();
 

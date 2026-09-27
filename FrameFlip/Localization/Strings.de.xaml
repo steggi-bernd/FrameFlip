@@ -1223,6 +1223,8 @@
     <sys:String x:Key="S_BrushFlow">Stärke</sys:String>
     <sys:String x:Key="S_BrushOpacity">Deckkraft</sys:String>
     <sys:String x:Key="S_BrushSpacing">Abstand</sys:String>
+    <sys:String x:Key="S_FrameNoSequence">Dieses Bild gehört zu keiner Folge – es gilt nur für sich.</sys:String>
+    <sys:String x:Key="S_NodeLayerFxAdd">Effekt nur auf diese Ebene – ein Klick öffnet die Effekte.</sys:String>
     <sys:String x:Key="S_FrameAllHint">Ganze Folge: Was du änderst, gilt für jedes Bild der Folge.</sys:String>
     <sys:String x:Key="S_FrameOneHint">Nur dieses Bild: Das Bild wird zu einem eigenen Einzelbild – ein Ordner mit seinem Namen im Quellordner, darin eine Kopie des Originals, sein Projekt (beginnend mit dem Stand der Folge) und später seine Ausgabe. Die Folge bleibt, wie sie ist.</sys:String>
     <sys:String x:Key="S_FrameOriginMissing">Das Bild der Folge, aus dem dieses kam, ist nicht mehr da.</sys:String>
