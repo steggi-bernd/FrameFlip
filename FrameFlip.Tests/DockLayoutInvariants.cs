@@ -13,7 +13,7 @@ namespace FrameFlip.Tests;
 /// </summary>
 public static class DockLayoutInvariants
 {
-    private static readonly string[] Known = { "histogram", "colour", "layers", "export" };
+    private static readonly string[] Known = { "histogram", "colour", "layers", "export", "tool" };
 
     public static void Run()
     {
@@ -101,6 +101,16 @@ public static class DockLayoutInvariants
         older.Normalise(Known);
         Check.That(older.Find("export") is { Zone: DockZone.Right, Group: 2 },
                    "eine Anordnung von frueher bekommt die Ausgabe unten rechts dazu");
+
+        // Entscheidung 10: die Werkzeugeinstellungen oben, als eigene Gruppe - auch bei einer
+        // Anordnung von frueher, die sie nicht kennt.
+        Check.That(layout.Find("tool") is { Zone: DockZone.Top, Group: 0 } && layout.Top.Count == 1,
+                   "die Werkzeugeinstellungen stehen oben");
+        Check.That(older.Find("tool") is { Zone: DockZone.Top } && older.Right.Count == 3,
+                   "eine Anordnung von frueher bekommt sie oben dazu - und rechts bleibt, was dort stand");
+        Check.That(DockLayout.IsHorizontal(DockZone.Top) && DockLayout.IsHorizontal(DockZone.Bottom) &&
+                   !DockLayout.IsHorizontal(DockZone.Left),
+                   "oben und unten liegen Gruppen nebeneinander, an den Seiten untereinander");
     }
 
     /// <summary>
@@ -291,8 +301,10 @@ public static class DockLayoutInvariants
 
         layout.Move("layers", DockZone.Left, 0, asTab: false);
         layout.Move("histogram", DockZone.Bottom, 0, asTab: false);
+        layout.Move("export", DockZone.Top, 1, asTab: false);
         layout.LeftWidth = 280;
         layout.BottomHeight = 190;
+        layout.TopHeight = 150;
         layout.Normalise(Known);
 
         var read = JsonSerializer.Deserialize<DockLayout>(JsonSerializer.Serialize(layout))!;
@@ -306,6 +318,9 @@ public static class DockLayoutInvariants
 
         Check.Near(read.LeftWidth, 280, 1e-9, "die Breite links");
         Check.Near(read.BottomHeight, 190, 1e-9, "und die Hoehe unten");
+        Check.That(read.Top.Count == 2 && read.Find("export") is { Zone: DockZone.Top, Group: 1 } &&
+                   Math.Abs(read.TopHeight - 150) < 1e-9 && layout.Clone().Top.Count == 2,
+                   "auch oben: die Ausgabe neben den Werkzeugeinstellungen, die Hoehe - und die Kopie");
 
         var copy = layout.Clone();
 

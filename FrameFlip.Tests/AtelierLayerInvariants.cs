@@ -1163,9 +1163,11 @@ public static class AtelierLayerInvariants
             // war es ein Drittel. Die Ausgabe darunter hat ihre eigene, feste Hoehe
             // (so hoch wie ihr Inhalt) - gemessen wird an dem, was die Spalte uebrig hat.
             var output = (FrameworkElement)page.FindName("ExportBar");
-            double column = output.IsVisible
+            var tool = (FrameworkElement)page.FindName("Properties");
+            double below = tool.IsVisible ? tool.TranslatePoint(new System.Windows.Point(0, tool.ActualHeight), dock).Y : 0;
+            double column = (output.IsVisible
                 ? output.TranslatePoint(new System.Windows.Point(0, 0), dock).Y
-                : dock.ActualHeight;
+                : dock.ActualHeight) - below;
 
             Check.That(colourHeight > column * 0.6,
                        "und die ist fast die ganze Spalte, nicht ein Drittel davon",
@@ -1232,6 +1234,39 @@ public static class AtelierLayerInvariants
             Check.Near(ExportTop(), top, 0.5, "ein Gewicht macht sie nicht groesser - ihre Hoehe ist die ihres Inhalts");
 
             export.Visibility = Visibility.Collapsed;
+            dock.ResetLayout();
+            page.UpdateLayout();
+
+            // Entscheidung 10: Die Werkzeugeinstellungen sind ein Feld der Andockflaeche - oben
+            // als Leiste ueber die ganze Breite, so hoch wie ihr Inhalt, ueber dem Bild.
+            var options = (PropertiesPanel)page.FindName("Properties");
+            options.Show(AtelierTool.Brush);
+            page.UpdateLayout();
+
+            var toolArea = options.TransformToAncestor(dock).TransformBounds(new Rect(options.RenderSize));
+            var picture = ((FrameworkElement)dock.Center!).TransformToAncestor(dock).TransformBounds(new Rect(dock.Center!.RenderSize));
+
+            Check.That(dock.Layout.Find("tool") is { Zone: DockZone.Top } && toolArea.Top < 4 &&
+                       toolArea.Width > dock.ActualWidth - 60 && toolArea.Bottom <= picture.Top &&
+                       Math.Abs(options.ActualHeight - options.DesiredSize.Height) < 1,
+                       "die Werkzeugeinstellungen stehen oben ueber die ganze Breite, ganz und ueber dem Bild",
+                       $"{toolArea} ueber {picture}, Flaeche {dock.ActualWidth:0}, Hoehe {options.ActualHeight:0.0} zu {options.DesiredSize.Height:0.0}");
+
+            // An die Seite gezogen: Die Gruppen stehen untereinander, und nichts ragt heraus.
+            dock.MovePanel("tool", DockZone.Right, 0, asTab: false);
+            page.UpdateLayout();
+
+            toolArea = options.TransformToAncestor(dock).TransformBounds(new Rect(options.RenderSize));
+            var size = (FrameworkElement)options.FindName("BrushSizeSlider");
+            var pressure = (FrameworkElement)options.FindName("BrushPressureBox");
+            double Right(FrameworkElement e) => e.TranslatePoint(new System.Windows.Point(e.ActualWidth, 0), options).X;
+
+            Check.That(dock.Layout.Find("tool") is { Zone: DockZone.Right, Group: 0 } &&
+                       toolArea.Width <= dock.Layout.RightWidth + 1 && toolArea.Height > 120 &&
+                       size.IsVisible && Right(size) <= options.ActualWidth + 0.5 && Right(pressure) <= options.ActualWidth + 0.5,
+                       "an die Seite gezogen: die Gruppen stehen untereinander, nichts ragt heraus",
+                       $"{toolArea}, Groesse bis {Right(size):0}, Druck bis {Right(pressure):0}");
+
             dock.ResetLayout();
             page.UpdateLayout();
 
