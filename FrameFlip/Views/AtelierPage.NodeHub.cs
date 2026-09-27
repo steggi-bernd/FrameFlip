@@ -110,7 +110,7 @@ public partial class AtelierPage
                 ? Strings.T("S_HubIntoWire", NodeTitles.For(from), NodeTitles.For(to))
                 : null;
 
-        var chosen = NodeView.Selected is { } node and not OutputNode ? node : null;
+        var chosen = SelectedNode is { } node and not OutputNode ? node : null;
 
         var hub = new NodeHub(HubCategories(at, link, target, after), note,
                               chosen is null ? null : NodeTitles.For(chosen),

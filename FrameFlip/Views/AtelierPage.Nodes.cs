@@ -77,6 +77,9 @@ public partial class AtelierPage
 
         NodeView.Graph = _graph;
         NodeView.Title = NodeTitles.For;
+
+        // Ein neuer Graph, nichts darin gewaehlt: Das Ziel ist das Bild, bis jemand waehlt.
+        _recipe.Focus(Atelier.EditingTarget.Picture);
         NodeView.MaskTitle = NodeTitles.MaskName;
 
         ShowNodeMode();
@@ -115,7 +118,7 @@ public partial class AtelierPage
 
         // Eine Kryptomatte, an der gewaehlt wird, braucht ihre Stufen, auch wenn sie
         // noch nirgends steckt - gewaehlt wird im Bild, nicht im Graphen.
-        if (NodeView.Selected is MaskNode { Mask: { Kind: MaskKind.Cryptomatte } picking })
+        if (SelectedNode is MaskNode { Mask: { Kind: MaskKind.Cryptomatte } picking })
         {
             foreach (string level in picking.Levels)
             {
@@ -225,7 +228,7 @@ public partial class AtelierPage
         Number = _number,
         Pool = pool ?? _pool,
         Cache = _cache,
-        Focus = NodeView.Selected?.Id,
+        Focus = SelectedNode?.Id,
         Previews = _previews,
         Viewer = _viewer,
     };

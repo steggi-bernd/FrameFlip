@@ -183,6 +183,9 @@ public partial class AtelierPage
         _cache.Clear();
 
         NodeView.Graph = null;
+
+        // Kein Graph mehr: Das Ziel ist das Bild, bis der Ebenenstreifen eine Ebene waehlt.
+        _recipe.Focus(Atelier.EditingTarget.Picture);
         NodeLayers.Visibility = Visibility.Collapsed;
         Layers.Visibility = Visibility.Visible;
 

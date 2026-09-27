@@ -38,7 +38,7 @@ public partial class AtelierPage
 
     /// <summary>Die Ebene, die in der Liste gewaehlt ist - ihr Mischen. Die Grundlage hat keines.</summary>
     private MixNode? ChosenLayer()
-        => _graph is not null && NodeView.Selected is MixNode mix && LayerEdits.ChainOf(LayerEdits.Chains(_graph), mix) is not null
+        => _graph is not null && SelectedNode is MixNode mix && LayerEdits.ChainOf(LayerEdits.Chains(_graph), mix) is not null
             ? mix
             : null;
 
