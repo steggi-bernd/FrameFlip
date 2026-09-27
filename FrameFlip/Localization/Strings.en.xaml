@@ -1244,6 +1244,17 @@
     <sys:String x:Key="S_ToolNodesOnly">Only in node mode – the stack has no place for it. Switch with the "Nodes" tool (N).</sys:String>
     <sys:String x:Key="S_ToolNeedsPaintedMask">First pick a painted mask in the graph – then it can be edited.</sys:String>
     <sys:String x:Key="S_ToolStampNeedsTip">The stamp needs a tip – load an image with "Tip …".</sys:String>
+    <sys:String x:Key="S_BrushGroupTip">TIP</sys:String>
+    <sys:String x:Key="S_BrushGroupPaint">PAINT</sys:String>
+    <sys:String x:Key="S_BrushGroupShape">SHAPE</sys:String>
+    <sys:String x:Key="S_BrushGroupBinding">BINDING</sys:String>
+    <sys:String x:Key="S_BrushGroupPressure">PRESSURE</sys:String>
+    <sys:String x:Key="S_BrushRound">Round</sys:String>
+    <sys:String x:Key="S_BrushRoundHint">Round tip – smooth in curves and on areas.</sys:String>
+    <sys:String x:Key="S_BrushSquare">Square</sys:String>
+    <sys:String x:Key="S_BrushFollow">follows the stroke</sys:String>
+    <sys:String x:Key="S_BrushObject">Object</sys:String>
+    <sys:String x:Key="S_BrushEdge">Surface</sys:String>
     <sys:String x:Key="S_BrushSquareHint">Square tip instead of round – gets cleanly into corners and along straight edges.</sys:String>
     <sys:String x:Key="S_BrushStampHint">Stamp: a tip made from an image – leaves, scratches, splatter. White paints, black doesn't; if the file has transparency, its opacity counts.</sys:String>
     <sys:String x:Key="S_BrushTipLoad">Tip …</sys:String>

@@ -14,13 +14,18 @@ public partial class AtelierPage
     /// <summary>"Bild oeffnen" - vorn in der Werkzeugleiste, vor den Kategorien.</summary>
     private System.Windows.Controls.Button OpenButton()
     {
+        // Zeichen und Name wie die Chips darunter (Entscheidung 9).
+        var label = new IconLabel { Icon = "open" };
+        label.SetResourceReference(IconLabel.TextProperty, "S_OpenImage");
+
         var button = new System.Windows.Controls.Button
         {
             Style = (Style)FindResource("OverlayButton"),
             Margin = new Thickness(0, 0, 8, 0),
+            Content = label,
         };
 
-        button.SetResourceReference(System.Windows.Controls.ContentControl.ContentProperty, "S_OpenImage");
+        button.SetResourceReference(System.Windows.Automation.AutomationProperties.NameProperty, "S_OpenImage");
         button.Click += OnOpenClicked;
         return button;
     }

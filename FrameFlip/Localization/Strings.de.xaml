@@ -1244,6 +1244,17 @@
     <sys:String x:Key="S_ToolNodesOnly">Nur im Knotenmodus – im Stapel hat es keinen Platz. Mit dem Werkzeug „Knoten“ (N) umschalten.</sys:String>
     <sys:String x:Key="S_ToolNeedsPaintedMask">Erst eine gemalte Maske im Graphen wählen – dann lässt sie sich bearbeiten.</sys:String>
     <sys:String x:Key="S_ToolStampNeedsTip">Der Stempel braucht eine Spitze – mit „Spitze …“ ein Bild laden.</sys:String>
+    <sys:String x:Key="S_BrushGroupTip">SPITZE</sys:String>
+    <sys:String x:Key="S_BrushGroupPaint">AUFTRAG</sys:String>
+    <sys:String x:Key="S_BrushGroupShape">FORM</sys:String>
+    <sys:String x:Key="S_BrushGroupBinding">BINDUNG</sys:String>
+    <sys:String x:Key="S_BrushGroupPressure">DRUCK</sys:String>
+    <sys:String x:Key="S_BrushRound">Rund</sys:String>
+    <sys:String x:Key="S_BrushRoundHint">Runde Spitze – weich in Kurven und auf Flächen.</sys:String>
+    <sys:String x:Key="S_BrushSquare">Eckig</sys:String>
+    <sys:String x:Key="S_BrushFollow">folgt dem Strich</sys:String>
+    <sys:String x:Key="S_BrushObject">Objekt</sys:String>
+    <sys:String x:Key="S_BrushEdge">Fläche</sys:String>
     <sys:String x:Key="S_BrushSquareHint">Eckige Spitze statt runder – kommt sauber in Ecken und an gerade Kanten.</sys:String>
     <sys:String x:Key="S_BrushStampHint">Stempel: eine Spitze aus einem Bild – Laub, Kratzer, Spritzer. Weiß malt, Schwarz nicht; hat die Datei Transparenz, zählt die Deckkraft.</sys:String>
     <sys:String x:Key="S_BrushTipLoad">Spitze …</sys:String>

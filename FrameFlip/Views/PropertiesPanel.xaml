@@ -1,6 +1,49 @@
 <UserControl x:Class="FrameFlip.Views.PropertiesPanel"
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
-             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:local="clr-namespace:FrameFlip.Views">
+
+    <UserControl.Resources>
+        <!--
+            Eine Gruppe der Leiste (Entscheidung 9): ein feiner Strich davor, ihr Name klein
+            vorn. Umgebrochen wird nur zwischen Gruppen - nie mitten durch eine, wie frueher,
+            als der Wert eines Reglers am Anfang der naechsten Zeile stehen konnte.
+        -->
+        <Style x:Key="OptionGroup" TargetType="Border">
+            <Setter Property="BorderBrush" Value="{StaticResource PanelBorder}" />
+            <Setter Property="BorderThickness" Value="1,0,0,0" />
+            <Setter Property="Padding" Value="10,0,8,0" />
+            <Setter Property="Margin" Value="0,5" />
+            <Setter Property="VerticalAlignment" Value="Center" />
+        </Style>
+        <Style x:Key="OptionCaption" TargetType="TextBlock">
+            <Setter Property="FontSize" Value="9" />
+            <Setter Property="FontWeight" Value="SemiBold" />
+            <Setter Property="Foreground" Value="{StaticResource MutedBrush}" />
+            <Setter Property="VerticalAlignment" Value="Center" />
+            <Setter Property="Margin" Value="0,0,10,0" />
+        </Style>
+
+        <!-- Name, Regler, Wert - ueberall gleich breit, damit die Gruppen ruhig stehen. -->
+        <Style x:Key="OptionLabel" TargetType="TextBlock" BasedOn="{StaticResource PanelLabel}">
+            <Setter Property="VerticalAlignment" Value="Center" />
+            <Setter Property="Margin" Value="0,0,6,0" />
+        </Style>
+        <Style x:Key="OptionSlider" TargetType="Slider" BasedOn="{StaticResource PanelSlider}">
+            <Setter Property="Width" Value="64" />
+            <Setter Property="VerticalAlignment" Value="Center" />
+        </Style>
+        <Style x:Key="OptionValue" TargetType="TextBlock" BasedOn="{StaticResource PanelValue}">
+            <Setter Property="Width" Value="32" />
+            <Setter Property="Margin" Value="5,0,10,0" />
+            <Setter Property="VerticalAlignment" Value="Center" />
+            <Setter Property="HorizontalAlignment" Value="Left" />
+        </Style>
+        <Style x:Key="OptionChip" TargetType="ToggleButton" BasedOn="{StaticResource OverlayToggle}">
+            <Setter Property="VerticalAlignment" Value="Center" />
+            <Setter Property="Margin" Value="0,0,4,0" />
+        </Style>
+    </UserControl.Resources>
 
     <!--
         Die Leiste des gewaehlten Werkzeugs - waagerecht, ueber dem Bild.
@@ -27,201 +70,218 @@
                            Foreground="{StaticResource ForegroundBrush}" VerticalAlignment="Center" />
             </StackPanel>
 
-            <!-- Der Pinsel: Regler in einer Zeile, die bei wenig Platz umbricht - mit der
-                 Spitze sind es mehr geworden, als eine Zeile immer fasst. -->
+            <!--
+                Der Pinsel in Gruppen wie im Entwurf: Spitze, Auftrag, Form, Bindung, Druck.
+                Bei wenig Platz bricht die Leiste zwischen den Gruppen um. Was zum gewaehlten
+                Werkzeug nicht gehoert, steht gar nicht da (ShowBrushGroups).
+            -->
             <WrapPanel x:Name="BrushBody" DockPanel.Dock="Left" Orientation="Horizontal"
                        VerticalAlignment="Center" Visibility="Collapsed">
 
                 <!-- Die Arten stehen seit Phase U als Werkzeuge in der Werkzeugzeile (Malen);
-                     hier bleiben sie nur als Stand, unsichtbar. -->
-                <StackPanel x:Name="BrushModeRow" Orientation="Horizontal" VerticalAlignment="Center" Visibility="Collapsed">
-                <!-- Womit gemalt wird: Zug oder Flaeche. Genau einer ist an. -->
-                <ToggleButton x:Name="BrushModeStroke" Style="{StaticResource OverlayToggle}" IsChecked="True"
-                              VerticalAlignment="Center" Content="✎" ToolTip="{DynamicResource S_BrushModeStrokeHint}"
-                              Checked="OnBrushMode" Unchecked="OnBrushMode" />
-                <ToggleButton x:Name="BrushModeRectangle" Style="{StaticResource OverlayToggle}" Margin="4,0,0,0"
-                              VerticalAlignment="Center" Content="▭" ToolTip="{DynamicResource S_BrushModeRectangleHint}"
-                              Checked="OnBrushMode" Unchecked="OnBrushMode" />
-                <ToggleButton x:Name="BrushModeEllipse" Style="{StaticResource OverlayToggle}" Margin="4,0,0,0"
-                              VerticalAlignment="Center" Content="◯" ToolTip="{DynamicResource S_BrushModeEllipseHint}"
-                              Checked="OnBrushMode" Unchecked="OnBrushMode" />
-                <ToggleButton x:Name="BrushModeLasso" Style="{StaticResource OverlayToggle}" Margin="4,0,14,0"
-                              VerticalAlignment="Center" Content="➰" ToolTip="{DynamicResource S_BrushModeLassoHint}"
-                              Checked="OnBrushMode" Unchecked="OnBrushMode" />
+                     hier bleiben sie nur als Stand, unsichtbar. Genau eine ist an. -->
+                <StackPanel x:Name="BrushModeRow" Orientation="Horizontal" Visibility="Collapsed">
+                    <ToggleButton x:Name="BrushModeStroke" Style="{StaticResource OverlayToggle}" IsChecked="True"
+                                  Content="✎" ToolTip="{DynamicResource S_BrushModeStrokeHint}"
+                                  Checked="OnBrushMode" Unchecked="OnBrushMode" />
+                    <ToggleButton x:Name="BrushModeRectangle" Style="{StaticResource OverlayToggle}"
+                                  Content="▭" ToolTip="{DynamicResource S_BrushModeRectangleHint}"
+                                  Checked="OnBrushMode" Unchecked="OnBrushMode" />
+                    <ToggleButton x:Name="BrushModeEllipse" Style="{StaticResource OverlayToggle}"
+                                  Content="◯" ToolTip="{DynamicResource S_BrushModeEllipseHint}"
+                                  Checked="OnBrushMode" Unchecked="OnBrushMode" />
+                    <ToggleButton x:Name="BrushModeLasso" Style="{StaticResource OverlayToggle}"
+                                  Content="➰" ToolTip="{DynamicResource S_BrushModeLassoHint}"
+                                  Checked="OnBrushMode" Unchecked="OnBrushMode" />
+                    <!-- Der Stempel ist ein Werkzeug der Zeile; der Schalter haelt nur den Stand. -->
+                    <ToggleButton x:Name="BrushStampToggle" Style="{StaticResource OverlayToggle}"
+                                  Content="✿" ToolTip="{DynamicResource S_BrushStampHint}"
+                                  Checked="OnBrushToggle" Unchecked="OnBrushToggle" />
                 </StackPanel>
 
-                <!-- Die Spitze: Groesse, Haerte, Staerke - nur beim Zug, nicht beim Fuellen. -->
-                <StackPanel x:Name="BrushTipRow" Orientation="Horizontal" VerticalAlignment="Center">
-                <TextBlock Text="{DynamicResource S_BrushSize}" Style="{StaticResource PanelLabel}"
-                           VerticalAlignment="Center" Margin="0,0,6,0" />
-                <Slider x:Name="BrushSizeSlider" Style="{StaticResource PanelSlider}" Width="110"
-                        VerticalAlignment="Center"
-                        Minimum="2" Maximum="400" Value="40" SmallChange="2" LargeChange="20"
-                        ValueChanged="OnBrushChanged" MouseDoubleClick="OnBrushReset" Tag="40" />
-                <TextBlock x:Name="BrushSizeValue" Style="{StaticResource PanelValue}"
-                           VerticalAlignment="Center" Width="46" Margin="6,0,14,0"
-                           HorizontalAlignment="Left" />
+                <!-- SPITZE - nur beim Zug. Rund oder eckig; beim Stempel statt dessen seine Spitze. -->
+                <Border x:Name="BrushTipRow" Style="{StaticResource OptionGroup}">
+                    <StackPanel Orientation="Horizontal">
+                        <TextBlock Style="{StaticResource OptionCaption}" Text="{DynamicResource S_BrushGroupTip}" />
 
-                <TextBlock Text="{DynamicResource S_BrushHardness}" Style="{StaticResource PanelLabel}"
-                           VerticalAlignment="Center" Margin="0,0,6,0" />
-                <Slider x:Name="BrushHardnessSlider" Style="{StaticResource PanelSlider}" Width="80"
-                        VerticalAlignment="Center"
-                        Minimum="0" Maximum="1" Value="0.5" SmallChange="0.02" LargeChange="0.1"
-                        ValueChanged="OnBrushChanged" MouseDoubleClick="OnBrushReset" Tag="0.5" />
-                <TextBlock x:Name="BrushHardnessValue" Style="{StaticResource PanelValue}"
-                           VerticalAlignment="Center" Width="36" Margin="6,0,14,0"
-                           HorizontalAlignment="Left" />
+                        <StackPanel x:Name="BrushTipShapes" Orientation="Horizontal" Margin="0,0,8,0">
+                            <ToggleButton x:Name="BrushRoundToggle" Style="{StaticResource OptionChip}"
+                                          ToolTip="{DynamicResource S_BrushRoundHint}"
+                                          Checked="OnBrushToggle" Unchecked="OnBrushToggle">
+                                <local:IconLabel Icon="round" Text="{DynamicResource S_BrushRound}" />
+                            </ToggleButton>
+                            <ToggleButton x:Name="BrushSquareToggle" Style="{StaticResource OptionChip}"
+                                          ToolTip="{DynamicResource S_BrushSquareHint}"
+                                          Checked="OnBrushToggle" Unchecked="OnBrushToggle">
+                                <local:IconLabel Icon="square" Text="{DynamicResource S_BrushSquare}" />
+                            </ToggleButton>
+                        </StackPanel>
 
-                <TextBlock Text="{DynamicResource S_BrushFlow}" Style="{StaticResource PanelLabel}"
-                           VerticalAlignment="Center" Margin="0,0,6,0" />
-                <Slider x:Name="BrushFlowSlider" Style="{StaticResource PanelSlider}" Width="80"
-                        VerticalAlignment="Center"
-                        Minimum="0.02" Maximum="1" Value="0.7" SmallChange="0.02" LargeChange="0.1"
-                        ValueChanged="OnBrushChanged" MouseDoubleClick="OnBrushReset" Tag="0.7" />
-                <TextBlock x:Name="BrushFlowValue" Style="{StaticResource PanelValue}"
-                           VerticalAlignment="Center" Width="36" Margin="6,0,14,0"
-                           HorizontalAlignment="Left" />
+                        <!-- Der Stempel: eine Spitze aus einem Bild, je Tupfer zufaellig gedreht und gestreut. -->
+                        <StackPanel x:Name="BrushStampRow" Orientation="Horizontal" Margin="0,0,8,0"
+                                    IsEnabled="{Binding IsChecked, ElementName=BrushStampToggle}">
+                            <Button x:Name="BrushTipButton" Style="{StaticResource OverlayButton}" VerticalAlignment="Center"
+                                    Margin="0,0,10,0"
+                                    Content="{DynamicResource S_BrushTipLoad}" ToolTip="{DynamicResource S_BrushTipHint}"
+                                    Click="OnBrushTipClicked" />
+                            <TextBlock Text="{DynamicResource S_BrushJitter}" Style="{StaticResource OptionLabel}"
+                                       ToolTip="{DynamicResource S_BrushJitterHint}" />
+                            <Slider x:Name="BrushJitterSlider" Style="{StaticResource OptionSlider}" Width="56" Margin="0,0,12,0"
+                                    Minimum="0" Maximum="1" Value="0.5" SmallChange="0.05" LargeChange="0.25"
+                                    ToolTip="{DynamicResource S_BrushJitterHint}"
+                                    ValueChanged="OnBrushChanged" MouseDoubleClick="OnBrushReset" Tag="0.5" />
+                            <TextBlock Text="{DynamicResource S_BrushScatter}" Style="{StaticResource OptionLabel}"
+                                       ToolTip="{DynamicResource S_BrushScatterHint}" />
+                            <Slider x:Name="BrushScatterSlider" Style="{StaticResource OptionSlider}" Width="56" Margin="0,0,12,0"
+                                    Minimum="0" Maximum="1" Value="0.25" SmallChange="0.05" LargeChange="0.25"
+                                    ToolTip="{DynamicResource S_BrushScatterHint}"
+                                    ValueChanged="OnBrushChanged" MouseDoubleClick="OnBrushReset" Tag="0.25" />
+                        </StackPanel>
 
-                </StackPanel>
+                        <TextBlock Text="{DynamicResource S_BrushSize}" Style="{StaticResource OptionLabel}" />
+                        <Slider x:Name="BrushSizeSlider" Style="{StaticResource OptionSlider}" Width="84"
+                                Minimum="2" Maximum="400" Value="40" SmallChange="2" LargeChange="20"
+                                ValueChanged="OnBrushChanged" MouseDoubleClick="OnBrushReset" Tag="40" />
+                        <TextBlock x:Name="BrushSizeValue" Style="{StaticResource OptionValue}" />
+
+                        <TextBlock Text="{DynamicResource S_BrushHardness}" Style="{StaticResource OptionLabel}" />
+                        <Slider x:Name="BrushHardnessSlider" Style="{StaticResource OptionSlider}"
+                                Minimum="0" Maximum="1" Value="0.5" SmallChange="0.02" LargeChange="0.1"
+                                ValueChanged="OnBrushChanged" MouseDoubleClick="OnBrushReset" Tag="0.5" />
+                        <TextBlock x:Name="BrushHardnessValue" Style="{StaticResource OptionValue}" Margin="5,0,0,0" />
+                    </StackPanel>
+                </Border>
+
+                <!-- FORM - nur beim Zug: gedreht, gestreckt, zum Karo gezogen, und ob der Winkel dem Strich folgt. -->
+                <Border x:Name="BrushShapeRow" Style="{StaticResource OptionGroup}">
+                    <StackPanel Orientation="Horizontal">
+                        <TextBlock Style="{StaticResource OptionCaption}" Text="{DynamicResource S_BrushGroupShape}" />
+
+                        <TextBlock Text="{DynamicResource S_BrushAngle}" Style="{StaticResource OptionLabel}"
+                                   ToolTip="{DynamicResource S_BrushAngleHint}" />
+                        <Slider x:Name="BrushAngleSlider" Style="{StaticResource OptionSlider}"
+                                Minimum="0" Maximum="180" Value="0" SmallChange="5" LargeChange="15"
+                                ToolTip="{DynamicResource S_BrushAngleHint}"
+                                ValueChanged="OnBrushChanged" MouseDoubleClick="OnBrushReset" Tag="0" />
+                        <TextBlock x:Name="BrushAngleValue" Style="{StaticResource OptionValue}" />
+
+                        <TextBlock Text="{DynamicResource S_BrushAspect}" Style="{StaticResource OptionLabel}"
+                                   ToolTip="{DynamicResource S_BrushAspectHint}" />
+                        <Slider x:Name="BrushAspectSlider" Style="{StaticResource OptionSlider}"
+                                Minimum="1" Maximum="8" Value="1" SmallChange="0.25" LargeChange="1"
+                                ToolTip="{DynamicResource S_BrushAspectHint}"
+                                ValueChanged="OnBrushChanged" MouseDoubleClick="OnBrushReset" Tag="1" />
+                        <TextBlock x:Name="BrushAspectValue" Style="{StaticResource OptionValue}" />
+
+                        <!-- Das Karo gibt es nur fuer die eckige Spitze. -->
+                        <StackPanel x:Name="BrushSquishRow" Orientation="Horizontal"
+                                    IsEnabled="{Binding IsChecked, ElementName=BrushSquareToggle}">
+                            <TextBlock Text="{DynamicResource S_BrushSquish}" Style="{StaticResource OptionLabel}"
+                                       ToolTip="{DynamicResource S_BrushSquishHint}" />
+                            <Slider x:Name="BrushSquishSlider" Style="{StaticResource OptionSlider}"
+                                    Minimum="0" Maximum="1" Value="0" SmallChange="0.05" LargeChange="0.25"
+                                    ToolTip="{DynamicResource S_BrushSquishHint}"
+                                    ValueChanged="OnBrushChanged" MouseDoubleClick="OnBrushReset" Tag="0" />
+                            <TextBlock x:Name="BrushSquishValue" Style="{StaticResource OptionValue}" />
+                        </StackPanel>
+
+                        <ToggleButton x:Name="BrushFollowToggle" Style="{StaticResource OptionChip}"
+                                      ToolTip="{DynamicResource S_BrushFollowHint}"
+                                      Checked="OnBrushToggle" Unchecked="OnBrushToggle">
+                            <local:IconLabel Icon="follow" Text="{DynamicResource S_BrushFollow}" />
+                        </ToggleButton>
+                    </StackPanel>
+                </Border>
 
                 <!--
-                    Staerke und Deckkraft sind nicht dasselbe, auch wenn sie sich
-                    aehnlich anfuehlen: Die eine sagt, wieviel EIN Strich auftraegt,
-                    die andere, wo auch zehn Striche aufhoeren.
+                    AUFTRAG - Staerke und Deckkraft sind nicht dasselbe, auch wenn sie sich
+                    aehnlich anfuehlen: Die eine sagt, wieviel EIN Strich auftraegt, die andere,
+                    wo auch zehn Striche aufhoeren. Beim Fuellen gilt nur die Deckkraft.
                 -->
-                <TextBlock Text="{DynamicResource S_BrushOpacity}" Style="{StaticResource PanelLabel}"
-                           VerticalAlignment="Center" Margin="0,0,6,0" />
-                <Slider x:Name="BrushOpacitySlider" Style="{StaticResource PanelSlider}" Width="80"
-                        VerticalAlignment="Center"
-                        Minimum="0.05" Maximum="1" Value="1" SmallChange="0.02" LargeChange="0.1"
-                        ValueChanged="OnBrushChanged" MouseDoubleClick="OnBrushReset" Tag="1" />
-                <TextBlock x:Name="BrushOpacityValue" Style="{StaticResource PanelValue}"
-                           VerticalAlignment="Center" Width="36" Margin="6,0,14,0"
-                           HorizontalAlignment="Left" />
+                <Border Style="{StaticResource OptionGroup}">
+                    <StackPanel Orientation="Horizontal">
+                        <TextBlock Style="{StaticResource OptionCaption}" Text="{DynamicResource S_BrushGroupPaint}" />
 
-                <StackPanel x:Name="BrushSpacingRow" Orientation="Horizontal" VerticalAlignment="Center">
-                <!-- Der Abstand der Tupfer, als Anteil des Radius. Strg und Rad am Bild tun dasselbe. -->
-                <TextBlock Text="{DynamicResource S_BrushSpacing}" Style="{StaticResource PanelLabel}"
-                           VerticalAlignment="Center" Margin="0,0,6,0"
-                           ToolTip="{DynamicResource S_BrushSpacingHint}" />
-                <Slider x:Name="BrushSpacingSlider" Style="{StaticResource PanelSlider}" Width="80"
-                        VerticalAlignment="Center"
-                        Minimum="0.05" Maximum="4" Value="0.25" SmallChange="0.05" LargeChange="0.25"
-                        ToolTip="{DynamicResource S_BrushSpacingHint}"
-                        ValueChanged="OnBrushChanged" MouseDoubleClick="OnBrushReset" Tag="0.25" />
-                <TextBlock x:Name="BrushSpacingValue" Style="{StaticResource PanelValue}"
-                           VerticalAlignment="Center" Width="40" Margin="6,0,0,0"
-                           HorizontalAlignment="Left" />
-                </StackPanel>
+                        <StackPanel x:Name="BrushFlowRow" Orientation="Horizontal">
+                            <TextBlock Text="{DynamicResource S_BrushFlow}" Style="{StaticResource OptionLabel}" />
+                            <Slider x:Name="BrushFlowSlider" Style="{StaticResource OptionSlider}"
+                                    Minimum="0.02" Maximum="1" Value="0.7" SmallChange="0.02" LargeChange="0.1"
+                                    ValueChanged="OnBrushChanged" MouseDoubleClick="OnBrushReset" Tag="0.7" />
+                            <TextBlock x:Name="BrushFlowValue" Style="{StaticResource OptionValue}" />
+                        </StackPanel>
 
-                <!-- Die Spitze: eckig oder rund, gedreht, gestreckt - und woran sie sich haelt. -->
-                <StackPanel x:Name="BrushShapeRow" Orientation="Horizontal" VerticalAlignment="Center">
-                <ToggleButton x:Name="BrushSquareToggle" Style="{StaticResource OverlayToggle}" Margin="14,0,0,0"
-                              VerticalAlignment="Center" Content="▢" ToolTip="{DynamicResource S_BrushSquareHint}"
-                              Checked="OnBrushToggle" Unchecked="OnBrushToggle" />
+                        <TextBlock Text="{DynamicResource S_BrushOpacity}" Style="{StaticResource OptionLabel}" />
+                        <Slider x:Name="BrushOpacitySlider" Style="{StaticResource OptionSlider}"
+                                Minimum="0.05" Maximum="1" Value="1" SmallChange="0.02" LargeChange="0.1"
+                                ValueChanged="OnBrushChanged" MouseDoubleClick="OnBrushReset" Tag="1" />
+                        <TextBlock x:Name="BrushOpacityValue" Style="{StaticResource OptionValue}" Margin="5,0,0,0" />
 
-                <!-- Der Stempel: eine Spitze aus einem Bild, je Tupfer zufaellig gedreht und gestreut. -->
-                <ToggleButton x:Name="BrushStampToggle" Style="{StaticResource OverlayToggle}" Margin="4,0,0,0" Visibility="Collapsed"
-                              VerticalAlignment="Center" Content="✿" ToolTip="{DynamicResource S_BrushStampHint}"
-                              Checked="OnBrushToggle" Unchecked="OnBrushToggle" />
-                <StackPanel x:Name="BrushStampRow" Orientation="Horizontal" VerticalAlignment="Center" Margin="6,0,0,0"
-                            IsEnabled="{Binding IsChecked, ElementName=BrushStampToggle}">
-                    <Button x:Name="BrushTipButton" Style="{StaticResource OverlayButton}" VerticalAlignment="Center"
-                            Content="{DynamicResource S_BrushTipLoad}" ToolTip="{DynamicResource S_BrushTipHint}"
-                            Click="OnBrushTipClicked" />
-                    <TextBlock Text="{DynamicResource S_BrushJitter}" Style="{StaticResource PanelLabel}"
-                               VerticalAlignment="Center" Margin="10,0,6,0" ToolTip="{DynamicResource S_BrushJitterHint}" />
-                    <Slider x:Name="BrushJitterSlider" Style="{StaticResource PanelSlider}" Width="50"
-                            VerticalAlignment="Center" Minimum="0" Maximum="1" Value="0.5" SmallChange="0.05" LargeChange="0.25"
-                            ToolTip="{DynamicResource S_BrushJitterHint}"
-                            ValueChanged="OnBrushChanged" MouseDoubleClick="OnBrushReset" Tag="0.5" />
-                    <TextBlock Text="{DynamicResource S_BrushScatter}" Style="{StaticResource PanelLabel}"
-                               VerticalAlignment="Center" Margin="10,0,6,0" ToolTip="{DynamicResource S_BrushScatterHint}" />
-                    <Slider x:Name="BrushScatterSlider" Style="{StaticResource PanelSlider}" Width="50"
-                            VerticalAlignment="Center" Minimum="0" Maximum="1" Value="0.25" SmallChange="0.05" LargeChange="0.25"
-                            ToolTip="{DynamicResource S_BrushScatterHint}"
-                            ValueChanged="OnBrushChanged" MouseDoubleClick="OnBrushReset" Tag="0.25" />
-                </StackPanel>
+                        <!-- Der Abstand der Tupfer, als Anteil des Radius. Strg und Rad am Bild tun dasselbe. -->
+                        <StackPanel x:Name="BrushSpacingRow" Orientation="Horizontal" Margin="12,0,0,0">
+                            <TextBlock Text="{DynamicResource S_BrushSpacing}" Style="{StaticResource OptionLabel}"
+                                       ToolTip="{DynamicResource S_BrushSpacingHint}" />
+                            <Slider x:Name="BrushSpacingSlider" Style="{StaticResource OptionSlider}"
+                                    Minimum="0.05" Maximum="4" Value="0.25" SmallChange="0.05" LargeChange="0.25"
+                                    ToolTip="{DynamicResource S_BrushSpacingHint}"
+                                    ValueChanged="OnBrushChanged" MouseDoubleClick="OnBrushReset" Tag="0.25" />
+                            <TextBlock x:Name="BrushSpacingValue" Style="{StaticResource OptionValue}" Margin="5,0,0,0" />
+                        </StackPanel>
+                    </StackPanel>
+                </Border>
 
-                <TextBlock Text="{DynamicResource S_BrushAngle}" Style="{StaticResource PanelLabel}"
-                           VerticalAlignment="Center" Margin="10,0,6,0" ToolTip="{DynamicResource S_BrushAngleHint}" />
-                <Slider x:Name="BrushAngleSlider" Style="{StaticResource PanelSlider}" Width="70"
-                        VerticalAlignment="Center" Minimum="0" Maximum="180" Value="0" SmallChange="5" LargeChange="15"
-                        ToolTip="{DynamicResource S_BrushAngleHint}"
-                        ValueChanged="OnBrushChanged" MouseDoubleClick="OnBrushReset" Tag="0" />
-                <TextBlock x:Name="BrushAngleValue" Style="{StaticResource PanelValue}"
-                           VerticalAlignment="Center" Width="36" Margin="6,0,14,0" HorizontalAlignment="Left" />
+                <!-- BINDUNG - woran der Strich sich haelt: das Objekt oder die Flaeche, auf der er ansetzt. -->
+                <Border Style="{StaticResource OptionGroup}">
+                    <StackPanel Orientation="Horizontal">
+                        <TextBlock Style="{StaticResource OptionCaption}" Text="{DynamicResource S_BrushGroupBinding}" />
 
-                <TextBlock Text="{DynamicResource S_BrushAspect}" Style="{StaticResource PanelLabel}"
-                           VerticalAlignment="Center" Margin="0,0,6,0" ToolTip="{DynamicResource S_BrushAspectHint}" />
-                <Slider x:Name="BrushAspectSlider" Style="{StaticResource PanelSlider}" Width="70"
-                        VerticalAlignment="Center" Minimum="1" Maximum="8" Value="1" SmallChange="0.25" LargeChange="1"
-                        ToolTip="{DynamicResource S_BrushAspectHint}"
-                        ValueChanged="OnBrushChanged" MouseDoubleClick="OnBrushReset" Tag="1" />
-                <TextBlock x:Name="BrushAspectValue" Style="{StaticResource PanelValue}"
-                           VerticalAlignment="Center" Width="36" Margin="6,0,10,0" HorizontalAlignment="Left" />
+                        <ToggleButton x:Name="BrushObjectToggle" Style="{StaticResource OptionChip}"
+                                      ToolTip="{DynamicResource S_BrushObjectHint}"
+                                      Checked="OnBrushToggle" Unchecked="OnBrushToggle">
+                            <local:IconLabel Icon="object" Text="{DynamicResource S_BrushObject}" />
+                        </ToggleButton>
+                        <ToggleButton x:Name="BrushEdgeToggle" Style="{StaticResource OptionChip}"
+                                      ToolTip="{DynamicResource S_BrushEdgeHint}"
+                                      Checked="OnBrushToggle" Unchecked="OnBrushToggle">
+                            <local:IconLabel Icon="edge" Text="{DynamicResource S_BrushEdge}" />
+                        </ToggleButton>
 
-                <!-- Das Karo gibt es nur fuer die eckige Spitze. -->
-                <StackPanel x:Name="BrushSquishRow" Orientation="Horizontal" VerticalAlignment="Center"
-                            IsEnabled="{Binding IsChecked, ElementName=BrushSquareToggle}">
-                    <TextBlock Text="{DynamicResource S_BrushSquish}" Style="{StaticResource PanelLabel}"
-                               VerticalAlignment="Center" Margin="0,0,6,0" ToolTip="{DynamicResource S_BrushSquishHint}" />
-                    <Slider x:Name="BrushSquishSlider" Style="{StaticResource PanelSlider}" Width="60"
-                            VerticalAlignment="Center" Minimum="0" Maximum="1" Value="0" SmallChange="0.05" LargeChange="0.25"
-                            ToolTip="{DynamicResource S_BrushSquishHint}"
-                            ValueChanged="OnBrushChanged" MouseDoubleClick="OnBrushReset" Tag="0" />
-                    <TextBlock x:Name="BrushSquishValue" Style="{StaticResource PanelValue}"
-                               VerticalAlignment="Center" Width="36" Margin="6,0,10,0" HorizontalAlignment="Left" />
-                </StackPanel>
+                        <!-- Wie weit die Flaeche vom Ansatz abweichen darf - nur mit der Flaeche. -->
+                        <StackPanel x:Name="BrushEdgeRow" Orientation="Horizontal" Margin="8,0,0,0"
+                                    IsEnabled="{Binding IsChecked, ElementName=BrushEdgeToggle}">
+                            <TextBlock Text="{DynamicResource S_BrushEdgeTolerance}" Style="{StaticResource OptionLabel}"
+                                       ToolTip="{DynamicResource S_BrushEdgeToleranceHint}" />
+                            <Slider x:Name="BrushEdgeSlider" Style="{StaticResource OptionSlider}"
+                                    Minimum="0" Maximum="1" Value="0.3" SmallChange="0.05" LargeChange="0.2"
+                                    ToolTip="{DynamicResource S_BrushEdgeToleranceHint}"
+                                    ValueChanged="OnBrushChanged" MouseDoubleClick="OnBrushReset" Tag="0.3" />
+                            <TextBlock x:Name="BrushEdgeValue" Style="{StaticResource OptionValue}" Margin="5,0,0,0" />
+                        </StackPanel>
+                    </StackPanel>
+                </Border>
 
-                <ToggleButton x:Name="BrushFollowToggle" Style="{StaticResource OverlayToggle}"
-                              VerticalAlignment="Center" Content="↻" ToolTip="{DynamicResource S_BrushFollowHint}"
-                              Checked="OnBrushToggle" Unchecked="OnBrushToggle" />
-                </StackPanel>
-
-                <ToggleButton x:Name="BrushObjectToggle" Style="{StaticResource OverlayToggle}" Margin="6,0,0,0"
-                              VerticalAlignment="Center" Content="⬢" ToolTip="{DynamicResource S_BrushObjectHint}"
-                              Checked="OnBrushToggle" Unchecked="OnBrushToggle" />
-                <ToggleButton x:Name="BrushEdgeToggle" Style="{StaticResource OverlayToggle}" Margin="6,0,0,0"
-                              VerticalAlignment="Center" Content="◩" ToolTip="{DynamicResource S_BrushEdgeHint}"
-                              Checked="OnBrushToggle" Unchecked="OnBrushToggle" />
-
-                <!-- Wie weit die Flaeche vom Ansatz abweichen darf - nur mit der Kante. -->
-                <StackPanel x:Name="BrushEdgeRow" Orientation="Horizontal" VerticalAlignment="Center" Margin="10,0,0,0"
-                            IsEnabled="{Binding IsChecked, ElementName=BrushEdgeToggle}">
-                    <TextBlock Text="{DynamicResource S_BrushEdgeTolerance}" Style="{StaticResource PanelLabel}"
-                               VerticalAlignment="Center" Margin="0,0,6,0" ToolTip="{DynamicResource S_BrushEdgeToleranceHint}" />
-                    <Slider x:Name="BrushEdgeSlider" Style="{StaticResource PanelSlider}" Width="60"
-                            VerticalAlignment="Center" Minimum="0" Maximum="1" Value="0.3" SmallChange="0.05" LargeChange="0.2"
-                            ToolTip="{DynamicResource S_BrushEdgeToleranceHint}"
-                            ValueChanged="OnBrushChanged" MouseDoubleClick="OnBrushReset" Tag="0.3" />
-                    <TextBlock x:Name="BrushEdgeValue" Style="{StaticResource PanelValue}"
-                               VerticalAlignment="Center" Width="36" Margin="6,0,0,0" HorizontalAlignment="Left" />
-                </StackPanel>
-
-                <StackPanel x:Name="BrushPressureRow" Orientation="Horizontal" VerticalAlignment="Center">
-                <!-- Der Druck eines Stifts - die Maus hat keinen. -->
-                <TextBlock Text="{DynamicResource S_BrushPressure}" Style="{StaticResource PanelLabel}"
-                           VerticalAlignment="Center" Margin="14,0,6,0" ToolTip="{DynamicResource S_BrushPressureHint}" />
-                <ComboBox x:Name="BrushPressureBox" Style="{StaticResource OverlayCombo}" Width="96"
-                          VerticalAlignment="Center" SelectedIndex="1" ToolTip="{DynamicResource S_BrushPressureHint}"
-                          SelectionChanged="OnBrushPressureChanged">
-                    <ComboBoxItem Content="{DynamicResource S_BrushPressureOff}" />
-                    <ComboBoxItem Content="{DynamicResource S_BrushPressureSize}" />
-                    <ComboBoxItem Content="{DynamicResource S_BrushPressureFlow}" />
-                    <ComboBoxItem Content="{DynamicResource S_BrushPressureBoth}" />
-                </ComboBox>
-
-                </StackPanel>
+                <!-- DRUCK - der Druck eines Stifts; die Maus hat keinen. Nur beim Zug. -->
+                <Border x:Name="BrushPressureRow" Style="{StaticResource OptionGroup}">
+                    <StackPanel Orientation="Horizontal">
+                        <TextBlock Style="{StaticResource OptionCaption}" Text="{DynamicResource S_BrushGroupPressure}" />
+                        <ComboBox x:Name="BrushPressureBox" Style="{StaticResource OverlayCombo}" Width="96"
+                                  VerticalAlignment="Center" SelectedIndex="1" ToolTip="{DynamicResource S_BrushPressureHint}"
+                                  SelectionChanged="OnBrushPressureChanged">
+                            <ComboBoxItem Content="{DynamicResource S_BrushPressureOff}" />
+                            <ComboBoxItem Content="{DynamicResource S_BrushPressureSize}" />
+                            <ComboBoxItem Content="{DynamicResource S_BrushPressureFlow}" />
+                            <ComboBoxItem Content="{DynamicResource S_BrushPressureBoth}" />
+                        </ComboBox>
+                    </StackPanel>
+                </Border>
 
                 <!-- Der Verlauf der Maske, auf die der Pinsel malt - nur im Knotenmodus,
                      nur dort wird er aufgezeichnet. -->
                 <Button x:Name="BrushEditButton" Style="{StaticResource OverlayButton}"
-                        VerticalAlignment="Center" Margin="16,0,0,0" Visibility="Collapsed"
+                        VerticalAlignment="Center" Margin="12,0,0,0" Visibility="Collapsed"
                         Content="{DynamicResource S_MaskEditButton}" Click="OnBrushEdit"
                         ToolTip="{DynamicResource S_MaskEditHint}" />
                 <Button x:Name="BrushHistoryButton" Style="{StaticResource OverlayButton}"
-                        VerticalAlignment="Center" Margin="16,0,0,0" Visibility="Collapsed"
+                        VerticalAlignment="Center" Margin="6,0,0,0" Visibility="Collapsed"
                         Content="{DynamicResource S_MaskMenuHistory}" Click="OnBrushHistory"
                         ToolTip="{DynamicResource S_MaskHistoryButtonHint}" />
             </WrapPanel>
