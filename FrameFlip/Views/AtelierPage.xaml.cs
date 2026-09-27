@@ -202,6 +202,7 @@ public sealed partial class AtelierPage : UserControl
         SetUpProjects();
         SetUpTargetPath();
         SetUpCryptoView();
+        SetUpPipette();
 
         _settle.Tick += (_, _) =>
         {

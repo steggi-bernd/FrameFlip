@@ -1524,6 +1524,25 @@ public partial class LayerPanel : UserControl
         Raise(interim: false);
     }
 
+    /// <summary>
+    /// Setzt Farbton und Breite der Farbbereich-Maske der gewaehlten Ebene - von der Pipette (C4).
+    /// False, wenn die gewaehlte Ebene keinen Farbbereich hat.
+    /// </summary>
+    public bool SetColourRange(float hue, float spread)
+    {
+        if (_selected is null || _selected.Mask.Kind != MaskKind.Colour) return false;
+
+        _selected.Mask.Hue = hue;
+        _selected.Mask.Spread = spread;
+
+        _filling = true;
+        try { PushMaskToControls(); }
+        finally { _filling = false; }
+
+        Raise(interim: false);
+        return true;
+    }
+
     /// <summary>Setzt die gewaehlten Objekte der Kryptomatte-Maske - fuer das Waehlen im Bild mit Umschalt und Alt (C3b).</summary>
     public void SetPicks(IEnumerable<CryptoPick> picks)
     {

@@ -400,10 +400,18 @@ public partial class PropertiesPanel : UserControl
     /// dann faellt die Zeile weg, statt eine Null zu zeigen. Eine Null waere eine
     /// Entfernung, und "keine Entfernung bekannt" ist etwas anderes als "null Meter".
     /// </summary>
+    /// <summary>Ob die Pipette die Quelle liest statt des angezeigten Ergebnisses (C4).</summary>
+    public bool PickSource => PickFromSource.IsChecked == true;
+
     public void Read(int x, int y, int r, int g, int b, float lr, float lg, float lb, float? depth)
     {
         PickWhere.Text = $"{x}, {y}";
         PickByte.Text = $"{r} / {g} / {b}";
+
+        var (hue, saturation, value) = Imaging.ColourReadout.Hsv((byte)r, (byte)g, (byte)b);
+        PickHex.Text = Imaging.ColourReadout.Hex((byte)r, (byte)g, (byte)b);
+        PickHsv.Text = $"{hue}° {saturation}% {value}%";
+        PickSwatch.Background = new System.Windows.Media.SolidColorBrush(System.Windows.Media.Color.FromRgb((byte)r, (byte)g, (byte)b));
         PickLight.Text = $"{lr:0.###}  {lg:0.###}  {lb:0.###}";
 
         _depth = depth;

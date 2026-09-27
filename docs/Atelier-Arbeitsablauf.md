@@ -668,3 +668,47 @@ Punkt 3, zweiter Teil, und der Kern von Punkt 12: „Auswahl → Aktion → Erge
   Knotenmodus, „+ Korrektur“ im Stapel und Umschalt an der bestehenden Maske. Die
   Nachbargruppen liefen mit 611 Zusicherungen grün, darunter die Knotenprobe „ein zweiter
   Klick nimmt es heraus, Rückgängig holt es zurück“.
+
+### C4: Pipette (`feature/pipette`)
+
+Punkt 4.
+
+- **Lupe beim Überfahren:** Mit der Pipette zeigt eine Lupe am Zeiger 11 × 11 Bildpunkte.
+  Die Mitte ist umrandet, darunter stehen Farbfeld, HEX, RGB, HSV und die linearen Werte.
+  Sie bleibt im Bildbereich und verschwindet beim Verlassen des Bildes und beim
+  Werkzeugwechsel.
+- **Was sie liest:** standardmäßig das angezeigte Ergebnis, also nach allen Korrekturen.
+  Der neue Knopf „Quelle“ in den Werkzeugeinstellungen schaltet auf das Bild vor den
+  Korrekturen um. Die linearen Werte kommen immer aus der Quelle, denn dort misst die
+  Farbbereich-Maske.
+  **Verhaltensänderung:** Vorher las die Pipette nur die Quelle. Der „Anzeigewert“ in
+  den Werkzeugeinstellungen nennt jetzt die angezeigte Farbe, dazu HEX, HSV und ein
+  Farbfeld.
+- **Klick auf einen Farbbereich:** Ist das Ziel ein Farbbereich, im Stapel die gewählte
+  Ebene, im Knotenmodus der gewählte Maskenknoten, dann setzt ein Klick dessen Farbton.
+  Die Breite bleibt. Mit Umschalt bleibt der Farbton, und die Breite wächst so weit, dass
+  die neue Farbe mit etwas Luft dazugehört, höchstens bis zum halben Kreis. Grau hat
+  keinen Farbton und ändert nichts. Im Knotenmodus lässt sich der Klick rückgängig machen.
+- **Wofür sie liest:** Die Lupe sagt es vorher selbst, „Pipette für: Farbbereich
+  ‚Himmel‘ – Klick setzt den Farbton, Umschalt erweitert“, sonst „Pipette: liest nur ab“.
+  Der Plan sah das in der Zielzeile vor. An der Lupe steht es dort, wohin man schaut.
+- **Nicht in diesem Schnitt:**
+  - Kein HSL neben HSV, denn es sagt dasselbe noch einmal anders.
+  - Die Tonwert-Pipette (W2b) bleibt ihr eigener Weg über die Knöpfe im Tonwertfeld.
+  - Weißabgleich per Klick fehlt weiterhin.
+- **Probe** (`PipetteInvariants`, 12 Zusicherungen):
+  - HEX, HSV, Farbton und Erweitern.
+  - Am synthetischen Bild: die Lupe über Rot, nach Belichtung +1 Ergebnis gegen Quelle,
+    der Hinweis am Farbbereich.
+  - Ein Klick setzt Rot, Umschalt erweitert bis Blau.
+  - Im Knotenmodus Farbton und Rückgängig, beim Werkzeugwechsel keine Lupe mehr.
+  - Die Nachbargruppen (Tonwert, Kryptomatte, Masken, Seite, Zielzeile, Aktionen,
+    Einstellungstexte, Knotenbearbeitung) liefen mit 373 Zusicherungen grün.
+  - Eine echte Instanz mit eigener Konfiguration startete ohne Fehler; die Leiste zeigt
+    HEX, HSV und „Quelle“, und der Knopf schaltet.
+- **Offen, C4:** Die Weißabgleich-Pipette braucht die Umkehrung von Farbtemperatur und
+  Tönung: aus einer Farbe, die grau sein soll, die beiden Reglerwerte. Die gibt es noch nicht.
+- **Offen, C4:** Punkt 4 nennt auch die Farbwähler der Filter. Die einzigen sind die
+  Farbräder (Lift, Gamma, Gain und die Tönung einer Ebene). Für sie ist offen, was ein Klick
+  heißen soll: die Farbe übernehmen (Tönung) oder sie neutralisieren (Lift/Gamma/Gain, wie
+  der Weißabgleich). Das wird vor dem Bauen nachgefragt.
