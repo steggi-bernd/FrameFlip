@@ -227,6 +227,49 @@
 
                 <local:LevelsEditor x:Name="LevelsField" />
 
+                <!--
+                    Auto und Pipetten (W2b): Sie lesen, was beim Tonwert ANKOMMT - nicht das
+                    fertige Bild, in dem er schon wirkt.
+                -->
+                <UniformGrid Columns="3" Margin="0,8,0,0">
+                    <Button Style="{StaticResource OverlayButton}" Margin="0,0,2,0" Tag="Levels"
+                            Content="{DynamicResource S_LevelsAuto}" ToolTip="{DynamicResource S_LevelsAutoHint}"
+                            Click="OnLevelsAutoClicked" />
+                    <Button Style="{StaticResource OverlayButton}" Margin="2,0,2,0" Tag="Contrast"
+                            Content="{DynamicResource S_LevelsAutoContrast}" ToolTip="{DynamicResource S_LevelsAutoContrastHint}"
+                            Click="OnLevelsAutoClicked" />
+                    <Button Style="{StaticResource OverlayButton}" Margin="2,0,0,0" Tag="Colour"
+                            Content="{DynamicResource S_LevelsAutoColour}" ToolTip="{DynamicResource S_LevelsAutoColourHint}"
+                            Click="OnLevelsAutoClicked" />
+                </UniformGrid>
+
+                <UniformGrid Columns="3" Margin="0,4,0,0">
+                    <ToggleButton x:Name="LevelsPickBlack" Style="{StaticResource OverlayToggle}" Margin="0,0,2,0" Tag="Black"
+                                  ToolTip="{DynamicResource S_LevelsPickBlackHint}"
+                                  Checked="OnLevelsPickToggled" Unchecked="OnLevelsPickToggled">
+                        <StackPanel Orientation="Horizontal">
+                            <local:IconLabel Icon="picker" />
+                            <Ellipse Width="9" Height="9" Margin="5,0,0,0" Fill="Black" Stroke="#FF8A8698" StrokeThickness="1" />
+                        </StackPanel>
+                    </ToggleButton>
+                    <ToggleButton x:Name="LevelsPickGray" Style="{StaticResource OverlayToggle}" Margin="2,0,2,0" Tag="Gray"
+                                  ToolTip="{DynamicResource S_LevelsPickGrayHint}"
+                                  Checked="OnLevelsPickToggled" Unchecked="OnLevelsPickToggled">
+                        <StackPanel Orientation="Horizontal">
+                            <local:IconLabel Icon="picker" />
+                            <Ellipse Width="9" Height="9" Margin="5,0,0,0" Fill="#FF808080" Stroke="#FF8A8698" StrokeThickness="1" />
+                        </StackPanel>
+                    </ToggleButton>
+                    <ToggleButton x:Name="LevelsPickWhite" Style="{StaticResource OverlayToggle}" Margin="2,0,0,0" Tag="White"
+                                  ToolTip="{DynamicResource S_LevelsPickWhiteHint}"
+                                  Checked="OnLevelsPickToggled" Unchecked="OnLevelsPickToggled">
+                        <StackPanel Orientation="Horizontal">
+                            <local:IconLabel Icon="picker" />
+                            <Ellipse Width="9" Height="9" Margin="5,0,0,0" Fill="White" Stroke="#FF8A8698" StrokeThickness="1" />
+                        </StackPanel>
+                    </ToggleButton>
+                </UniformGrid>
+
                 <TextBlock x:Name="LevelsValues" Margin="0,6,0,0" Style="{StaticResource PanelValue}"
                            HorizontalAlignment="Left" FontSize="10" />
 

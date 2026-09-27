@@ -57,6 +57,9 @@ public static class Icons
         ["pressure"] = "M4,20 h4 l10.5,-10.5 a2.828,2.828 0 1 0 -4,-4 l-10.5,10.5 v4 M13.5,6.5 l4,4",
         ["history"] = "M12,8 v4 l2,2 M3.05,11 a9,9 0 1 1 0.5,4 M3,20 v-5 h5",
 
+        // Die Pipetten des Tonwerts.
+        ["picker"] = "M11,7 l6,6 M4,16 l11.7,-11.7 a1,1 0 0 1 1.4,0 l2.6,2.6 a1,1 0 0 1 0,1.4 l-11.7,11.7 h-4 v-4 z",
+
         // Die Ebenenliste.
         ["plus"] = "M12,5 v14 M5,12 h14",
         ["adjustment"] = "M4,8 h4 v4 h-4 z M6,4 v4 M6,12 v8 M10,14 h4 v4 h-4 z M12,4 v10 M12,18 v2 M16,5 h4 v4 h-4 z M18,4 v1 M18,9 v11",

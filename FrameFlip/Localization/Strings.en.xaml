@@ -14,6 +14,15 @@
     <sys:String x:Key="S_Levels">Levels</sys:String>
     <sys:String x:Key="S_LevelsHint">The handles below the histogram: black, grey and white of the input, below them the output range. What lies left of the black point or right of the white point is clipped. Double-click resets a handle.</sys:String>
     <sys:String x:Key="S_LevelsValues">Input {0} · {1} · {2}    Output {3} – {4}</sys:String>
+    <sys:String x:Key="S_LevelsAuto">Auto</sys:String>
+    <sys:String x:Key="S_LevelsAutoHint">Auto levels: black and white per channel, clipping one per mille. Stretches every channel and takes a colour cast along.</sys:String>
+    <sys:String x:Key="S_LevelsAutoContrast">Contrast</sys:String>
+    <sys:String x:Key="S_LevelsAutoContrastHint">Auto contrast: black and white shared by all channels – more contrast, colours stay as they are.</sys:String>
+    <sys:String x:Key="S_LevelsAutoColour">Colour</sys:String>
+    <sys:String x:Key="S_LevelsAutoColourHint">Auto colour: each channel stretched and the midtones neutral – a grey becomes grey again.</sys:String>
+    <sys:String x:Key="S_LevelsPickBlackHint">Black eyedropper: click the tone in the image that should become black – per channel, so it also removes a cast in the shadows.</sys:String>
+    <sys:String x:Key="S_LevelsPickGrayHint">Grey eyedropper: click something that should be grey – the midtones of each channel are set so it becomes grey. Removes a colour cast.</sys:String>
+    <sys:String x:Key="S_LevelsPickWhiteHint">White eyedropper: click the tone in the image that should become white – per channel.</sys:String>
     <sys:String x:Key="S_Curves">Curves</sys:String>
     <sys:String x:Key="S_CurveHint">Click to add a point, drag to move it, right-click to remove it.</sys:String>
     <sys:String x:Key="S_ShowOriginal">Original</sys:String>
