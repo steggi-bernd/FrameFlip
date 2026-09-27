@@ -171,6 +171,16 @@ public sealed class DockHost : Border
         LayoutChanged?.Invoke(Layout);
     }
 
+    /// <summary>Ein einzelnes Feld zurueck an seinen Platz - die anderen bleiben, wo sie sind.</summary>
+    public void HomePanel(string panel)
+    {
+        Layout.Home(panel);
+        Layout.Normalise(Ids);
+
+        Rebuild();
+        LayoutChanged?.Invoke(Layout);
+    }
+
     /// <summary>Zurueck zur Grundanordnung - fuer den, der sich verzogen hat.</summary>
     public void ResetLayout()
     {
@@ -279,6 +289,11 @@ public sealed class DockHost : Border
         bool leftFolded = Layout.IsFolded(DockZone.Left);
         bool rightFolded = Layout.IsFolded(DockZone.Right);
         bool bottomFolded = Layout.IsFolded(DockZone.Bottom);
+
+        // Unten wie oben: Liegen dort nur Felder, die so hoch sind wie ihr Inhalt, ist die Zone
+        // genau so hoch - statt einer festen Hoehe, in der die Werkzeugeinstellungen verloren
+        // in viel leerer Flaeche standen.
+        bool bottomFits = bottom && Layout.Bottom.All(g => g.Collapsed || FitsContent(g));
         bool topFolded = Layout.IsFolded(DockZone.Top);
 
         // Oben liegen in der Grundanordnung nur die Werkzeugeinstellungen - so hoch wie ihr
@@ -287,12 +302,12 @@ public sealed class DockHost : Border
 
         _leftColumn = new ColumnDefinition { Width = Size(left, leftFolded, Layout.LeftWidth) };
         _rightColumn = new ColumnDefinition { Width = Size(right, rightFolded, Layout.RightWidth) };
-        _bottomRow = new RowDefinition { Height = Size(bottom, bottomFolded, Layout.BottomHeight) };
+        _bottomRow = new RowDefinition { Height = Size(bottom, bottomFolded || bottomFits, Layout.BottomHeight) };
         _topRow = new RowDefinition { Height = Size(top, topFolded || topFits, Layout.TopHeight) };
 
         if (left && !leftFolded) _leftColumn.MinWidth = 180;
         if (right && !rightFolded) _rightColumn.MinWidth = 200;
-        if (bottom && !bottomFolded) _bottomRow.MinHeight = 120;
+        if (bottom && !bottomFolded && !bottomFits) _bottomRow.MinHeight = 120;
         if (top && !topFolded && !topFits) _topRow.MinHeight = 80;
 
         root.ColumnDefinitions.Add(_leftColumn);
@@ -306,7 +321,7 @@ public sealed class DockHost : Border
         root.RowDefinitions.Add(_topRow);
         root.RowDefinitions.Add(new RowDefinition { Height = new GridLength(top ? (topFolded || topFits ? 8 : 12) : 0) });
         root.RowDefinitions.Add(new RowDefinition { Height = new GridLength(1, GridUnitType.Star), MinHeight = 200 });
-        root.RowDefinitions.Add(new RowDefinition { Height = new GridLength(Gap(bottom, bottomFolded)) });
+        root.RowDefinitions.Add(new RowDefinition { Height = new GridLength(bottomFits && !bottomFolded ? 8 : Gap(bottom, bottomFolded)) });
         root.RowDefinitions.Add(_bottomRow);
 
         static GridLength Size(bool there, bool folded, double size)
@@ -368,7 +383,7 @@ public sealed class DockHost : Border
             Grid.SetRow(zone, 4);
             root.Children.Add(zone);
 
-            if (!bottomFolded)
+            if (!bottomFolded && !bottomFits)
             {
                 root.Children.Add(Splitter(column: 2, row: 3, rowSpan: 1, columns: false, () =>
                 {
@@ -500,7 +515,10 @@ public sealed class DockHost : Border
     /// <summary>Eine Zone: ihre Gruppen untereinander (oder nebeneinander), mit Griffen dazwischen.</summary>
     private FrameworkElement ZoneView(DockZone zone, List<DockGroup> groups, bool vertical)
     {
-        var grid = new Grid();
+        var grid = vertical ? new ZoneGrid() : new Grid();
+
+        // Die Zeilen der Gruppen, die so hoch sind wie ihr Inhalt - in einer Seitenzone.
+        var fits = new List<RowDefinition>();
 
         for (int i = 0; i < groups.Count; i++)
         {
@@ -528,6 +546,8 @@ public sealed class DockHost : Border
 
             var view = GroupView(zone, i, groups[i]);
 
+            if (vertical && fixedSize && !groups[i].Collapsed) fits.Add(grid.RowDefinitions[^1]);
+
             if (vertical) Grid.SetRow(view, grid.RowDefinitions.Count - 1);
             else Grid.SetColumn(view, grid.ColumnDefinitions.Count - 1);
 
@@ -535,9 +555,62 @@ public sealed class DockHost : Border
             _groupViews.Add((zone, i, view));
         }
 
+        if (vertical && fits.Count > 0) KeepInside((ZoneGrid)grid, fits);
+
         _zoneViews[zone] = grid;
 
         return grid;
+    }
+
+    /// <summary>
+    /// Haelt eine Seitenzone in ihrer Hoehe. Gruppen, die so hoch sind wie ihr Inhalt, bekommen
+    /// hoechstens den Platz, den die anderen lassen, und ihr Inhalt rollt (GroupView). Sonst
+    /// schnitt ein niedriges Fenster die unteren Gruppen ab - samt ihrem Reiter, dem einzigen
+    /// Griff, und nur das Zuruecksetzen der ganzen Anordnung holte sie zurueck.
+    ///
+    /// Stehen in der Zone nur solche Gruppen, fuellt die letzte die Spalte: Ein Kasten, der
+    /// oben in einer sonst leeren Spalte haengt, gehoert nicht erkennbar dazu.
+    /// </summary>
+    private static void KeepInside(ZoneGrid grid, List<RowDefinition> fits)
+    {
+        if (!grid.RowDefinitions.Any(r => r.Height.IsStar))
+        {
+            fits[^1].Height = new GridLength(1, GridUnitType.Star);
+            fits.RemoveAt(fits.Count - 1);
+        }
+
+        grid.Fits.AddRange(fits);
+    }
+
+    /// <summary>
+    /// Das Raster einer Seitenzone. Es kuerzt beim Messen die Zeilen der Gruppen, die so hoch
+    /// sind wie ihr Inhalt, auf den Platz, den die Zone hat - dort ist die verfuegbare Hoehe
+    /// bekannt. Danach gefragt, wie hoch das Raster geworden ist, antwortete WPF mit der Hoehe
+    /// samt dem, was schon abgeschnitten war.
+    /// </summary>
+    private sealed class ZoneGrid : Grid
+    {
+        public List<RowDefinition> Fits { get; } = new();
+
+        /// <summary>Wie hoch eine eingeklappte Gruppe ist - ihre Reiterleiste.</summary>
+        private const double Folded = 40, Least = 72;
+
+        protected override System.Windows.Size MeasureOverride(System.Windows.Size constraint)
+        {
+            if (Fits.Count > 0 && !double.IsInfinity(constraint.Height))
+            {
+                double taken = RowDefinitions
+                    .Where(r => !Fits.Contains(r))
+                    .Sum(r => r.Height.IsAbsolute ? r.Height.Value : r.Height.IsStar ? r.MinHeight : Folded);
+
+                double each = Math.Max(Least, (constraint.Height - taken) / Fits.Count);
+
+                foreach (var row in Fits)
+                    if (Math.Abs(row.MaxHeight - each) > 0.5) row.MaxHeight = each;
+            }
+
+            return base.MeasureOverride(constraint);
+        }
     }
 
     /// <summary>
@@ -695,7 +768,7 @@ public sealed class DockHost : Border
                     FontSize = 11,
                     Foreground = (Brush)FindResource("MutedBrush"),
                 }
-                : panel;
+                : Scrolling(zone, group, panel);
         }
 
         var grid = new Grid();
@@ -736,16 +809,7 @@ public sealed class DockHost : Border
         var element = PanelOf(id);
         string title = element is null ? id : Strings.T(GetTitleKey(element));
 
-        var dots = new System.Windows.Shapes.Path
-        {
-            Data = Geometry.Parse("M1,1 h0.01 M6,1 h0.01 M1,6 h0.01 M6,6 h0.01 M1,11 h0.01 M6,11 h0.01"),
-            Stroke = (Brush)FindResource(active ? "AccentBrush" : "MutedBrush"),
-            StrokeThickness = 2.4,
-            StrokeStartLineCap = PenLineCap.Round,
-            StrokeEndLineCap = PenLineCap.Round,
-            HorizontalAlignment = HorizontalAlignment.Center,
-            VerticalAlignment = VerticalAlignment.Center,
-        };
+        var dots = Dots((Brush)FindResource(active ? "AccentBrush" : "MutedBrush"), 12);
 
         var grip = new Grid
         {
@@ -755,6 +819,7 @@ public sealed class DockHost : Border
             Cursor = Cursors.SizeAll,
             Tag = id,
             ToolTip = title + " – " + Strings.T("S_DockTabHint"),
+            ContextMenu = PanelMenu(id),
         };
 
         grip.Children.Add(dots);
@@ -766,6 +831,62 @@ public sealed class DockHost : Border
         grip.LostMouseCapture += OnTabLost;
 
         return grip;
+    }
+
+    /// <summary>
+    /// In einer Seitenzone rollt der Inhalt einer Gruppe, die so hoch ist wie er - falls
+    /// KeepInside sie kuerzen musste. Oben und unten nie: Dort ist die Zone so hoch wie er.
+    /// </summary>
+    private FrameworkElement Scrolling(DockZone zone, DockGroup group, FrameworkElement panel)
+    {
+        if (DockLayout.IsHorizontal(zone) || !FitsContent(group)) return panel;
+
+        return new ScrollViewer
+        {
+            Content = panel,
+            VerticalScrollBarVisibility = ScrollBarVisibility.Auto,
+            HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled,
+            Focusable = false,
+        };
+    }
+
+    /// <summary>
+    /// Das Menue am Griff eines Feldes: dieses eine Feld an seinen Platz zurueck - oder die ganze
+    /// Anordnung. Am Rechtsklick auf Reiter und Punktegriff, ueberall gleich.
+    /// </summary>
+    private ContextMenu PanelMenu(string id)
+    {
+        var menu = new ContextMenu();
+
+        var home = new MenuItem { Header = Strings.T("S_DockPanelHome") };
+        home.Click += (_, _) => HomePanel(id);
+        menu.Items.Add(home);
+
+        menu.Items.Add(new Separator());
+
+        var reset = new MenuItem { Header = Strings.T("S_DockReset") };
+        reset.Click += (_, _) => ResetLayout();
+        menu.Items.Add(reset);
+
+        return menu;
+    }
+
+    /// <summary>Sechs Punkte - das Zeichen fuer "hier anfassen", auf jedem Reiter und am Griff oben.</summary>
+    private static System.Windows.Shapes.Path Dots(Brush brush, double size)
+    {
+        double k = size / 12;
+
+        return new System.Windows.Shapes.Path
+        {
+            Data = Geometry.Parse(FormattableString.Invariant(
+                $"M{1 * k},{1 * k} h0.01 M{6 * k},{1 * k} h0.01 M{1 * k},{6 * k} h0.01 M{6 * k},{6 * k} h0.01 M{1 * k},{11 * k} h0.01 M{6 * k},{11 * k} h0.01")),
+            Stroke = brush,
+            StrokeThickness = 2.4 * Math.Max(0.75, k),
+            StrokeStartLineCap = PenLineCap.Round,
+            StrokeEndLineCap = PenLineCap.Round,
+            HorizontalAlignment = HorizontalAlignment.Center,
+            VerticalAlignment = VerticalAlignment.Center,
+        };
     }
 
     /// <summary>Ein Reiter: Name, Zaehler, und die Linie unter dem vorderen.</summary>
@@ -780,6 +901,12 @@ public sealed class DockHost : Border
             HorizontalAlignment = HorizontalAlignment.Center,
             Margin = new Thickness(10, 0, 10, 0),
         };
+
+        // Die Punkte sagen: Das hier laesst sich greifen und woanders hinziehen.
+        var grip = Dots((Brush)FindResource("MutedBrush"), 9);
+        grip.Margin = new Thickness(0, 0, 7, 0);
+        grip.Opacity = 0.7;
+        label.Children.Add(grip);
 
         label.Children.Add(new TextBlock
         {
@@ -815,6 +942,7 @@ public sealed class DockHost : Border
             Cursor = Cursors.Hand,
             Tag = id,
             ToolTip = Strings.T("S_DockTabHint"),
+            ContextMenu = PanelMenu(id),
         };
 
         TextElement.SetFontSize(tab, 12);
@@ -1106,7 +1234,9 @@ public sealed class DockHost : Border
                                       new Rect(centre.Left, centre.Top, wide, centre.Height)),
                     DockZone.Right => (new Rect(centre.Right - edge, centre.Top, edge, centre.Height),
                                        new Rect(centre.Right - wide, centre.Top, wide, centre.Height)),
-                    DockZone.Top => (new Rect(centre.Left, centre.Top, centre.Width, edge),
+                    // Nach oben zieht man gern ueber den oberen Rand hinaus, auf die Werkzeugleiste
+                    // - auch dort landet es oben. Ohne das traf man nur einen schmalen Streifen im Bild.
+                    DockZone.Top => (new Rect(centre.Left, centre.Top - 160, centre.Width, edge + 160),
                                      new Rect(centre.Left, centre.Top, centre.Width, over)),
                     _ => (new Rect(centre.Left, centre.Bottom - edge, centre.Width, edge),
                           new Rect(centre.Left, centre.Bottom - high, centre.Width, high)),

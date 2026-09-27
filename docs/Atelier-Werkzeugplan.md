@@ -522,6 +522,38 @@ Der Rahmen nach Entscheidung 9, in vier Schnitten:
 
 **Phase R ist damit abgeschlossen.** Als Nächstes laut Reihenfolge: W2 Tonwert.
 
+**Nachtrag zum Andockfeld (`fix/werkzeug-andocken`), nach einem Bericht des Nutzers:** An eine
+andere Stelle gezogen, ließen sich die Werkzeugeinstellungen teilweise nicht mehr greifen; nur
+das Zurücksetzen der ganzen Anordnung half.
+
+- **Ursache:** In einer vollen Seitenzone bekamen Gruppen, die so hoch sind wie ihr Inhalt,
+  ihre volle Höhe, auch wenn die Zone kürzer war. Das Raster schnitt dann die unteren Gruppen
+  ab, samt ihrem Reiter, dem einzigen Griff. Nachgestellt bei 1000 × 460: Der Reiter lag unter
+  dem sichtbaren Rand.
+- **Behoben:** Eine Seitenzone kürzt solche Gruppen beim Messen auf den Platz, den die anderen
+  lassen (`ZoneGrid`), und ihr Inhalt rollt. Jede Gruppe und ihr Reiter bleiben in der Zone.
+- **Ein Feld an seinen Platz:** Rechtsklick auf Reiter oder Griff bietet „An den Standardplatz
+  zurück“ (`DockLayout.Home`). Es bringt nur dieses Feld zurück, die anderen bleiben.
+  „Anordnung zurücksetzen“ steht darunter.
+- **Nach oben:** Das Ziel oben gilt auch über dem Bild, auf der Werkzeugleiste losgelassen.
+  Vorher traf man nur einen schmalen Streifen im Bild.
+- **Wie es aussieht:**
+  - Unter dem Bild ist die Zone so hoch wie die Einstellungen, statt einer festen Höhe mit
+    viel leerer Fläche.
+  - Als Reiter in einer hohen Gruppe stehen die Einstellungen oben bündig.
+  - Stehen in einer Seitenzone nur solche Felder, füllt das letzte die Spalte, statt oben
+    darin zu hängen.
+  - Jeder Reiter trägt sechs Punkte als Zeichen für „hier anfassen“, wie der Griff oben.
+- **Proben** (`DockToolInvariants`): in sechs Fenstergrößen jede Stelle, als eigene Gruppe
+  und als Reiter.
+  - Der Griff ist zu sehen, liegt in der Fläche und bekommt die Maus.
+  - Von dort geht es zurück nach oben.
+  - Das Menü am Griff bringt nur dieses Feld zurück.
+  - Oberhalb des Bildes losgelassen, landet es oben.
+  - Aussehen: unten ohne leere Fläche, als Reiter oben bündig, links die ganze Spalte.
+  - Vor der Behebung schlug die Griffprobe bei 1000 × 460 fehl.
+  - Die UI-Reihe zeichnet das Atelier mit Bild und den Einstellungen an sechs Stellen.
+
 ## 4c. W2 Tonwert im Einzelnen
 
 In sechs Schnitten, nach Nutzen und Abhängigkeit:

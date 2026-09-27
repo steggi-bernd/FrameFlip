@@ -228,6 +228,37 @@ public sealed class DockLayout
     }
 
     /// <summary>
+    /// Bringt EIN Feld an seinen Platz in der Grundanordnung zurueck, ohne die anderen anzufassen:
+    /// als Reiter zu einem Feld, mit dem es dort eine Gruppe teilt, sonst als eigene Gruppe an
+    /// seiner Stelle in seiner Zone. Wer ein Feld verloren hat, soll nicht die ganze Anordnung
+    /// zuruecksetzen muessen.
+    /// </summary>
+    public void Home(string panel)
+    {
+        var fresh = Default();
+        if (fresh.Find(panel) is not { } home) return;
+
+        var partner = fresh.Zone(home.Zone)[home.Group].Panels.FirstOrDefault(p => p != panel && Find(p) is not null);
+
+        if (partner is not null && Find(partner) is { } together)
+        {
+            Move(panel, together.Zone, together.Group, asTab: true);
+            return;
+        }
+
+        // Eine eigene Gruppe - schon dort, allein, heisst: nur nach vorn holen und aufklappen.
+        if (Find(panel) is { } now && now.Zone == home.Zone && Zone(now.Zone)[now.Group].Panels.Count == 1)
+        {
+            var group = Zone(now.Zone)[now.Group];
+            group.Active = panel;
+            group.Collapsed = false;
+            return;
+        }
+
+        Move(panel, home.Zone, Math.Min(home.Group, Zone(home.Zone).Count), asTab: false);
+    }
+
+    /// <summary>
     /// Stellt die Zusage her: jedes bekannte Feld genau einmal, keine leeren Gruppen,
     /// in jeder Gruppe liegt ein Feld vorn, das auch zu ihr gehoert.
     ///

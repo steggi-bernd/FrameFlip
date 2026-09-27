@@ -215,7 +215,9 @@
                 Grundanordnung oben als Leiste ueber dem Bild, und wer mag, zieht sie an eine
                 Seite - dort stehen die Gruppen untereinander. So hoch wie ihr Inhalt.
             -->
-            <local:PropertiesPanel x:Name="Properties"
+            <!-- Oben buendig: In einer hohen Gruppe - als Reiter neben der Farbe - stuenden die
+                 Regler sonst mitten in leerer Flaeche. -->
+            <local:PropertiesPanel x:Name="Properties" VerticalAlignment="Top"
                                    local:DockHost.PanelId="tool"
                                    local:DockHost.TitleKey="S_SectionTool"
                                    local:DockHost.FitsContent="True" />
