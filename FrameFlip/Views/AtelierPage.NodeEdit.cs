@@ -56,6 +56,7 @@ public partial class AtelierPage
         SetUpNodePreviews();
         SetUpNodeLayerList();
         SetUpPictureMenu();
+        SetUpLevels();
         NodeView.UndoWanted += () => StepNodes(back: true);
         NodeView.RedoWanted += () => StepNodes(back: false);
 

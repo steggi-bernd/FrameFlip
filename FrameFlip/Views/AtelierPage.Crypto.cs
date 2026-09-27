@@ -51,7 +51,12 @@ public partial class AtelierPage
         // anderen und braucht keine Ebene, keine Maske und keinen Stapel.
         if (_tool == AtelierTool.Pick)
         {
-            if (PixelAt(e.GetPosition(Display), out int rx, out int ry)) ReadAt(rx, ry);
+            // Eine Pipette des Tonwerts wartet: Der Ton hier wird ihr Punkt (W2b).
+            if (PixelAt(e.GetPosition(Display), out int rx, out int ry))
+            {
+                if (_levelsPick is not null) LevelsPickAt(rx, ry);
+                else ReadAt(rx, ry);
+            }
 
             e.Handled = true;
 

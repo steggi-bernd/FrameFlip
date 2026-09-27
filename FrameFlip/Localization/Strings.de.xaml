@@ -14,6 +14,15 @@
     <sys:String x:Key="S_Levels">Tonwert</sys:String>
     <sys:String x:Key="S_LevelsHint">Die Anfasser unter dem Histogramm: Schwarz, Grau und Weiß des Eingangs, darunter der Bereich der Ausgabe. Was links vom Schwarzpunkt und rechts vom Weißpunkt liegt, wird abgeschnitten. Doppelklick setzt einen Anfasser zurück.</sys:String>
     <sys:String x:Key="S_LevelsValues">Eingang {0} · {1} · {2}    Ausgabe {3} – {4}</sys:String>
+    <sys:String x:Key="S_LevelsAuto">Auto</sys:String>
+    <sys:String x:Key="S_LevelsAutoHint">Auto-Tonwert: Schwarz und Weiß je Kanal, sodass ein Promille abgeschnitten wird. Streckt jeden Kanal und nimmt dabei einen Farbstich mit.</sys:String>
+    <sys:String x:Key="S_LevelsAutoContrast">Kontrast</sys:String>
+    <sys:String x:Key="S_LevelsAutoContrastHint">Auto-Kontrast: Schwarz und Weiß gemeinsam für alle Kanäle – mehr Kontrast, die Farben bleiben, wie sie sind.</sys:String>
+    <sys:String x:Key="S_LevelsAutoColour">Farbe</sys:String>
+    <sys:String x:Key="S_LevelsAutoColourHint">Auto-Farbe: je Kanal gestreckt und die Mitten neutral – ein Grau wird wieder grau.</sys:String>
+    <sys:String x:Key="S_LevelsPickBlackHint">Pipette Schwarz: Den Ton im Bild anklicken, der schwarz werden soll – je Kanal, also auch gegen einen Farbstich in den Schatten.</sys:String>
+    <sys:String x:Key="S_LevelsPickGrayHint">Pipette Grau: Etwas im Bild anklicken, das grau sein sollte – die Mitten jedes Kanals werden so gestellt, dass es grau wird. Nimmt einen Farbstich.</sys:String>
+    <sys:String x:Key="S_LevelsPickWhiteHint">Pipette Weiß: Den Ton im Bild anklicken, der weiß werden soll – je Kanal.</sys:String>
     <sys:String x:Key="S_Curves">Kurven</sys:String>
     <sys:String x:Key="S_CurveHint">Klicken setzt einen Punkt, Ziehen verschiebt ihn, rechte Maustaste entfernt ihn.</sys:String>
     <sys:String x:Key="S_ShowOriginal">Original</sys:String>

@@ -46,8 +46,9 @@ public partial class AtelierPage
         {
             _tool = tool;
 
-            // Ein anderes Werkzeug beendet das Waehlen fuer eine Objektmaske.
+            // Ein anderes Werkzeug beendet das Waehlen fuer eine Objektmaske - und die Pipette des Tonwerts.
             if (tool != AtelierTool.Select) EndObjectMask();
+            if (tool != AtelierTool.Pick) EndLevelsPick();
 
             // "Auswaehlen" IST der Auswahlmodus des Maskenbereichs. Wer das
             // Werkzeug wechselt, verlaesst ihn damit auch dort - sonst bliebe im

@@ -35,6 +35,18 @@ public partial class GradingPanel : UserControl
 
     /// <summary>Welcher Kanal der Tonwertkorrektur bearbeitet wird: 0 gemeinsam, 1 bis 3 R, G, B.</summary>
     private int _levelsChannel;
+
+    /// <summary>Auto am Tonwert wurde gedrueckt - die Seite misst, was bei ihm ankommt.</summary>
+    public event Action<LevelsTool, LevelsAutoKind>? LevelsAutoWanted;
+
+    /// <summary>Eine Pipette des Tonwerts wurde gewaehlt - null: wieder abgewaehlt.</summary>
+    public event Action<LevelsTool, LevelsPickKind?>? LevelsPickWanted;
+
+    /// <summary>Waehrend die Pipetten von aussen zurueckgestellt werden, meldet ihr Umschalten nichts.</summary>
+    private bool _endingPick;
+
+    /// <summary>Der Tonwert der Karte - fuer die Probe.</summary>
+    internal LevelsTool Levels => _levels;
     private WhiteBalanceTool _whiteBalance = new();
     private LiftGammaGainTool _zones = new();
     private HslTool _bands = new();
@@ -1388,6 +1400,55 @@ public partial class GradingPanel : UserControl
         LevelsField.HistogramColour = LevelsColours[_levelsChannel];
         LevelsField.InvalidateVisual();
         ShowLevelsValues();
+    }
+
+    private void OnLevelsAutoClicked(object sender, RoutedEventArgs e)
+    {
+        if (sender is not FrameworkElement { Tag: string tag } || !Enum.TryParse(tag, out LevelsAutoKind kind)) return;
+
+        LevelsAutoWanted?.Invoke(_levels, kind);
+    }
+
+    /// <summary>Genau eine Pipette ist an - oder keine.</summary>
+    private void OnLevelsPickToggled(object sender, RoutedEventArgs e)
+    {
+        if (_endingPick || sender is not ToggleButton { Tag: string tag } toggle || LevelsPickWhite is null) return;
+        if (!Enum.TryParse(tag, out LevelsPickKind kind)) return;
+
+        if (toggle.IsChecked == true)
+        {
+            _endingPick = true;
+
+            foreach (var other in new[] { LevelsPickBlack, LevelsPickGray, LevelsPickWhite })
+                if (!ReferenceEquals(other, toggle)) other.IsChecked = false;
+
+            _endingPick = false;
+            LevelsPickWanted?.Invoke(_levels, kind);
+        }
+        else
+        {
+            LevelsPickWanted?.Invoke(_levels, null);
+        }
+    }
+
+    /// <summary>Die Pipette hat geklickt oder wurde verlassen - alle drei wieder aus.</summary>
+    public void EndLevelsPick()
+    {
+        _endingPick = true;
+
+        foreach (var toggle in new[] { LevelsPickBlack, LevelsPickGray, LevelsPickWhite })
+            toggle.IsChecked = false;
+
+        _endingPick = false;
+    }
+
+    /// <summary>Auto oder eine Pipette hat den Tonwert gestellt - die Karte zieht nach, das Bild auch.</summary>
+    public void LevelsChangedOutside()
+    {
+        _levels.Prepare();
+        LevelsField.InvalidateVisual();
+        ShowLevelsValues();
+        Raise(interim: false);
     }
 
     private void OnResetLevelsClicked(object sender, RoutedEventArgs e)
