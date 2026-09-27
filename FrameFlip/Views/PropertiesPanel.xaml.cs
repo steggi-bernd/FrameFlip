@@ -195,8 +195,9 @@ public partial class PropertiesPanel : UserControl
 
     /// <summary>
     /// Zeigt nur, was zum gewaehlten Werkzeug gehoert (Phase U3). Rechteck, Ellipse und Lasso
-    /// fuellen - Spitze, Abstand und Druck haben dort nichts zu sagen. Das Karo gibt es nur
-    /// eckig, Spitze, Zufall und Streuung nur beim Stempel, die Toleranz nur mit der Kante.
+    /// fuellen - Spitze, Staerke, Abstand, Form und Druck haben dort nichts zu sagen. Das Karo
+    /// gibt es nur eckig, Spitze, Zufall und Streuung nur beim Stempel, und dann nicht die
+    /// Wahl rund oder eckig. Die Toleranz nur mit der Kante.
     /// </summary>
     private void ShowBrushGroups()
     {
@@ -207,12 +208,17 @@ public partial class PropertiesPanel : UserControl
         static void Show(UIElement element, bool shown) => element.Visibility = shown ? Visibility.Visible : Visibility.Collapsed;
 
         Show(BrushTipRow, stroke);
+        Show(BrushFlowRow, stroke);
         Show(BrushSpacingRow, stroke);
         Show(BrushShapeRow, stroke);
         Show(BrushPressureRow, stroke);
         Show(BrushStampRow, BrushShape == BrushShape.Stamp);
+        Show(BrushTipShapes, BrushShape != BrushShape.Stamp);
         Show(BrushSquishRow, BrushShape == BrushShape.Square);
         Show(BrushEdgeRow, BrushEdge);
+
+        // Rund ist, was nicht eckig ist - der Chip zeigt es nur an.
+        BrushRoundToggle.IsChecked = BrushSquareToggle.IsChecked != true;
     }
 
     /// <summary>Der Strich bleibt auf der Flaeche, auf der er ansetzt - aus Tiefe und Normale.</summary>
@@ -242,6 +248,10 @@ public partial class PropertiesPanel : UserControl
 
     private void OnBrushToggle(object sender, RoutedEventArgs e)
     {
+        // Rund oder eckig: Rund schaltet eckig ab und laesst sich selbst nicht abschalten -
+        // es ist das, was bleibt, wenn eckig aus ist (ShowBrushGroups).
+        if (ReferenceEquals(sender, BrushRoundToggle) && BrushRoundToggle.IsChecked == true) BrushSquareToggle.IsChecked = false;
+
         // Eckig oder Stempel - eine Spitze hat nur eine Form.
         if (ReferenceEquals(sender, BrushSquareToggle) && BrushSquareToggle.IsChecked == true) BrushStampToggle.IsChecked = false;
         if (ReferenceEquals(sender, BrushStampToggle) && BrushStampToggle.IsChecked == true) BrushSquareToggle.IsChecked = false;

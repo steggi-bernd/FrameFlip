@@ -105,13 +105,17 @@ public partial class ToolBand : UserControl
         foreach (var entry in ToolCatalog.All.Where(e => e.Category == category))
         {
             bool usable = !entry.NodesOnly || _inNodes;
+            string title = Strings.T(entry.TitleKey);
 
             var button = new ToggleButton
             {
                 Style = (Style)FindResource("OverlayToggle"),
                 IsChecked = entry.Key == _active,
                 Margin = new Thickness(0, 0, 4, 4),
-                Content = entry.Glyph + " " + Strings.T(entry.TitleKey),
+
+                // Ein gezeichnetes Zeichen, wo es eines gibt (Entscheidung 9) - die uebrigen
+                // behalten ihr Schriftzeichen, bis ihre Phase sie ohnehin anfasst.
+                Content = Icons.Has(entry.Key) ? new IconLabel { Icon = entry.Key, Text = title } : entry.Glyph + " " + title,
                 Tag = entry,
                 IsEnabled = usable,
                 ToolTip = usable
@@ -119,6 +123,7 @@ public partial class ToolBand : UserControl
                     : Strings.T("S_ToolNodesOnly"),
             };
 
+            System.Windows.Automation.AutomationProperties.SetName(button, title);
             ToolTipService.SetShowOnDisabled(button, true);
             // Gedrueckt steht nur, was die Seite als wirkend meldet - ein Klick allein schaltet nichts um.
             button.Click += (_, _) =>

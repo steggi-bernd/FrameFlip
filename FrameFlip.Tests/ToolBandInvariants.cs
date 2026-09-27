@@ -57,6 +57,29 @@ public static class ToolBandInvariants
         Check.That(vignette.FirstOrDefault()?.Section == "Vignette" && brush.FirstOrDefault()?.Key == "brush",
                    "die Suche findet beim Namen, und was damit anfaengt, steht vorn");
         Check.That(ToolCatalog.Find("feather", Strings.T).Any(e => e.Key == "mask-edit"), "und auch ueber weitere Woerter");
+
+        // Die gezeichneten Zeichen (Entscheidung 9): Jedes laesst sich lesen und bleibt in
+        // seinem Raster von 24 - ein Tippfehler im Pfad zeigte sich sonst erst beim Zeichnen,
+        // und ein Zeichen ausserhalb des Rasters ragte aus seinem Knopf.
+        var broken = new List<string>();
+
+        foreach (string key in Icons.Keys)
+        {
+            try
+            {
+                var bounds = Icons.Of(key).Bounds;
+                if (bounds.IsEmpty || bounds.Left < -0.5 || bounds.Top < -0.5 || bounds.Right > 24.5 || bounds.Bottom > 24.5)
+                    broken.Add($"{key} {bounds}");
+            }
+            catch (FormatException)
+            {
+                broken.Add(key + " (unlesbar)");
+            }
+        }
+
+        Check.That(broken.Count == 0, "jedes gezeichnete Zeichen ist lesbar und bleibt im Raster", string.Join(", ", broken));
+        Check.That(ToolCatalog.All.Where(e => e.Category == ToolCatalog.Paint).All(e => Icons.Has(e.Key)),
+                   "jedes Werkzeug der Zeile Malen hat ein gezeichnetes Zeichen");
     }
 
     private static void TheBandWorks()
@@ -139,8 +162,9 @@ public static class ToolBandInvariants
             Check.That(band.Active == "rectangle" && !Shown("BrushTipRow") && !Shown("BrushShapeRow") && !Shown("BrushPressureRow") &&
                        !Shown("BrushModeRow"),
                        "Rechteck: gedrueckt in der Zeile, und keine Spitze, kein Abstand, kein Druck in der Pinselleiste");
-            Check.That(Seen("BrushOpacitySlider") && Seen("BrushObjectToggle") && !Seen("BrushSizeSlider") && !Seen("BrushSpacingSlider"),
-                       "Rechteck: Deckkraft und Bindung stehen wirklich da, Groesse und Abstand nicht");
+            Check.That(Seen("BrushOpacitySlider") && Seen("BrushObjectToggle") && !Seen("BrushSizeSlider") &&
+                       !Seen("BrushSpacingSlider") && !Seen("BrushFlowSlider") && !Seen("BrushAngleSlider"),
+                       "Rechteck: Deckkraft und Bindung stehen wirklich da, Groesse, Staerke, Abstand und Form nicht");
 
             page.UseTool(ToolCatalog.All.Single(e => e.Key == "brush"));
             Pump();
@@ -154,9 +178,34 @@ public static class ToolBandInvariants
                        string.Join(", ", new[] { "BrushSizeSlider", "BrushHardnessSlider", "BrushFlowSlider", "BrushSpacingSlider",
                                                  "BrushAngleSlider", "BrushPressureBox" }.Where(n => !Seen(n))));
 
-            ((System.Windows.Controls.Primitives.ToggleButton)properties.FindName("BrushSquareToggle")).IsChecked = true;
-            Check.That(Shown("BrushSquishRow"), "eckig: jetzt gibt es das Karo");
-            ((System.Windows.Controls.Primitives.ToggleButton)properties.FindName("BrushSquareToggle")).IsChecked = false;
+            var round = (System.Windows.Controls.Primitives.ToggleButton)properties.FindName("BrushRoundToggle");
+            var square = (System.Windows.Controls.Primitives.ToggleButton)properties.FindName("BrushSquareToggle");
+
+            Check.That(round.IsChecked == true && square.IsChecked != true, "rund ist gedrueckt, solange die Spitze nicht eckig ist");
+
+            square.IsChecked = true;
+            Check.That(Shown("BrushSquishRow") && round.IsChecked != true, "eckig: jetzt gibt es das Karo - und rund ist nicht mehr gedrueckt");
+
+            round.IsChecked = true;
+            Check.That(square.IsChecked != true && properties.BrushShape == BrushShape.Round && !Shown("BrushSquishRow"),
+                       "ein Klick auf rund macht die Spitze wieder rund");
+
+            round.IsChecked = false;
+            Check.That(round.IsChecked == true, "rund laesst sich nicht abschalten - es ist, was bleibt, wenn eckig aus ist");
+
+            page.UseTool(ToolCatalog.All.Single(e => e.Key == "stamp"));
+            Pump();
+            Check.That(Shown("BrushStampRow") && !Shown("BrushTipShapes"),
+                       "Stempel: seine Spitze statt der Wahl rund oder eckig");
+            page.UseTool(ToolCatalog.All.Single(e => e.Key == "brush"));
+            Pump();
+            Check.That(!Shown("BrushStampRow") && Shown("BrushTipShapes") && round.IsChecked == true,
+                       "zurueck zum Pinsel: wieder rund oder eckig");
+
+            band.Choose(ToolCatalog.Paint);
+            var brushButton = band.ToolButtons.Single(b => b.Tag is ToolEntry { Key: "brush" });
+            Check.That(brushButton.Content is IconLabel && System.Windows.Automation.AutomationProperties.GetName(brushButton) == Strings.T("S_ToolBrush"),
+                       "der Pinsel in der Zeile: gezeichnetes Zeichen, und sein Name fuer Bildschirmleser");
 
             column.Select(AtelierTool.Move, notify: true);
             Pump();
