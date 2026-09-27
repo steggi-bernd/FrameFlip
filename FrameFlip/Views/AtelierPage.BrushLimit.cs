@@ -15,8 +15,15 @@ namespace FrameFlip.Views;
 /// </summary>
 public partial class AtelierPage
 {
-    /// <summary>Gebaute Begrenzungen: Kryptomatte, Kennung, Bild.</summary>
-    private readonly Dictionary<(string Set, float Id, int Number), string> _limits = new();
+    /// <summary>
+    /// Gebaute Begrenzungen: Datei, Kryptomatte, Kennung, Bild.
+    ///
+    /// Die Datei gehoert dazu. Eine Kennung ist der Hash eines Objektnamens - dasselbe Objekt
+    /// in einem anderen Render derselben Szene hat dieselbe Kennung, meist auch dieselbe
+    /// Bildnummer, steht aber woanders. Ohne die Datei bekam es die Deckung des alten Renders,
+    /// und der Strich blieb auf einem Umriss, den es im offenen Bild nicht gibt.
+    /// </summary>
+    private readonly Dictionary<(string Path, string Set, float Id, int Number), string> _limits = new();
 
     /// <summary>
     /// Die gepackte Deckung des Objekts an diesem Punkt des Bildes - oder null, wenn dort
@@ -45,7 +52,7 @@ public partial class AtelierPage
         float id = levels[0].R[y * width + x];
         if (id == 0f) return null;
 
-        var key = (set.Prefix, id, _number);
+        var key = (_path, set.Prefix, id, _number);
         if (_limits.TryGetValue(key, out var known)) return known;
 
         // In der Groesse der Maske: je Maskenpunkt die Deckung in der Mitte seines Feldes.
