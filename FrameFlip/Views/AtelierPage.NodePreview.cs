@@ -265,6 +265,10 @@ public partial class AtelierPage
     private void OnLayerChosen(Node node)
     {
         NodeView.Select(node);
+
+        // In der Liste gewaehlt: Was jetzt aus der Werkzeugleiste kommt, gilt dieser Ebene.
+        // Erst nach dem Waehlen - das Waehlen selbst vergisst die vorige.
+        _layerFocus = node as MixNode;
         NodeView.Reveal(node);
         ShowNodeLayers();
     }

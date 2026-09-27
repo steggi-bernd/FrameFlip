@@ -1087,6 +1087,12 @@
     <sys:String x:Key="S_NodeLayerMask">Die Maske der Ebene</sys:String>
     <sys:String x:Key="S_NodeLayerHidden">ausgeblendet</sys:String>
     <sys:String x:Key="S_NodeLayerOnTop">obenauf</sys:String>
+    <sys:String x:Key="S_NodeLayerAddChip">Ebene</sys:String>
+    <sys:String x:Key="S_NodeLayerAdjustChip">Einstellung</sys:String>
+    <sys:String x:Key="S_NodeLayerAdjustHint">Eine Einstellungsebene über der gewählten – sie korrigiert, was darunter liegt.</sys:String>
+    <sys:String x:Key="S_NodeLayerFx">Effekte nur dieser Ebene – ein Klick zeigt den obersten.</sys:String>
+    <sys:String x:Key="S_NodeLayerObject">Objektmaske aus der Kryptomatte – ein Klick zeigt die Maske.</sys:String>
+    <sys:String x:Key="S_LayerMenuEffect">Effekt nur auf diese Ebene …</sys:String>
     <sys:String x:Key="S_NodeLayerAdd">Ebene hinzufügen – über der gewählten</sys:String>
     <sys:String x:Key="S_NodeLayerDuplicate">Ebene samt ihrem Zweig verdoppeln</sys:String>
     <sys:String x:Key="S_NodeLayerRemove">Ebene samt ihrem Zweig löschen</sys:String>

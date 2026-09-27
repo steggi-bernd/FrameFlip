@@ -28,6 +28,10 @@ public partial class AtelierPage
 
     private void OnNodeSelected()
     {
+        // Etwas anderes gewaehlt als die Ebene aus der Liste: Sie gilt nicht mehr als gewaehlte
+        // Ebene - auch nicht, wenn man danach ihr Mischen im Graphen anklickt.
+        if (!ReferenceEquals(NodeView.Selected, _layerFocus)) _layerFocus = null;
+
         ShowNodeSettings();
         ShowPlacement();
         ShowNodeLayers();

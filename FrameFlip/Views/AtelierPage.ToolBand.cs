@@ -65,6 +65,14 @@ public partial class AtelierPage
 
         var node = kind.Create();
 
+        // Eine Ebene in der Liste gewaehlt: Der Effekt wirkt nur auf sie - er kommt in ihren
+        // Zweig, vor ihr Mischen, und nicht dahinter auf alles, was darunter liegt.
+        if (NodeEdits.Through(node).Input is not null && LayerBranch() is { } branch)
+        {
+            AddIntoLayer(node, branch);
+            return;
+        }
+
         if (NodeView.Selected is { } after and not OutputNode &&
             NodeEdits.Through(after).Output is not null && NodeEdits.Through(node).Input is not null)
         {

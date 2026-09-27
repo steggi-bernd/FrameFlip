@@ -91,8 +91,9 @@ public partial class AtelierPage
     /// Ein Knoten, hinter den das Neue gesetzt wird - "Dahinter einfuegen" aus seinem
     /// Menue. Das Bild laeuft danach durch das Neue weiter.
     /// </param>
+    /// <param name="into">Ein Kabel, in das gesetzt wird, was man nimmt - etwa der Zweig einer Ebene.</param>
     internal void ShowNodeHub(Point at, string? category = null, UIElement? anchor = null, Func<Node?>? target = null,
-                              Node? after = null)
+                              Node? after = null, NodeLink? into = null)
     {
         if (_graph is null) return;
 
@@ -100,7 +101,7 @@ public partial class AtelierPage
         MakePassThumbs();
 
         var screen = NodeView.ToScreen(at);
-        var link = anchor is null && NodeView.NodeAt(screen) is null ? NodeView.LinkAt(screen) : null;
+        var link = into ?? (anchor is null && NodeView.NodeAt(screen) is null ? NodeView.LinkAt(screen) : null);
         target ??= LayerTarget;
 
         string? note = after is not null
