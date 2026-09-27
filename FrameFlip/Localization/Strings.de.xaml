@@ -413,6 +413,7 @@
     <sys:String x:Key="S_LanguageEnglish">English</sys:String>
     <sys:String x:Key="S_Playback">Wiedergabe</sys:String>
     <sys:String x:Key="S_LoopSeamless">Nach dem letzten Frame nahtlos von vorn</sys:String>
+    <sys:String x:Key="X_LoopSeamless">Die Vorschau springt vom letzten Bild ohne Pause zum ersten. Aus, wenn sie am Ende stehen bleiben soll. L schaltet es im Vorschaufenster um.</sys:String>
     <sys:String x:Key="S_LockToDisplay">Bei passender Bildrate an den Bildschirmtakt koppeln</sys:String>
     <sys:String x:Key="S_LockToDisplayHint">Verhindert Ruckler, wenn Sollrate und Bildschirmtakt zusammenfallen – etwa 60 fps auf 60 Hz. Die Wiedergabe läuft dann mit dem Schirmtakt statt exakt mit der Sollrate.</sys:String>
     <sys:String x:Key="S_CloseOnFocusLoss">Vorschau schliessen, sobald sie den Fokus verliert</sys:String>

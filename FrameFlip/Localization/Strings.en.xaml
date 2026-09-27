@@ -413,6 +413,7 @@
     <sys:String x:Key="S_LanguageEnglish">English</sys:String>
     <sys:String x:Key="S_Playback">Playback</sys:String>
     <sys:String x:Key="S_LoopSeamless">Loop seamlessly after the last frame</sys:String>
+    <sys:String x:Key="X_LoopSeamless">The preview jumps from the last frame to the first without a pause. Off if it should stop at the end. L toggles it in the preview window.</sys:String>
     <sys:String x:Key="S_LockToDisplay">Lock to the display refresh at matching frame rates</sys:String>
     <sys:String x:Key="S_LockToDisplayHint">Prevents judder when the target rate coincides with the display refresh – 60 fps on 60 Hz, say. Playback then follows the display rather than the exact target rate.</sys:String>
     <sys:String x:Key="S_CloseOnFocusLoss">Close the preview as soon as it loses focus</sys:String>

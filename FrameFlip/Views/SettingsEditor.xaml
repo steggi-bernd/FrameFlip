@@ -276,7 +276,8 @@
                                 <ComboBox x:Name="FpsBox" Style="{StaticResource DesktopCombo}" Width="180" Tag="fps" />
                             </views:SettingRow>
 
-                            <views:SettingRow Style="{StaticResource SettingRowStyle}" Header="{DynamicResource S_LoopSeamless}">
+                            <views:SettingRow Style="{StaticResource SettingRowStyle}" Header="{DynamicResource S_LoopSeamless}"
+                                              Explain="{DynamicResource X_LoopSeamless}">
                                 <CheckBox x:Name="LoopBox" Style="{StaticResource DesktopCheckBox}" />
                             </views:SettingRow>
 
@@ -311,7 +312,8 @@
                                 <TextBox x:Name="AheadBox" Style="{StaticResource DashTextBox}" Width="120" />
                             </views:SettingRow>
 
-                            <views:SettingRow Style="{StaticResource SettingRowStyle}" Header="{DynamicResource S_PrefetchBehind}">
+                            <views:SettingRow Style="{StaticResource SettingRowStyle}" Header="{DynamicResource S_PrefetchBehind}"
+                                              Explain="{DynamicResource X_Prefetch}">
                                 <TextBox x:Name="BehindBox" Style="{StaticResource DashTextBox}" Width="120" />
                             </views:SettingRow>
                         </views:SettingGroup>
