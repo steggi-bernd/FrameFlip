@@ -281,6 +281,8 @@ Auf `refactor/studio-s2-target`, auf `feature/atelier` (`913905b`). Anlass und E
   - Sie lief vor und nach dem Umbau unverändert grün.
   - `AtelierEditingSessionInvariants` prüft das Ziel ohne Fenster.
 - **Lokal:** die Nachbargruppen mit 1.070 Zusicherungen grün.
+- **Abnahme in der CI von #68:** **5.148 Zusicherungen** in `FrameFlip.Tests` und **250
+  UI-Prüfungen**, beide vollständig erfolgreich. Gemergt am 27. September.
 
 **Offen:**
 - Im Stapel lesen Rahmen und Pinsel weiter `Layers.Selection`. Das Umsortieren per Ziehen
