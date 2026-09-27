@@ -5,14 +5,15 @@
          Vorher stand hier je Regler ein Gitter fuer die Beschriftung, darunter der
          Regler, und dazwischen von Hand gesetzte 26 Pixel. Fuenfmal dasselbe,
          fuenfmal einzeln geschrieben - und beim sechsten Regler haette es wieder
-         jemand abgetippt. -->
+         jemand abgetippt.
 
-    <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" Padding="0,4,10,8">
+         Titel, Untertitel und Rollen stellt die Seite der Einstellungen, wie bei jeder
+         anderen Kategorie. Mit eigenem Rollbereich und eigener Breite stand diese Seite
+         sonst ein Stueck eingerueckt neben allen anderen. -->
+
         <StackPanel>
-            <TextBlock Text="{DynamicResource D_AppearanceIntro}" TextWrapping="Wrap"
-                       Foreground="{StaticResource DesktopMuted}" FontSize="11.5" Margin="0,0,0,14" />
 
-            <views:SettingGroup Style="{StaticResource SettingGroupStyle}" Header="{DynamicResource D_Appearance}">
+            <views:SettingGroup Style="{StaticResource SettingGroupStyle}" Header="{DynamicResource D_AppearanceSizes}">
                 <views:SettingRow Style="{StaticResource SettingRowStyle}"
                                   Header="{DynamicResource D_UiScale}"
                                   Explain="{DynamicResource X_UiScale}" Important="True">
@@ -130,5 +131,4 @@
             <Button Content="{DynamicResource D_ResetLayout}" Style="{StaticResource DesktopButton}"
                     HorizontalAlignment="Left" Click="OnReset" />
         </StackPanel>
-    </ScrollViewer>
 </UserControl>

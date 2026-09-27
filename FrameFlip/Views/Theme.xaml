@@ -1317,6 +1317,14 @@
                             </Track.IncreaseRepeatButton>
                         </Track>
                     </Grid>
+                    <!-- Gibt es nichts zu rollen, bleibt der Platz frei, aber leer. So kann eine
+                         Seite ihren Rollbalken immer stehen lassen und springt nicht zur Seite,
+                         sobald ihr Inhalt laenger wird als das Fenster. -->
+                    <ControlTemplate.Triggers>
+                        <Trigger Property="IsEnabled" Value="False">
+                            <Setter TargetName="PART_Track" Property="Visibility" Value="Hidden" />
+                        </Trigger>
+                    </ControlTemplate.Triggers>
                 </ControlTemplate>
             </Setter.Value>
         </Setter>

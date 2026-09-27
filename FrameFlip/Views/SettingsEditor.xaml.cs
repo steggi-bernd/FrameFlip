@@ -471,7 +471,7 @@ public partial class SettingsEditor : System.Windows.Controls.UserControl, IDisp
 
         _watchCard = new WatchCard(
             new WatchCard.Parts(WatchToggle, WatchToggleText, WatchCodeFrame, WatchCode, WatchAddress, WatchHint,
-                                WatchPassRow, WatchPass, WatchPassHint, WatchActions),
+                                WatchPassRow, WatchPass, WatchPassHint, WatchActions, WatchAddressCopy),
             new WatchCard.Host(_latest, _apply, watch, renew, setCode, () => _layout.LightQr, () => true,
                                askTerms, note, ShowStatus, CardAction, CopyToClipboard));
 
@@ -497,17 +497,19 @@ public partial class SettingsEditor : System.Windows.Controls.UserControl, IDisp
         return button;
     }
 
-    private void CopyToClipboard(string text)
+    private bool CopyToClipboard(string text)
     {
         try
         {
             Clipboard.SetText(text);
             ShowStatus(Strings.T("S_Copied"));
+            return true;
         }
         catch (Exception)
         {
             // Die Zwischenablage kann von einem anderen Programm belegt sein.
             ShowStatus(Strings.T("S_NoClipboard"));
+            return false;
         }
     }
 

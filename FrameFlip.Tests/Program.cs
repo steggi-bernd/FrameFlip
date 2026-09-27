@@ -148,6 +148,7 @@ static int RunAll()
     WatchInvariants.Run();
     WatchLifecycleInvariants.Run();
     WatchCardInvariants.Run();
+    SettingsTextInvariants.Run();
     DashboardLiveInvariants.Run();
     DashboardLiveControllerInvariants.Run();
     DashboardSelectionInvariants.Run();

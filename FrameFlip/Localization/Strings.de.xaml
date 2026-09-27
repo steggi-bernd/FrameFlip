@@ -403,6 +403,7 @@
     <sys:String x:Key="S_HotkeyNote">Mindestens ein Modifikator. Esc bricht die Aufnahme ab.</sys:String>
     <sys:String x:Key="S_PrefetchBehind">Puffer zurück</sys:String>
     <sys:String x:Key="S_AdaptiveLoad">Dynamische Last</sys:String>
+    <sys:String x:Key="S_AdaptiveLoadAuto">Automatisch anpassen</sys:String>
     <sys:String x:Key="S_AdaptiveLoadHint">Ressourcen an CPU-, GPU- und RAM-Last anpassen</sys:String>
     <sys:String x:Key="S_LoadInterval">Messtakt (s)</sys:String>
     <sys:String x:Key="S_MaxThreads">Decoder-Threads max</sys:String>
@@ -412,6 +413,7 @@
     <sys:String x:Key="S_LanguageEnglish">English</sys:String>
     <sys:String x:Key="S_Playback">Wiedergabe</sys:String>
     <sys:String x:Key="S_LoopSeamless">Nach dem letzten Frame nahtlos von vorn</sys:String>
+    <sys:String x:Key="X_LoopSeamless">Die Vorschau springt vom letzten Bild ohne Pause zum ersten. Aus, wenn sie am Ende stehen bleiben soll. L schaltet es im Vorschaufenster um.</sys:String>
     <sys:String x:Key="S_LockToDisplay">Bei passender Bildrate an den Bildschirmtakt koppeln</sys:String>
     <sys:String x:Key="S_LockToDisplayHint">Verhindert Ruckler, wenn Sollrate und Bildschirmtakt zusammenfallen – etwa 60 fps auf 60 Hz. Die Wiedergabe läuft dann mit dem Schirmtakt statt exakt mit der Sollrate.</sys:String>
     <sys:String x:Key="S_CloseOnFocusLoss">Vorschau schliessen, sobald sie den Fokus verliert</sys:String>
@@ -506,6 +508,9 @@
     <sys:String x:Key="S_NewKeyHint">Trennt alle bisher gekoppelten Geräte.</sys:String>
     <sys:String x:Key="S_CopyLink">Link kopieren</sys:String>
     <sys:String x:Key="S_Copied">Kopiert.</sys:String>
+    <sys:String x:Key="S_CopyAddress">Adresse kopieren</sys:String>
+    <sys:String x:Key="S_CopyAddressHint">Klicken, um die Adresse zu kopieren</sys:String>
+    <sys:String x:Key="S_CopiedAddress">✓ Kopiert</sys:String>
     <sys:String x:Key="S_RoomLabel">Raum {0}</sys:String>
 
     <sys:String x:Key="S_HotkeyTaken">Der Hotkey {0} ist belegt. Bitte in den Einstellungen ändern.</sys:String>
@@ -677,6 +682,7 @@
     <sys:String x:Key="S_RenderEnable">Renders auf diesem Rechner starten</sys:String>
     <sys:String x:Key="S_RenderHint">Die App darf dann eine freigegebene .blend-Datei rendern lassen. Geschrieben wird nur in einen Ordner, den FrameFlip dafür neu anlegt – nichts wird überschrieben. Ein Render startet ein Programm auf diesem Rechner; deshalb steht das hier getrennt.</sys:String>
     <sys:String x:Key="S_BlenderLabel">Blender</sys:String>
+    <sys:String x:Key="S_BlenderProgram">Programm</sys:String>
     <sys:String x:Key="S_AddBlender">Andere Fassung …</sys:String>
     <sys:String x:Key="S_PickBlender">blender.exe auswählen</sys:String>
     <sys:String x:Key="S_NoBlender">Keine Fassung gefunden</sys:String>
@@ -685,8 +691,9 @@
 
     <!-- ================================================================ Dateien annehmen -->
     <sys:String x:Key="S_PushEnable">Dateien vom Handy annehmen</sys:String>
-    <sys:String x:Key="S_PushHint">Die App darf .blend-Dateien ablegen – in den Austauschordner unten oder in einen freigegebenen Projektordner. Jede angenommene Datei bekommt „_exchanged“ in den Namen: Man sieht sofort, welche von außen kam, und eine vorhandene wird nie überschrieben.</sys:String>
+    <sys:String x:Key="S_PushHint">Die App darf .blend-Dateien ablegen – in den Austauschordner oder in einen freigegebenen Projektordner. Jede angenommene Datei bekommt „_exchanged“ in den Namen: Man sieht sofort, welche von außen kam, und eine vorhandene wird nie überschrieben.</sys:String>
     <sys:String x:Key="S_ExchangeFolder">Austauschordner</sys:String>
+    <sys:String x:Key="S_ExchangeFolderPath">Ordner</sys:String>
     <sys:String x:Key="S_PickExchange">Ordner für den Austausch wählen</sys:String>
     <sys:String x:Key="S_NoFolderSet">kein Ordner gewählt</sys:String>
     <sys:String x:Key="S_ChooseFolder">Wählen …</sys:String>
@@ -732,11 +739,12 @@
     <sys:String x:Key="D_Apply">Übernehmen</sys:String>
     <sys:String x:Key="D_ClassicQr">Klassischer QR-Code (dunkel auf hell)</sys:String>
     <sys:String x:Key="D_Permissions">Blender &amp; Dateien</sys:String>
-    <sys:String x:Key="D_PermissionsIntro">Lege fest, wie Blender angebunden ist und was dein gekoppeltes Gerät auf diesem PC tun darf.</sys:String>
+    <sys:String x:Key="D_PermissionsIntro">Wie Blender angebunden ist und was das gekoppelte Handy auf diesem Rechner darf.</sys:String>
     <sys:String x:Key="D_BlenderBridge">FrameFlip-Bridge für Renderstatus aktivieren</sys:String>
     <sys:String x:Key="D_FileRead">Dateien aus dem Austauschordner lesen erlauben</sys:String>
     <sys:String x:Key="D_WorkspaceBehaviour">Verhalten</sys:String>
     <sys:String x:Key="D_Appearance">Arbeitsbereich</sys:String>
+    <sys:String x:Key="D_AppearanceSizes">Größen und Aufteilung</sys:String>
     <sys:String x:Key="D_AppearanceIntro">Diese Anpassungen werden sofort angewendet und gespeichert. Bei wenig Platz ordnen sich die Bereiche automatisch untereinander an.</sys:String>
     <sys:String x:Key="D_UiScale">Oberflächenskalierung</sys:String>
     <sys:String x:Key="D_UiScaleAuto">Nach Bildschirm</sys:String>
@@ -747,9 +755,9 @@
     <sys:String x:Key="D_MonitorFirst">Metriken links anzeigen</sys:String>
     <sys:String x:Key="D_ReduceMotion">Bewegung reduzieren</sys:String>
     <sys:String x:Key="D_ResetLayout">Standardlayout wiederherstellen</sys:String>
-    <sys:String x:Key="D_SaveToPair">Fernsteuerung aktivieren und übernehmen, um den Kopplungscode anzuzeigen.</sys:String>
-    <sys:String x:Key="D_BlenderRequired">Bitte Fernsteuerung aktivieren und eine vorhandene blender.exe auswählen.</sys:String>
-    <sys:String x:Key="D_FolderRequired">Bitte Fernsteuerung aktivieren und einen vorhandenen Austauschordner auswählen.</sys:String>
+    <sys:String x:Key="D_SaveToPair">„Renderfortschritt ans Handy senden“ einschalten und übernehmen, dann erscheint hier der Kopplungscode.</sys:String>
+    <sys:String x:Key="D_BlenderRequired">Bitte „Renderfortschritt ans Handy senden“ einschalten und eine vorhandene blender.exe auswählen.</sys:String>
+    <sys:String x:Key="D_FolderRequired">Bitte „Renderfortschritt ans Handy senden“ einschalten und einen vorhandenen Austauschordner auswählen.</sys:String>
     <sys:String x:Key="D_ReadRequired">Zum Ablegen von Dateien muss auch der Lesezugriff aktiviert sein.</sys:String>
     <sys:String x:Key="D_Saved">Einstellungen übernommen.</sys:String>
     <sys:String x:Key="D_Preview">UI-VORSCHAU</sys:String>

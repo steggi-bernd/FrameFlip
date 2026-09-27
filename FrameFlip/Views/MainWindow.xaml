@@ -715,10 +715,19 @@
                                     <views:QrCodeView x:Name="WatchCode" LightModules="True" />
                                 </Border>
 
-                                <TextBlock x:Name="WatchAddress" Margin="0,12,0,0"
-                                           HorizontalAlignment="Center" TextAlignment="Center"
-                                           TextWrapping="Wrap" Style="{StaticResource DashMono}"
-                                           FontSize="11" Foreground="{StaticResource DesktopInk}" />
+                                <!-- Die Adresse ist der Knopf, der sie kopiert - siehe WatchCard. -->
+                                <Button x:Name="WatchAddressCopy" Style="{StaticResource CopyField}" Margin="0,7,0,0"
+                                        HorizontalAlignment="Center" Visibility="Collapsed"
+                                        ToolTip="{DynamicResource S_CopyAddressHint}"
+                                        AutomationProperties.Name="{DynamicResource S_CopyAddress}">
+                                    <DockPanel>
+                                        <views:IconLabel DockPanel.Dock="Right" Icon="copy" Margin="8,0,0,0"
+                                                         TextElement.Foreground="{StaticResource DesktopMuted}" />
+                                        <TextBlock x:Name="WatchAddress" TextAlignment="Center" TextWrapping="Wrap"
+                                                   VerticalAlignment="Center" Style="{StaticResource DashMono}"
+                                                   FontSize="11" Foreground="{StaticResource DesktopInk}" />
+                                    </DockPanel>
+                                </Button>
 
                                 <TextBlock x:Name="WatchHint" Margin="0,8,0,0" TextWrapping="Wrap"
                                            TextAlignment="Center" FontSize="10.5" LineHeight="16"
