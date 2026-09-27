@@ -105,32 +105,25 @@ public static class RoundedClipInvariants
                     window.UpdateLayout();
                 }
 
-                // Mit vierfacher Aufloesung gezeichnet: Die Viewbox verkleinert die Buehne je nach
-                // Bildschirm, und die Ecke soll trotzdem mehrere Bildpunkte breit sein - sonst
-                // verschmilzt sie mit der Randlinie des Rahmens.
-                const int Dense = 4;
-                var surface = (FrameworkElement)window.Content;
-                int w = (int)surface.ActualWidth * Dense, h = (int)surface.ActualHeight * Dense;
-                var pixels = Pixels(surface, w, h, Dense);
+                // Der Rahmen allein, in seiner eigenen Groesse - ueber einen VisualBrush, damit die
+                // Viewbox darueber nicht mitzeichnet. Sie verkleinert die Buehne je nach Bildschirm,
+                // auf dem kleinen der CI bis auf ein Viertel; die Ecke verschmolz dann mit der
+                // Randlinie, und die Probe mass nichts mehr.
+                int w = (int)Math.Ceiling(stage.ActualWidth), h = (int)Math.Ceiling(stage.ActualHeight);
+                var pixels = Snapshot(stage, w, h);
 
-                // Die Ecke des Inhalts - zwei Punkte hinein, in den Koordinaten des Inhalts; die
-                // Viewbox darueber verkleinert das.
-                Point At(double x, double y)
-                {
-                    var at = content.TranslatePoint(new Point(x, y), surface);
-                    return new Point(at.X * Dense, at.Y * Dense);
-                }
+                // Die Ecke des Inhalts - zwei Punkte hinein, in Punkten des Rahmens.
+                Point At(double x, double y) => content.TranslatePoint(new Point(x, y), stage);
 
                 var corner = At(2, 2);
-                double scale = At(100, 0).X - At(0, 0).X;
                 var middle = At(content.ActualWidth / 2, content.ActualHeight / 2);
 
                 Check.That(content.Clip is RectangleGeometry { RadiusX: > 0 } clip &&
                            Math.Abs(clip.Rect.Width - content.ActualWidth) < 0.5 && Math.Abs(clip.Rect.Height - content.ActualHeight) < 0.5,
                            $"{width:0} x {height:0}: der Zuschnitt hat die Groesse des Inhalts und runde Ecken");
-                Check.That(scale >= 120 && !White(pixels, w, (int)corner.X, (int)corner.Y) && White(pixels, w, (int)middle.X, (int)middle.Y),
+                Check.That(!White(pixels, w, (int)corner.X, (int)corner.Y) && White(pixels, w, (int)middle.X, (int)middle.Y),
                            $"{width:0} x {height:0}: in der Ecke steht nicht das Bild, in der Mitte schon",
-                           $"Ecke bei {corner.X:0},{corner.Y:0}, Massstab {scale / 100:0.00}");
+                           $"Ecke bei {corner.X:0},{corner.Y:0}");
             }
         }
         finally
@@ -142,10 +135,31 @@ public static class RoundedClipInvariants
         }
     }
 
-    private static byte[] Pixels(FrameworkElement element, int width, int height, int dense = 1)
+    /// <summary>Zeichnet ein Element, das selbst die Wurzel ist - ohne Fenster darum.</summary>
+    private static byte[] Pixels(FrameworkElement element, int width, int height)
     {
-        var bitmap = new RenderTargetBitmap(width, height, 96 * dense, 96 * dense, PixelFormats.Pbgra32);
+        var bitmap = new RenderTargetBitmap(width, height, 96, 96, PixelFormats.Pbgra32);
         bitmap.Render(element);
+
+        var pixels = new byte[width * height * 4];
+        bitmap.CopyPixels(pixels, width * 4, 0);
+
+        return pixels;
+    }
+
+    /// <summary>
+    /// Zeichnet ein Element in einem Fenster in seiner eigenen Groesse - ueber einen VisualBrush,
+    /// so dass weder sein Versatz im Fenster noch eine Viewbox darueber mitzeichnet.
+    /// </summary>
+    private static byte[] Snapshot(FrameworkElement element, int width, int height)
+    {
+        var drawing = new DrawingVisual();
+        using (var context = drawing.RenderOpen())
+            context.DrawRectangle(new VisualBrush(element) { Stretch = Stretch.None, AlignmentX = AlignmentX.Left, AlignmentY = AlignmentY.Top },
+                                  null, new Rect(0, 0, width, height));
+
+        var bitmap = new RenderTargetBitmap(width, height, 96, 96, PixelFormats.Pbgra32);
+        bitmap.Render(drawing);
 
         var pixels = new byte[width * height * 4];
         bitmap.CopyPixels(pixels, width * 4, 0);
