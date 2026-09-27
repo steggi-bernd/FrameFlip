@@ -35,6 +35,7 @@
     <sys:String x:Key="S_OutputFormat">Output format</sys:String>
     <sys:String x:Key="S_FormatPng16">PNG · 16 bit</sys:String>
     <sys:String x:Key="S_FormatPng8">PNG · 8 bit</sys:String>
+    <sys:String x:Key="S_EightBitOnly">Pixel sort and error diffusion work in 8 bit and are left out of this format. PNG · 8 bit, JPG or a video keep them.</sys:String>
     <sys:String x:Key="S_FormatTiff16">TIFF · 16 bit</sys:String>
     <sys:String x:Key="S_FormatJpeg">JPEG</sys:String>
     <sys:String x:Key="S_ChooseTarget">Target folder …</sys:String>
@@ -157,7 +158,7 @@
     <sys:String x:Key="S_SortCross">Crosswise</sys:String>
     <sys:String x:Key="S_SortCrossHint">After the first pass a second one turned by 90 degrees - like Kim Asendorf, columns first, then rows. The picture melts both ways.</sys:String>
     <sys:String x:Key="S_SortKeyHint">What is compared - and what the threshold means. Brightness turns runs into gradients from dark to light, hue makes bands, saturation separates pale from vivid and leaves the form standing.</sys:String>
-    <sys:String x:Key="S_SortHint">Only pixels BETWEEN the two thresholds are reordered - the window is the strength control. Closed, nothing happens; opened, the picture falls into runs with everything else left standing. Like dithering, it joins on release.</sys:String>
+    <sys:String x:Key="S_SortHint">Only pixels BETWEEN the two thresholds are reordered - the window is the strength control. Newly added, it starts open; fully closed, nothing happens. Opened, the picture falls into runs with everything else left standing. Like dithering, it joins on release, and only in 8-bit output - PNG 16 bit and TIFF leave it out.</sys:String>
     <sys:String x:Key="S_Grain">Film grain</sys:String>
     <sys:String x:Key="S_GrainAmount">Amount</sys:String>
     <sys:String x:Key="S_GrainSize">Size</sys:String>

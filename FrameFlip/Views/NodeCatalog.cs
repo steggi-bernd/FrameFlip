@@ -59,27 +59,46 @@ public static class NodeCatalog
         new("S_GroupBasics", "S_Vibrance", () => new PointToolNode { Tool = new VibranceTool() }),
 
         new("S_GroupLight", "S_Dehaze", () => new LocalNode { Tool = new DehazeTool() }, "Dehaze"),
-        new("S_GroupLight", "S_Bloom", () => new LocalNode { Tool = new BloomTool() }, "Bloom"),
-        new("S_GroupLight", "S_Halation", () => new LocalNode { Tool = new HalationTool() }, "Halation"),
+        new("S_GroupLight", "S_Bloom", () => Started(new LocalNode { Tool = new BloomTool() }), "Bloom"),
+        new("S_GroupLight", "S_Halation", () => Started(new LocalNode { Tool = new HalationTool() }), "Halation"),
         new("S_GroupLight", "S_Noise", () => new LocalNode { Tool = new NoiseTool() }, "Noise"),
         new("S_GroupLight", "S_Clarity", () => new LocalNode { Tool = new ClarityTool() }, "Clarity"),
         new("S_GroupLight", "S_Texture", () => new LocalNode { Tool = new TextureTool() }, "Texture"),
         new("S_GroupLight", "S_Sharpen", () => new LocalNode { Tool = new SharpenTool() }, "Sharpen"),
 
-        new("S_GroupOptics", "S_Motion", () => new DataNode { Tool = new MotionBlurTool() }, "Motion"),
-        new("S_GroupOptics", "S_Displace", () => new DataNode { Tool = new DisplaceTool() }, "Displace"),
-        new("S_GroupOptics", "S_DepthField", () => new DataNode { Tool = new DepthFieldTool() }, "Depth"),
-        new("S_GroupOptics", "S_Distortion", () => new GeometryNode { Tool = new DistortionTool() }, "Distortion"),
-        new("S_GroupOptics", "S_Chromatic", () => new GeometryNode { Tool = new ChromaticTool() }, "Chromatic"),
-        new("S_GroupOptics", "S_Vignette", () => new OpticsNode { Tool = new VignetteTool() }, "Vignette"),
+        new("S_GroupOptics", "S_Motion", () => Started(new DataNode { Tool = new MotionBlurTool() }), "Motion"),
+        new("S_GroupOptics", "S_Displace", () => Started(new DataNode { Tool = new DisplaceTool() }), "Displace"),
+        new("S_GroupOptics", "S_DepthField", () => Started(new DataNode { Tool = new DepthFieldTool() }), "Depth"),
+        new("S_GroupOptics", "S_Distortion", () => Started(new GeometryNode { Tool = new DistortionTool() }), "Distortion"),
+        new("S_GroupOptics", "S_Chromatic", () => Started(new GeometryNode { Tool = new ChromaticTool() }), "Chromatic"),
+        new("S_GroupOptics", "S_Vignette", () => Started(new OpticsNode { Tool = new VignetteTool() }), "Vignette"),
 
-        new("S_GroupFilm", "S_Dither", () => new OpticsNode { Tool = new DitherTool() }, "Dither"),
-        new("S_GroupFilm", "S_NodeDiffusion", () => new FramePassNode { Pass = new DiffusionTool() }),
-        new("S_GroupFilm", "S_Sort", () => new FramePassNode { Pass = new SortTool() }, "Sort"),
-        new("S_GroupFilm", "S_Grain", () => new OpticsNode { Tool = new GrainTool() }, "Grain"),
+        new("S_GroupFilm", "S_Dither", () => Started(new OpticsNode { Tool = new DitherTool() }), "Dither"),
+        new("S_GroupFilm", "S_NodeDiffusion", () => Started(new FramePassNode { Pass = new DiffusionTool() })),
+        new("S_GroupFilm", "S_Sort", () => Started(new FramePassNode { Pass = new SortTool() }), "Sort"),
+        new("S_GroupFilm", "S_Grain", () => Started(new OpticsNode { Tool = new GrainTool() }), "Grain"),
 
         new("S_GroupTable", "S_Lut", () => new PointToolNode { Tool = new LutTool() }, "Lut"),
     };
+
+    /// <summary>
+    /// Ein neuer Effekt mit seinem sichtbaren Startwert - siehe <see cref="EffectStart"/>.
+    /// Korrekturen gehen nicht hier durch, sie beginnen neutral.
+    /// </summary>
+    private static Node Started(Node node)
+    {
+        EffectStart.Apply(node switch
+        {
+            LocalNode { Tool: { } tool } => tool,
+            OpticsNode { Tool: { } tool } => tool,
+            GeometryNode { Tool: { } tool } => tool,
+            DataNode { Tool: { } tool } => tool,
+            FramePassNode { Pass: { } pass } => pass,
+            _ => null,
+        });
+
+        return node;
+    }
 
     /// <summary>Die Art, fuer die eine Kachel der Palette steht.</summary>
     public static NodeKind? ForSection(string section) => All.FirstOrDefault(k => k.Section == section);

@@ -85,6 +85,7 @@ static int RunAll()
     ImageAndGroupInvariants.Run();
     ClipAndCoverageInvariants.Run();
     NodeParityInvariants.Run();
+    EffectStartInvariants.Run();
     NodeExportInvariants.Run();
     NodeModeInvariants.Run();
     NodeEditInvariants.Run();
