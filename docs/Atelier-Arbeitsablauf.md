@@ -502,3 +502,41 @@ Ecken des Bildes über die runden des Rahmens.
     Hochformat-Bühne auf ein Viertel, und die Ecke verschmolz mit der Randlinie. Beides ist
     korrigiert.
 - **Echte Instanz:** Debug-Build mit eigener Konfiguration startet ohne Ausnahme.
+
+### A5: Pixel Sort und die Startwerte der Effekte (`feature/effekt-startwerte`)
+
+Punkt 13 mit Entscheidung 2. Pixel Sort rechnete richtig (4.2), wirkte aber nach dem
+Hinzufügen nicht, und eine 16-Bit-Ausgabe ließ es stillschweigend weg. Die Exportleiste
+steht dabei standardmäßig auf „PNG · 16 Bit“.
+
+- **Startwerte:** Ein neu hinzugefügter Effekt kommt sichtbar, im Knotenmenü wie in der
+  Palette des Stapels (`EffectStart`).
+  - Pixel Sort 0,25 bis 0,8, Filmkorn 0,25, Vignette −0,35, Glanz und Halation 0,4.
+  - Rastern und Diffusion voll, Farbsäume 0,3, Verzeichnung 0,15.
+  - Bewegungsunschärfe 0,5, Verschiebung 20, Tiefenschärfe 0,3.
+  - Korrekturen bleiben neutral. Ein schon eingestellter oder kopierter Effekt behält
+    seine Werte.
+  - Die Werkzeugklassen bleiben neutral, weil der Stapel jedes Werkzeug auch ungenutzt
+    anlegt. Gesetzt wird nur im Augenblick des Hinzufügens.
+  - Bei der Karte „Rastern“, die Raster und Diffusion über einen Regler bedient, bekommt
+    nur das Raster den Startwert.
+- **Grenzen der Startwerte:** Glanz und Halation greifen erst über ihrer Schwelle. Die drei
+  Effekte mit Renderdaten wirken nur, wenn die Datei die Pässe führt.
+- **Ausgabe:** Wirkt Pixel Sort oder Fehlerdiffusion und ist PNG 16 Bit oder TIFF gewählt,
+  steht an der Exportleiste: „Pixel Sort und Fehlerdiffusion rechnen in 8 Bit und fehlen in
+  diesem Format …“. Die Karte von Pixel Sort sagt es ebenfalls.
+- **Offen:** Während ein Regler gezogen wird, zeigt die grobe Vorschau Pixel Sort noch
+  nicht. Das kommt beim Loslassen, wie bisher. Eine grobe Fassung des Durchgangs wäre ein
+  eigener Schnitt.
+- **Probe** (`EffectStartInvariants`, 15 Zusicherungen):
+  - Jeder Effekt des Knotenmenüs mit Startwert, jede Korrektur neutral.
+  - Pixel Sort, Filmkorn und Vignette aus dem Menü verändern ein synthetisches Bild sofort.
+  - Im Stapel dasselbe, beim Rastern nur das Raster. Eine schon hinzugefügte Karte wird
+    nicht wieder aufgezogen.
+  - Der Hinweis an der Ausgabe erscheint bei PNG 16 Bit und TIFF, nicht bei PNG 8 Bit,
+    ebenso im Knotenmodus.
+  - `GradingGroupInvariants` hielt fest, dass ein hinzugefügter Effekt nichts tut. Die
+    Probe stellt Vignette und Korn jetzt ausdrücklich auf null, bevor sie Strich und
+    Ausschalten prüft.
+- **Echte Instanz:** Debug-Build mit eigener Konfiguration und synthetischer Folge. Das
+  Atelier öffnet mit Exportleiste, ohne Ausnahme.
