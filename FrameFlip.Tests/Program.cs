@@ -110,6 +110,7 @@ static int RunAll()
     AtelierEditingSessionInvariants.Run();
     EditingTargetInvariants.Run();
     TargetPathInvariants.Run();
+    TargetActionInvariants.Run();
     AtelierProjectInvariants.Run();
     AtelierProjectPageInvariants.Run();
     SwitchLeftoverInvariants.Run();

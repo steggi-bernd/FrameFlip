@@ -38,11 +38,15 @@ public static class TargetPath
         }
     }
 
-    private static IReadOnlyList<TargetStep> ForNode(Node node, NodeGraph graph)
+    /// <summary>
+    /// Die Ebene, der ein Knoten gehoert - die innerste, wenn er in einer Gruppe steckt -, und ob
+    /// er in ihrer Maske liegt. Null: Er gehoert zu keiner Ebene. Dieselbe Antwort fuer Zielzeile
+    /// und Einfuegestelle, damit ein Effekt dorthin geht, wo die Zeile es sagt.
+    /// </summary>
+    public static (NodeLayer Layer, bool InMask)? OwnerOf(Node node, NodeGraph graph)
     {
         var layers = NodeLayerList.Of(graph);
 
-        // Die Ebene, der der Knoten gehoert - die innerste, wenn er in einer Gruppe steckt.
         NodeLayer? owner = null;
         int ownerSize = int.MaxValue;
 
@@ -65,7 +69,23 @@ public static class TargetPath
             }
         }
 
-        if (owner is null)
+        if (owner is null) return null;
+
+        // Zur Maske gehoert, was in sie fliesst und nicht auch ins Bild der Ebene. Masken lesen das
+        // Bild der Ebene als Eingang - die Korrektur der Ebene liegt also auch "vor" ihrer Maske,
+        // bleibt aber ein Knoten der Ebene.
+        bool inPicture = owner.Mix is { } layerMix && graph.Into(layerMix.Id, "Oben") is { } picture &&
+                         (picture.From == node.Id || Upstream(graph, picture.From).Contains(node.Id));
+
+        bool inMask = !ReferenceEquals(owner.Target, node) && !inPicture && owner.MaskSource is { } mask &&
+                      (ReferenceEquals(mask, node) || Upstream(graph, mask.Id).Contains(node.Id));
+
+        return (owner, inMask);
+    }
+
+    private static IReadOnlyList<TargetStep> ForNode(Node node, NodeGraph graph)
+    {
+        if (OwnerOf(node, graph) is not var (owner, inMask))
         {
             return new[]
             {
@@ -82,13 +102,7 @@ public static class TargetPath
 
         var head = new TargetStep(Strings.T("S_TargetLayer", owner.Name), layerTarget, false);
 
-        // Zur Maske gehoert, was in sie fliesst und nicht auch ins Bild der Ebene. Masken lesen das
-        // Bild der Ebene als Eingang - die Korrektur der Ebene liegt also auch "vor" ihrer Maske,
-        // bleibt aber ein Knoten der Ebene.
-        bool inPicture = owner.Mix is { } layerMix && graph.Into(layerMix.Id, "Oben") is { } picture &&
-                         (picture.From == node.Id || Upstream(graph, picture.From).Contains(node.Id));
-
-        if (owner.MaskSource is { } mask && !inPicture && (ReferenceEquals(mask, node) || Upstream(graph, mask.Id).Contains(node.Id)))
+        if (inMask && owner.MaskSource is { } mask)
         {
             var maskStep = ReferenceEquals(mask, node)
                 ? new TargetStep(Strings.T("S_TargetMask", NodeTitles.MaskName(mask)), null, true)
