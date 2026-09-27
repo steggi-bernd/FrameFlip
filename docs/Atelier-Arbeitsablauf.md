@@ -777,3 +777,49 @@ Punkt 7: „Doppelklick auf einen Node → kleines Panel daneben“.
   - Den Doppelklick selbst täuscht die Probe nicht vor. Sie prüft, dass der Editor mit dem
     Feld verbunden ist.
   - Die Nachbargruppen liefen mit 356 Zusicherungen grün.
+
+### C6: Isolieren (`feature/isolieren`)
+
+Punkt 10. Wie geplant über den vorhandenen Betrachter, ohne neuen Zustand. Deshalb vorerst
+nur im Knotenmodus, denn nur dort gibt es den Betrachter.
+
+- **Ebene allein:** Alt+Klick auf das Auge einer Ebene in der Ebenenliste zeigt, was oben
+  in ihr Mischen fließt. Das Auge bleibt, wie es stand, nichts wird ausgeblendet.
+- **Maske allein:** Alt+Klick auf das Maskenbild der Ebene zeigt, was im Faktor ankommt,
+  grau im Bild.
+- **Aus dem Schnellfeld (C5b):** „Ebene isolieren“ am Mischen, „Maske isolieren“ an ihrer
+  Maske.
+- **Schild:** Über dem Bild steht „Isoliert: Ebene ‚Himmel‘ – Esc beendet“ oder „Isoliert:
+  Maske von ‚Himmel‘ – Esc beendet“. Das ergibt sich aus dem Betrachter: Zeigt er genau
+  das, was eine Ebene oben oder im Faktor bekommt, heißt es „isoliert“, sonst wie bisher
+  „Betrachter: …“, jetzt ebenfalls mit „Esc beendet“.
+- **Ende:**
+  - Esc beendet es, aber nur, wenn niemand sonst Esc braucht: kein Zug mit der Maus, kein
+    offenes Menü, keine Objektwahl.
+  - Ohne Isolieren bleibt Esc frei.
+  - Ein zweiter Alt+Klick beendet es ebenfalls, ebenso ein anderes Bild.
+- **Gefundener Fehler (eigener Commit):** Nach einem Projektwechsel war der Betrachter
+  zurückgesetzt, sein Schild stand aber noch über dem Bild und nannte einen Knoten, den es
+  nicht mehr gab. Das galt für Projekte mit und ohne Knoten. Jetzt frischen das Betreten
+  und Verlassen des Knotenmodus das Schild auf. Die Probe steht in
+  `SwitchLeftoverInvariants`.
+- **Probe gehärtet (eigener Commit):**
+  - Die Prüfung aus A1, ob ein Strich im neuen Bild in die Maske des alten Projekts geht,
+    maß die alte Maske an der Stelle des neuen Strichs gegen null.
+  - Damit maß sie auch den weichen Rand des ersten Strichs mit. Wie weit der reicht,
+    hängt davon ab, wie groß der Pinsel in dem Moment in Bildpunkten war, also vom
+    Layout.
+  - Eine zusätzliche Neuzeichnung im Editor ließ sie kippen. Eine Gegenprobe auf dem
+    unveränderten Stand bestätigte, dass der zweite Strich die alte Maske nicht anrührt.
+  - Fehler 1 ist also nicht zurück. Die Prüfung vergleicht jetzt die alte Maske vor und
+    nach dem Strich.
+- **Offen, C6:**
+  - Isolieren im Stapel: Dort gibt es keinen Betrachter. Es braucht eine eigene Anzeige
+    des Zwischenstands einer Ebene im Zusammensetzen (`LayerComposer`).
+  - Die Maske als roter Schleier über dem Bild (Umschalt) statt grau.
+  - Die Zielzeile nennt das Isolierte noch nicht, das Schild steht über dem Bild.
+- **Probe** (`IsolationInvariants`, 14 Zusicherungen):
+  - Ebene und Maske allein, der Aufbau bleibt unverändert.
+  - Zweiter Klick, Esc, Esc ohne Isolieren, das Schild für einen anderen Knoten.
+  - Die Einträge im Schnellfeld, ein anderes Bild.
+  - Die Nachbargruppen liefen mit 356 Zusicherungen grün.
