@@ -171,8 +171,10 @@ public partial class AtelierPage
         ShowMissingLayers();
         KeepViewer();
 
-        // Namen und Aufbau koennen sich geaendert haben, ohne dass das Ziel wechselte.
+        // Namen, Aufbau und die Auswahl einer Kryptomatte koennen sich geaendert haben, ohne dass
+        // das Ziel wechselte.
         ShowTargetPath();
+        ShowCryptoView();
 
         // Erst grob, dann voll - wie beim Ziehen an einem Regler. Der Editor zeigt die
         // Aenderung sofort, das Bild zieht im naechsten Bild nach, scharf nach einer Pause.

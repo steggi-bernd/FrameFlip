@@ -107,7 +107,20 @@
                                 <Grid>
                                     <Image x:Name="Display" Stretch="Uniform"
                                            RenderOptions.BitmapScalingMode="HighQuality"
-                                           MouseLeftButtonDown="OnImageClicked" />
+                                           MouseLeftButtonDown="OnImageClicked"
+                                           MouseMove="OnCryptoHover" MouseLeave="OnCryptoHoverLeft" />
+
+                                    <!-- Rueckmeldung beim Waehlen (C3): die gewaehlten Objekte umrandet,
+                                         das unter dem Zeiger hell ueberlagert. Genau so gross wie das Bild,
+                                         beim Einpassen wie beim Zoom - siehe AtelierPage.CryptoView. -->
+                                    <Image x:Name="CryptoSelection" IsHitTestVisible="False" Stretch="Fill"
+                                           Width="{Binding ActualWidth, ElementName=Display}"
+                                           Height="{Binding ActualHeight, ElementName=Display}"
+                                           RenderOptions.BitmapScalingMode="Linear" />
+                                    <Image x:Name="CryptoHover" IsHitTestVisible="False" Stretch="Fill"
+                                           Width="{Binding ActualWidth, ElementName=Display}"
+                                           Height="{Binding ActualHeight, ElementName=Display}"
+                                           RenderOptions.BitmapScalingMode="Linear" />
 
                                     <local:PlacementAdorner x:Name="Placement" />
                                 </Grid>
@@ -120,6 +133,17 @@
                                 Blender.
                             -->
                             <local:NodeEditor x:Name="NodeView" Visibility="Collapsed" />
+
+                            <!-- Der Name des Objekts am Zeiger (C3). Ohne Treffer fuer die Maus. -->
+                            <Canvas x:Name="CryptoHoverLayer" IsHitTestVisible="False">
+                                <Border x:Name="CryptoHoverName" Visibility="Collapsed"
+                                        Background="{StaticResource PanelBackground}"
+                                        BorderBrush="{StaticResource PanelBorder}" BorderThickness="1"
+                                        CornerRadius="5" Padding="8,3">
+                                    <TextBlock x:Name="CryptoHoverText" FontSize="12"
+                                               Foreground="{StaticResource ForegroundBrush}" />
+                                </Border>
+                            </Canvas>
 
                             <!--
                                 Das Angebot umzuschalten. Ein eigenes Feld und keine

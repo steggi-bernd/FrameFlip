@@ -201,6 +201,7 @@ public sealed partial class AtelierPage : UserControl
         SetUpView();
         SetUpProjects();
         SetUpTargetPath();
+        SetUpCryptoView();
 
         _settle.Tick += (_, _) =>
         {
@@ -302,6 +303,7 @@ public sealed partial class AtelierPage : UserControl
 
         _sources.Clear();
         _unreadable.Clear();
+        ForgetCryptoView();
         _pool.Clear();
         _regionPool.Clear();
         _cache.Clear();
@@ -399,6 +401,7 @@ public sealed partial class AtelierPage : UserControl
 
         _frame = loaded;
         ShowTargetPath();
+        ShowCryptoView();
 
         UpdateSourceText();
         FindSequence(path);

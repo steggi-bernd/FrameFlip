@@ -1189,6 +1189,10 @@
     <sys:String x:Key="S_TargetAddCorrectionHint">A correction for what the line names – added and connected.</sys:String>
     <sys:String x:Key="S_TargetAddEffect">+ Effect …</sys:String>
     <sys:String x:Key="S_TargetAddEffectHint">Find an effect – it goes where the line points.</sys:String>
+    <sys:String x:Key="S_SelectSet">Cryptomatte: {0}</sys:String>
+    <sys:String x:Key="S_SelectUnder">Under the pointer:</sys:String>
+    <sys:String x:Key="S_SelectNoTarget">No cryptomatte target – objects are only shown.</sys:String>
+    <sys:String x:Key="S_SelectRemovePick">Remove from the selection</sys:String>
     <sys:String x:Key="S_NodeMenuView">Show in the viewer (Ctrl+Shift+Click)</sys:String>
     <sys:String x:Key="S_NodeMenuViewOff">Viewer off – show the output again</sys:String>
     <sys:String x:Key="S_NodeLayerName">Layer name</sys:String>

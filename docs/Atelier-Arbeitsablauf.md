@@ -612,3 +612,32 @@ Bearbeitungsziel. Das gilt für die Werkzeugleiste, die Suche und die neuen Knö
 - **Offen:** C2b, mehrere Ebenen (Entscheidung 4: eine gemeinsame Korrektur darüber).
   Dafür braucht es erst eine Mehrfachauswahl in Ebenenliste und Ebenenstreifen. Die
   Kryptomatte-Auswahl als Ziel kommt mit C3.
+
+### C3a: Rückmeldung beim Wählen (`feature/krypto-rueckmeldung`)
+
+Punkt 3, sichtbarer Teil. Mit dem Werkzeug „Auswählen“ gibt es jetzt:
+
+- **Am Zeiger:** der Name des Objekts. Führt die Datei eine zweite Kryptomatte, etwa das
+  Material, und sind deren Stufen schon da, steht deren Name dabei.
+- **Über dem Bild:**
+  - Das Objekt unter dem Zeiger ist hell überlagert. Die Deckung wird aus jedem vierten
+    Bildpunkt gerechnet und je Objekt gemerkt.
+  - Die gewählten Objekte sind leise gefüllt und kräftig umrandet, gerechnet aus jedem
+    zweiten Bildpunkt, sobald sich die Auswahl ändert.
+  - Beides liegt genau so groß wie das Bild darüber, beim Einpassen wie beim Zoom.
+- **In den Werkzeugeinstellungen:** die Kryptomatte, die Auswahl als Chips mit Kreuz und
+  was unter dem Zeiger liegt. Das Kreuz nimmt ein Objekt aus der Maske.
+- **Ziel:** Gewählt wird an der Kryptomatte des Bearbeitungsziels: im Stapel die Maske der
+  gewählten Ebene, im Graphen der gewählte Maskenknoten. Ohne ein solches Ziel werden die
+  Objekte der Objekt-Kryptomatte nur angezeigt, und das steht da.
+- **Stufen:** Fehlende Stufen werden im Hintergrund gelesen. Baut die Seite ihren Vorrat
+  danach neu auf, etwa weil eine Maskenebene dazukam, werden sie wieder geholt. Die
+  Probe hat genau diesen Fall gefunden.
+- **Probe** (`CryptoFeedbackInvariants`, 10 Zusicherungen): Deckung und Umriss ohne
+  Fenster. Auf der Seite mit einem synthetischen Render (Kugel, Boden) prüft sie Name und
+  Hervorhebung, den Hinweis ohne Ziel, Umriss und Chip nach „Kugel als Maske“, das Kreuz am
+  Chip und das Verschwinden bei einem anderen Werkzeug.
+- **Echte Instanz:** Debug-Build ohne Ausnahme.
+- **Offen, C3b:** Im Knotenmodus ohne gewählten Maskenknoten entsteht noch keine
+  vorläufige Auswahl. Dazu kommen Klick ersetzt / Umschalt fügt hinzu / Alt nimmt heraus
+  und „+ Korrektur“ auf die Auswahl.

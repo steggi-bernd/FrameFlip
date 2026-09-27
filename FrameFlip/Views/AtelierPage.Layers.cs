@@ -105,8 +105,13 @@ public partial class AtelierPage
 
         ShowLayerCount();
 
-        // Eine umbenannte Ebene heisst auch in der Zielzeile so.
-        if (!interim) ShowTargetPath();
+        // Eine umbenannte Ebene heisst auch in der Zielzeile so, und eine geaenderte Auswahl der
+        // Kryptomatte zeigt ihren Umriss.
+        if (!interim)
+        {
+            ShowTargetPath();
+            ShowCryptoView();
+        }
 
         string? path = _path;
 

@@ -362,6 +362,17 @@
                            Foreground="{StaticResource MutedBrush}" />
             </StackPanel>
 
+            <!-- Beim Waehlen (C3): an welcher Kryptomatte, was gewaehlt ist, was unter dem Zeiger liegt. -->
+            <StackPanel x:Name="SelectBody" DockPanel.Dock="Left" Orientation="Horizontal"
+                        VerticalAlignment="Center" Visibility="Collapsed">
+                <TextBlock x:Name="SelectSet" Style="{StaticResource PanelLabel}" VerticalAlignment="Center"
+                           Margin="0,0,10,0" />
+                <WrapPanel x:Name="SelectPicks" VerticalAlignment="Center" />
+                <TextBlock Text="{DynamicResource S_SelectUnder}" Style="{StaticResource PanelLabel}"
+                           VerticalAlignment="Center" Margin="12,0,6,0" />
+                <TextBlock x:Name="SelectHover" Style="{StaticResource PanelValue}" VerticalAlignment="Center" />
+            </StackPanel>
+
             <!--
                 Der Satz zum Werkzeug, am Ende: Er nimmt, was an Platz uebrig bleibt,
                 und steht beim Pinsel hinter den Reglern statt davor.
