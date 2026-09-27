@@ -359,8 +359,8 @@ Der Rahmen nach Entscheidung 9, in vier Schnitten:
    - Ein Effekt wirkt nur auf die gewählte Ebene: Im Knotenmodus wird er in den Zweig der
      Ebene eingesetzt, vor ihrem Mischen. Heute wählt ein Klick auf die Ebene ihr Mischen,
      und alles darunter ist mit betroffen.
-4. **R4 – Objektmaske:** ein Objekt im Bild anklicken, und aus der Kryptomatte entsteht eine
-   Maske auf der gewählten Ebene.
+4. **R4 – Objektmaske** (`feature/objektmaske`): ein Objekt im Bild anklicken, und aus der
+   Kryptomatte entsteht eine Maske auf der gewählten Ebene.
 
 **R1 (`feature/atelier-rahmen`):**
 
@@ -492,7 +492,35 @@ Der Rahmen nach Entscheidung 9, in vier Schnitten:
   - Eine Anordnung von früher bekommt das Feld oben, die obere Zone übersteht das Speichern.
   - Die UI-Reihe zeichnet das leere Atelier mit der Leiste oben und an der rechten Seite.
 
-Danach R4, dann laut Reihenfolge W2 Tonwert.
+**R4 (`feature/objektmaske`), im Knotenmodus:**
+
+- **Ablauf:** Unter der Ebenenliste steht der Chip „Objektmaske“. Ebene in der Liste wählen,
+  den Chip drücken, ein Objekt im Bild anklicken: Aus der Kryptomatte entsteht eine Maske
+  und steckt im Faktor dieser Ebene.
+  - Weitere Klicks nehmen Objekte hinzu. Ein zweiter Klick auf dasselbe nimmt es wieder
+    heraus, in derselben Maske.
+  - Genommen wird die Kryptomatte für Objekte (CryptoObject), sonst die erste der Datei.
+  - Die Zeile der Ebene zeigt danach „⬢“.
+- **Hinweis über dem Bild:** Er sagt, was ein Klick jetzt tut, und bietet „Fertig“ an.
+  Beendet wird mit „Fertig“, Escape, einem anderen Werkzeug oder einem anderen Bild.
+- **Bestehende Maske:** Steckte im Faktor schon eine andere Maske, bleibt sie frei im Graphen
+  stehen (Abschnitt „Masken“ der Liste). Rückgängig stellt den alten Stand her.
+- **Ohne gewählte Ebene** entsteht beim ersten Klick eine eigene Maskenebene wie bisher. Die
+  folgenden Klicks wählen an ihr weiter.
+- **Bildmenü:** Mit gewählter Ebene steht dort zuerst „Objekt hier als Maske von …“.
+- **Ohne Kryptomatte** in der Datei ist der Chip aus, der Hinweis sagt warum.
+- Der Ebenenstreifen im Stapel hat seine Kryptomatte weiterhin im Maskenbereich der Ebene.
+- **Proben** (`ObjectMaskInvariants`, synthetische EXR mit Kryptomatte):
+  - Der Chip ist an und schaltet auf Auswählen, mit Hinweis.
+  - Ein Klick legt die Maske in den Faktor der gewählten Ebene: keine neue Ebene, ein
+    Schritt im Verlauf.
+  - Ein zweiter Klick nimmt das Objekt heraus, ein dritter wieder auf.
+  - Ein anderes Werkzeug beendet das Wählen.
+  - Das Bildmenü bietet die Maske für die gewählte Ebene an.
+  - Ohne gewählte Ebene entsteht genau eine Maskenebene.
+  - Ohne Kryptomatte ist der Chip aus.
+
+**Phase R ist damit abgeschlossen.** Als Nächstes laut Reihenfolge: W2 Tonwert.
 
 ## 5. KI-Werkzeuge: Last, Größe, Lizenz
 
