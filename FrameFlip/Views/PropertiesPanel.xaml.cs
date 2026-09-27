@@ -384,6 +384,7 @@ public partial class PropertiesPanel : UserControl
         ToolName.ToolTip = ToolHint.Text;
 
         PickBody.Visibility = tool == AtelierTool.Pick ? Visibility.Visible : Visibility.Collapsed;
+        SelectBody.Visibility = tool == AtelierTool.Select ? Visibility.Visible : Visibility.Collapsed;
 
         BrushBody.Visibility = tool == AtelierTool.Brush ? Visibility.Visible : Visibility.Collapsed;
 
@@ -413,6 +414,54 @@ public partial class PropertiesPanel : UserControl
         if (depth is { } metres) PickDepth.Text = $"{metres:0.###}";
 
         FocusNote.Visibility = Visibility.Collapsed;
+    }
+
+    /// <summary>Ein gewaehltes Objekt soll aus der Auswahl - sein Kreuz in der Leiste.</summary>
+    public event Action<Imaging.Grading.CryptoPick>? PickRemoveWanted;
+
+    /// <summary>
+    /// Was beim Waehlen gilt (C3): an welcher Kryptomatte gewaehlt wird, was gewaehlt ist - als
+    /// Chips mit Kreuz - und was unter dem Zeiger liegt. Ohne Kryptomatte-Maske als Ziel steht
+    /// statt der Chips, dass die Objekte nur angezeigt werden.
+    /// </summary>
+    internal void ShowSelection(string? set, IReadOnlyList<Imaging.Grading.CryptoPick>? picks, string? hover)
+    {
+        SelectSet.Text = set is null ? string.Empty : Strings.T("S_SelectSet", set);
+        SelectSet.Visibility = set is null ? Visibility.Collapsed : Visibility.Visible;
+        SelectHover.Text = string.IsNullOrEmpty(hover) ? "–" : hover;
+
+        SelectPicks.Children.Clear();
+
+        if (picks is null)
+        {
+            var none = new TextBlock { Text = Strings.T("S_SelectNoTarget"), FontSize = 11, VerticalAlignment = VerticalAlignment.Center };
+            none.SetResourceReference(TextBlock.ForegroundProperty, "MutedBrush");
+            SelectPicks.Children.Add(none);
+            return;
+        }
+
+        foreach (var pick in picks)
+        {
+            var name = new TextBlock { Text = pick.Name.Length > 0 ? pick.Name : "?", FontSize = 11, VerticalAlignment = VerticalAlignment.Center };
+            name.SetResourceReference(TextBlock.ForegroundProperty, "AccentBrush");
+
+            var remove = new Button { Content = "✕", FontSize = 10, Margin = new Thickness(4, 0, 0, 0), ToolTip = Strings.T("S_SelectRemovePick") };
+            remove.SetResourceReference(StyleProperty, "LinkButton");
+            System.Windows.Automation.AutomationProperties.SetName(remove, Strings.T("S_SelectRemovePick"));
+            remove.Click += (_, _) => PickRemoveWanted?.Invoke(pick);
+
+            var chip = new Border
+            {
+                Child = new StackPanel { Orientation = Orientation.Horizontal, Children = { name, remove } },
+                Padding = new Thickness(7, 1, 3, 1),
+                Margin = new Thickness(0, 0, 4, 0),
+                CornerRadius = new CornerRadius(5),
+                BorderThickness = new Thickness(1),
+            };
+            chip.SetResourceReference(Border.BorderBrushProperty, "AccentBrush");
+
+            SelectPicks.Children.Add(chip);
+        }
     }
 
     /// <summary>Sagt, was aus dem Uebernehmen geworden ist.</summary>

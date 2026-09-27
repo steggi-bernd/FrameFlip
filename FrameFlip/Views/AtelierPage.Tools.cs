@@ -86,6 +86,9 @@ public partial class AtelierPage
         // Und die Knoten: Sie liegen nur ueber dem Bild, solange ihr Werkzeug gilt.
         ShowNodeMode();
 
+        // Beim Waehlen: was gewaehlt ist und was unter dem Zeiger liegt - sonst nichts davon.
+        ShowCryptoView();
+
         if (tool == AtelierTool.Nodes && InNodes) NodeView.Focus();
     }
 

@@ -74,7 +74,11 @@ public partial class AtelierPage
             return;
         }
 
-        if (PickAt(x, y)) e.Handled = true;
+        if (PickAt(x, y))
+        {
+            e.Handled = true;
+            ShowCryptoView();
+        }
     }
 
     /// <summary>

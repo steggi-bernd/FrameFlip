@@ -1189,6 +1189,10 @@
     <sys:String x:Key="S_TargetAddCorrectionHint">Eine Korrektur für das, was links steht – angelegt und verbunden.</sys:String>
     <sys:String x:Key="S_TargetAddEffect">+ Effekt …</sys:String>
     <sys:String x:Key="S_TargetAddEffectHint">Einen Effekt suchen – er kommt dorthin, was links steht.</sys:String>
+    <sys:String x:Key="S_SelectSet">Kryptomatte: {0}</sys:String>
+    <sys:String x:Key="S_SelectUnder">Unter dem Zeiger:</sys:String>
+    <sys:String x:Key="S_SelectNoTarget">Kein Kryptomatte-Ziel – die Objekte werden nur angezeigt.</sys:String>
+    <sys:String x:Key="S_SelectRemovePick">Aus der Auswahl nehmen</sys:String>
     <sys:String x:Key="S_NodeMenuView">Im Betrachter zeigen (Strg+Umschalt+Klick)</sys:String>
     <sys:String x:Key="S_NodeMenuViewOff">Betrachter aus – wieder die Ausgabe zeigen</sys:String>
     <sys:String x:Key="S_NodeLayerName">Name der Ebene</sys:String>
