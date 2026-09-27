@@ -27,7 +27,7 @@
             Die Einstellungen des gewaehlten Werkzeugs - als Leiste unter der Werkzeugzeile,
             ueber die ganze Breite, und nicht mehr ueber dem Bild.
         -->
-        <local:PropertiesPanel x:Name="Properties" Grid.Row="1" Grid.ColumnSpan="2" Margin="0,0,0,8" />
+        <!-- Die Einstellungen des Werkzeugs sind ein Feld der Andockflaeche (Entscheidung 10) - siehe unten. -->
 
         <!--
             Die Werkzeugspalte: was die Maus im Bild tut.
@@ -189,6 +189,16 @@
                 Feld der Andockflaeche - in der Grundanordnung unten rechts, und wer mag, zieht
                 es woanders hin.
             -->
+            <!--
+                Die Einstellungen des gewaehlten Werkzeugs (Entscheidung 10): in der
+                Grundanordnung oben als Leiste ueber dem Bild, und wer mag, zieht sie an eine
+                Seite - dort stehen die Gruppen untereinander. So hoch wie ihr Inhalt.
+            -->
+            <local:PropertiesPanel x:Name="Properties"
+                                   local:DockHost.PanelId="tool"
+                                   local:DockHost.TitleKey="S_SectionTool"
+                                   local:DockHost.FitsContent="True" />
+
             <Border x:Name="ExportBar"
                     local:DockHost.PanelId="export"
                     local:DockHost.TitleKey="S_SectionExport"

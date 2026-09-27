@@ -26,6 +26,8 @@ public partial class PropertiesPanel : UserControl
     {
         InitializeComponent();
 
+        SizeChanged += (_, _) => ArrangeFor(ActualWidth);
+
         BrushShapeBox.ItemsSource = new[]
         {
             new IconChoice("round", Strings.T("S_BrushRound")),
@@ -33,6 +35,18 @@ public partial class PropertiesPanel : UserControl
         };
 
         ShowBrushGroups();
+    }
+
+    /// <summary>
+    /// Schmal - in einer Seitenzone - steht der Name des Werkzeugs ueber den Gruppen statt
+    /// links daneben, wo er eine ganze Spalte fraesse.
+    /// </summary>
+    private void ArrangeFor(double width)
+    {
+        bool narrow = width > 0 && width < 520;
+
+        DockPanel.SetDock(ToolNamePanel, narrow ? Dock.Top : Dock.Left);
+        ToolNamePanel.Margin = narrow ? new Thickness(0, 8, 0, 2) : new Thickness(0, 0, 16, 0);
     }
 
     /// <summary>Das Werkzeug der Zeile, das der Pinsel gerade ist - Art oder Stempel.</summary>
