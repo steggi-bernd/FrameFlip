@@ -243,7 +243,13 @@ public partial class MainWindow : Window
             ShellChrome.Attach(this);
         };
 
-        StateChanged += (_, _) => RefreshMaximizeGlyph();
+        StateChanged += (_, _) =>
+        {
+            RefreshMaximizeGlyph();
+
+            // Erst wenn Windows das Fenster in seine neue Groesse gelegt hat, laesst sich messen.
+            Dispatcher.BeginInvoke(new Action(FitIntoScreen), DispatcherPriority.Loaded);
+        };
         PreviewKeyDown += OnWindowKeyDown;
         LocationChanged += (_, _) =>
         {
@@ -253,12 +259,19 @@ public partial class MainWindow : Window
             if (_layout.AutoScale) ApplyScale();
         };
 
-        DpiChanged += (_, _) => ApplyScale();
+        DpiChanged += (_, _) =>
+        {
+            ApplyScale();
+            FitIntoScreen();
+        };
 
         SizeChanged += (_, _) =>
         {
             ApplyScale();
             Remember();
+
+            // Auch beim Start maximiert und beim Wechsel auf einen anderen Bildschirm.
+            FitIntoScreen();
         };
 
         BuildPlayChips();
@@ -452,6 +465,12 @@ public partial class MainWindow : Window
     }
 
     private void OnCloseWindow(object sender, RoutedEventArgs e) => Close();
+
+    /// <summary>
+    /// Maximiert rueckt der Inhalt um das ein, was ueber den Bildschirm hinausragt - sonst
+    /// klebten die Reiter oben und die Statuszeile unten am Rand, halb abgeschnitten.
+    /// </summary>
+    private void FitIntoScreen() => Root.Margin = ShellChrome.Overhang(this);
 
     /// <summary>Das Zeichen zeigt, was der Klick tut - nicht, wie das Fenster steht.</summary>
     private void RefreshMaximizeGlyph()
