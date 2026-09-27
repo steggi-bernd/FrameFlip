@@ -85,7 +85,26 @@ public partial class AtelierPage
     /// Werkzeugleiste. Im Stapel die Grundkarte des Ziels, im Graphen ein Knoten an seiner Stelle.
     /// </summary>
     private void OnTargetCorrect(object sender, RoutedEventArgs e)
-        => UseTool(ToolCatalog.All.Single(entry => entry.TitleKey == "S_Correction"));
+    {
+        // Auf eine Auswahl: Die neue Maskenebene bringt ihre Korrektur schon mit - sie wird das Ziel,
+        // statt eine zweite dahinter zu legen.
+        if (MaterialiseSelection())
+        {
+            if (InNodes && SelectedNode is MaskNode mask && _graph?.Into(mask.Id, "Ebene") is { } picture &&
+                _graph.Find(picture.From) is LayerGradeNode grade)
+            {
+                NodeView.Select(grade);
+            }
+            else if (!InNodes)
+            {
+                Tools.Show("Basic");
+            }
+
+            return;
+        }
+
+        UseTool(ToolCatalog.All.Single(entry => entry.TitleKey == "S_Correction"));
+    }
 
     /// <summary>"+ Effekt ...": die Suche der Werkzeugleiste - was darin gewaehlt wird, geht dorthin, wo die Zeile zeigt.</summary>
     private void OnTargetEffect(object sender, RoutedEventArgs e) => ToolBand.OpenSearch();

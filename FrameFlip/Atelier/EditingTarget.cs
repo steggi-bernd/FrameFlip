@@ -49,4 +49,12 @@ public abstract record EditingTarget
     /// den Zweig dieser Ebene, vor ihr Mischen - im Editor gewaehlt dahinter.
     /// </param>
     public sealed record GraphNode(Node Node, bool FromLayerList) : EditingTarget;
+
+    /// <summary>
+    /// Kryptomatte-Objekte, noch ohne Maske (C3b): im Bild gewaehlt, bevor eine Aktion aus ihnen
+    /// eine Maskenebene macht - "Auswahl -> Aktion -> Ergebnis".
+    /// </summary>
+    /// <param name="Set">Die Kryptomatte, an der gewaehlt wurde - ihr Praefix.</param>
+    /// <param name="Picks">Die gewaehlten Objekte.</param>
+    public sealed record CryptoSelection(string Set, IReadOnlyList<CryptoPick> Picks) : EditingTarget;
 }

@@ -1183,6 +1183,8 @@
     <sys:String x:Key="S_TargetLayer">Layer: {0}</sys:String>
     <sys:String x:Key="S_TargetMask">Mask: {0}</sys:String>
     <sys:String x:Key="S_TargetNode">Node: {0}</sys:String>
+    <sys:String x:Key="S_TargetSelection">Selection: {0}</sys:String>
+    <sys:String x:Key="S_TargetSelectionNote">no mask yet – “+ Correction” or “+ Effect …” creates one</sys:String>
     <sys:String x:Key="S_TargetColourOnPicture">Colour tools act on the whole picture</sys:String>
     <sys:String x:Key="S_TargetHint">What you are working on. Click a step to select it.</sys:String>
     <sys:String x:Key="S_TargetAddCorrection">+ Correction</sys:String>
@@ -1209,8 +1211,8 @@
     <sys:String x:Key="S_ToolHand">Hand</sys:String>
     <sys:String x:Key="S_ToolPick">Pick</sys:String>
     <sys:String x:Key="S_ToolMoveShort">Drags the selected layer in the picture. Corners resize, the grip above rotates. Double-click centres it again. The mouse wheel zooms around the pointer.</sys:String>
-    <sys:String x:Key="S_ToolSelectShort">Clicking an object creates a cryptomatte. Its settings live with the layer's mask section.</sys:String>
-    <sys:String x:Key="S_ToolSelectNodesShort">Clicking an object adds it to the selected cryptomatte node – a second click removes it again.</sys:String>
+    <sys:String x:Key="S_ToolSelectShort">A click selects the object, Shift adds, Alt removes. Without a cryptomatte mask this makes a selection – “+ Correction” or “+ Effect …” turns it into a mask layer.</sys:String>
+    <sys:String x:Key="S_ToolSelectNodesShort">A click selects the object, Shift adds, Alt removes – in the selected cryptomatte node or as a selection that “+ Correction” turns into a mask layer.</sys:String>
     <sys:String x:Key="S_ToolCropShort">Drags the crop edges of the selected layer. The faint frame shows what is being cut away. Double-click undoes the crop.</sys:String>
     <sys:String x:Key="S_ToolHandShort">Pans the view. The middle mouse button does the same anywhere, without switching tools.</sys:String>
     <sys:String x:Key="S_ToolPickShort">Reads the value under the pointer - and the distance, if the file carries a depth pass.</sys:String>

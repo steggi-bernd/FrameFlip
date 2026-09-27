@@ -33,6 +33,12 @@ public static class TargetPath
             case EditingTarget.GraphNode { Node: var node } when graph is not null:
                 return (ForNode(node, graph), null);
 
+            case EditingTarget.CryptoSelection { Picks: var picks }:
+            {
+                string names = string.Join(", ", picks.Select(p => p.Name.Length > 0 ? p.Name : "?"));
+                return (new[] { new TargetStep(Strings.T("S_TargetSelection", names), null, true) }, Strings.T("S_TargetSelectionNote"));
+            }
+
             default:
                 return (new[] { new TargetStep(Strings.T("S_TargetPicture"), null, true) }, null);
         }
