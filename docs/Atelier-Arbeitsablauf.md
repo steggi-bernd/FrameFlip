@@ -1,7 +1,7 @@
 # Atelier: Arbeitsablauf und Bearbeitungsziel
 
-Stand 27. September 2026. Analyse zum Nutzerbericht mit den Punkten 1 und 3–20. Noch
-keine Umsetzung, die großen Entscheidungen stehen in Abschnitt 8.
+Stand 27. September 2026. Analyse zum Nutzerbericht mit den Punkten 1 und 3–20. Die
+Entscheidungen und die Reihenfolge stehen in Abschnitt 8; begonnen wird mit Phase A.
 
 Leitlinie des Nutzers: **Intern knotenbasiert, im Alltag „Auswahl → Aktion → Ergebnis“.**
 Wer ein Auto farblich korrigieren will, wählt das Auto und sagt „Farbe korrigieren“.
@@ -268,7 +268,7 @@ entsteht:
 |---|---|---|
 | Gesamtbild | Knoten vor Anzeige und Ausgabe | Einfügen am Ende |
 | Ebene | hinter die Korrektur der Ebene, vor ihr Mischen | `AddIntoLayer` (R3) |
-| mehrere Ebenen | eine gemeinsame Korrektur darüber, auf diese Ebenen begrenzt (Frage 4) | Gruppe, neu |
+| mehrere Ebenen | eine gemeinsame Korrektur darüber, auf diese Ebenen begrenzt (Entscheidung 4) | Gruppe, neu |
 | Auswahl (Kryptomatte) | neue Maskenebene: Korrektur + Kryptomaske + Mischen; die Auswahl wird ihre Maske | `AddNodeMaskLayer`, Objektmaske (R4) |
 | Maske einer Ebene | wie Ebene: Die Maske begrenzt schon | `AddIntoLayer` |
 | Knoten | direkt hinter den Knoten, sein Ausgang läuft weiter | `ShowNodeHub(into:)` |
@@ -279,7 +279,7 @@ entsteht:
 - im Rechtsklickmenü des Bildes (gibt es, bekommt die Zielzeile);
 - als schmale Leiste unter der Zielzeile: Korrigieren, Belichtung, Sättigung, Tonwert,
   Weichzeichnen, Filter …, Maske, Isolieren;
-- am Knoten per Doppelklick (Schnellfeld, Frage 3).
+- am Knoten per Doppelklick (Schnellfeld, Entscheidung 3).
 
 Jede Aktion legt an, verbindet und wählt das Neue als Ziel. Der Farbstreifen zeigt sofort
 dessen Karte. Rückgängig nimmt die ganze Aktion in einem Schritt zurück.
@@ -340,7 +340,7 @@ Skala hat.
 - **Ende:** Über dem Bild steht dann „Isoliert: Maske ‚Auto‘ – Esc beendet“. Esc, ein
   zweiter Klick oder ein Projektwechsel beendet es.
 
-## 8. Reihenfolge und offene Entscheidungen
+## 8. Reihenfolge und Entscheidungen
 
 **Vorschlag:**
 
@@ -350,7 +350,7 @@ Skala hat.
    - Einstellungen: doppelter Satz, Texte durchsehen, Web-Adresse kopierbar (15, 16).
    - Zuletzt geöffnet: Eintrag entfernen (14).
    - Übersicht: abgerundeter Zuschnitt (17).
-   - Pixel Sort: Hinweis bei 16 Bit, Startwerte nach Frage 2 (13).
+   - Pixel Sort: Hinweis bei 16 Bit, Startwerte nach Entscheidung 2 (13).
 2. **B, das Bearbeitungsziel** (S2 zweiter Teil): Charakterisierung, Umbau ohne
    Produktänderung, Plan.
 3. **C, auf B:**
@@ -364,16 +364,15 @@ Skala hat.
 4. **W2c–W2f** danach. C7 steht vor W2c, weil die Clipping-Anzeige denselben Regler
    braucht.
 
-**Offene Entscheidungen:**
+**Entschieden am 27. September, alle vier wie empfohlen:**
 
-1. Reihenfolge: erst A, dann B, dann C? Oder C1–C3 vorziehen?
-2. Effekte beim Hinzufügen: sichtbare Startwerte (Pixel Sort mit offenem Fenster,
-   Filmkorn mit etwas Korn …) oder neutral mit Hinweis „noch ohne Wirkung – Regler
-   aufziehen“?
-3. Knoteneinstellungen: Eigenschaften im Dock folgen dem Ziel, dazu ein Schnellfeld am
-   Knoten per Doppelklick? Oder nur eines von beiden?
-4. Filter auf mehrere Ebenen: eine gemeinsame Korrektur darüber, oder jede Ebene ihre
-   eigene Kopie?
+1. **Reihenfolge:** erst A, dann B, dann C, danach W2c–W2f.
+2. **Effekte beim Hinzufügen:** Effekte bekommen sichtbare Startwerte (Pixel Sort mit
+   offenem Fenster, Filmkorn mit etwas Korn …). Korrekturen bleiben neutral.
+3. **Knoteneinstellungen:** beides. Die Eigenschaften im Dock folgen dem Ziel, dazu kommt
+   ein Schnellfeld am Knoten per Doppelklick.
+4. **Filter auf mehrere Ebenen:** eine gemeinsame Korrektur darüber, auf diese Ebenen
+   begrenzt.
 
 ## 9. Testmaterial (Punkt 18)
 
