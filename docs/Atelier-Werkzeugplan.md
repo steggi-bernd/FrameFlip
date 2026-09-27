@@ -566,6 +566,33 @@ In sechs Schnitten, nach Nutzen und Abhängigkeit:
   - Zeichnen in allen Größen.
   - Die UI-Reihe zeichnet die Karte mit synthetischer Verteilung.
 
+**W2b (`feature/tonwert-auto`):**
+
+- **Auto** in der Karte „Tonwert“, drei Knöpfe wie in Photoshop (`LevelsAuto`):
+  - „Auto“: Schwarz und Weiß je Kanal, ein Promille abgeschnitten, gemeinsam neutral.
+  - „Kontrast“: gemeinsam über alle Kanäle, die Kanäle neutral.
+  - „Farbe“: je Kanal gestreckt, dazu das Gamma jedes Kanals so, dass die Mittelwerte gleich
+    liegen.
+- **Pipetten** für Schwarz, Grau und Weiß: Ein Klick ins Bild setzt den Punkt je Kanal. Grau
+  stellt die Mitten jedes Kanals so, dass der Ton grau wird. Die gemeinsame Einstellung bleibt,
+  die Kanäle wirken nach ihr. Nach dem Klick geht die Maus zu ihrem vorigen Werkzeug zurück.
+- **Gemessen wird, was beim Tonwert ankommt:**
+  - Im Stapel läuft derselbe Weg wie beim Histogramm, nur mit den Anzeigewerkzeugen vor dem
+    Tonwert. Die Messung und diese Stichprobe teilen sich dafür eine Rechnung je Punkt
+    (`DisplayPipeline` in `FloatFrameProcessor`).
+  - Im Knotenmodus wird der Graph bis zum Kabel in den Tonwertknoten gerechnet, mit eigenem
+    Vorrat und ohne Zwischenspeicher. Die laufende Anzeige merkt davon nichts.
+  - Steht der Tonwert in der Korrektur einer Ebene statt im Stapel des ganzen Bildes, wird am
+    fertigen Bild gemessen.
+- **Proben:**
+  - Rechnung: Grenzen je Kanal, gemeinsamer Kontrast, gleiche Mittel nach „Farbe“, ein
+    einziger Ton bleibt, Pipetten Schwarz, Weiß und Grau.
+  - Auf der Seite: Auto trifft die Grenzen der Kanäle, ein zweites Auto liefert dasselbe, und
+    eine Kurve hinter dem Tonwert ändert nichts.
+  - Die Pipette setzt den Punkt und gibt die Maus zurück.
+  - Im Knotenmodus misst Auto am Eingang des Knotens.
+  - Gegenprobe: Gemessen am fertigen Bild schlagen genau diese Proben fehl.
+
 ## 5. KI-Werkzeuge: Last, Größe, Lizenz
 
 **Laufzeit.** ONNX Runtime (MIT-Lizenz) mit DirectML auf jeder Grafikkarte unter
