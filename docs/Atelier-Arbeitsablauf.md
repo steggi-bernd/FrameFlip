@@ -540,3 +540,17 @@ steht dabei standardmäßig auf „PNG · 16 Bit“.
     Ausschalten prüft.
 - **Echte Instanz:** Debug-Build mit eigener Konfiguration und synthetischer Folge. Das
   Atelier öffnet mit Exportleiste, ohne Ausnahme.
+
+### B: Das Bearbeitungsziel (`refactor/studio-s2-target`)
+
+Umgesetzt wie in Abschnitt 5 entworfen, als Refactoring ohne Produktänderung. Einzelheiten
+und Abnahme stehen im [Refactoring-Studio](Refactoring-Studio.md), S2 zweiter Teil.
+
+- `EditingTarget` in der Sitzung, drei Fälle: Bild, Stapelebene, Knoten. Die Masken- und
+  Auswahlziele aus Abschnitt 5 kommen mit den Schnitten, die sie brauchen (C2, C3).
+- Die Wahl in Ebenenstreifen, Knoteneditor und Ebenenliste setzt das Ziel. Farbstreifen,
+  Pinsel, Klick ins Bild, Objektmaske, Werkzeugleiste und Hub lesen es.
+- Ein neues Rezept setzt das Ziel aufs Bild zurück. Damit gibt es für die Rückwege aus 4.1
+  eine Stelle statt vieler.
+- Im Stapel lesen Rahmen und Pinsel noch die Auswahl des Ebenenstreifens. Sie ziehen mit C
+  um.

@@ -245,6 +245,50 @@ Abnahme: **4.578 Zusicherungen** in `FrameFlip.Tests` (Release). Offen für den 
 Teil: Bild und Ebene als ausdrückliche Bearbeitungsziele, unabhängige Export-Snapshots
 aus der Sitzung, die Abnahmefälle oben zu allen sechs Werkzeuglisten und den Anstrichen.
 
+### Stand S2, zweiter Teil: das Bearbeitungsziel (27. September 2026)
+
+Auf `refactor/studio-s2-target`, auf `feature/atelier` (`913905b`). Anlass und Entwurf:
+[Arbeitsablauf im Atelier](Atelier-Arbeitsablauf.md), Abschnitt 5 und Phase B.
+
+- **Neu:** `FrameFlip/Atelier/EditingTarget`, UI-frei, mit drei Fällen:
+  - das fertige Bild;
+  - eine Stapelebene, dazu ob die Farbwerkzeuge ihr gelten;
+  - ein Knoten, dazu ob er in der Ebenenliste als Ebene gewählt wurde.
+- **Die Sitzung:** `AtelierEditingSession` hält das Ziel neben dem Rezept (`Target`,
+  `Focus`, `TargetChanged`). `Switch` setzt es aufs Bild zurück. Das Ziel ist kein Teil
+  des Rezepts, es macht nichts ungespeichert.
+- **Objekt statt Kennung:** Ebene und Knoten stehen als Objekt im Ziel. Knotenkennungen
+  wiederholen sich in jedem Graphen, ein Ziel nach Kennung trüge über einen Graphwechsel
+  auf einen anderen Knoten.
+- **Die Seite:** `_editing` und `_layerFocus` sind keine eigenen Felder mehr.
+  - Das Ziel setzen `Bind`, die Wahl im Knoteneditor und die Ebenenliste.
+  - Das Ziel lesen: der Farbstreifen im Stapel, der Pinsel (`PaintTarget`), der Klick ins
+    Bild, der Chip „Objektmaske“, Werkzeugleiste und Hub sowie die Einfügestellen für
+    Ebenen.
+  - Die Markierung in der Ebenenliste zeigt weiter die Wahl im Editor.
+- **Beobachtet, nicht geändert:** Tauscht der Editor seinen Graphen (Rückgängig,
+  Neuaufbau) und gibt es den gewählten Knoten darin nicht mehr, wählt er still ab und
+  meldet es nicht. Die Seite las die Wahl bisher direkt und merkte das nicht. Das Ziel
+  hätte auf den verschwundenen Knoten gezeigt. `ShowGraph` gleicht es deshalb nach dem
+  Tausch an. `NodeEditInvariants` hat den Fall gefunden, die neue Charakterisierung nicht.
+- **Charakterisierung vorher** (`EditingTargetInvariants`, 17 Prüfungen): wohin Regler,
+  Pinselstrich und Effekt aus der Werkzeugleiste gehen.
+  - Im Stapel: am Bild, an einer im Farbstreifen gewählten Ebene, an einer
+    Einstellungsebene; erster und zweiter Strich.
+  - Im Knotenmodus: Regler am Knoten, Effekt in die in der Liste gewählte Ebene oder hinter
+    den im Editor gewählten Knoten, Pinsel auf die Maske des gewählten Mischens.
+  - Nach einem Projektwechsel wieder das Bild.
+  - Sie lief vor und nach dem Umbau unverändert grün.
+  - `AtelierEditingSessionInvariants` prüft das Ziel ohne Fenster.
+- **Lokal:** die Nachbargruppen mit 1.070 Zusicherungen grün.
+
+**Offen:**
+- Im Stapel lesen Rahmen und Pinsel weiter `Layers.Selection`. Das Umsortieren per Ziehen
+  wählt dort, ohne `Bind` zu rufen. Diese Leser ziehen mit Phase C um, wenn sie ohnehin
+  angefasst werden.
+- Unabhängige Export-Snapshots aus der Sitzung und die übrigen Abnahmefälle von S2 bleiben
+  offen.
+
 ## S3: Exportauftrag und Frame-Kontext vereinheitlichen
 
 **Nach S2, auf dem gesicherten S0-Ausgabeverhalten.** `GradeBatch` und
