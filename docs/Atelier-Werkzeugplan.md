@@ -426,6 +426,32 @@ Der Rahmen nach Entscheidung 9, in vier Schnitten:
   zeichnet die Liste, prüft „fx“ nur an der Ebene mit eigenem Effekt und „⬢“ an der Ebene mit
   Kryptomatte.
 
+**Feinschliff nach dem ersten Test (`feature/rahmen-feinschliff`):**
+
+- **Maximiert** ragte das Fenster um den Anfassrahmen über den Bildschirm hinaus. Auf einem
+  zweiten Bildschirm links vom ersten greift die Korrektur in WM_GETMINMAXINFO nicht. Die
+  Reiter klebten deshalb oben am Rand, die Statuszeile unten. Jetzt rückt der Inhalt um das
+  gemessene Stück ein (`ShellChrome.Overhang`), 14 Punkte je Seite bei 175 %.
+- **Werkzeugleiste wie im Entwurf:**
+  - Die Kategorien stehen nur als Name da, die gewählte ist gerahmt.
+  - Die Werkzeuge liegen in einem eigenen Balken.
+  - Original, Zoom und Speichern stehen oben rechts neben der Suche.
+- **Folge oder Bild:** Der Umschalter steht bei jedem offenen Bild an seinem Platz. Bei einem
+  Bild ohne Folge ist „ganze Folge“ aus, mit dem Grund im Hinweis. Das ändert Entscheidung 7
+  auf Wunsch des Nutzers: Vorher fehlte der Umschalter und wurde gesucht.
+- **Beschreibungen** stehen nicht mehr in der Einstellungsleiste, sondern als Hinweis am
+  Werkzeugnamen. Die Hinweise haben jetzt den Stil der Oberfläche: dunkel, gerundet, lange
+  Sätze brechen um.
+- **fx an jeder Ebene** mit Mischen:
+  - Ohne eigene Effekte ist es gedämpft, ein Klick öffnet die Effekte für diese Ebene.
+  - Mit eigenen Effekten ist es hell und zeigt ihre Zahl, ein Klick zeigt den obersten.
+- **Atelier:** weniger Rand um die Seite, vor allem unter der Statuszeile.
+
+**Offen, zur Entscheidung:**
+
+- Die Einstellungsleiste nur mit Zeichen, Pinselform im Auswahlfeld.
+- Werkzeugfenster, die sich lösen und woanders andocken lassen.
+
 Danach R4, dann laut Reihenfolge W2 Tonwert.
 
 ## 5. KI-Werkzeuge: Last, Größe, Lizenz
