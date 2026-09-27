@@ -114,6 +114,7 @@ static int RunAll()
     CryptoFeedbackInvariants.Run();
     CryptoSelectionInvariants.Run();
     PipetteInvariants.Run();
+    PropertiesFollowInvariants.Run();
     AtelierProjectInvariants.Run();
     AtelierProjectPageInvariants.Run();
     SwitchLeftoverInvariants.Run();

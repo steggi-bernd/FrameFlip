@@ -266,7 +266,11 @@ public partial class AtelierPage
 
     private void OnLayerChosen(Node node)
     {
-        NodeView.Select(node);
+        // Gewaehlt wird in der Liste - das Eigenschaftenfeld soll sie nicht verdecken (C5a).
+        _choosingInList = true;
+
+        try { NodeView.Select(node); }
+        finally { _choosingInList = false; }
 
         // In der Liste gewaehlt: Was jetzt aus der Werkzeugleiste kommt, gilt dieser Ebene.
         // Erst nach dem Waehlen - das Waehlen selbst vergisst die vorige. Und nur, wenn der

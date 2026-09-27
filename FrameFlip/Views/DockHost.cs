@@ -228,6 +228,19 @@ public sealed class DockHost : Border
         return true;
     }
 
+    /// <summary>
+    /// Gibt einem Feld einen anderen Namen auf dem Reiter - das Farbfeld heisst im Knotenmodus
+    /// "Eigenschaften" (C5a). Nur seine Gruppe wird neu gebaut.
+    /// </summary>
+    public void Retitle(string panel, string titleKey)
+    {
+        if (PanelOf(panel) is not { } element || GetTitleKey(element) == titleKey) return;
+
+        SetTitleKey(element, titleKey);
+
+        if (Layout.Find(panel) is { } at) RebuildGroup(at.Zone, at.Group);
+    }
+
     /// <summary>Eine kleine Zahl neben dem Namen auf dem Reiter.</summary>
     public void SetBadge(string panel, string text)
     {
