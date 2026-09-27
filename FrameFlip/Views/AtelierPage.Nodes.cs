@@ -338,6 +338,10 @@ public partial class AtelierPage
     {
         ToolBand.InNodes = InNodes;
 
+        // Im Knotenmodus zeigt das Farbfeld die Einstellungen des gewaehlten Knotens - einer
+        // Datei, einer Mischung, eines Effekts. "Farbe" sagte da das Falsche (C5a).
+        Dock.Retitle(PropertiesPanelId, InNodes ? "S_SectionProperties" : "S_SectionColour");
+
         bool nodesTool = _tool == AtelierTool.Nodes;
 
         NodeView.Visibility = nodesTool && InNodes ? Visibility.Visible : Visibility.Collapsed;

@@ -712,3 +712,29 @@ Punkt 4.
   Farbräder (Lift, Gamma, Gain und die Tönung einer Ebene). Für sie ist offen, was ein Klick
   heißen soll: die Farbe übernehmen (Tönung) oder sie neutralisieren (Lift/Gamma/Gain, wie
   der Weißabgleich). Das wird vor dem Bauen nachgefragt.
+
+### C5a: Eigenschaften folgen dem Ziel (`feature/eigenschaften-ziel`)
+
+Punkt 8: „Node auswählen → Einstellungen sofort sichtbar.“
+
+- **Name:** Im Knotenmodus heißt das Farbfeld „Eigenschaften“. Es zeigt dort die
+  Einstellungen jedes gewählten Knotens, auch von Datei, Mischen oder Maske. „Farbe“ sagte
+  da das Falsche. Im Stapel heißt es weiter „Farbe“.
+- **Nach vorn und auf:** Wird ein Knoten mit Einstellungen gewählt, kommt das Feld in
+  seiner Gruppe nach vorn. War die Gruppe zugeklappt, klappt sie auf.
+- **Zurück:** Ist danach nichts mehr mit Einstellungen gewählt, steht das Feld wieder wie
+  vorher: den vorigen Reiter vorn, zugeklappt, wenn es zugeklappt war.
+- **Der Nutzer geht vor:** Hat man die Anordnung zwischendurch selbst angefasst (Reiter,
+  Klappen, Ziehen), klappt nichts mehr von allein zurück.
+- **Die Liste der Ebenen bleibt vorn:** Wer in ihr wählt und sie mit dem Feld eine Gruppe
+  teilt, wie in der Grundanordnung, dem wird sie nicht verdeckt. Liegen die Ebenen in einer
+  eigenen Gruppe, kommen die Eigenschaften daneben nach vorn.
+- **Mitten im Klick:** Auf- und Zuklappen baut die ganze Fläche neu und hängt dabei auch
+  den Graphen aus. Deshalb wartet es, bis die Maus losgelassen ist. Sonst ließe sich ein
+  gerade angeklickter Knoten nicht mehr ziehen. Ein bloßer Reiterwechsel geschieht sofort.
+- **Probe** (`PropertiesFollowInvariants`, 11 Zusicherungen): Name in Stapel und Knoten,
+  nach vorn und zurück, auf- und wieder zugeklappt, eigenes Umstellen hat Vorrang, Wahl aus
+  der Liste in geteilter und in eigener Gruppe. Die Nachbargruppen (Andocken, Knoten, Ziel,
+  Seite, Objektmaske, Zielzeile, Aktionen, Auswahl, Pipette) liefen mit 379 Zusicherungen grün.
+  Das Warten auf das Loslassen der Maus prüft die Probe nicht, denn sie kann keine gedrückte
+  Maus vortäuschen.
