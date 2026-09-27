@@ -172,9 +172,9 @@ public static class ToolBandInvariants
             Check.That(band.Active == "brush" && Shown("BrushTipRow") && Shown("BrushShapeRow") && !Shown("BrushSquishRow") && !Shown("BrushStampRow"),
                        "Pinsel: die Spitze ist wieder da - das Karo nur eckig, der Stempel nur als Stempel");
             Check.That(new[] { "BrushSizeSlider", "BrushHardnessSlider", "BrushFlowSlider", "BrushOpacitySlider",
-                               "BrushSpacingSlider", "BrushSquareToggle", "BrushAngleSlider", "BrushAspectSlider",
+                               "BrushSpacingSlider", "BrushShapeBox", "BrushAngleSlider", "BrushAspectSlider",
                                "BrushFollowToggle", "BrushPressureBox" }.All(Seen),
-                       "Pinsel: Groesse, Haerte, Staerke, Deckkraft, Abstand, Spitze und Druck stehen wirklich da",
+                       "Pinsel: Groesse, Haerte, Staerke, Deckkraft, Abstand, die Form im Auswahlfeld und Druck stehen wirklich da",
                        string.Join(", ", new[] { "BrushSizeSlider", "BrushHardnessSlider", "BrushFlowSlider", "BrushSpacingSlider",
                                                  "BrushAngleSlider", "BrushPressureBox" }.Where(n => !Seen(n))));
 

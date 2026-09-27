@@ -25,6 +25,13 @@ public partial class PropertiesPanel : UserControl
     public PropertiesPanel()
     {
         InitializeComponent();
+
+        BrushShapeBox.ItemsSource = new[]
+        {
+            new IconChoice("round", Strings.T("S_BrushRound")),
+            new IconChoice("square", Strings.T("S_BrushSquare")),
+        };
+
         ShowBrushGroups();
     }
 
@@ -217,8 +224,23 @@ public partial class PropertiesPanel : UserControl
         Show(BrushSquishRow, BrushShape == BrushShape.Square);
         Show(BrushEdgeRow, BrushEdge);
 
-        // Rund ist, was nicht eckig ist - der Chip zeigt es nur an.
+        // Rund ist, was nicht eckig ist - der Schalter und das Auswahlfeld zeigen es nur an.
         BrushRoundToggle.IsChecked = BrushSquareToggle.IsChecked != true;
+
+        _showingShape = true;
+        BrushShapeBox.SelectedIndex = BrushSquareToggle.IsChecked == true ? 1 : 0;
+        _showingShape = false;
+    }
+
+    private bool _showingShape;
+
+    /// <summary>Rund oder eckig aus dem Auswahlfeld - es stellt nur die Schalter, die den Stand halten.</summary>
+    private void OnBrushShapeChosen(object sender, SelectionChangedEventArgs e)
+    {
+        if (_showingShape || BrushRoundToggle is null || BrushSquareToggle is null) return;
+
+        if (BrushShapeBox.SelectedIndex == 1) BrushSquareToggle.IsChecked = true;
+        else BrushRoundToggle.IsChecked = true;
     }
 
     /// <summary>Der Strich bleibt auf der Flaeche, auf der er ansetzt - aus Tiefe und Normale.</summary>
