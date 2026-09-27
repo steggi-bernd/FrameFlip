@@ -69,7 +69,12 @@ internal static partial class Program
             {
                 double y(FrameworkElement e) => e.TranslatePoint(new Point(0, e.ActualHeight / 2), host).Y;
                 Check(Math.Abs(y(size) - y(hardness)) < 1, $"{name}: Groesse und Haerte stehen in einer Zeile - die Gruppe bricht nicht");
-                if (width >= 1500) Check(height < 100, $"{name}: breit hoechstens zwei Zeilen ({height})");
+                if (width >= 1500) Check(height < 60, $"{name}: breit eine Zeile - nur Zeichen, Regler und Werte ({height})");
+
+                // Das Auswahlfeld der Form zeigt, was gilt - bei jeder Leiste, nicht nur bei der ersten.
+                var shape = (ComboBox)panel.FindName("BrushShapeBox");
+                Check(shape.SelectedItem is IconChoice { Icon: "round" } && shape.SelectionBoxItem is IconChoice,
+                      $"{name}: die Form steht im Auswahlfeld - rund");
             }
             else
             {

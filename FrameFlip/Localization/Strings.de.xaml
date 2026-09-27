@@ -1257,6 +1257,7 @@
     <sys:String x:Key="S_BrushGroupShape">FORM</sys:String>
     <sys:String x:Key="S_BrushGroupBinding">BINDUNG</sys:String>
     <sys:String x:Key="S_BrushGroupPressure">DRUCK</sys:String>
+    <sys:String x:Key="S_BrushShapeHint">Die Form der Spitze – rund oder eckig. Der Stempel ist ein eigenes Werkzeug in der Zeile „Malen“.</sys:String>
     <sys:String x:Key="S_BrushRound">Rund</sys:String>
     <sys:String x:Key="S_BrushRoundHint">Runde Spitze – weich in Kurven und auf Flächen.</sys:String>
     <sys:String x:Key="S_BrushSquare">Eckig</sys:String>

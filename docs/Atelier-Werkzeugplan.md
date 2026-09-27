@@ -51,6 +51,17 @@ Getroffen am 26. September 2026:
      wird etwas kleiner, damit rechts Platz für neue Knöpfe ist. Dazu kommen unten
      „+ Ebene“, „Einstellung“ und „Objektmaske“.
 
+10. **Die Einstellungsleiste zeigt nur Zeichen, und die Werkzeugeinstellungen werden ein
+    Andockfeld** (entschieden am 27. September 2026, nach dem ersten Test des Rahmens: Der
+    Balken über dem Bild war überladen):
+    - Regler, Chips und Knöpfe stehen als Zeichen da, ihr Name im Hinweis. Die Werte hinter
+      den Reglern bleiben sichtbar. Die Form der Spitze (rund oder eckig) ist ein Auswahlfeld.
+      Die Gruppennamen entfallen, die feinen Striche zwischen den Gruppen bleiben.
+    - Die Einstellungen werden ein Feld der Andockfläche wie Ebenen und Farbe: in der
+      Grundanordnung oben als Leiste, per Ziehen links, rechts oder unten eingerastet und dort
+      senkrecht angeordnet. Freie, schwebende Fenster gibt es nicht; die Begründung steht in
+      `DockHost`.
+
 ## 2. Reihenfolge
 
 Jede Phase ist ein eigener Zweig mit eigener PR. Zuerst kommen die Pinsel, weil sie im
@@ -447,12 +458,20 @@ Der Rahmen nach Entscheidung 9, in vier Schnitten:
   - Mit eigenen Effekten ist es hell und zeigt ihre Zahl, ein Klick zeigt den obersten.
 - **Atelier:** weniger Rand um die Seite, vor allem unter der Statuszeile.
 
-**Offen, zur Entscheidung:**
+**Symbole (`feature/leiste-symbole`), erster Teil von Entscheidung 10:**
 
-- Die Einstellungsleiste nur mit Zeichen, Pinselform im Auswahlfeld.
-- Werkzeugfenster, die sich lösen und woanders andocken lassen.
+- Größe, Härte, Stärke, Deckkraft, Abstand, Winkel, Streckung, Karo, Toleranz, Zufall,
+  Streuung und Druck haben Zeichen statt Namen. Der Name steht im Hinweis an Zeichen und
+  Regler.
+- Die Chips „folgt dem Strich“, Objekt und Fläche sind nur Zeichen. Dasselbe gilt für
+  „Spitze laden“ und die Knöpfe für Maske und Maskenverlauf.
+- Rund oder eckig ist ein Auswahlfeld. Die Einträge kommen als Daten (`IconChoice`): Ein
+  Element als Eintrag kann nur an einer Stelle stehen, und das Feld blieb bei der ersten
+  Leiste leer.
+- Breit passt die Leiste des Pinsels jetzt in eine Zeile, vorher waren es zwei.
 
-Danach R4, dann laut Reihenfolge W2 Tonwert.
+Danach die Einstellungen als Andockfeld (zweiter Teil von Entscheidung 10), dann R4, dann
+laut Reihenfolge W2 Tonwert.
 
 ## 5. KI-Werkzeuge: Last, Größe, Lizenz
 
