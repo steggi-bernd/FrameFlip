@@ -117,7 +117,6 @@ public static class RecentSequences
         }
     }
 
-    /// <summary>Einen Eintrag entfernen - etwa, weil der Ordner nicht mehr da ist.</summary>
     /// <summary>
     /// Die ganze Merkliste vergessen.
     ///
@@ -139,6 +138,10 @@ public static class RecentSequences
         }
     }
 
+    /// <summary>
+    /// Einen Eintrag entfernen - etwa, weil der Ordner nicht mehr da ist. Wie beim Leeren bleibt
+    /// der Ordner selbst unberuehrt.
+    /// </summary>
     public static void Forget(string folder)
     {
         lock (Gate)

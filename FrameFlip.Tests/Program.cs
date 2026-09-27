@@ -172,6 +172,7 @@ static int RunAll()
     ProjectNavigationInvariants.Run();
     ProjectNavigationStateInvariants.Run();
     ProjectScanPageInvariants.Run();
+    RecentForgetInvariants.Run();
     ProjectScanServiceInvariants.Run();
     ProjectScanConcurrencyInvariants.Run();
     ProjectThumbnailPageInvariants.Run();
