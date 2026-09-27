@@ -478,3 +478,27 @@ sollte gehen können, ohne die ganze Liste zu leeren.
 gelöschtem Ordner. Ein Eintrag geht, die anderen bleiben in ihrer Reihenfolge. Der Ordner
 ist unberührt, die Seite zeigt ihn nicht mehr, und der verschwundene lässt sich ebenso
 austragen.
+
+### A4: Ecken der Übersicht-Vorschau (`fix/vorschau-ecken`)
+
+Punkt 17. Der Rahmen der Bühne nimmt das Seitenverhältnis der Folge an, das Bild füllt ihn
+also bis in die Ecken. `ClipToBounds` schneidet in WPF aber rechteckig, deshalb standen die
+Ecken des Bildes über die runden des Rahmens.
+
+- **Behebung:** Ein kleiner Baustein `RoundedClip` schneidet den Inhalt auf den inneren
+  Radius (Eckradius 10 weniger Rand 1) und zieht den Zuschnitt bei jeder Größenänderung
+  nach. Er liegt in den Koordinaten des Inhalts, gilt also für Quer- und Hochformat und
+  skaliert mit der `Viewbox` darüber. Eine Zoomstufe hat die Übersicht nicht, das Bild wird
+  immer eingepasst.
+- **Probe** (`RoundedClipInvariants`), am Pixel:
+  - Der Baustein allein in drei Formaten, nach Größenänderungen: in den Ecken der Grund,
+    in der Mitte und an den Rändern das Bild.
+  - Die echte Bühne im Hauptfenster, quer und hoch, mit einem weißen Bild im Format des
+    Rahmens. Gezeichnet wird der Rahmen allein über einen `VisualBrush` in seiner eigenen
+    Größe, so dass die `Viewbox` darüber nicht mitspielt.
+  - Gegenprobe ohne Zuschnitt: alle vier Bühnenprüfungen rot. Frühere Fassungen der Probe
+    blieben dabei grün oder hingen am Bildschirm. Ein quadratisches Probebild erreichte die
+    Ecken gar nicht. Auf dem kleinen Bildschirm der CI verkleinerte die `Viewbox` die
+    Hochformat-Bühne auf ein Viertel, und die Ecke verschmolz mit der Randlinie. Beides ist
+    korrigiert.
+- **Echte Instanz:** Debug-Build mit eigener Konfiguration startet ohne Ausnahme.
