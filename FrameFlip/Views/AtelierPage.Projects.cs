@@ -139,6 +139,13 @@ public partial class AtelierPage
         _redo.Clear();
         _valueEditOpen = false;
 
+        // Die Vorschauen der Knoten ebenso. Knoten heissen in jedem Graphen n1, n2, ... - ein
+        // Knoten des neuen Projekts zeigte sonst die Vorschau seines Namensvetters im alten, bis
+        // er selbst gerechnet wird, und ein Zweig, der nie gerechnet wird, behielte sie.
+        _previews.Clear();
+        _previewImages.Clear();
+        _previewsShown = -1;
+
         if (_recipe.Nodes is { Length: > 0 } json && NodeGraph.Load(json) is { } graph && graph.Problems().Count == 0)
         {
             _graph = graph;
