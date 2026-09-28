@@ -33,6 +33,7 @@ public static class SwitchLeftoverInvariants
         ObjectLimitReadsTheOpenFile();
         LevelsPickEndsWithTheImage();
         PreviewsBelongToTheProject();
+        ViewerEndsWithTheProject();
     }
 
     /// <summary>Ein Strich ueber die echten Tasten des Rahmens, nach einem Projektwechsel.</summary>
@@ -67,6 +68,11 @@ public static class SwitchLeftoverInvariants
             Show(page, second);
             Check.That(!page.InNodes, "Vorbereitung: das neue Bild rechnet im Stapel");
 
+            // Die alte Maske vor dem neuen Strich festhalten. Gegen null zu pruefen hiess, den
+            // weichen Rand des ersten Strichs mitzumessen: Wie weit der reicht, haengt davon ab,
+            // wie gross der Pinsel beim ersten Strich in Bildpunkten war - und das vom Layout.
+            var oldBefore = nodeMask?.Mask.PaintFor(1)?.Cover();
+
             Stroke(frame, 180, 120, 210, 130);
             Pump(() => false, 0.3);
 
@@ -74,7 +80,8 @@ public static class SwitchLeftoverInvariants
             Check.That(paint.Count == 1 && paint[0].At(195, 125) > 0.5f,
                        "der Strich im neuen Bild landet in einer Maskenebene des neuen Projekts", $"{paint.Count} gemalte Masken");
             Check.That(paint.All(p => p.At(40, 32) < 0.01f), "die Maske des alten Projekts ist nicht mitgekommen");
-            Check.That(nodeMask?.Mask.PaintFor(1) is not { } old || old.At(195, 125) < 0.01f,
+            Check.That(nodeMask?.Mask.PaintFor(1)?.Cover() is not { } oldAfter ||
+                       (oldBefore is not null && oldAfter.AsSpan().SequenceEqual(oldBefore)),
                        "und der neue Strich ist nicht in die Maske des alten Projekts gegangen");
 
             // Dasselbe aus dem Stapel heraus: eine gemalte Maskenebene, dann ein neues Bild.
@@ -170,6 +177,40 @@ public static class SwitchLeftoverInvariants
             var left = ids.Where(id => previews.For(id) is not null).ToList();
             Check.That(left.Count == 0, "nach dem Wechsel steht keine Vorschau des alten Projekts mehr unter seinen Knotennamen",
                        string.Join(", ", left));
+        });
+    }
+
+    private static void ViewerEndsWithTheProject()
+    {
+        Check.Group("Wechsel: der Betrachter und sein Schild enden mit dem Projekt");
+
+        WithPage((page, root) =>
+        {
+            string first = Png(root, "eins", "render_0001.png");
+            string second = Png(root, "zwei", "shot_0001.png");
+            string third = Png(root, "drei", "take_0001.png");
+            var badge = (Border)page.FindName("ViewerBadge");
+
+            Show(page, first);
+            page.ConvertToNodes();
+            Pump(() => page.InNodes);
+            Show(page, second);
+            page.ConvertToNodes();
+            Pump(() => page.InNodes);
+
+            var file = page.Graph!.Nodes.OfType<RenderNode>().First();
+            page.SetViewer((file.Id, file.Outputs[0].Name));
+            Check.That(badge.Visibility == Visibility.Visible, "Vorbereitung: der Betrachter zeigt einen Knoten, das Schild steht da");
+
+            Show(page, first);
+            Check.That(page.InNodes && badge.Visibility != Visibility.Visible,
+                       "ein anderes Projekt mit Knoten: kein Schild eines Betrachters, den es nicht mehr gibt");
+
+            file = page.Graph!.Nodes.OfType<RenderNode>().First();
+            page.SetViewer((file.Id, file.Outputs[0].Name));
+            Show(page, third);
+            Check.That(!page.InNodes && badge.Visibility != Visibility.Visible,
+                       "ein Projekt ohne Knoten: ebenso");
         });
     }
 

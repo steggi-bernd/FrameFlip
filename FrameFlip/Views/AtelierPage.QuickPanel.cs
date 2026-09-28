@@ -59,6 +59,15 @@ public partial class AtelierPage
             menu.Item("⬢", Strings.T("S_QuickObjectMask"), () => StartObjectMask(mix));
         }
 
+        // Isolieren (C6): die Ebene dieses Mischens allein - oder die Ebene, deren Maske dieser Knoten ist.
+        var layers = NodeLayerList.Of(_graph);
+
+        if (layers.FirstOrDefault(l => ReferenceEquals(l.Mix, node)) is { } own)
+            menu.Item("◧", Strings.T("S_QuickIsolateLayer"), () => Isolate(own, mask: false), "Alt+Klick aufs Auge");
+
+        if (layers.FirstOrDefault(l => l.Mix is { } m && _graph.Into(m.Id, "Faktor")?.From == node.Id) is { } masked)
+            menu.Item("◧", Strings.T("S_QuickIsolateMask"), () => Isolate(masked, mask: true), "Alt+Klick auf die Maske");
+
         if (node.Outputs.Count > 0) menu.Item("◉", Strings.T("S_HubViewer"), () => OnViewWanted(node), "Strg+Umschalt+Klick");
 
         // Die Ausgabe hat nichts davon - dann gar kein Feld statt eines leeren.

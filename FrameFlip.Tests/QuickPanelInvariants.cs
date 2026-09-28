@@ -137,6 +137,7 @@ public static class QuickPanelInvariants
             // Ohne Kryptomatte in der Datei gibt es kein "Objekt als Maske".
             page.ShowQuickPanel(ownedMix);
             Check.That(!page.QuickPanel!.Items.Contains(T("S_QuickObjectMask")), "ohne Kryptomatte in der Datei: kein \"Objekt als Maske\"");
+            page.QuickPanel.Close();
 
             // Die Ausgabe: nichts hinzuzufuegen, kein Betrachter.
             var output = graph.Nodes.OfType<OutputNode>().Single();

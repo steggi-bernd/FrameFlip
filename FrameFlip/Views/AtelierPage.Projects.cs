@@ -196,5 +196,8 @@ public partial class AtelierPage
         ShowNodeMode();
         ShowLayerCount();
         ShowPlacement();
+
+        // Ohne Graph kein Betrachter - und kein Schild, das noch einen nennt.
+        ShowViewer();
     }
 }

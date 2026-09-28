@@ -1098,7 +1098,7 @@
     <sys:String x:Key="S_SocketWert">Value</sys:String>
     <sys:String x:Key="S_NodeLayersHint">Each layer is a “Mix” in the graph. A click selects the node and brings it into view, the dot on the left mutes the layer. Rows can be dragged – the layer takes its branch along.</sys:String>
     <sys:String x:Key="S_NodeLayersEmpty">Nothing is mixed in the graph – there are no layers.</sys:String>
-    <sys:String x:Key="S_NodeLayerMute">Mute the layer or show it again</sys:String>
+    <sys:String x:Key="S_NodeLayerMute">Mute the layer or show it again – Alt+click: show it alone</sys:String>
     <sys:String x:Key="S_NodeLayerNothing">(nothing plugged in)</sys:String>
     <sys:String x:Key="S_NodeLayerClipped">clipped</sys:String>
     <sys:String x:Key="S_NodeLayerGroup">Group</sys:String>
@@ -1106,7 +1106,7 @@
     <sys:String x:Key="S_NodeLayersMissing">The stack has hidden layers that are missing here: {0}. The graph was converted before they came along – they can be inserted muted, without changing the picture or your nodes.</sys:String>
     <sys:String x:Key="S_NodeLayersMissingRebuild">The stack has hidden layers that are missing here: {0}. The graph has changed so much that they can no longer be inserted – only a rebuild from the stack brings them (Ctrl+Z brings the current graph back).</sys:String>
     <sys:String x:Key="S_NodeLayersAdopt">Bring into the graph</sys:String>
-    <sys:String x:Key="S_NodeLayerMask">The layer's mask</sys:String>
+    <sys:String x:Key="S_NodeLayerMask">The layer's mask – Alt+click: show it alone</sys:String>
     <sys:String x:Key="S_NodeLayerHidden">hidden</sys:String>
     <sys:String x:Key="S_NodeLayerOnTop">on top</sys:String>
     <sys:String x:Key="S_NodeLayerObjectChip">Object mask</sys:String>
@@ -1177,7 +1177,7 @@
     <sys:String x:Key="S_LayerMenuViewAlone">Alone in the viewer</sys:String>
     <sys:String x:Key="S_LayerMenuClip">Clipped</sys:String>
     <sys:String x:Key="S_NodeViewerTag">Viewer</sys:String>
-    <sys:String x:Key="S_ViewerShowing">Viewer: {0}</sys:String>
+    <sys:String x:Key="S_ViewerShowing">Viewer: {0} – Esc ends</sys:String>
     <sys:String x:Key="S_ViewerBack">Back to the output</sys:String>
     <sys:String x:Key="S_TargetPicture">Whole picture</sys:String>
     <sys:String x:Key="S_TargetLayer">Layer: {0}</sys:String>
@@ -1196,6 +1196,10 @@
     <sys:String x:Key="S_QuickCorrectWithMask">Correction with this mask</sys:String>
     <sys:String x:Key="S_QuickSelectObjects">Choose objects</sys:String>
     <sys:String x:Key="S_QuickObjectMask">Object as mask</sys:String>
+    <sys:String x:Key="S_IsolatedLayer">Isolated: layer “{0}” – Esc ends</sys:String>
+    <sys:String x:Key="S_IsolatedMask">Isolated: mask of “{0}” – Esc ends</sys:String>
+    <sys:String x:Key="S_QuickIsolateLayer">Isolate layer</sys:String>
+    <sys:String x:Key="S_QuickIsolateMask">Isolate mask</sys:String>
     <sys:String x:Key="S_SelectSet">Cryptomatte: {0}</sys:String>
     <sys:String x:Key="S_SelectUnder">Under the pointer:</sys:String>
     <sys:String x:Key="S_SelectNoTarget">No cryptomatte target – objects are only shown.</sys:String>
