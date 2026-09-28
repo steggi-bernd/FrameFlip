@@ -87,6 +87,13 @@ public partial class LayerPanel : UserControl
         TintWheel.Changed += OnTintChanged;
         TintWheel.Released += () => Raise(interim: false);
 
+        MaskRange.Scale = RangeScale.Unit;
+        MaskHueRange.Scale = RangeScale.Hue;
+        MaskRange.Changed += OnMaskRangeChanged;
+        MaskHueRange.Changed += OnMaskRangeChanged;
+        MaskRange.ResetWanted += OnMaskRangeReset;
+        MaskHueRange.ResetWanted += OnMaskRangeReset;
+
         Rebuild();
     }
 
@@ -1757,6 +1764,13 @@ public partial class LayerPanel : UserControl
         mask.Hue = (float)MaskHueSlider.Value;
         mask.Spread = (float)MaskSpreadSlider.Value;
 
+        // Der Regler "Weich" gilt beiden Kanten: Er fuegt ein getrenntes Paar wieder zusammen (C7).
+        if (ReferenceEquals(sender, MaskSoftSlider))
+        {
+            mask.SoftLow = null;
+            mask.SoftHigh = null;
+        }
+
         // Von darf Bis nicht ueberholen - sonst laesst die Maske nichts mehr durch,
         // und das sieht aus, als waere die Ebene verschwunden.
         if (mask.Low > mask.High)
@@ -1812,6 +1826,9 @@ public partial class LayerPanel : UserControl
         MaskZoneRow.Visibility = kind is MaskKind.Luminance or MaskKind.Underlying
             ? Visibility.Visible
             : Visibility.Collapsed;
+
+        // Der Bereichsregler dort, wo die beiden Regler ein Fenster sind - nicht an Schwarz- und Weisspunkt.
+        MaskRangeRow.Visibility = MaskZoneRow.Visibility;
         MaskGradientBody.Visibility = gradient ? Visibility.Visible : Visibility.Collapsed;
         MaskSourceBox.Visibility = source ? Visibility.Visible : Visibility.Collapsed;
         MaskInvertButton.IsEnabled = kind != MaskKind.None;
@@ -1896,6 +1913,63 @@ public partial class LayerPanel : UserControl
         MaskWidthValue.Text = $"{MaskWidthSlider.Value:0.00}";
         MaskHueValue.Text = $"{MaskHueSlider.Value:0} °";
         MaskSpreadValue.Text = $"±{MaskSpreadSlider.Value:0} °";
+
+        if (_selected?.Mask is not { } mask) return;
+
+        // Getrennte Kanten: beide Werte, sonst der eine.
+        if (mask.SoftLow is not null || mask.SoftHigh is not null)
+            MaskSoftValue.Text = $"{mask.LowSoftness:0.00} · {mask.HighSoftness:0.00}";
+
+        var window = RangeWindows.Of(mask);
+
+        if (mask.Kind == MaskKind.Colour)
+        {
+            MaskHueRange.Window = window;
+            MaskHueRangeValue.Text = RangeText(window, "0", " °");
+        }
+        else if (mask.Kind is MaskKind.Luminance or MaskKind.Underlying)
+        {
+            MaskRange.Window = window;
+            MaskRangeValue.Text = RangeText(window, "0.00", "");
+        }
+    }
+
+    /// <summary>"0,20 – 0,80" - und die Kanten, wenn es welche gibt.</summary>
+    private static string RangeText(RangeWindow window, string format, string unit)
+    {
+        string text = $"{window.Low.ToString(format)}{unit} – {window.High.ToString(format)}{unit}";
+
+        return window.SoftLow > 0f || window.SoftHigh > 0f
+            ? text + $"  ({window.SoftLow.ToString(format)} · {window.SoftHigh.ToString(format)})"
+            : text;
+    }
+
+    /// <summary>Ein Zug am Bereichsregler: das Fenster in die Maske, die Regler darunter ziehen nach.</summary>
+    private void OnMaskRangeChanged(RangeWindow window, bool interim)
+    {
+        if (_selected is null) return;
+
+        RangeWindows.Apply(_selected.Mask, window);
+
+        _filling = true;
+        try { PushMaskToControls(); }
+        finally { _filling = false; }
+
+        Raise(interim);
+    }
+
+    /// <summary>Doppelklick auf den Bereichsregler: das Fenster in Grundstellung.</summary>
+    private void OnMaskRangeReset()
+    {
+        if (_selected is null) return;
+
+        RangeWindows.Reset(_selected.Mask);
+
+        _filling = true;
+        try { PushMaskToControls(); }
+        finally { _filling = false; }
+
+        Raise(interim: false);
     }
 
     /// <summary>
@@ -1922,6 +1996,8 @@ public partial class LayerPanel : UserControl
         mask.Low = low;
         mask.High = high;
         mask.Softness = 0.15f;
+        mask.SoftLow = null;
+        mask.SoftHigh = null;
 
         _filling = true;
 
