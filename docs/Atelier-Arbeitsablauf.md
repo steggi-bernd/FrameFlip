@@ -1032,3 +1032,30 @@ Die ersten beiden offenen Punkte aus C7.
     - Die Verteilung unter der Helligkeitsmaske.
   - Die Nachbargruppen liefen mit 460 Zusicherungen grün.
   - Eine echte Instanz startete ohne Fehler.
+
+### C7c: Pixel Sort beim Ziehen (`feature/sort-grob`)
+
+Der offene Punkt aus A5 und der Rest von Fehler 13: Während ein Regler gezogen wurde, fehlte
+Pixel Sort in der Vorschau ganz, und beim Loslassen sprang das Bild um.
+
+- **Grobe Fassung:** Beim Ziehen rechnet die Vorschau auf einem Gitter, jeden vierten
+  Bildpunkt. Pixel Sort sortiert jetzt auf diesem Gitter dieselben Läufe, im Verhältnis
+  kürzer: Was ein Lauf höchstens misst, gilt in Bildpunkten des Bildes, auf dem Gitter also
+  ein Viertel davon. Aufgeblasen sieht das aus wie das volle Bild, etwas weicher.
+- **Nur wer es kann:** Eine grobe Fassung hat, wer `ICoarseFramePass` kennt, bisher nur Pixel
+  Sort. Die Fehlerdiffusion bleibt beim Ziehen aus, wie bisher. Sie entscheidet nach der
+  Nachbarschaft, und das Gitter änderte die Nachbarschaft; das Ergebnis wäre ein anderes,
+  nicht ein gröberes.
+- **Stapel und Knoten:** Beide groben Wege, auch der mit örtlichen Werkzeugen, rufen die grobe
+  Fassung vor dem Aufblasen. Im Knotenmodus entscheidet der Knoten selbst. Vorher schaltete
+  der Graph alle Durchgänge auf dem Gitter ab.
+- **Der Hinweis der Karte** sagt jetzt, dass die Vorschau beim Ziehen eine grobe Fassung zeigt.
+- **Probe** (`SortCoarseInvariants`, 6 Zusicherungen):
+  - Auf dem Gitter mit Läufen im Verhältnis kommt fast das volle Ergebnis heraus: im Mittel
+    4,5 Stufen daneben, bedingt durch den Versatz im Gitter. Mit ungekürzten Läufen sind es
+    48.
+  - Die Einstellung bleibt, wie sie war.
+  - Im Stapel und im Knotenmodus ist Pixel Sort in der groben Vorschau zu sehen, die
+    Fehlerdiffusion nicht.
+  - Die Nachbargruppen (Pixel Sort, Startwerte, Gleichheit von Stapel und Knoten, Export
+    aus Knoten, Bildweg) liefen mit 687 Zusicherungen grün.
