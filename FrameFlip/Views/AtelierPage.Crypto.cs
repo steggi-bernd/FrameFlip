@@ -55,7 +55,7 @@ public partial class AtelierPage
             if (PixelAt(e.GetPosition(Display), out int rx, out int ry))
             {
                 if (_levelsPick is not null) LevelsPickAt(rx, ry);
-                else ReadAt(rx, ry);
+                else if (!ColourPickAt(rx, ry)) ReadAt(rx, ry);
             }
 
             e.Handled = true;

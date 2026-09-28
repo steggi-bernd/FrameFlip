@@ -386,6 +386,13 @@
                         <TextBlock x:Name="LiftValues" FontSize="9" Margin="0,4,0,0"
                                    HorizontalAlignment="Center" TextAlignment="Center"
                                    Foreground="{StaticResource MutedBrush}" />
+                        <!-- Pipette (C4b): ein Klick ins Bild macht diese Stelle in dieser Zone grau. -->
+                        <ToggleButton x:Name="LiftPick" Style="{StaticResource OverlayToggle}" Tag="Lift"
+                                      HorizontalAlignment="Center" Margin="0,4,0,0"
+                                      ToolTip="{DynamicResource S_ZonePickHint}"
+                                      Checked="OnZonePickToggled" Unchecked="OnZonePickToggled">
+                            <local:IconLabel Icon="picker" />
+                        </ToggleButton>
                     </StackPanel>
 
                     <StackPanel Grid.Column="1">
@@ -399,6 +406,13 @@
                         <TextBlock x:Name="GammaValues" FontSize="9" Margin="0,4,0,0"
                                    HorizontalAlignment="Center" TextAlignment="Center"
                                    Foreground="{StaticResource MutedBrush}" />
+                        <!-- Pipette (C4b): ein Klick ins Bild macht diese Stelle in dieser Zone grau. -->
+                        <ToggleButton x:Name="GammaPick" Style="{StaticResource OverlayToggle}" Tag="Gamma"
+                                      HorizontalAlignment="Center" Margin="0,4,0,0"
+                                      ToolTip="{DynamicResource S_ZonePickHint}"
+                                      Checked="OnZonePickToggled" Unchecked="OnZonePickToggled">
+                            <local:IconLabel Icon="picker" />
+                        </ToggleButton>
                     </StackPanel>
 
                     <StackPanel Grid.Column="2">
@@ -412,6 +426,13 @@
                         <TextBlock x:Name="GainValues" FontSize="9" Margin="0,4,0,0"
                                    HorizontalAlignment="Center" TextAlignment="Center"
                                    Foreground="{StaticResource MutedBrush}" />
+                        <!-- Pipette (C4b): ein Klick ins Bild macht diese Stelle in dieser Zone grau. -->
+                        <ToggleButton x:Name="GainPick" Style="{StaticResource OverlayToggle}" Tag="Gain"
+                                      HorizontalAlignment="Center" Margin="0,4,0,0"
+                                      ToolTip="{DynamicResource S_ZonePickHint}"
+                                      Checked="OnZonePickToggled" Unchecked="OnZonePickToggled">
+                            <local:IconLabel Icon="picker" />
+                        </ToggleButton>
                     </StackPanel>
                 </Grid>
 

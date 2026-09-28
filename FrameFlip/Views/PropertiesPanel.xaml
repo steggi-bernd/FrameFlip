@@ -373,6 +373,14 @@
                 <TextBlock x:Name="FocusNote" Margin="10,0,0,0" FontSize="10"
                            VerticalAlignment="Center" Visibility="Collapsed"
                            Foreground="{StaticResource MutedBrush}" />
+
+                <!-- Der Farbspeicher (C4b): was die Pipette gelesen hat, ueber das Bild hinaus. -->
+                <StackPanel x:Name="PickStoreRow" Orientation="Horizontal" Margin="16,0,0,0" VerticalAlignment="Center"
+                            Visibility="Collapsed" ToolTip="{DynamicResource S_PickStoreHint}">
+                    <TextBlock Text="{DynamicResource S_PickStore}" Style="{StaticResource PanelLabel}"
+                               VerticalAlignment="Center" Margin="0,0,6,0" />
+                    <StackPanel x:Name="PickStore" Orientation="Horizontal" VerticalAlignment="Center" />
+                </StackPanel>
             </StackPanel>
 
             <!-- Beim Waehlen (C3): an welcher Kryptomatte, was gewaehlt ist, was unter dem Zeiger liegt. -->

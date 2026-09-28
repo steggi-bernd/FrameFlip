@@ -1210,6 +1210,15 @@
     <sys:String x:Key="S_PickSourceHint">Pressed: reads the source before any correction – otherwise the shown colour.</sys:String>
     <sys:String x:Key="S_PickForColourRange">Eyedropper for: colour range “{0}” – click sets the hue, Shift widens</sys:String>
     <sys:String x:Key="S_PickReadOnly">Eyedropper: reads only</sys:String>
+    <sys:String x:Key="S_ZonePickHint">Eyedropper: a click in the picture makes that spot grey in this zone – brightness stays.</sys:String>
+    <sys:String x:Key="S_TintPickHint">Eyedropper: the tint takes the colour you click in the picture – or a swatch from the colour store.</sys:String>
+    <sys:String x:Key="S_PickStore">Kept</sys:String>
+    <sys:String x:Key="S_PickStoreHint">Every colour the eyedropper reads is kept – beyond this picture too. Click: take it into the waiting tint. Right-click: forget it.</sys:String>
+    <sys:String x:Key="S_PickForZone">Eyedropper for: neutralise {0} – click a spot that should be grey</sys:String>
+    <sys:String x:Key="S_PickForTint">Eyedropper for: tint of “{0}” – a click takes the colour</sys:String>
+    <sys:String x:Key="S_ZoneLift">Shadows</sys:String>
+    <sys:String x:Key="S_ZoneGamma">Midtones</sys:String>
+    <sys:String x:Key="S_ZoneGain">Highlights</sys:String>
     <sys:String x:Key="S_NodeMenuView">Show in the viewer (Ctrl+Shift+Click)</sys:String>
     <sys:String x:Key="S_NodeMenuViewOff">Viewer off – show the output again</sys:String>
     <sys:String x:Key="S_NodeLayerName">Layer name</sys:String>

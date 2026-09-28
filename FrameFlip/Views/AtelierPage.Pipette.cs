@@ -121,7 +121,8 @@ public partial class AtelierPage
         LoupeSwatch.Background = new SolidColorBrush(Color.FromRgb(r, g, b));
         LoupeHex.Text = ColourReadout.Hex(r, g, b);
         LoupeValues.Text = $"RGB {r} {g} {b}\nHSV {hue}° {saturation}% {value}%\nlin {lr:0.###} {lg:0.###} {lb:0.###}";
-        LoupeFor.Text = ColourTarget() is var (_, name) ? Strings.T("S_PickForColourRange", name) : Strings.T("S_PickReadOnly");
+        LoupeFor.Text = ColourPickPurpose()
+                        ?? (ColourTarget() is var (_, name) ? Strings.T("S_PickForColourRange", name) : Strings.T("S_PickReadOnly"));
 
         PickLoupe.Visibility = Visibility.Visible;
 
@@ -153,6 +154,7 @@ public partial class AtelierPage
         PickText.Visibility = Visibility.Visible;
 
         Properties.Read(x, y, r, g, b, lr, lg, lb, DepthAt(y * _frame!.Width + x));
+        RememberColour(x, y);
 
         PickColourRange(lr, lg, lb, widen: (Keyboard.Modifiers & ModifierKeys.Shift) != 0);
     }

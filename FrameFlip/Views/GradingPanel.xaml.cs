@@ -1409,6 +1409,68 @@ public partial class GradingPanel : UserControl
         LevelsAutoWanted?.Invoke(_levels, kind);
     }
 
+    /// <summary>
+    /// Eine Pipette an einem Rad wurde gewaehlt - oder abgewaehlt (null): Der naechste Klick ins
+    /// Bild macht die Stelle in dieser Zone grau (C4b).
+    /// </summary>
+    public event Action<LiftGammaGainTool, ZoneKind?>? ZonePickWanted;
+
+    private void OnZonePickToggled(object sender, RoutedEventArgs e)
+    {
+        if (_endingPick || sender is not ToggleButton { Tag: string tag } toggle || GainPick is null) return;
+        if (!Enum.TryParse(tag, out ZoneKind zone)) return;
+
+        if (toggle.IsChecked == true)
+        {
+            _endingPick = true;
+
+            foreach (var other in new[] { LiftPick, GammaPick, GainPick })
+                if (!ReferenceEquals(other, toggle)) other.IsChecked = false;
+
+            _endingPick = false;
+            ZonePickWanted?.Invoke(_zones, zone);
+        }
+        else
+        {
+            ZonePickWanted?.Invoke(_zones, null);
+        }
+    }
+
+    /// <summary>Die Pipette am Rad hat geklickt oder wurde verlassen - alle drei wieder aus.</summary>
+    public void EndZonePick()
+    {
+        _endingPick = true;
+
+        foreach (var toggle in new[] { LiftPick, GammaPick, GainPick })
+            toggle.IsChecked = false;
+
+        _endingPick = false;
+    }
+
+    /// <summary>
+    /// Macht einen Ton in einer Zone grau: das Rad dorthin, wo die Rechnung des Bildes ihn neutral
+    /// herausgibt, bei gleicher Helligkeit. Der Ton ist der, der bei Lift, Gamma und Gain ankommt.
+    /// </summary>
+    public void NeutraliseZone(ZoneKind zone, float r, float g, float b)
+    {
+        var (wheel, slider, triplet, neutral, scale) = zone switch
+        {
+            ZoneKind.Lift => (LiftWheel, LiftBrightSlider, _zones.Lift, 0f, LiftScale),
+            ZoneKind.Gamma => (GammaWheel, GammaBrightSlider, _zones.Gamma, 1f, GammaScale),
+            _ => (GainWheel, GainBrightSlider, _zones.Gain, 1f, GainScale),
+        };
+
+        var point = ColourSolve.Neutralise(_zones, zone, r, g, b, scale);
+
+        _filling = true;
+        try { wheel.Value = point; }
+        finally { _filling = false; }
+
+        PullZone(wheel, slider, triplet, neutral, scale);
+        UpdateZoneValues();
+        Raise(interim: false);
+    }
+
     /// <summary>Genau eine Pipette ist an - oder keine.</summary>
     private void OnLevelsPickToggled(object sender, RoutedEventArgs e)
     {

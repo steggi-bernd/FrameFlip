@@ -205,6 +205,7 @@ public sealed partial class AtelierPage : UserControl
         SetUpPipette();
         SetUpPropertiesFollow();
         SetUpQuickPanel();
+        SetUpColourPick();
 
         _settle.Tick += (_, _) =>
         {
@@ -269,6 +270,7 @@ public sealed partial class AtelierPage : UserControl
         // Ebenso eine wartende Pipette des Tonwerts. Sie hielte das Werkzeug des alten Rezepts,
         // und ihr Klick aenderte etwas, das nicht mehr gerechnet wird.
         LeaveLevelsPick();
+        LeaveColourPick();
 
         _path = path;
 

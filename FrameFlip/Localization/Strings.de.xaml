@@ -1210,6 +1210,15 @@
     <sys:String x:Key="S_PickSourceHint">Gedrückt: liest die Quelle vor allen Korrekturen – sonst die angezeigte Farbe.</sys:String>
     <sys:String x:Key="S_PickForColourRange">Pipette für: Farbbereich „{0}“ – Klick setzt den Farbton, Umschalt erweitert</sys:String>
     <sys:String x:Key="S_PickReadOnly">Pipette: liest nur ab</sys:String>
+    <sys:String x:Key="S_ZonePickHint">Pipette: Ein Klick ins Bild macht diese Stelle in dieser Zone grau – die Helligkeit bleibt.</sys:String>
+    <sys:String x:Key="S_TintPickHint">Pipette: Die Tönung übernimmt die Farbe, auf die du im Bild klickst – oder ein Feld aus dem Farbspeicher.</sys:String>
+    <sys:String x:Key="S_PickStore">Gemerkt</sys:String>
+    <sys:String x:Key="S_PickStoreHint">Jede Farbe, die die Pipette liest, wird gemerkt – auch über das Bild hinaus. Klick: in die wartende Tönung übernehmen. Rechtsklick: vergessen.</sys:String>
+    <sys:String x:Key="S_PickForZone">Pipette für: {0} neutralisieren – Klick auf eine Stelle, die grau sein soll</sys:String>
+    <sys:String x:Key="S_PickForTint">Pipette für: Tönung von „{0}“ – Klick übernimmt die Farbe</sys:String>
+    <sys:String x:Key="S_ZoneLift">Tiefen</sys:String>
+    <sys:String x:Key="S_ZoneGamma">Mitten</sys:String>
+    <sys:String x:Key="S_ZoneGain">Lichter</sys:String>
     <sys:String x:Key="S_NodeMenuView">Im Betrachter zeigen (Strg+Umschalt+Klick)</sys:String>
     <sys:String x:Key="S_NodeMenuViewOff">Betrachter aus – wieder die Ausgabe zeigen</sys:String>
     <sys:String x:Key="S_NodeLayerName">Name der Ebene</sys:String>
