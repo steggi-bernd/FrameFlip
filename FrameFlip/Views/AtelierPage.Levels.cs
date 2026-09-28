@@ -47,7 +47,11 @@ public partial class AtelierPage
             return;
         }
 
-        if (_levelsPick is null) _beforeLevelsPick = _tool == AtelierTool.Pick ? AtelierTool.Move : _tool;
+        if (_levelsPick is null) _beforeLevelsPick = ColourPicking ? _beforeColourPick
+                                                   : _tool == AtelierTool.Pick ? AtelierTool.Move : _tool;
+
+        // Immer nur eine wartende Pipette: die an Rad oder Toenung geht aus (C4b).
+        EndColourPick();
 
         _levelsPick = (tool, chosen);
 
@@ -112,8 +116,11 @@ public partial class AtelierPage
         return FloatFrameProcessor.Sample(frame, _finalAdjustments, ViewFor(frame), BeforeLevels(tool), step, _number);
     }
 
-    /// <summary>Der Ton, der an einem Bildpunkt beim Tonwert ankommt.</summary>
-    private (float R, float G, float B)? LevelsInputAt(LevelsTool tool, int x, int y)
+    /// <summary>
+    /// Der Ton, der an einem Bildpunkt bei einem Anzeigewerkzeug ankommt - dem Tonwert, oder
+    /// Lift, Gamma und Gain (C4b).
+    /// </summary>
+    private (float R, float G, float B)? LevelsInputAt(IGradingTool tool, int x, int y)
     {
         if (InNodes)
         {
@@ -135,7 +142,7 @@ public partial class AtelierPage
     /// Die fertigen Werkzeuge ohne den Tonwert und alles, was im Stapel nach ihm kommt. Steht er
     /// nicht im Stapel des ganzen Bildes - etwa bei einer Ebene -, bleibt es beim fertigen Bild.
     /// </summary>
-    private PreparedGrading BeforeLevels(LevelsTool tool)
+    private PreparedGrading BeforeLevels(IGradingTool tool)
     {
         var tools = Tools.Stack.Tools;
         int at = tools.FindIndex(t => ReferenceEquals(t, tool));
@@ -152,7 +159,7 @@ public partial class AtelierPage
     /// Im Knotenmodus: der Graph bis zum Kabel, das in den Knoten des Tonwerts fuehrt - mit
     /// eigenem Vorrat und ohne Zwischenspeicher, damit die laufende Anzeige nichts merkt.
     /// </summary>
-    private (float[] Rgb, int Width, int Height, int[] Columns, int[] Rows)? NodeInput(LevelsTool tool, int step)
+    private (float[] Rgb, int Width, int Height, int[] Columns, int[] Rows)? NodeInput(IGradingTool tool, int step)
     {
         if (_graph is null || _base is null) return null;
 

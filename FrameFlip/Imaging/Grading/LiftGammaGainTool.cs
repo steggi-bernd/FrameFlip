@@ -88,7 +88,7 @@ public sealed class LiftGammaGainTool : IGradingTool
     /// ohne ihn waere er ein Helligkeitsversatz ueber das ganze Bild und Weiss
     /// liefe sofort aus dem Bereich.
     /// </summary>
-    private static float Channel(float v, float lift, float gain, float inverseGamma)
+    internal static float Channel(float v, float lift, float gain, float inverseGamma)
     {
         v = v + lift * (1f - v);
         v *= gain;

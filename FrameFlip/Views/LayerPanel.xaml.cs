@@ -1138,6 +1138,56 @@ public partial class LayerPanel : UserControl
         Raise(interim: true);
     }
 
+    /// <summary>Die Pipette an der Toenung wurde gewaehlt - mit der Ebene - oder abgewaehlt (null).</summary>
+    public event Action<ImageLayer?>? TintPickWanted;
+
+    private bool _endingTintPick;
+
+    private void OnTintPickToggled(object sender, RoutedEventArgs e)
+    {
+        if (_endingTintPick) return;
+
+        // Ohne Ebene gibt es keine Toenung, die etwas uebernehmen koennte.
+        if (TintPick.IsChecked == true && _selected is null)
+        {
+            EndTintPick();
+            return;
+        }
+
+        TintPickWanted?.Invoke(TintPick.IsChecked == true ? _selected : null);
+    }
+
+    /// <summary>Die Pipette an der Toenung hat eine Farbe genommen oder wurde verlassen.</summary>
+    public void EndTintPick()
+    {
+        _endingTintPick = true;
+        try { TintPick.IsChecked = false; }
+        finally { _endingTintPick = false; }
+    }
+
+    /// <summary>
+    /// Die Toenung der gewaehlten Ebene uebernimmt eine Farbe (linear): das Rad in ihre Richtung,
+    /// so weit es reicht. Falsch ohne Ebene.
+    /// </summary>
+    public bool TakeTint(float r, float g, float b)
+    {
+        if (_selected is null) return false;
+
+        var point = ColourSolve.TintOf(r, g, b, TintScale);
+        var (tr, tg, tb) = ColourWheelMath.ToChannels(point, 0f, 1f, TintScale);
+
+        _selected.Tint.R = tr;
+        _selected.Tint.G = tg;
+        _selected.Tint.B = tb;
+
+        _filling = true;
+        try { TintWheel.Value = point; }
+        finally { _filling = false; }
+
+        Raise(interim: false);
+        return true;
+    }
+
     private void OnTintChanged()
     {
         if (_filling || _selected is null) return;

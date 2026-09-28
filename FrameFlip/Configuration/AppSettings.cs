@@ -430,6 +430,12 @@ public sealed class AppSettings
     /// </summary>
     public string? AtelierNodes { get; set; }
 
+    /// <summary>
+    /// Der Farbspeicher der Pipette (C4b): die zuletzt gelesenen Farben, die neueste vorn. Hier
+    /// und nicht im Projekt, weil sie gerade zwischen Bildern wandern sollen.
+    /// </summary>
+    public List<FrameFlip.Imaging.SavedColour> AtelierColours { get; set; } = new();
+
     /// <summary>Gespeicherte Korrektureinstellungen, im Panel auswaehlbar.</summary>
     public List<AdjustmentPreset> AdjustmentPresets { get; set; } = new();
 

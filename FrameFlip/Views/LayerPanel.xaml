@@ -223,6 +223,13 @@
                         <local:ColourWheel x:Name="TintWheel" Width="66" Height="66" />
                         <TextBlock Text="{DynamicResource S_LayerTint}" Style="{StaticResource PanelLabel}"
                                    HorizontalAlignment="Center" Margin="0,4,0,0" />
+                        <!-- Pipette (C4b): die Toenung uebernimmt eine Farbe aus dem Bild - oder aus dem Farbspeicher. -->
+                        <ToggleButton x:Name="TintPick" Style="{StaticResource OverlayToggle}"
+                                      HorizontalAlignment="Center" Margin="0,4,0,0"
+                                      ToolTip="{DynamicResource S_TintPickHint}"
+                                      Checked="OnTintPickToggled" Unchecked="OnTintPickToggled">
+                            <local:IconLabel Icon="picker" />
+                        </ToggleButton>
                     </StackPanel>
 
                     <StackPanel Grid.Column="1" VerticalAlignment="Center">

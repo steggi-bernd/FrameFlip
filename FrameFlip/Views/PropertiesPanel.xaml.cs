@@ -424,6 +424,54 @@ public partial class PropertiesPanel : UserControl
         FocusNote.Visibility = Visibility.Collapsed;
     }
 
+    /// <summary>Ein Feld im Farbspeicher wurde angeklickt.</summary>
+    public event Action<Imaging.SavedColour>? StoredColourChosen;
+
+    /// <summary>Ein Feld im Farbspeicher soll weg - Rechtsklick.</summary>
+    public event Action<Imaging.SavedColour>? StoredColourRemoved;
+
+    /// <summary>Die gemerkten Farben als kleine Felder, die neueste vorn (C4b).</summary>
+    public void ShowStore(IReadOnlyList<Imaging.SavedColour> colours)
+    {
+        PickStore.Children.Clear();
+        PickStoreRow.Visibility = colours.Count > 0 ? Visibility.Visible : Visibility.Collapsed;
+
+        foreach (var colour in colours)
+        {
+            var swatch = new System.Windows.Controls.Border
+            {
+                Width = 14,
+                Height = 14,
+                CornerRadius = new CornerRadius(3),
+                Margin = new Thickness(0, 0, 3, 0),
+                BorderThickness = new Thickness(1),
+                BorderBrush = (System.Windows.Media.Brush)FindResource("PanelBorder"),
+                Background = new System.Windows.Media.SolidColorBrush(
+                    System.Windows.Media.Color.FromRgb(colour.ShownR, colour.ShownG, colour.ShownB)),
+                Cursor = System.Windows.Input.Cursors.Hand,
+                ToolTip = colour.From is { } from ? $"{colour.Hex} · {from} ({colour.X}, {colour.Y})" : colour.Hex,
+                Tag = colour,
+            };
+
+            swatch.MouseLeftButtonUp += (_, e) =>
+            {
+                e.Handled = true;
+                StoredColourChosen?.Invoke(colour);
+            };
+
+            swatch.MouseRightButtonUp += (_, e) =>
+            {
+                e.Handled = true;
+                StoredColourRemoved?.Invoke(colour);
+            };
+
+            PickStore.Children.Add(swatch);
+        }
+    }
+
+    /// <summary>Die Felder im Farbspeicher - fuer die Probe.</summary>
+    internal int StoredShown => PickStore.Children.Count;
+
     /// <summary>Ein gewaehltes Objekt soll aus der Auswahl - sein Kreuz in der Leiste.</summary>
     public event Action<Imaging.Grading.CryptoPick>? PickRemoveWanted;
 
