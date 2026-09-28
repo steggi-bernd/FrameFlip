@@ -81,8 +81,8 @@ public static class AtelierPageInvariants
         // Stapel nur zwei davon kannte.
         foreach (var kind in new[]
                  {
-                     typeof(LevelsTool), typeof(CurvesTool), typeof(WhiteBalanceTool), typeof(LiftGammaGainTool),
-                     typeof(HslTool), typeof(VibranceTool), typeof(LutTool),
+                     typeof(LevelsTool), typeof(EqualiseTool), typeof(CurvesTool), typeof(WhiteBalanceTool),
+                     typeof(LiftGammaGainTool), typeof(HslTool), typeof(VibranceTool), typeof(LutTool),
                  })
         {
             int count = panel.Stack.Tools.Count(t => t.GetType() == kind);
@@ -95,7 +95,7 @@ public static class AtelierPageInvariants
 
         // Ein zweites Laden darf nicht doppeln.
         panel.Load(null, panel.Stack);
-        Check.That(panel.Stack.Tools.Count == 7, "nochmal laden doppelt nichts",
+        Check.That(panel.Stack.Tools.Count == 8, "nochmal laden doppelt nichts",
                    $"{panel.Stack.Tools.Count}");
 
         // Und den eigenen Stapel hereinzureichen darf ihn nicht leeren. Vorher wurde

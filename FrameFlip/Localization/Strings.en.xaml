@@ -12,6 +12,16 @@
     <sys:String x:Key="S_Adjusted">The display is corrected – the files are untouched</sys:String>
     <sys:String x:Key="S_FloatPath">The correction is working on the file’s float values – exposure recovers detail from the highlights</sys:String>
     <sys:String x:Key="S_Levels">Levels</sys:String>
+    <sys:String x:Key="S_Equalise">Equalise</sys:String>
+    <sys:String x:Key="S_EqualiseMeasure">Equalise</sys:String>
+    <sys:String x:Key="S_EqualiseMeasureAgain">Measure again</sys:String>
+    <sys:String x:Key="S_EqualiseMeasureHint">Measures the brightness of what arrives at the tool. If the strength is at zero, it then applies fully.</sys:String>
+    <sys:String x:Key="S_EqualiseNotMeasured">not measured yet</sys:String>
+    <sys:String x:Key="S_EqualiseMeasured">measured – applies to the whole sequence</sys:String>
+    <sys:String x:Key="S_EqualiseAmount">Strength</sys:String>
+    <sys:String x:Key="S_EqualiseSteps">Steps</sys:String>
+    <sys:String x:Key="S_EqualiseStepless">stepless</sys:String>
+    <sys:String x:Key="S_EqualiseHint">Stepless, the tool spreads the tones so that every brightness gets the same area. With steps it becomes a posterisation by quantiles: each step covers the same share of the picture, and its tone stays where it was. It measures once; the curve then applies to the whole sequence – no flicker.</sys:String>
     <sys:String x:Key="S_LevelsHint">The handles below the histogram: black, grey and white of the input, below them the output range. What lies left of the black point or right of the white point is clipped. Double-click resets a handle.</sys:String>
     <sys:String x:Key="S_LevelsValues">Input {0} · {1} · {2}    Output {3} – {4}</sys:String>
     <sys:String x:Key="S_LevelsAuto">Auto</sys:String>
@@ -47,7 +57,7 @@
     <sys:String x:Key="S_OutputFormat">Output format</sys:String>
     <sys:String x:Key="S_FormatPng16">PNG · 16 bit</sys:String>
     <sys:String x:Key="S_FormatPng8">PNG · 8 bit</sys:String>
-    <sys:String x:Key="S_EightBitOnly">Pixel sort and error diffusion work in 8 bit and are left out of this format. PNG · 8 bit, JPG or a video keep them.</sys:String>
+    <sys:String x:Key="S_EightBitOnly">Pixel sort, error diffusion and local equalise work in 8 bit and are left out of this format. PNG · 8 bit, JPG or a video keep them.</sys:String>
     <sys:String x:Key="S_FormatTiff16">TIFF · 16 bit</sys:String>
     <sys:String x:Key="S_FormatJpeg">JPEG</sys:String>
     <sys:String x:Key="S_ChooseTarget">Target folder …</sys:String>
@@ -83,6 +93,11 @@
     <sys:String x:Key="S_Luminance">Lum.</sys:String>
     <sys:String x:Key="S_Lut">Lookup table</sys:String>
     <sys:String x:Key="S_Clarity">Clarity</sys:String>
+    <sys:String x:Key="S_Clahe">Local equalise</sys:String>
+    <sys:String x:Key="S_ClaheAmount">Strength</sys:String>
+    <sys:String x:Key="S_ClaheTiles">Tiles</sys:String>
+    <sys:String x:Key="S_ClaheLimit">Contrast limit</sys:String>
+    <sys:String x:Key="S_ClaheHint">CLAHE: equalises tile by tile and blends softly – it brings out detail in shadows and highlights. The contrast limit keeps calm areas calm. It runs over the finished image at 8 bit; a 16-bit export leaves it out, like Pixel Sort.</sys:String>
     <sys:String x:Key="S_ClarityAmount">Amount</sys:String>
     <sys:String x:Key="S_ClarityReach">Radius</sys:String>
     <sys:String x:Key="S_ClarityHint">Local contrast: it boosts what a pixel is against its surroundings and leaves flat areas alone. A large radius gives modelling, a small one gives sharpness. Negative takes contrast away.</sys:String>

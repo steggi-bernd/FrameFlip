@@ -48,6 +48,7 @@ public enum GradingStage
                  UnknownDerivedTypeHandling = JsonUnknownDerivedTypeHandling.FailSerialization)]
 [JsonDerivedType(typeof(CurvesTool), CurvesTool.KindName)]
 [JsonDerivedType(typeof(LevelsTool), LevelsTool.KindName)]
+[JsonDerivedType(typeof(EqualiseTool), EqualiseTool.KindName)]
 [JsonDerivedType(typeof(WhiteBalanceTool), WhiteBalanceTool.KindName)]
 [JsonDerivedType(typeof(LiftGammaGainTool), LiftGammaGainTool.KindName)]
 [JsonDerivedType(typeof(VibranceTool), VibranceTool.KindName)]

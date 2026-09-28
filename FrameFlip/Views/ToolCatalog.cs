@@ -107,11 +107,11 @@ public static class ToolCatalog
         ["S_MaskGradient"] = Select, ["S_NodeMaskShape"] = Select, ["S_NodeMaskMath"] = Select, ["S_NodeCutout"] = Select,
         ["S_MaskPainted"] = Paint,
 
-        ["S_Correction"] = Tone, ["S_Levels"] = Tone, ["S_Curves"] = Tone, ["S_Zones"] = Tone, ["S_NodeTone"] = Tone, ["S_NodeMapRange"] = Tone,
+        ["S_Correction"] = Tone, ["S_Levels"] = Tone, ["S_Equalise"] = Tone, ["S_Curves"] = Tone, ["S_Zones"] = Tone, ["S_NodeTone"] = Tone, ["S_NodeMapRange"] = Tone,
 
         ["S_WhiteBalance"] = Colour, ["S_ColourBands"] = Colour, ["S_Vibrance"] = Colour, ["S_NodeColorRamp"] = Colour, ["S_Lut"] = Colour,
 
-        ["S_Clarity"] = Details, ["S_Texture"] = Details, ["S_Sharpen"] = Details, ["S_Noise"] = Details, ["S_Grain"] = Details,
+        ["S_Clarity"] = Details, ["S_Clahe"] = Details, ["S_Texture"] = Details, ["S_Sharpen"] = Details, ["S_Noise"] = Details, ["S_Grain"] = Details,
 
         ["S_Motion"] = Optics, ["S_Displace"] = Optics, ["S_DepthField"] = Optics, ["S_Distortion"] = Optics,
         ["S_Chromatic"] = Optics, ["S_Vignette"] = Optics,

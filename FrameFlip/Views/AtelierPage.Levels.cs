@@ -25,16 +25,29 @@ public partial class AtelierPage
     {
         Tools.LevelsAutoWanted += (tool, kind) => AutoLevels(tool, kind);
         Tools.LevelsPickWanted += StartLevelsPick;
+        Tools.EqualiseMeasureWanted += tool => MeasureEqualise(tool);
     }
 
     /// <summary>Auto am Tonwert - aus dem, was bei ihm ankommt.</summary>
     internal bool AutoLevels(LevelsTool tool, LevelsAutoKind kind)
     {
-        if (LevelsInput(tool, step: 4) is not { } sample) return false;
+        if (ToolInput(tool, step: 4) is not { } sample) return false;
 
         LevelsAuto.Apply(tool, sample.Rgb, kind);
         Tools.LevelsChangedOutside();
 
+        return true;
+    }
+
+    /// <summary>
+    /// Ausgleichen (W2e): misst die Helligkeit dessen, was beim Werkzeug ankommt, und legt die
+    /// Verteilung im Werkzeug ab - danach gilt sie fuer die ganze Folge.
+    /// </summary>
+    internal bool MeasureEqualise(EqualiseTool tool)
+    {
+        if (ToolInput(tool, step: 4) is not { } sample) return false;
+
+        Tools.EqualiseMeasured(tool, EqualiseTool.Measure(sample.Rgb));
         return true;
     }
 
@@ -103,10 +116,10 @@ public partial class AtelierPage
     // ------------------------------------------------------------------ was ankommt
 
     /// <summary>
-    /// Was beim Tonwert ankommt, als Stichprobe jedes <paramref name="step"/>-ten Punktes. Null,
-    /// wenn es nichts zu messen gibt.
+    /// Was bei einem Anzeigewerkzeug ankommt - dem Tonwert oder dem Ausgleich -, als Stichprobe
+    /// jedes <paramref name="step"/>-ten Punktes. Null, wenn es nichts zu messen gibt.
     /// </summary>
-    internal (float[] Rgb, int Width, int Height)? LevelsInput(LevelsTool tool, int step)
+    internal (float[] Rgb, int Width, int Height)? ToolInput(IGradingTool tool, int step)
     {
         if (InNodes) return NodeInput(tool, step) is { } node ? (node.Rgb, node.Width, node.Height) : null;
 
