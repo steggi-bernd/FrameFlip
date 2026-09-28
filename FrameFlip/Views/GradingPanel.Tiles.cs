@@ -43,6 +43,7 @@ public partial class GradingPanel
     {
         ("S_GroupBasics", "Basic", "S_Correction", "☀"),
         ("S_GroupBasics", "Levels", "S_Levels", "⊿"),
+        ("S_GroupBasics", "Equalise", "S_Equalise", "≡"),
         ("S_GroupBasics", "Curve", "S_Curves", "∿"),
         ("S_GroupBasics", "WhiteBalance", "S_WhiteBalance", "◑"),
         ("S_GroupBasics", "Zones", "S_Zones", "◐"),
@@ -53,6 +54,7 @@ public partial class GradingPanel
         ("S_GroupLight", "Halation", "S_Halation", "◎"),
         ("S_GroupLight", "Noise", "S_Noise", "░"),
         ("S_GroupLight", "Clarity", "S_Clarity", "◈"),
+        ("S_GroupLight", "Clahe", "S_Clahe", "▣"),
         ("S_GroupLight", "Texture", "S_Texture", "▦"),
         ("S_GroupLight", "Sharpen", "S_Sharpen", "△"),
 
@@ -689,6 +691,7 @@ public partial class GradingPanel
     {
         "Basic" => new object[] { _vibrance },
         "Levels" => new object[] { _levels },
+        "Equalise" => new object[] { _equalise },
         "Curve" => new object[] { _curves },
         "WhiteBalance" => new object[] { _whiteBalance },
         "Zones" => new object[] { _zones },
@@ -698,6 +701,7 @@ public partial class GradingPanel
         "Halation" => new object[] { _halation },
         "Noise" => new object[] { _noise },
         "Clarity" => new object[] { _clarity },
+        "Clahe" => new object[] { _clahe },
         "Texture" => new object[] { _texture },
         "Sharpen" => new object[] { _sharpen },
         "Motion" => new object[] { _motion },
@@ -789,6 +793,7 @@ public partial class GradingPanel
     {
         "Basic" => !Adjustments.IsNeutral || !_vibrance.IsNeutral,
         "Levels" => !_levels.IsNeutral,
+        "Equalise" => !_equalise.IsNeutral,
         "Curve" => !_curves.IsNeutral,
         "WhiteBalance" => !_whiteBalance.IsNeutral,
         "Zones" => !_zones.IsNeutral,
@@ -798,6 +803,7 @@ public partial class GradingPanel
         "Halation" => !_halation.IsNeutral,
         "Noise" => !_noise.IsNeutral,
         "Clarity" => !_clarity.IsNeutral,
+        "Clahe" => !_clahe.IsNeutral,
         "Texture" => !_texture.IsNeutral,
         "Sharpen" => !_sharpen.IsNeutral,
         "Motion" => !_motion.IsNeutral,

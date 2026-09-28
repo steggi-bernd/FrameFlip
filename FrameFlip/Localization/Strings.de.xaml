@@ -12,6 +12,16 @@
     <sys:String x:Key="S_Adjusted">Die Anzeige ist korrigiert – die Dateien bleiben unverändert</sys:String>
     <sys:String x:Key="S_FloatPath">Die Korrektur rechnet auf den Gleitkommawerten der Datei – Belichtung holt Zeichnung aus den Lichtern zurück</sys:String>
     <sys:String x:Key="S_Levels">Tonwert</sys:String>
+    <sys:String x:Key="S_Equalise">Ausgleich</sys:String>
+    <sys:String x:Key="S_EqualiseMeasure">Ausgleichen</sys:String>
+    <sys:String x:Key="S_EqualiseMeasureAgain">Neu messen</sys:String>
+    <sys:String x:Key="S_EqualiseMeasureHint">Misst die Helligkeit dessen, was beim Ausgleich ankommt. Steht die Stärke auf null, wirkt er danach ganz.</sys:String>
+    <sys:String x:Key="S_EqualiseNotMeasured">noch nicht gemessen</sys:String>
+    <sys:String x:Key="S_EqualiseMeasured">gemessen – gilt für die ganze Folge</sys:String>
+    <sys:String x:Key="S_EqualiseAmount">Stärke</sys:String>
+    <sys:String x:Key="S_EqualiseSteps">Stufen</sys:String>
+    <sys:String x:Key="S_EqualiseStepless">stufenlos</sys:String>
+    <sys:String x:Key="S_EqualiseHint">Stufenlos verteilt der Ausgleich die Töne so, dass jede Helligkeit gleich viel Fläche bekommt. Mit Stufen wird daraus eine Tonwerttrennung nach Quantilen: Jede Stufe deckt gleich viel Bild, ihr Ton bleibt, wo er war. Gemessen wird einmal, danach gilt die Kurve für die ganze Folge – ohne Flackern.</sys:String>
     <sys:String x:Key="S_LevelsHint">Die Anfasser unter dem Histogramm: Schwarz, Grau und Weiß des Eingangs, darunter der Bereich der Ausgabe. Was links vom Schwarzpunkt und rechts vom Weißpunkt liegt, wird abgeschnitten. Doppelklick setzt einen Anfasser zurück.</sys:String>
     <sys:String x:Key="S_LevelsValues">Eingang {0} · {1} · {2}    Ausgabe {3} – {4}</sys:String>
     <sys:String x:Key="S_LevelsAuto">Auto</sys:String>
@@ -47,7 +57,7 @@
     <sys:String x:Key="S_OutputFormat">Ausgabeformat</sys:String>
     <sys:String x:Key="S_FormatPng16">PNG · 16 Bit</sys:String>
     <sys:String x:Key="S_FormatPng8">PNG · 8 Bit</sys:String>
-    <sys:String x:Key="S_EightBitOnly">Pixel Sort und Fehlerdiffusion rechnen in 8 Bit und fehlen in diesem Format. PNG · 8 Bit, JPG oder ein Video nehmen sie mit.</sys:String>
+    <sys:String x:Key="S_EightBitOnly">Pixel Sort, Fehlerdiffusion und der örtliche Ausgleich rechnen in 8 Bit und fehlen in diesem Format. PNG · 8 Bit, JPG oder ein Video nehmen sie mit.</sys:String>
     <sys:String x:Key="S_FormatTiff16">TIFF · 16 Bit</sys:String>
     <sys:String x:Key="S_FormatJpeg">JPEG</sys:String>
     <sys:String x:Key="S_ChooseTarget">Zielordner …</sys:String>
@@ -83,6 +93,11 @@
     <sys:String x:Key="S_Luminance">Hell.</sys:String>
     <sys:String x:Key="S_Lut">Tabelle</sys:String>
     <sys:String x:Key="S_Clarity">Klarheit</sys:String>
+    <sys:String x:Key="S_Clahe">Örtlicher Ausgleich</sys:String>
+    <sys:String x:Key="S_ClaheAmount">Stärke</sys:String>
+    <sys:String x:Key="S_ClaheTiles">Kacheln</sys:String>
+    <sys:String x:Key="S_ClaheLimit">Kontrastgrenze</sys:String>
+    <sys:String x:Key="S_ClaheHint">CLAHE: gleicht Kachel für Kachel aus und blendet weich über – das holt Zeichnung aus Tiefen und Lichtern. Die Kontrastgrenze hält ruhige Flächen ruhig. Er läuft über das fertige Bild mit 8 Bit; im Export mit 16 Bit fällt er weg wie Pixel Sort.</sys:String>
     <sys:String x:Key="S_ClarityAmount">Stärke</sys:String>
     <sys:String x:Key="S_ClarityReach">Radius</sys:String>
     <sys:String x:Key="S_ClarityHint">Örtlicher Kontrast: Er verstärkt, was ein Punkt gegenüber seiner Umgebung ist, und lässt gleichmäßige Flächen in Ruhe. Großer Radius gibt Plastizität, kleiner gibt Schärfe. Negativ nimmt Kontrast weg.</sys:String>

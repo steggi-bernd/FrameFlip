@@ -31,6 +31,7 @@ namespace FrameFlip.Imaging.Grading;
 [JsonPolymorphic(TypeDiscriminatorPropertyName = "kind")]
 [JsonDerivedType(typeof(DiffusionTool), DiffusionTool.KindName)]
 [JsonDerivedType(typeof(SortTool), SortTool.KindName)]
+[JsonDerivedType(typeof(ClaheTool), ClaheTool.KindName)]
 public interface IFramePass
 {
     /// <summary>Kennung fuer die Speicherung.</summary>

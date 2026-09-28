@@ -32,6 +32,7 @@ public partial class GradingPanel : UserControl
 
     private CurvesTool _curves = new();
     private LevelsTool _levels = new();
+    private EqualiseTool _equalise = new();
 
     /// <summary>Welcher Kanal der Tonwertkorrektur bearbeitet wird: 0 gemeinsam, 1 bis 3 R, G, B.</summary>
     private int _levelsChannel;
@@ -79,6 +80,7 @@ public partial class GradingPanel : UserControl
     private MotionBlurTool _motion = new();
     private DisplaceTool _displace = new();
     private SortTool _sort = new();
+    private ClaheTool _clahe = new();
 
     private static readonly Color[] CurveColours =
     {
@@ -276,6 +278,7 @@ public partial class GradingPanel : UserControl
         HalationBody.IsEnabled = enabled;
         NoiseBody.IsEnabled = enabled;
         ClarityBody.IsEnabled = enabled;
+        ClaheBody.IsEnabled = enabled;
         TextureBody.IsEnabled = enabled;
         SharpenBody.IsEnabled = enabled;
         MotionBody.IsEnabled = enabled;
@@ -396,6 +399,19 @@ public partial class GradingPanel : UserControl
             return created;
         }
 
+        // Der Ausgleich (W2e) steht hinter dem Tonwert und vor den Kurven - auch in einem Stapel von
+        // frueher. Gemessen wird, was bei ihm ankommt; die Kurven formen danach weiter.
+        _equalise = Stack.Tools.OfType<EqualiseTool>().FirstOrDefault() ?? InsertEqualise();
+
+        EqualiseTool InsertEqualise()
+        {
+            var created = new EqualiseTool();
+            int curves = Stack.Tools.FindIndex(t => t is CurvesTool);
+
+            Stack.Tools.Insert(curves < 0 ? Stack.Tools.Count : curves, created);
+            return created;
+        }
+
         _curves = Take<CurvesTool>();
         _whiteBalance = Take<WhiteBalanceTool>();
         _zones = Take<LiftGammaGainTool>();
@@ -419,6 +435,18 @@ public partial class GradingPanel : UserControl
         _vignette = TakeOptics<VignetteTool>();
         _grain = TakeOptics<GrainTool>();
         _dither = TakeOptics<DitherTool>();
+
+        // Der oertliche Ausgleich (W2e) laeuft als erster Durchgang ueber das fertige Bild - vor dem
+        // Rastern und dem Sortieren, die sonst seine Stufen und Laeufe mit ausglichen.
+        _clahe = Stack.Frame.OfType<ClaheTool>().FirstOrDefault() ?? InsertClahe();
+
+        ClaheTool InsertClahe()
+        {
+            var created = new ClaheTool();
+            Stack.Frame.Insert(0, created);
+            return created;
+        }
+
         _diffusion = TakeFrame<DiffusionTool>();
         _sort = TakeFrame<SortTool>();
 
@@ -728,6 +756,14 @@ public partial class GradingPanel : UserControl
             UpdateLutText();
 
             ClaritySlider.Value = Math.Clamp(_clarity.Amount, ClaritySlider.Minimum, ClaritySlider.Maximum);
+
+            EqualiseAmountSlider.Value = Math.Clamp(_equalise.Amount, EqualiseAmountSlider.Minimum, EqualiseAmountSlider.Maximum);
+            EqualiseStepsSlider.Value = Math.Clamp(_equalise.Steps, EqualiseStepsSlider.Minimum, EqualiseStepsSlider.Maximum);
+            ShowEqualiseState();
+
+            ClaheAmountSlider.Value = Math.Clamp(_clahe.Amount, ClaheAmountSlider.Minimum, ClaheAmountSlider.Maximum);
+            ClaheTilesSlider.Value = Math.Clamp(_clahe.Tiles, ClaheTilesSlider.Minimum, ClaheTilesSlider.Maximum);
+            ClaheLimitSlider.Value = Math.Clamp(_clahe.Limit, ClaheLimitSlider.Minimum, ClaheLimitSlider.Maximum);
             ClarityReachSlider.Value = Math.Clamp(_clarity.Reach,
                                                   ClarityReachSlider.Minimum, ClarityReachSlider.Maximum);
 
@@ -1022,6 +1058,16 @@ public partial class GradingPanel : UserControl
         _clarity.Amount = (float)ClaritySlider.Value;
         _clarity.Reach = (int)Math.Round(ClarityReachSlider.Value);
 
+        _equalise.Amount = (float)EqualiseAmountSlider.Value;
+        _equalise.Steps = (int)Math.Round(EqualiseStepsSlider.Value);
+
+        _clahe.Amount = (float)ClaheAmountSlider.Value;
+        _clahe.Tiles = (int)Math.Round(ClaheTilesSlider.Value);
+        _clahe.Limit = (float)ClaheLimitSlider.Value;
+
+        // Die Staerke hochgezogen, bevor gemessen wurde: dann jetzt messen - sonst taete der Regler nichts.
+        if (_equalise.Amount >= 0.001f && _equalise.Measured is null) EqualiseMeasureWanted?.Invoke(_equalise);
+
         _sharpen.Amount = (float)SharpenSlider.Value;
         _sharpen.Reach = (int)Math.Round(SharpenRadiusSlider.Value);
         _sharpen.Threshold = (float)SharpenThresholdSlider.Value;
@@ -1160,6 +1206,11 @@ public partial class GradingPanel : UserControl
         LutStrengthValue.Text = $"{LutStrengthSlider.Value:0.00}";
         ClarityValue.Text = $"{ClaritySlider.Value:+0.00;-0.00;0.00}";
         ClarityReachValue.Text = $"{ClarityReachSlider.Value:0}";
+        EqualiseAmountValue.Text = $"{EqualiseAmountSlider.Value:0.00}";
+        EqualiseStepsValue.Text = EqualiseStepsSlider.Value < 2 ? Strings.T("S_EqualiseStepless") : $"{EqualiseStepsSlider.Value:0}";
+        ClaheAmountValue.Text = $"{ClaheAmountSlider.Value:0.00}";
+        ClaheTilesValue.Text = $"{ClaheTilesSlider.Value:0}";
+        ClaheLimitValue.Text = $"{ClaheLimitSlider.Value:0.0}";
         SharpenValue.Text = $"{SharpenSlider.Value:0.00}";
         SharpenRadiusValue.Text = $"{SharpenRadiusSlider.Value:0}";
         SharpenThresholdValue.Text = $"{SharpenThresholdSlider.Value:0.000}";
@@ -1402,6 +1453,39 @@ public partial class GradingPanel : UserControl
         LevelsField.HistogramColour = LevelsColours[_levelsChannel];
         LevelsField.InvalidateVisual();
         ShowLevelsValues();
+    }
+
+    // ------------------------------------------------------------ Ausgleich (W2e)
+
+    /// <summary>Der Ausgleich soll messen, was bei ihm ankommt - das weiss die Seite.</summary>
+    public event Action<EqualiseTool>? EqualiseMeasureWanted;
+
+    /// <summary>Der Ausgleich der Karte - fuer die Probe.</summary>
+    internal EqualiseTool Equalise => _equalise;
+
+    private void OnEqualiseMeasureClicked(object sender, RoutedEventArgs e) => EqualiseMeasureWanted?.Invoke(_equalise);
+
+    /// <summary>
+    /// Die Seite hat gemessen. Steht die Staerke noch auf null, wirkt der Ausgleich jetzt ganz - wer
+    /// "Ausgleichen" drueckt, will es sehen.
+    /// </summary>
+    public void EqualiseMeasured(EqualiseTool tool, float[] measured)
+    {
+        tool.Measured = measured;
+        if (tool.Amount < 0.001f) tool.Amount = 1f;
+
+        if (!ReferenceEquals(tool, _equalise)) return;
+
+        PushToControls();
+        Raise(interim: false);
+    }
+
+    private void ShowEqualiseState()
+    {
+        bool measured = _equalise.Measured is not null;
+
+        EqualiseMeasureButton.SetResourceReference(ContentProperty, measured ? "S_EqualiseMeasureAgain" : "S_EqualiseMeasure");
+        EqualiseState.SetResourceReference(TextBlock.TextProperty, measured ? "S_EqualiseMeasured" : "S_EqualiseNotMeasured");
     }
 
     private void OnLevelsAutoClicked(object sender, RoutedEventArgs e)

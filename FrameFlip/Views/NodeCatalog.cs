@@ -52,6 +52,7 @@ public static class NodeCatalog
 
         new("S_GroupBasics", "S_Correction", () => new LayerGradeNode { Tools = new GradingStack() }, "Basic"),
         new("S_GroupBasics", "S_Levels", () => new PointToolNode { Tool = new LevelsTool() }, "Levels"),
+        new("S_GroupBasics", "S_Equalise", () => new PointToolNode { Tool = new EqualiseTool() }, "Equalise"),
         new("S_GroupBasics", "S_Curves", () => new PointToolNode { Tool = new CurvesTool() }, "Curve"),
         new("S_GroupBasics", "S_WhiteBalance", () => new PointToolNode { Tool = new WhiteBalanceTool() }, "WhiteBalance"),
         new("S_GroupBasics", "S_Zones", () => new PointToolNode { Tool = new LiftGammaGainTool() }, "Zones"),
@@ -63,6 +64,7 @@ public static class NodeCatalog
         new("S_GroupLight", "S_Halation", () => Started(new LocalNode { Tool = new HalationTool() }), "Halation"),
         new("S_GroupLight", "S_Noise", () => new LocalNode { Tool = new NoiseTool() }, "Noise"),
         new("S_GroupLight", "S_Clarity", () => new LocalNode { Tool = new ClarityTool() }, "Clarity"),
+        new("S_GroupLight", "S_Clahe", () => new FramePassNode { Pass = new ClaheTool() }, "Clahe"),
         new("S_GroupLight", "S_Texture", () => new LocalNode { Tool = new TextureTool() }, "Texture"),
         new("S_GroupLight", "S_Sharpen", () => new LocalNode { Tool = new SharpenTool() }, "Sharpen"),
 

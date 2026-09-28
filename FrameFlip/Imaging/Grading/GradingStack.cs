@@ -231,6 +231,8 @@ public sealed class GradingStack
 
         SortTool sort => sort.Clone(),
 
+        ClaheTool clahe => clahe.Clone(),
+
         _ => throw new NotSupportedException($"Kein Kopierweg fuer {pass.GetType().Name}."),
     };
 
@@ -296,6 +298,7 @@ public sealed class GradingStack
     {
         CurvesTool curves => curves.Clone(),
         LevelsTool levels => levels.Clone(),
+        EqualiseTool equalise => equalise.Clone(),
         LiftGammaGainTool lgg => lgg.Clone(),
         WhiteBalanceTool wb => new WhiteBalanceTool { Kelvin = wb.Kelvin, Tint = wb.Tint },
         VibranceTool vibrance => new VibranceTool { Amount = vibrance.Amount },

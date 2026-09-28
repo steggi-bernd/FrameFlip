@@ -183,6 +183,21 @@ public static class EffectStartInvariants
             Check.That(note.Visibility == Visibility.Visible, "TIFF 16 Bit: wieder der Hinweis");
 
             format.SelectedIndex = 0;
+
+            // Mit dem Regler geschlossen: Nach dem Zug ist der Durchgang weg - und der Hinweis auch.
+            // Der Zug rechnet erst grob und am Ende genau; auch dieses Ende muss den Hinweis stellen.
+            var low = (Slider)tools.FindName("SortLowSlider");
+            var high = (Slider)tools.FindName("SortHighSlider");
+            double open = high.Value;
+
+            high.Value = low.Value;
+            Pump(() => note.Visibility != Visibility.Visible, 2);
+            Check.That(note.Visibility != Visibility.Visible, "Pixel Sort mit dem Regler geschlossen: nach dem Zug kein Hinweis mehr");
+
+            high.Value = open;
+            Pump(() => note.Visibility == Visibility.Visible, 2);
+            Check.That(note.Visibility == Visibility.Visible, "und mit dem Regler wieder geoeffnet: der Hinweis ist zurueck");
+
             page.ConvertToNodes();
             Pump(() => page.InNodes);
             Pump(() => false, 0.3);

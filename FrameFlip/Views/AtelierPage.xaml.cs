@@ -226,6 +226,10 @@ public sealed partial class AtelierPage : UserControl
             Render();
             Measure();
 
+            // Ein Regler kann einen Durchgang ueber das Bild ein- oder ausgeschaltet haben - auch
+            // nach einem Zug muss der Hinweis an der Ausgabe stimmen, nicht erst beim naechsten Klick.
+            ShowEightBitNote();
+
             // Ein Zug ist zu Ende - jetzt gehoert der Stand des Graphen in die
             // Einstellungen. Waehrend des Zuges waere das bei jedem Bild ein Durchgang
             // durch den ganzen Graphen.

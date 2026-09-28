@@ -19,6 +19,7 @@ public static class NodeTitles
     {
         [CurvesTool.KindName] = ("Curve", "S_Curves"),
         [LevelsTool.KindName] = ("Levels", "S_Levels"),
+        [EqualiseTool.KindName] = ("Equalise", "S_Equalise"),
         [WhiteBalanceTool.KindName] = ("WhiteBalance", "S_WhiteBalance"),
         [LiftGammaGainTool.KindName] = ("Zones", "S_Zones"),
         [HslTool.KindName] = ("Bands", "S_ColourBands"),
@@ -29,6 +30,7 @@ public static class NodeTitles
         [HalationTool.KindName] = ("Halation", "S_Halation"),
         [NoiseTool.KindName] = ("Noise", "S_Noise"),
         [ClarityTool.KindName] = ("Clarity", "S_Clarity"),
+        [ClaheTool.KindName] = ("Clahe", "S_Clahe"),
         [TextureTool.KindName] = ("Texture", "S_Texture"),
         [SharpenTool.KindName] = ("Sharpen", "S_Sharpen"),
         [MotionBlurTool.KindName] = ("Motion", "S_Motion"),
