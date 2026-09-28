@@ -754,6 +754,58 @@ In sechs Schnitten, nach Nutzen und Abhängigkeit:
     Schnellwahl) liefen mit 654 Zusicherungen grün.
   - Eine echte Instanz startete ohne Fehler; beide Zeichen stehen in der Palette.
 
+**W2f (`feature/angleichen`):**
+
+- **Farbe angleichen** (`MatchTool`, Kennung `match`) in der Grundkorrektur, zuletzt im Stapel
+  hinter der LUT. Gemessen wird dort, wo es steht; so gleicht das fertige Bild dem Vorbild.
+  - „Als Vorbild merken“ misst das gezeigte Bild beim Werkzeug. Danach geht man zu einem
+    anderen Bild der Folge und drückt „Angleichen“.
+  - „Vorbild aus Datei …“ nimmt ein anderes Bild, so wie es ohne Korrektur aussieht.
+  - Übertragen werden Mittel und Streuung der beiden Farbdifferenzen (Rec. 709 Cb/Cr).
+    „Helligkeit und Kontrast mit“ überträgt auch die Helligkeit; ohne bleibt sie. So lässt
+    sich die Temperatur eines anderen Bildes übernehmen, ohne seine Belichtung.
+  - Die Streckung ist auf das Vierfache begrenzt. Ein graues Bild wird verschoben, nicht
+    gesprengt.
+  - Beides wird einmal gemessen und steht im Werkzeug; die Abbildung gilt für die ganze Folge.
+  - An einer Ebene mit Maske wirkt es nur stellenweise – die Grundkorrektur ist dort nicht
+    gesperrt. Das ergänzt C4b/C4c (gespeicherte Farben, Weißabgleich aus einem Bild) um das
+    Angleichen des ganzen Bildes.
+- **Deflicker** (`DeflickerTool`, Kennung `deflicker`) bei Film, ein Ortswerkzeug auf der
+  linearen Seite: je Bildnummer ein Faktor auf das Licht, vor der Sichtumwandlung.
+  - „Folge messen“ lädt im Hintergrund jedes Bild der Folge (auf der Hälfte der Kerne) und
+    legt je Bildnummer das Mittel des linearen Lichts im Werkzeug ab. Der Knopf wird dabei zu
+    „Abbrechen“, die Karte zählt mit.
+  - Geglättet wird im Logarithmus mit einer Geraden durch das Fenster um jedes Bild (3 bis
+    51 Bilder). Mitten in der Folge ist das das Mittel des Fensters. An den Enden rückt das
+    Fenster nach innen, statt zu schrumpfen; so werden auch das erste und das letzte Bild
+    ausgeglichen. Eine gewollte Blende liegt auf ihrer Geraden und bleibt.
+  - Die Karte nennt die Zahl der Bilder und die stärkste Korrektur in Blenden. Nach neuen
+    Renders misst man neu.
+  - Gilt für das ganze Bild und ist an einer Ebene gesperrt. Es läuft im Export mit, auch mit
+    16 Bit, weil es ein Faktor auf das Licht ist und kein Durchgang über das fertige Bild.
+- **Beim Bau geändert:** Die erste Glättung ließ das Fenster an den Enden symmetrisch
+  schrumpfen. Das hielt Blenden, ließ aber das erste und letzte Bild unkorrigiert, und die
+  Probe mit einem Sprung fand nur 71 % weniger Streuung. Die Gerade durch das volle Fenster
+  hält Blenden genauso und gleicht die Enden aus.
+- **Proben** (`MatchInvariants`, 24 Zusicherungen):
+  - Angleichen: hin und zurück dieselbe Farbe; das kühle Bild bekommt Farbe und
+    Farbstreuung des warmen Vorbilds, Helligkeit und Kontrast bleiben, mit „Helligkeit mit“
+    kommen auch sie; halbe Stärke auf halbem Weg; ohne Vorbild, Messung oder Stärke nichts;
+    ein graues Bild wird warm, ohne zu explodieren.
+  - Deflicker: eine ruhige Folge und eine gleichmäßige Blende bekommen keinen Faktor, auch
+    an den Enden; Flackern um 20 % mit einem Sprung behält weniger als ein Viertel der
+    Streuung; Stärke null gibt keinen Faktor; ein Bild außerhalb der Messung bleibt.
+  - Speichern und Kopieren mit Vorbild, Messung, Stärke und Glättung.
+  - Auf der Seite: Farbe angleichen steht zuletzt; ohne Vorbild ist „Angleichen“ aus; das
+    kühle zweite Bild einer Folge wird so warm wie das gemerkte erste; ein Vorbild aus einer
+    Datei wird ohne Korrektur gemessen. „Folge messen“ misst zwölf flackernde Bilder im
+    Hintergrund, das helle wird dunkler und das dunkle daneben steht danach fast gleich hell.
+  - Angepasst: `AtelierPageInvariants` zählt neun Anzeigewerkzeuge.
+  - Die Nachbargruppen (21 Gruppen, dazu Optik, Weißabgleich und Farbspeicher) liefen mit
+    752 Zusicherungen grün.
+  - Eine echte Instanz startete ohne Fehler; die Zeichen von Ausgleich, CLAHE, Farbe
+    angleichen und Deflicker stehen in der Palette.
+
 ## 5. KI-Werkzeuge: Last, Größe, Lizenz
 
 **Laufzeit.** ONNX Runtime (MIT-Lizenz) mit DirectML auf jeder Grafikkarte unter
