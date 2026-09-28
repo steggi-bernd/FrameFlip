@@ -1595,6 +1595,41 @@ public partial class GradingPanel : UserControl
         Raise(interim);
     }
 
+    /// <summary>Ob die Karte der Kurven zu sehen ist - dann setzt Strg+Klick ins Bild einen Punkt (W2c).</summary>
+    public bool CurvesShown => CurveField.IsVisible;
+
+    /// <summary>Die Kurven dieses Streifens - fuer die Frage, was bei ihnen ankommt.</summary>
+    public CurvesTool Curves => _curves;
+
+    /// <summary>
+    /// Ein Punkt auf der gezeigten Kurve beim Ton eines Bildpunkts, so wie er bei den Kurven
+    /// ankommt (W2c): auf der Gesamtkurve seine Helligkeit, auf einer Kanalkurve sein Kanal. Der
+    /// Punkt liegt auf der Kurve - sie aendert sich erst, wenn man ihn zieht. Liegt dort schon
+    /// einer, bleibt es bei ihm.
+    /// </summary>
+    public bool AddCurvePoint(float r, float g, float b)
+    {
+        if (!CurvesShown || CurveField.Curve is not { } curve) return false;
+
+        float tone = ReferenceEquals(curve, _curves.Red) ? r
+                   : ReferenceEquals(curve, _curves.Green) ? g
+                   : ReferenceEquals(curve, _curves.Blue) ? b
+                   : 0.2126f * r + 0.7152f * g + 0.0722f * b;
+
+        tone = Math.Clamp(tone, 0f, 1f);
+
+        if (curve.Points.Any(p => MathF.Abs(p.X - tone) < 0.01f)) return true;
+
+        curve.Prepare();
+        curve.Points.Add(new CurvePoint(tone, curve.Evaluate(tone)));
+        curve.Points.Sort((a, c) => a.X.CompareTo(c.X));
+        curve.Prepare();
+
+        CurveField.InvalidateVisual();
+        Raise(interim: false);
+        return true;
+    }
+
     /// <summary>Genau eine Pipette ist an - oder keine.</summary>
     private void OnLevelsPickToggled(object sender, RoutedEventArgs e)
     {
