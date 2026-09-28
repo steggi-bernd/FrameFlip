@@ -993,3 +993,42 @@ Der offene Rest aus C4b: Der Knoten „Belichtung & Tönung“ nimmt jetzt ebenf
   - Die Farbe eines anderen Bildes aus dem Speicher.
   - Das Ende bei einem anderen Knoten.
   - Die Nachbargruppen liefen mit 558 Zusicherungen grün.
+
+### C7b: Pixel-Sort-Fenster und Verteilung unter der Skala (`feature/sortfenster`)
+
+Die ersten beiden offenen Punkte aus C7.
+
+- **Pixel Sort:** Das Fenster, also Von und Bis, steht jetzt als Bereichsregler über den
+  beiden Reglern.
+  - Es ist ein hartes Fenster: Sortiert wird, was dazwischen liegt, oder nicht. Deshalb hat
+    es nur die beiden inneren Griffe, und Alt trennt nichts.
+  - Unter den Griffen liegt die Skala des Sortierwerts: Helligkeit, Farbkreis oder
+    Sättigung.
+  - Ein Doppelklick schließt das Fenster.
+- **Verteilung unter der Skala:** Ein Band zeigt, wo die Werte des Bildes liegen, zwischen
+  denen man das Fenster setzt.
+  - Pixel Sort: der Sortierwert, wie er beim Sortieren ankommt. Das ist das fertige
+    Anzeigebild vor den Durchgängen, gerechnet mit derselben Formel wie das Sortieren
+    (`SortTool.KeyOf` steht dafür jetzt für sich).
+  - Helligkeits- und Untergrundmaske: die wahrgenommene Helligkeit des zusammengesetzten
+    Bildes.
+  - Farbbereich: die Farbtöne, je blasser, desto weniger, wie die Maske selbst zählt.
+  - Gemessen wird nach jedem vollen Durchgang wie das Histogramm, aber nur, wenn ein Regler
+    sie zeigt, jedes vierte Pixel.
+- **Gefunden:** Mit Alt zog der innere Griff eines Fensters ohne Kanten gar nicht, weil er
+  allein ziehen wollte, sich aber keine Kante auftun durfte. Ohne Kanten zieht Alt jetzt wie
+  ohne Alt.
+- **Nicht in diesem Schnitt:**
+  - Im Knotenmodus fehlt die Verteilung. Dort stehen Maske und Pixel Sort als Felder am
+    Knoten, und das Bild vor dem Knoten müsste erst durch den Graphen gerechnet werden.
+  - Keying gibt es als Werkzeug noch nicht.
+- **Probe** (`SortWindowInvariants`, 12 Zusicherungen):
+  - Die Rechnung: nur innere Griffe auch mit Alt, keine Kante beim Ziehen, Fächer und
+    Bezug der Verteilung, Farbkreis mit Gewicht, leere Verteilung, der Sortierwert für sich.
+  - Im Atelier:
+    - Die Karte von Pixel Sort mit Fenster und zwei Bergen im zweifarbigen Bild.
+    - Ein Zug, dem Pixel Sort und der Regler folgen, und das Schließen.
+    - Der Farbkreis beim Sortieren nach Farbton.
+    - Die Verteilung unter der Helligkeitsmaske.
+  - Die Nachbargruppen liefen mit 460 Zusicherungen grün.
+  - Eine echte Instanz startete ohne Fehler.

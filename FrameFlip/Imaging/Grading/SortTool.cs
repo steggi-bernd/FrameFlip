@@ -410,11 +410,17 @@ public sealed class SortTool : IFramePass
     }
 
     /// <summary>Der Wert, nach dem verglichen wird - und der die Schwelle entscheidet.</summary>
-    private float KeyOf(byte red, byte green, byte blue)
+    private float KeyOf(byte red, byte green, byte blue) => KeyOf(_key, red, green, blue);
+
+    /// <summary>
+    /// Der Sortierwert eines Anzeigewerts, 0 bis 1. Fuer sich, damit das Histogramm unter dem
+    /// Fenster (C7b) genau dieselbe Frage stellt wie das Sortieren.
+    /// </summary>
+    public static float KeyOf(SortKey key, byte red, byte green, byte blue)
     {
         float r = red / 255f, g = green / 255f, b = blue / 255f;
 
-        switch (_key)
+        switch (key)
         {
             case SortKey.Brightness:
                 return 0.2126f * r + 0.7152f * g + 0.0722f * b;
@@ -430,7 +436,7 @@ public sealed class SortTool : IFramePass
         float low = MathF.Min(r, MathF.Min(g, b));
         float chroma = high - low;
 
-        if (_key == SortKey.Saturation) return high <= 1e-6f ? 0f : chroma / high;
+        if (key == SortKey.Saturation) return high <= 1e-6f ? 0f : chroma / high;
 
         // Farbton, auf 0 bis 1 gelegt. Grau hat keinen - es kommt auf null und
         // sammelt sich damit an einem Ende, was richtig ist: Es gehoert nirgends

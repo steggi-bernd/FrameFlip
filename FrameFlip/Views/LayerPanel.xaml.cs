@@ -1879,6 +1879,9 @@ public partial class LayerPanel : UserControl
 
         // Der Bereichsregler dort, wo die beiden Regler ein Fenster sind - nicht an Schwarz- und Weisspunkt.
         MaskRangeRow.Visibility = MaskZoneRow.Visibility;
+
+        // Mit der Art kann sich die Verteilung aendern, die unter ihm liegt.
+        if (MaskDistributionKind is not null) MaskDistributionWanted?.Invoke();
         MaskGradientBody.Visibility = gradient ? Visibility.Visible : Visibility.Collapsed;
         MaskSourceBox.Visibility = source ? Visibility.Visible : Visibility.Collapsed;
         MaskInvertButton.IsEnabled = kind != MaskKind.None;
@@ -1982,6 +1985,24 @@ public partial class LayerPanel : UserControl
             MaskRange.Window = window;
             MaskRangeValue.Text = RangeText(window, "0.00", "");
         }
+    }
+
+    /// <summary>Die Verteilung unter dem Bereichsregler soll neu gemessen werden - eine andere Maske oder Art.</summary>
+    public event Action? MaskDistributionWanted;
+
+    /// <summary>
+    /// Welche Verteilung der Bereichsregler der gewaehlten Maske braucht: Helligkeit, Untergrund
+    /// oder Farbton - oder keine.
+    /// </summary>
+    public MaskKind? MaskDistributionKind => _selected?.Mask.Kind is MaskKind.Luminance or MaskKind.Underlying or MaskKind.Colour
+        ? _selected.Mask.Kind
+        : null;
+
+    /// <summary>Die Verteilung des Bildes unter dem Bereichsregler der Maske (C7b).</summary>
+    public void ShowMaskDistribution(float[]? bins)
+    {
+        if (_selected?.Mask.Kind == MaskKind.Colour) MaskHueRange.Distribution = bins;
+        else MaskRange.Distribution = bins;
     }
 
     /// <summary>"0,20 – 0,80" - und die Kanten, wenn es welche gibt.</summary>
