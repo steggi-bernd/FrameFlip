@@ -692,6 +692,13 @@ public sealed class MixNode : Node
     /// <summary>An "Unten" anschneiden - eine Schnittmaske.</summary>
     public bool Clip { get; set; }
 
+    /// <summary>
+    /// Das obere Bild ist fuer sich gerechnet, auf Schwarz, und traegt seine Deckung schon in
+    /// sich - eine Gruppe fuer sich (C2b). Es kommt mit dieser Deckung auf das untere, wie im Composer.
+    /// </summary>
+    [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingDefault)]
+    public bool Covered { get; set; }
+
     public override IReadOnlyList<Socket> Inputs { get; } = new[]
     {
         new Socket("Unten", SocketType.Image),
@@ -749,6 +756,32 @@ public sealed class MixNode : Node
                 // Dieselbe Rechnung und dieselbe Reihenfolge wie im Composer: die
                 // Deckkraft, mal dem Faktor, mal der aufbereiteten Freistellung.
                 float f = opacity * (factor is null ? 1f : factor.V[at]);
+
+                // Eine Gruppe fuer sich: mit ihrer Deckung auftragen - und wo sie nichts deckt,
+                // bleibt das untere, wie im Composer (C2b).
+                if (Covered)
+                {
+                    float cover = oa[at];
+
+                    if (cover <= 1e-6f)
+                    {
+                        rgb[at * 3] = r0;
+                        rgb[at * 3 + 1] = g0;
+                        rgb[at * 3 + 2] = b0;
+
+                        if (!Clip) a[at] = ua[at];
+                        continue;
+                    }
+
+                    float laid = f * cover;
+
+                    LayerComposer.Blend(Mode, InDisplay, laid, r0, g0, b0,
+                                        or_[at * 3] / cover, or_[at * 3 + 1] / cover, or_[at * 3 + 2] / cover,
+                                        out rgb[at * 3], out rgb[at * 3 + 1], out rgb[at * 3 + 2]);
+
+                    if (!Clip) a[at] = MathF.Max(ua[at], laid);
+                    continue;
+                }
 
                 if (matte)
                     f *= Math.Clamp(ImageLayer.Lift(ImageLayer.CleanMatte(oa[at], MatteFloor), Reveal), 0f, 1f);

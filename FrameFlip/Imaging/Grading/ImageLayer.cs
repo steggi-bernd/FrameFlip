@@ -253,6 +253,17 @@ public sealed class ImageLayer
     public List<ImageLayer> Children { get; set; } = new();
 
     /// <summary>
+    /// Eine Gruppe fuer sich (C2b): Ihre Ebenen rechnen auf Schwarz statt auf dem, was darunter
+    /// liegt, und das Ergebnis kommt mit seiner Deckung auf den Stapel - wie eine Gruppe in
+    /// Photoshop, die nicht "hindurchwirkt". Eine Korrektur darin trifft damit nur diese Ebenen.
+    ///
+    /// Ohne das, und so wie jede Gruppe bisher, sieht die Gruppe, was unter ihr liegt. Nur
+    /// geschrieben, wenn gesetzt: Ein Rezept von vorher bleibt, wie es war.
+    /// </summary>
+    [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingDefault)]
+    public bool Isolated { get; set; }
+
+    /// <summary>
     /// True, wenn an der Ebene selbst nichts eingestellt ist. Die Mischung zaehlt
     /// hier NICHT mit: Sie sagt, wie die Ebene auf die darunter wirkt, und das ist
     /// eine Aussage ueber den Stapel, nicht ueber die Ebene. Auf der untersten
@@ -327,6 +338,7 @@ public sealed class ImageLayer
         Place = Place.Clone(),
         OnTop = OnTop,
         Children = Children.Select(c => c.Clone()).ToList(),
+        Isolated = Isolated,
         Adjustments = Adjustments,
         Tools = Tools?.Clone(),
         Tint = Tint.Clone(),

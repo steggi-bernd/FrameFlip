@@ -149,6 +149,9 @@ public static class StackToGraph
 
             var saved = _below;
 
+            // Eine Gruppe fuer sich rechnet auf Schwarz (C2b).
+            if (group.Isolated) _below = (_graph.Add(new BlackNode()), "Bild");
+
             Layers(group.Children, depth + 1);
             Close();
 
@@ -161,6 +164,7 @@ public static class StackToGraph
                 Mode = group.Mode,
                 Opacity = Math.Clamp(group.Opacity, 0f, 1f),
                 InDisplay = group.BlendInDisplay,
+                Covered = group.Isolated,
             });
 
             _graph.Connect(saved.Node, saved.Output, mix, "Unten");

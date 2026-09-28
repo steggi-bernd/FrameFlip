@@ -109,6 +109,7 @@
                 -->
                 <Grid>
                     <ListBox x:Name="LayerList" MaxHeight="380" MinHeight="150" Background="Transparent"
+                             SelectionMode="Extended"
                              BorderThickness="0"
                              ItemContainerStyle="{StaticResource LayerRow}"
                              ScrollViewer.HorizontalScrollBarVisibility="Disabled"

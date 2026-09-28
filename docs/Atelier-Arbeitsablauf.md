@@ -1096,3 +1096,58 @@ Die offenen Punkte aus C6: Isolieren auch im Stapel, und die Maske als roter Sch
       durch ein anderes Bild.
     - Im Knotenmodus isoliert der Betrachter.
   - Die Nachbargruppen liefen mit 726 Zusicherungen grün.
+
+### C2b: Eine gemeinsame Korrektur über mehreren Ebenen (`feature/gemeinsame-korrektur`)
+
+Entscheidung 4: Mehrere Ebenen bekommen eine gemeinsame Korrektur darüber, auf diese Ebenen
+begrenzt.
+
+- **Gruppe für sich:** Eine Gruppe wirkte bisher immer hindurch. Ihre Ebenen rechneten auf
+  dem, was darunter liegt, und eine Korrektur darin traf auch das Bild darunter.
+  - Neu ist die Gruppe für sich (`ImageLayer.Isolated`), wie eine Photoshop-Gruppe im Modus
+    Normal statt „Hindurchwirken“.
+  - Ihre Ebenen rechnen auf Schwarz, und das Ergebnis kommt mit seiner Deckung auf den Stapel.
+  - Eine Korrektur darin trifft damit nur diese Ebenen.
+  - Bestehende Gruppen bleiben, wie sie waren. Das Feld wird nur geschrieben, wenn es gesetzt
+    ist.
+  - Im Menü einer Gruppe lässt es sich umschalten.
+- **Stapel und Knoten gleich:** Die Umwandlung baut eine Gruppe für sich mit schwarzem Grund
+  (`BlackNode`), und ihr Mischen trägt das Ergebnis mit dessen Deckung auf
+  (`MixNode.Covered`). Die Probe vergleicht Bildpunkt für Bildpunkt.
+- **Bedienung:**
+  - Im Ebenenstreifen lassen sich mit Strg- oder Umschalt-Klick mehrere Ebenen wählen. Ohne
+    Taste bleibt es bei einer, wie bisher.
+  - „+ Korrektur“ in der Zielzeile legt mit mehreren gewählten Ebenen eine Gruppe für sich
+    an, an ihren Platz, obenauf eine Einstellungsebene. Die ist danach gewählt, und ihre
+    Karte ist offen.
+- **Das Bild bleibt beim Zusammenlegen gleich:**
+  - Die Gruppe mischt sich, wie die unterste der Ebenen es vorher tat.
+  - Die unterste liegt in der Gruppe auf Schwarz, dort ist Normal dasselbe.
+  - Passe addieren sich weiter auf das Bild darunter.
+  - Halb deckende Bildebenen bleiben auch am Rand ihrer Deckung gleich.
+- **Grenzen:**
+  - Nur Ebenen, die nebeneinander in derselben Gruppe liegen. Sonst änderte das Zusammenlegen
+    die Reihenfolge; die Zielzeile sagt es.
+  - Keine Einstellungsebenen: Sie tragen kein eigenes Bild und lägen in der Gruppe auf
+    Schwarz.
+  - Eine Korrektur darin rechnet auf dem Ergebnis mit seiner Deckung. An halb deckenden
+    Rändern ist das eine Näherung, bei Passen und voll deckenden Ebenen genau.
+- **Nicht in diesem Schnitt:** Die Mehrfachauswahl in der Ebenenliste des Knotenmodus. Dort
+  gibt es noch keine gemeinsame Korrektur per Klick; eine umgewandelte Gruppe für sich
+  rechnet aber richtig.
+- **Probe** (`SharedCorrectionInvariants`, 14 Zusicherungen):
+  - Zusammensetzen:
+    - Passe bleiben gleich, die Korrektur trifft nur sie (0,5 statt 0,35). Eine Gruppe, die
+      hindurchwirkt, träfe auch das Bild darunter (0,7).
+    - Eine halb deckende Bildebene bleibt gleich und wird nur dort korrigiert, wo sie deckt.
+    - Stapel und Knoten rechnen für Passe und Bildebene dasselbe.
+  - Im Atelier:
+    - Nicht benachbarte Ebenen werden abgewiesen, mit Begründung.
+    - Zwei Ebenen werden zur Gruppe mit gewählter Korrektur, und das Bild bleibt gleich.
+    - Eine Blende heller trifft nur die beiden Ebenen.
+    - Der Schalter im Menü; die Einstellungsebene wird abgewiesen.
+  - Die Nachbargruppen (35 Gruppen zu Ebenen, Stapel, Knoten, Masken, Ziel, dazu die Texte)
+    liefen mit 1680 Zusicherungen grün.
+  - Die Mehrfachauswahl brach dabei zuerst Proben, die eine Zeile per `IsSelected` wählen;
+    eine neu gewählte Zeile ist ohne Strg oder Umschalt jetzt wieder die einzige.
+  - Eine echte Instanz startete ohne Fehler.

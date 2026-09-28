@@ -132,6 +132,10 @@ public static class StackIsolationInvariants
                        "dasselbe noch einmal beendet es");
 
             page.IsolateStack(layer, SoloView.Layer);
+
+            // Ein offenes Menue aus einer frueheren Gruppe haelt sonst die Maus, und dann gehoert
+            // Esc zu Recht ihm - wie in IsolationInvariants.
+            Mouse.Capture(null);
             Check.That(page.HandleToolKey(Key.Escape) && page.StackSolo is null && badge.Visibility != Visibility.Visible,
                        "Esc beendet es");
 

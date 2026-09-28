@@ -225,6 +225,11 @@
     <sys:String x:Key="S_PlaceHint">In fractions of the image, not in pixels – a recipe made at 1080p holds at 4K. Size 1 means fitted.</sys:String>
     <sys:String x:Key="S_DropHere">Drop an image here</sys:String>
     <sys:String x:Key="S_GroupLayer">Group</sys:String>
+    <sys:String x:Key="S_SharedCorrectionGroup">Shared correction</sys:String>
+    <sys:String x:Key="S_SharedCorrection">Correction</sys:String>
+    <sys:String x:Key="S_SharedCorrectionNeighbours">A shared correction works on layers that lie next to each other in the same group.</sys:String>
+    <sys:String x:Key="S_SharedCorrectionNoAdjustment">Adjustment layers carry no picture of their own – a shared correction works on image, pass and group layers.</sys:String>
+    <sys:String x:Key="S_GroupIsolated">On its own – corrections inside only touch these layers</sys:String>
     <sys:String x:Key="S_MoveIntoGroup">Into the group below</sys:String>
     <sys:String x:Key="S_MoveOutOfGroup">Out of the group</sys:String>
     <sys:String x:Key="S_FollowSequence">Follow the frame number</sys:String>
