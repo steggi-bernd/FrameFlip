@@ -660,6 +660,41 @@ In sechs Schnitten, nach Nutzen und Abhängigkeit:
     Isolieren, Seite, Werkzeuge, Andocken, Texte) liefen mit 845 Zusicherungen grün.
   - Eine echte Instanz startete ohne Fehler; der Knopf schaltet Normal, Clipping, Falschfarben.
 
+**W2d (`feature/messgeraete`):**
+
+- **Im Feld „Verteilung“** schaltet ein Knopf zwischen Histogramm, Waveform, RGB-Parade und
+  Vektorskop. Beim Histogramm stehen daneben wie bisher „RGB“ und neu „lin/log“; bei den
+  anderen Geräten fallen diese Knöpfe und die Zeile zu den Rändern weg.
+- **Gemessen wird das angezeigte Bild** (`Scopes`), wie auf dem Monitor eines Farbkorrektors:
+  nach jedem vollen Durchgang, im Stapel und im Knotenmodus. Bei einer Sichthilfe zählt das
+  Bild darunter. Gezählt wird jeder n-te Bildpunkt in beiden Richtungen, sodass es um die
+  hunderttausend werden. Solange das Histogramm steht, rechnet kein Gerät.
+- **Waveform:** je Bildspalte, wie sich die Helligkeit (Rec. 709) über die Höhe verteilt,
+  Schwarz unten; Raster bei 0, 25, 50, 75 und 100 %.
+- **RGB-Parade:** dasselbe je Kanal, drei Drittel in Rot, Grün und Blau nebeneinander.
+- **Vektorskop:** Farbton als Richtung, Sättigung als Abstand von der Mitte (Cb/Cr nach Rec. 709),
+  Rot oben links. Kreis, Achsen, die sechs Farbziele bei 75 % und die Linie der Hauttöne.
+- **Dichte:** logarithmisch hell, damit eine große Fläche nicht alles andere ins Dunkel drückt;
+  jeder gezählte Punkt bleibt sichtbar.
+- **Histogramm logarithmisch:** Der Schalter „lin/log“ stellt den Maßstab von der Wurzel (wie
+  bisher) auf den Logarithmus. Dann zeigen sich auch ganz wenige Bildpunkte, etwa ein paar
+  ausgefressene Lichter neben einer großen dunklen Fläche.
+- **Proben** (`ScopeInvariants`, 16 Zusicherungen):
+  - Rechnung: Der Verlauf steht in der Waveform auf seiner Höhe; reines Rot oben im roten
+    Drittel der Parade, Grün und Blau unten; im Vektorskop Rot oben links, Grau in der Mitte,
+    Cyan gegenüber; der logarithmische Maßstab zeigt einen einzelnen Punkt, die Spitze bleibt
+    oben.
+  - Kosten bei 4K: Waveform, Parade und Vektorskop kosten nicht mehr als das Histogramm
+    daneben (abwechselnd gemessen, als Zeitprüfung).
+  - Auf der Seite: anfangs das Histogramm und keine andere Messung; ein Klick misst die
+    Waveform sofort; mit Clipping misst sie das Bild darunter; Parade und Vektorskop am
+    Verlauf; im Knotenmodus misst die Seite nach dem Durchgang neu; vier Klicks führen zum
+    Histogramm zurück; „lin/log“ schaltet hin und her.
+  - Die Nachbargruppen (Sichthilfen, Tonwert, Kurven, Seite, Knotenmodus, Pipetten,
+    Weißabgleich, Texte, Andocken, Gruppen) liefen mit 382 Zusicherungen grün.
+  - Eine echte Instanz startete ohne Fehler; der Knopf schaltet die vier Geräte durch, „lin“
+    wird zu „log“, und die Knöpfe des Histogramms verschwinden bei den anderen Geräten.
+
 ## 5. KI-Werkzeuge: Last, Größe, Lizenz
 
 **Laufzeit.** ONNX Runtime (MIT-Lizenz) mit DirectML auf jeder Grafikkarte unter

@@ -365,6 +365,12 @@
 
     <!-- ================================================================ Korrektur -->
     <sys:String x:Key="S_Distribution">Verteilung</sys:String>
+    <sys:String x:Key="S_ScopeHistogram">Histogramm</sys:String>
+    <sys:String x:Key="S_ScopeWaveform">Waveform</sys:String>
+    <sys:String x:Key="S_ScopeParade">RGB-Parade</sys:String>
+    <sys:String x:Key="S_ScopeVector">Vektorskop</sys:String>
+    <sys:String x:Key="S_ScopeHint">Messgerät wechseln: Histogramm, Waveform (Helligkeit je Bildspalte), RGB-Parade (dasselbe je Kanal), Vektorskop (Farbton und Sättigung, mit Farbzielen und Hautlinie).</sys:String>
+    <sys:String x:Key="S_HistogramLogHint">Maßstab des Histogramms: lin (Wurzel, wie bisher) oder log – dann werden auch ganz wenige Bildpunkte sichtbar.</sys:String>
     <sys:String x:Key="S_Correction">Korrektur</sys:String>
     <sys:String x:Key="S_Reset">zurücksetzen</sys:String>
     <sys:String x:Key="S_Exposure">Belichtung</sys:String>

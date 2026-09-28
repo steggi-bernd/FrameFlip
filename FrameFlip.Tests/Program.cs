@@ -126,6 +126,7 @@ static int RunAll()
     StackIsolationInvariants.Run();
     SharedCorrectionInvariants.Run();
     ViewAidInvariants.Run();
+    ScopeInvariants.Run();
     AtelierProjectInvariants.Run();
     AtelierProjectPageInvariants.Run();
     SwitchLeftoverInvariants.Run();

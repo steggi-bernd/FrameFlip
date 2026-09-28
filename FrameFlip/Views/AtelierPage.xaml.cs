@@ -208,6 +208,7 @@ public sealed partial class AtelierPage : UserControl
         SetUpColourPick();
         SetUpDistributions();
         SetUpViewAids();
+        Tools.ScopeWanted += ShowScope;
         Layers.IsolateWanted += (layer, view) => IsolateStack(layer, view);
 
         _settle.Tick += (_, _) =>
@@ -819,6 +820,9 @@ public sealed partial class AtelierPage : UserControl
         // Die Verteilungen unter den Bereichsreglern - nur, wenn einer sie zeigt (C7b).
         ShowSortDistribution();
         ShowMaskDistribution();
+
+        // Und das Messgeraet, wenn eines statt des Histogramms steht (W2d).
+        ShowScope();
     }
 
     private void UpdateSourceText()
