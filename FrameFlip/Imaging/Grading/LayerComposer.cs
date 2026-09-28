@@ -231,7 +231,8 @@ public static class LayerComposer
             plans[i] = new Plan(used[i].Frame, layer.Mode, Math.Clamp(layer.Opacity, 0f, 1f),
                                 gain * layer.Tint.R, gain * layer.Tint.G, gain * layer.Tint.B, clipped,
                                 sampler, layer.Content, grade, used[i].Kind, placed, placement,
-                                layer.MatteFloor, layer.BlendInDisplay, layer.Reveal);
+                                layer.MatteFloor, layer.BlendInDisplay, layer.Reveal,
+                                layer.Content == LayerContent.Group && layer.Isolated);
         }
 
         // Die Gitterpunkte einmal aufschreiben, statt sie je Bildpunkt auszurechnen.
@@ -312,6 +313,9 @@ public static class LayerComposer
                                 depth++;
                             }
 
+                            // Eine Gruppe fuer sich beginnt auf Schwarz, ohne Deckung (C2b).
+                            if (plan.Isolated) vr = vg = vb = va = 0f;
+
                             continue;
                         }
 
@@ -331,6 +335,31 @@ public static class LayerComposer
                             ? plan.Opacity
                             : plan.Opacity * plan.Sampler.Factor(x, y, width, height, i,
                                                                  vr, vg, vb, br, bg, bb);
+
+                        // Fuer sich gerechnet, liegt das Ergebnis mit seiner Deckung vor - so viel,
+                        // wie die Ebenen darin decken. Aufgetragen wird es deshalb mit genau dieser
+                        // Deckung, auf den gesicherten Stand (C2b).
+                        if (plan.Isolated)
+                        {
+                            float cover = va;
+
+                            if (cover <= 1e-6f)
+                            {
+                                vr = br;
+                                vg = bg;
+                                vb = bb;
+                                va = ba;
+                                continue;
+                            }
+
+                            float laid = groupFactor * cover;
+
+                            Blend(plan.Mode, plan.Display, laid, br, bg, bb, vr / cover, vg / cover, vb / cover,
+                                  out vr, out vg, out vb);
+
+                            va = MathF.Max(ba, laid);
+                            continue;
+                        }
 
                         Blend(plan.Mode, plan.Display, groupFactor, br, bg, bb, vr, vg, vb,
                               out vr, out vg, out vb);
@@ -787,12 +816,16 @@ public static class LayerComposer
     /// <summary>Was je Ebene einmal feststeht.</summary>
     private readonly struct Plan
     {
+        /// <summary>Die Klammer einer Gruppe fuer sich (C2b).</summary>
+        public readonly bool Isolated;
+
         public Plan(FloatFrame? frame, BlendMode mode, float opacity,
                     float sr, float sg, float sb, bool clipped, MaskSampler sampler,
                     LayerContent content, LayerGrade grade, StepKind step,
                     bool placed, LayerPlacement placement,
-                    float matteFloor, bool display, float reveal)
+                    float matteFloor, bool display, float reveal, bool isolated = false)
         {
+            Isolated = isolated;
             Sampler = sampler;
             Display = display;
             Reveal = reveal;

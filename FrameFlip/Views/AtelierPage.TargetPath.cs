@@ -86,6 +86,15 @@ public partial class AtelierPage
     /// </summary>
     private void OnTargetCorrect(object sender, RoutedEventArgs e)
     {
+        // Mehrere Ebenen gewaehlt: eine gemeinsame Korrektur ueber ihnen (C2b, Entscheidung 4).
+        if (!InNodes && Layers.SelectedLayers is { Count: >= 2 } several)
+        {
+            if (Layers.CorrectTogether(several, out string? why)) Tools.Show("Basic");
+            else TargetNote.Text = why;
+
+            return;
+        }
+
         // Auf eine Auswahl: Die neue Maskenebene bringt ihre Korrektur schon mit - sie wird das Ziel,
         // statt eine zweite dahinter zu legen.
         if (MaterialiseSelection())

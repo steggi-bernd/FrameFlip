@@ -225,6 +225,11 @@
     <sys:String x:Key="S_PlaceHint">In Anteilen der Bildgröße, nicht in Bildpunkten – ein Rezept von 1080p gilt damit auch für 4K. Größe 1 heißt: eingepasst.</sys:String>
     <sys:String x:Key="S_DropHere">Bild hierher ziehen</sys:String>
     <sys:String x:Key="S_GroupLayer">Gruppe</sys:String>
+    <sys:String x:Key="S_SharedCorrectionGroup">Gemeinsame Korrektur</sys:String>
+    <sys:String x:Key="S_SharedCorrection">Korrektur</sys:String>
+    <sys:String x:Key="S_SharedCorrectionNeighbours">Eine gemeinsame Korrektur geht über Ebenen, die nebeneinander in derselben Gruppe liegen.</sys:String>
+    <sys:String x:Key="S_SharedCorrectionNoAdjustment">Einstellungsebenen tragen kein eigenes Bild – eine gemeinsame Korrektur geht über Bild-, Pass- und Gruppenebenen.</sys:String>
+    <sys:String x:Key="S_GroupIsolated">Für sich – Korrekturen darin treffen nur diese Ebenen</sys:String>
     <sys:String x:Key="S_MoveIntoGroup">In die Gruppe darunter</sys:String>
     <sys:String x:Key="S_MoveOutOfGroup">Aus der Gruppe heraus</sys:String>
     <sys:String x:Key="S_FollowSequence">Bildnummer folgen</sys:String>

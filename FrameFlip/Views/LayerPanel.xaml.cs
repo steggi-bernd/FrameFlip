@@ -350,7 +350,7 @@ public partial class LayerPanel : UserControl
     private static string Marker(ImageLayer layer) => layer.Content switch
     {
         LayerContent.Adjustment => "≡ ",
-        LayerContent.Group => "▼ ",
+        LayerContent.Group => layer.Isolated ? "▼▣ " : "▼ ",
         LayerContent.Image => "▣ ",
         _ => "",
     };
@@ -540,6 +540,115 @@ public partial class LayerPanel : UserControl
     /// <summary>Das zuletzt geoeffnete Menue einer Zeile - fuer die Probe.</summary>
     internal FlipMenu? RowMenu { get; private set; }
 
+    /// <summary>
+    /// Die gewaehlten Ebenen - mit Strg- oder Umschalt-Klick auch mehrere (C2b), in der
+    /// Reihenfolge des Stapels, von unten nach oben.
+    /// </summary>
+    public IReadOnlyList<ImageLayer> SelectedLayers
+    {
+        get
+        {
+            var chosen = LayerList.SelectedItems.OfType<ListBoxItem>().Select(i => i.Tag).OfType<ImageLayer>().ToList();
+            var order = Stack.All().ToList();
+            return chosen.OrderBy(order.IndexOf).ToList();
+        }
+    }
+
+    /// <summary>Waehlt mehrere Ebenen zugleich - der Weg der Strg-Klicks, fuer die Probe.</summary>
+    internal void SelectLayers(IEnumerable<ImageLayer> layers)
+    {
+        var wanted = layers.ToHashSet();
+
+        _choosingSeveral = true;
+
+        try
+        {
+            LayerList.SelectedItems.Clear();
+
+            foreach (var item in LayerList.Items.OfType<ListBoxItem>())
+                if (item.Tag is ImageLayer layer && wanted.Contains(layer)) LayerList.SelectedItems.Add(item);
+        }
+        finally
+        {
+            _choosingSeveral = false;
+        }
+    }
+
+    /// <summary>
+    /// Eine gemeinsame Korrektur ueber mehreren Ebenen (C2b, Entscheidung 4): Die Ebenen kommen
+    /// in eine Gruppe fuer sich, an ihren Platz, und obenauf in der Gruppe liegt eine
+    /// Einstellungsebene. Sie trifft nur diese Ebenen und ist danach gewaehlt.
+    ///
+    /// Das Bild aendert sich dabei nicht: Die Gruppe mischt sich, wie die unterste der Ebenen es
+    /// vorher tat, und die unterste liegt in ihr auf Schwarz. Nur Ebenen, die nebeneinander in
+    /// derselben Gruppe liegen - sonst wuerde das Zusammenlegen die Reihenfolge aendern.
+    /// </summary>
+    public bool CorrectTogether(IReadOnlyList<ImageLayer> layers, out string? why)
+    {
+        why = null;
+
+        if (layers.Count < 2) return false;
+
+        var owner = Owner(layers[0]);
+        var positions = layers.Select(l => owner?.IndexOf(l) ?? -1).OrderBy(i => i).ToList();
+
+        bool together = owner is not null && positions[0] >= 0 &&
+                        layers.All(l => ReferenceEquals(Owner(l), owner)) &&
+                        positions.Zip(positions.Skip(1), (a, b) => b - a).All(d => d == 1);
+
+        if (!together)
+        {
+            why = Strings.T("S_SharedCorrectionNeighbours");
+            return false;
+        }
+
+        // Eine Einstellungsebene bringt kein eigenes Bild mit - in einer Gruppe fuer sich laege
+        // sie auf Schwarz und korrigierte nichts mehr.
+        if (layers.Any(l => l.Content == LayerContent.Adjustment))
+        {
+            why = Strings.T("S_SharedCorrectionNoAdjustment");
+            return false;
+        }
+
+        var members = positions.Select(i => owner![i]).ToList();
+        var lowest = members[0];
+
+        var group = new ImageLayer
+        {
+            Content = LayerContent.Group,
+            Name = Strings.T("S_SharedCorrectionGroup"),
+            Mode = lowest.Mode,
+            BlendInDisplay = lowest.BlendInDisplay,
+            Isolated = true,
+        };
+
+        // Die unterste liegt in der Gruppe auf Schwarz - dort ist Normal, was sie vorher auf dem
+        // Stapel darunter war. Ihre Mischung traegt jetzt die Gruppe.
+        lowest.Mode = BlendMode.Normal;
+        lowest.BlendInDisplay = false;
+
+        foreach (var member in members) owner!.Remove(member);
+
+        group.Children.AddRange(members);
+
+        var correction = new ImageLayer
+        {
+            Content = LayerContent.Adjustment,
+            Name = Strings.T("S_SharedCorrection"),
+            Mode = BlendMode.Normal,
+        };
+
+        group.Children.Add(correction);
+        owner!.Insert(positions[0], group);
+
+        _selected = correction;
+
+        Rebuild();
+        Editing?.Invoke(EditedLayer);
+        Raise(interim: false);
+        return true;
+    }
+
     /// <summary>Eine Ebene soll allein gezeigt werden - oder ihre Maske (C6b). Alt+Klick oder das Menue der Zeile.</summary>
     public event Action<ImageLayer, SoloView>? IsolateWanted;
 
@@ -580,6 +689,17 @@ public partial class LayerPanel : UserControl
             .Item("⇥", Strings.T("S_MoveIntoGroup"), () => OnIndentClicked(this, none), "Strg+G")
             .Item("⇤", Strings.T("S_MoveOutOfGroup"), () => OnOutdentClicked(this, none), "Strg+Umschalt+G",
                   enabled: owner is not null && GroupOf(owner) is not null);
+
+        // Eine Gruppe fuer sich oder eine, die hindurchwirkt (C2b).
+        if (layer.Content == LayerContent.Group)
+        {
+            menu.Toggle(Strings.T("S_GroupIsolated"), layer.Isolated, () =>
+            {
+                layer.Isolated = !layer.Isolated;
+                Rebuild();
+                Raise(interim: false);
+            });
+        }
 
         // Anschneiden geht, wo es der Knopf erlaubt: nicht an der untersten Ebene.
         if (Stack.Layers.IndexOf(layer) > 0)
@@ -646,10 +766,35 @@ public partial class LayerPanel : UserControl
                                             or ".tif" or ".tiff" or ".bmp" or ".webp";
     }
 
+    /// <summary>Ob gerade bewusst mehrere Zeilen gewaehlt werden - dann bleibt die Auswahl, wie sie ist.</summary>
+    private bool _choosingSeveral;
+
     private void OnSelectionChanged(object sender, SelectionChangedEventArgs e)
     {
         if (_filling) return;
-        if (LayerList.SelectedItem is not ListBoxItem item || item.Tag is not ImageLayer layer) return;
+
+        // Mehrere Zeilen nur mit Strg oder Umschalt - oder wenn sie bewusst gewaehlt werden (C2b).
+        // Sonst gilt, was immer galt: Eine neu gewaehlte Zeile ist DIE gewaehlte.
+        var added = e.AddedItems.OfType<ListBoxItem>().LastOrDefault();
+        bool several = _choosingSeveral || (Keyboard.Modifiers & (ModifierKeys.Control | ModifierKeys.Shift)) != 0;
+
+        if (added is not null && !several && LayerList.SelectedItems.Count > 1)
+        {
+            _filling = true;
+
+            try
+            {
+                LayerList.SelectedItems.Clear();
+                added.IsSelected = true;
+            }
+            finally
+            {
+                _filling = false;
+            }
+        }
+
+        var chosen = added ?? LayerList.SelectedItem as ListBoxItem;
+        if (chosen is not ListBoxItem item || item.Tag is not ImageLayer layer) return;
 
         _selected = layer;
         PushToControls();
