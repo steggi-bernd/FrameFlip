@@ -874,3 +874,58 @@ Grenzen aufteilen lassen, als wiederverwendbarer Baustein.
   - Die Nachbargruppen (Masken, Ebenen, Stapel, Pipette, Texte, Knoten) liefen mit 845 und
     338 Zusicherungen grün.
   - Eine echte Instanz mit eigener Konfiguration startete ohne Fehler.
+
+### C4b: Farbspeicher und Farbräder (`feature/farbspeicher`)
+
+Der offene Teil von Punkt 4, entschieden am 28. September:
+
+- Farben werden gespeichert.
+- Die Tönung übernimmt die Farbe.
+- Lift/Gamma/Gain neutralisieren.
+- Die gespeicherten Farben sollen für automatische Anpassungen dienen, etwa die
+  Temperatur eines anderen Bildes übernehmen, auch nur stellenweise. Das folgt in C4c.
+
+- **Farbspeicher:** Jede Farbe, die die Pipette liest, wird gemerkt.
+  - Es wird zweierlei festgehalten: die Farbe wie angezeigt und das Licht der Quelle, dazu
+    Datei und Stelle.
+  - Der Speicher gilt über das Bild hinaus, denn Farben sollen zwischen Bildern wandern. Er
+    liegt in den Einstellungen, nicht im Projekt.
+  - Er fasst zwölf Farben, die neueste vorn. Dieselbe Farbe aus derselben Datei kommt nicht
+    zweimal hintereinander hinein.
+  - In der Werkzeugleiste der Pipette steht er als Reihe kleiner Felder. Ein Klick übernimmt
+    ein Feld in die wartende Tönung, ein Rechtsklick vergisst es.
+- **Tönung übernimmt:** Neben dem Tönungsrad einer Ebene steht eine Pipette.
+  - Der nächste Klick ins Bild, oder ein Feld aus dem Speicher, setzt die Tönung auf diese
+    Farbe: das Rad in ihre Richtung, so weit, wie ihre Kanäle auseinanderliegen, ohne die
+    Helligkeit zu ändern.
+  - So wird die Farbe eines Bildes die Tönung in einem anderen.
+- **Lift/Gamma/Gain neutralisieren:** Unter jedem Rad steht eine Pipette. Ein Klick ins Bild
+  macht diese Stelle in dieser Zone grau, die Helligkeit der Zone bleibt.
+  - Der Ton ist der, der bei Lift, Gamma und Gain ankommt, also dieselbe Frage wie bei den
+    Pipetten des Tonwerts. Im Stapel und im Knotenmodus gelten deren Wege.
+  - Das Rad wird nicht aus einer umgekehrten Formel gerechnet, sondern mit genau der
+    Rechnung des Bildes über die Fläche des Rades gesucht. Das stimmt auch bei Gamma und an
+    der Grenze, und mit den beiden anderen Zonen, wie sie stehen.
+  - Reicht der Rand des Rades nicht, ist es der Punkt, der Grau am nächsten kommt.
+- **Wie der Tonwert:**
+  - Nach dem Klick ist die Pipette fertig, und die Maus geht zu ihrem vorigen Werkzeug
+    zurück.
+  - Es wartet immer nur eine Pipette.
+  - Die Lupe sagt vorher, wofür sie liest.
+  - Ein anderes Bild beendet sie.
+  - Hat man inzwischen eine andere Ebene gewählt, geht die Tönung nicht an die falsche.
+- **Nicht in diesem Schnitt:** Die Tönung eines Knotens (Belichtung & Tönung) nimmt noch keine
+  Farbe. Die Pipette steht am Rad im Ebenenstreifen.
+- **Probe** (`ColourStoreInvariants`, 17 Zusicherungen):
+  - Die Rechnung: Reihenfolge und Grenze des Speichers, Tönung aus einer Farbe und aus Grau.
+  - Neutralisieren in allen drei Zonen mit gleicher Helligkeit, zu kräftig für das Rad.
+  - Im Atelier:
+    - Ein Klick merkt die Farbe, zweimal dieselbe nur einmal, und sie wird gespeichert.
+    - Die Pipette an den Lichtern wartet, stellt ein und ist danach fertig; die Stelle kommt
+      grau aus Lift, Gamma und Gain.
+    - Die Tönung aus dem Bild.
+    - In einem anderen Bild ist der Speicher noch da, und seine Farbe wird dort die Tönung.
+    - Ein Rechtsklick vergisst eine Farbe.
+  - Die Nachbargruppen (Tonwert, Farbstreifen, Farbrad, Ebenen, Einstellungen, Pipette,
+    Texte) liefen mit 760 Zusicherungen grün.
+  - Eine echte Instanz startete ohne Fehler.
