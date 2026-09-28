@@ -206,6 +206,7 @@ public sealed partial class AtelierPage : UserControl
         SetUpPropertiesFollow();
         SetUpQuickPanel();
         SetUpColourPick();
+        SetUpDistributions();
 
         _settle.Tick += (_, _) =>
         {
@@ -803,6 +804,10 @@ public sealed partial class AtelierPage : UserControl
                                     histogram, step: 4, _number);
 
         Tools.ShowHistogram(histogram);
+
+        // Die Verteilungen unter den Bereichsreglern - nur, wenn einer sie zeigt (C7b).
+        ShowSortDistribution();
+        ShowMaskDistribution();
     }
 
     private void UpdateSourceText()

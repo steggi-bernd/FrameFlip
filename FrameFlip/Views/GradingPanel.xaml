@@ -1271,6 +1271,15 @@
                     Laeufe. Deshalb stehen die beiden ganz oben und nicht unter
                     "Weiteres": Wer sie nicht findet, haelt das Werkzeug fuer kaputt.
                 -->
+                <!-- Das Fenster als Bereichsregler (C7b), darunter die Verteilung des Sortierwerts im Bild. -->
+                <StackPanel Margin="0,10,0,0" ToolTip="{DynamicResource S_SortRangeHint}">
+                    <Grid Margin="0,0,0,2">
+                        <TextBlock Text="{DynamicResource S_SortRange}" Style="{StaticResource PanelLabel}" />
+                        <TextBlock x:Name="SortRangeValue" Style="{StaticResource PanelValue}" />
+                    </Grid>
+                    <local:RangeSlider x:Name="SortRange" />
+                </StackPanel>
+
                 <Grid Margin="0,10,0,2">
                     <TextBlock Text="{DynamicResource S_SortFrom}" Style="{StaticResource PanelLabel}" />
                     <TextBlock x:Name="SortLowValue" Style="{StaticResource PanelValue}" />

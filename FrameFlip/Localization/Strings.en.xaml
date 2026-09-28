@@ -130,6 +130,8 @@
     <sys:String x:Key="S_VignetteHint">A lens falling off towards the edges. It multiplies light and acts before the view transform — which is why it needs no highlight protection: a lamp stays white instead of turning into a grey disc. Roundness runs from diamond through circle to rectangle.</sys:String>
     <sys:String x:Key="S_Sort">Pixel sorting</sys:String>
     <sys:String x:Key="S_SortFrom">From</sys:String>
+    <sys:String x:Key="S_SortRange">Window</sys:String>
+    <sys:String x:Key="S_SortRangeHint">Whatever lies between the two handles is sorted. The band shows where the picture's values lie. Shift: fine. Double-click: close.</sys:String>
     <sys:String x:Key="S_SortTo">To</sys:String>
     <sys:String x:Key="S_SortLongest">Longest run</sys:String>
     <sys:String x:Key="S_SortLongestOff">no limit</sys:String>

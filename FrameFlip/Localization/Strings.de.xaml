@@ -130,6 +130,8 @@
     <sys:String x:Key="S_VignetteHint">Der Randabfall einer Linse. Sie multipliziert das Licht und wirkt vor der Sichtumwandlung — deshalb braucht sie keinen Lichterschutz: Eine Lampe bleibt weiß, statt zur grauen Scheibe zu werden. Rundung geht von der Raute über den Kreis zum Rechteck.</sys:String>
     <sys:String x:Key="S_Sort">Pixel Sorting</sys:String>
     <sys:String x:Key="S_SortFrom">Von</sys:String>
+    <sys:String x:Key="S_SortRange">Fenster</sys:String>
+    <sys:String x:Key="S_SortRangeHint">Umsortiert wird, was zwischen den beiden Griffen liegt. Das Band zeigt, wo die Werte des Bildes liegen. Umschalt: fein. Doppelklick: schließen.</sys:String>
     <sys:String x:Key="S_SortTo">Bis</sys:String>
     <sys:String x:Key="S_SortLongest">Hoechste Laenge</sys:String>
     <sys:String x:Key="S_SortLongestOff">ohne Grenze</sys:String>

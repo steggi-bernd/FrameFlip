@@ -38,6 +38,15 @@ public readonly record struct RangeScale(float Min, float Max, bool Circular, fl
 
     /// <summary>Farbton: ein Kreis in Grad, eine Kante hoechstens 90 Grad - derselbe Regler "Weich", in halben Kreisen.</summary>
     public static readonly RangeScale Hue = new(0f, 360f, true, 90f);
+
+    /// <summary>
+    /// Ein hartes Fenster von 0 bis 1 - ohne Kanten, zwei Griffe (C7b). Fuer das, was nur "dazu"
+    /// oder "nicht dazu" kennt, wie die Schwelle von Pixel Sort.
+    /// </summary>
+    public static readonly RangeScale Window = new(0f, 1f, false, 0f);
+
+    /// <summary>Ob das Fenster weiche Kanten haben kann - sonst hat es nur die beiden inneren Griffe.</summary>
+    public bool HasEdges => MaxSoft > 0f;
 }
 
 /// <summary>Die Rechnung des Bereichsreglers - ohne Fenster pruefbar, wie die des Farbrads.</summary>
@@ -54,6 +63,10 @@ public static class RangeWindows
     public static RangeWindow Drag(RangeWindow window, RangeHandle handle, float delta, bool alone, RangeScale scale)
     {
         float low = window.Low, high = window.High, softLow = window.SoftLow, softHigh = window.SoftHigh;
+
+        // Ohne Kanten gibt es nichts zu trennen: Alt zieht dann wie ohne Alt, sonst stuende der
+        // Griff fest, weil sich keine Kante auftun darf.
+        if (!scale.HasEdges) alone = false;
 
         // Auf dem Kreis bleibt ein Fenster mindestens ein Grad weit und hoechstens ein ganzer Kreis.
         float minWidth = scale.Circular ? 1f : 0f;
@@ -139,6 +152,9 @@ public static class RangeWindows
     /// </summary>
     public static RangeHandle? HandleAt(RangeWindow window, float value, float reach, bool alt, RangeScale scale)
     {
+        // Ohne Kanten gibt es keinen aeusseren Griff - auch nicht mit Alt.
+        if (!scale.HasEdges) alt = false;
+
         RangeHandle[] order = alt
             ? new[] { RangeHandle.OuterLow, RangeHandle.OuterHigh, RangeHandle.Low, RangeHandle.High }
             : new[] { RangeHandle.Low, RangeHandle.High, RangeHandle.OuterLow, RangeHandle.OuterHigh };
@@ -148,6 +164,8 @@ public static class RangeWindows
 
         foreach (var handle in order)
         {
+            if (!scale.HasEdges && handle is RangeHandle.OuterLow or RangeHandle.OuterHigh) continue;
+
             float distance = Distance(Shown(window, handle, scale), value, scale);
 
             // Erst deutlich naeher zaehlt: So gewinnt bei Gleichstand der Griff, der vorn in der Reihe steht.
@@ -177,6 +195,35 @@ public static class RangeWindows
         if (away <= half) return 1f;
 
         return edge <= 1e-4f ? 0f : 1f - Math.Clamp((away - half) / edge, 0f, 1f);
+    }
+
+    /// <summary>
+    /// Eine Verteilung fuer das Band unter der Skala: die Werte in <paramref name="bins"/> Faecher
+    /// gezaehlt, auf das hoechste bezogen. Null, wenn nichts gezaehlt wurde.
+    /// </summary>
+    public static float[]? Distribution(IEnumerable<(float Value, float Weight)> values, RangeScale scale, int bins = 64)
+    {
+        var counts = new float[bins];
+        float total = 0f;
+
+        foreach (var (value, weight) in values)
+        {
+            if (weight <= 0f || float.IsNaN(value)) continue;
+
+            float at = (value - scale.Min) / scale.Span;
+            if (scale.Circular) at -= MathF.Floor(at);
+
+            int bin = Math.Clamp((int)(at * bins), 0, bins - 1);
+            counts[bin] += weight;
+            total += weight;
+        }
+
+        if (total <= 0f) return null;
+
+        float highest = counts.Max();
+        for (int i = 0; i < bins; i++) counts[i] /= highest;
+
+        return counts;
     }
 
     private static float Distance(float a, float b, RangeScale scale)

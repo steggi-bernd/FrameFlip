@@ -12,6 +12,9 @@ using Size = System.Windows.Size;
 
 namespace FrameFlip.Views;
 
+/// <summary>Was unter der Skala des Bereichsreglers liegt. Auto: der Farbkreis auf einem Kreis, sonst die Helligkeit.</summary>
+public enum RangeTrack { Auto, Light, Hue, Saturation }
+
 /// <summary>
 /// Der Bereichsregler (docs/Atelier-Arbeitsablauf.md, C7): ein Fenster auf einer Skala, mit vier
 /// Griffen - je zwei als Paar.
@@ -65,6 +68,35 @@ public sealed class RangeSlider : FrameworkElement
         }
     }
 
+    /// <summary>Was unter der Skala liegt: ein Verlauf der Helligkeit, der Farbkreis oder die Saettigung.</summary>
+    public RangeTrack Track
+    {
+        get => _track;
+        set
+        {
+            _track = value;
+            InvalidateVisual();
+        }
+    }
+
+    private RangeTrack _track = RangeTrack.Auto;
+
+    /// <summary>
+    /// Wie sich die Werte des Bildes ueber die Skala verteilen, auf das hoechste Fach bezogen -
+    /// als Band ueber dem Verlauf (C7b). Null: keines.
+    /// </summary>
+    public float[]? Distribution
+    {
+        get => _distribution;
+        set
+        {
+            _distribution = value;
+            InvalidateVisual();
+        }
+    }
+
+    private float[]? _distribution;
+
     /// <summary>Ein Zug hat das Fenster geaendert - mit <c>true</c>, solange er laeuft.</summary>
     public event Action<RangeWindow, bool>? Changed;
 
@@ -73,26 +105,50 @@ public sealed class RangeSlider : FrameworkElement
 
     // ---------------------------------------------------------------- Zeichnen
 
-    private double Track => Math.Max(1, ActualWidth - 2 * Side);
+    private double TrackWidth => Math.Max(1, ActualWidth - 2 * Side);
 
-    private double XOf(float value) => Side + (value - _scale.Min) / _scale.Span * Track;
+    private double XOf(float value) => Side + (value - _scale.Min) / _scale.Span * TrackWidth;
 
-    private float ValueAt(double x) => _scale.Min + (float)((x - Side) / Track) * _scale.Span;
+    private float ValueAt(double x) => _scale.Min + (float)((x - Side) / TrackWidth) * _scale.Span;
 
     protected override Size MeasureOverride(Size available)
         => new(double.IsInfinity(available.Width) ? 160 : available.Width, 32);
 
     protected override void OnRender(DrawingContext dc)
     {
-        var track = new Rect(Side, TrackTop, Track, TrackHeight);
+        var track = new Rect(Side, TrackTop, TrackWidth, TrackHeight);
 
-        dc.DrawRoundedRectangle(Scale.Circular ? HueBrush : LightBrush, null, track, 3, 3);
+        var brush = (_track == RangeTrack.Auto ? (Scale.Circular ? RangeTrack.Hue : RangeTrack.Light) : _track) switch
+        {
+            RangeTrack.Hue => HueBrush,
+            RangeTrack.Saturation => SaturationBrush,
+            _ => LightBrush,
+        };
+
+        dc.DrawRoundedRectangle(brush, null, track, 3, 3);
+
+        // Die Verteilung des Bildes: wo die Werte liegen, zwischen denen man das Fenster setzt.
+        if (_distribution is { Length: > 0 } bins)
+        {
+            var bar = new SolidColorBrush(Color.FromArgb(0x8C, 0x9A, 0x96, 0xA8));
+            bar.Freeze();
+
+            double width = TrackWidth / bins.Length;
+
+            for (int i = 0; i < bins.Length; i++)
+            {
+                double height = TrackHeight * Math.Sqrt(Math.Clamp(bins[i], 0f, 1f));
+                if (height < 0.5) continue;
+
+                dc.DrawRectangle(bar, null, new Rect(Side + i * width, TrackTop + TrackHeight - height, Math.Max(1, width - 0.5), height));
+            }
+        }
 
         // Was nicht durchgelassen wird, liegt im Schatten - so weit, wie die Kante es sagt.
         var shade = new SolidColorBrush(Color.FromArgb(0xB0, 0x10, 0x10, 0x16));
         shade.Freeze();
 
-        int columns = Math.Max(1, (int)Track);
+        int columns = Math.Max(1, (int)TrackWidth);
         var outline = new StreamGeometry();
 
         using (var geometry = outline.Open())
@@ -119,6 +175,9 @@ public sealed class RangeSlider : FrameworkElement
         foreach (var handle in new[] { RangeHandle.OuterLow, RangeHandle.OuterHigh, RangeHandle.Low, RangeHandle.High })
         {
             bool inner = handle is RangeHandle.Low or RangeHandle.High;
+
+            // Ein hartes Fenster hat nur die beiden inneren Griffe.
+            if (!inner && !_scale.HasEdges) continue;
             double x = XOf(RangeWindows.Shown(_window, handle, _scale));
             double top = TrackTop + TrackHeight + 2;
 
@@ -154,6 +213,9 @@ public sealed class RangeSlider : FrameworkElement
         new(Color.FromRgb(0xFF, 0x00, 0xFF), 5 / 6.0),
         new(Color.FromRgb(0xFF, 0x00, 0x00), 1),
     }, 0));
+
+    private static readonly Brush SaturationBrush = Frozen(new LinearGradientBrush(Color.FromRgb(0x80, 0x80, 0x80),
+                                                                                  Color.FromRgb(0xE0, 0x30, 0x30), 0));
 
     private static Brush Frozen(Brush brush)
     {
@@ -216,7 +278,7 @@ public sealed class RangeSlider : FrameworkElement
     /// </summary>
     internal bool Grab(double x, bool alt)
     {
-        float reach = (float)(HandleSize / Track) * _scale.Span;
+        float reach = (float)(HandleSize / TrackWidth) * _scale.Span;
 
         _dragging = RangeWindows.HandleAt(_window, ValueAt(x), reach, alt, _scale);
         if (_dragging is null) return false;
@@ -234,7 +296,7 @@ public sealed class RangeSlider : FrameworkElement
     {
         if (_dragging is not { } handle) return;
 
-        float delta = (float)((x - _startX) / Track) * _scale.Span * (fine ? 0.1f : 1f);
+        float delta = (float)((x - _startX) / TrackWidth) * _scale.Span * (fine ? 0.1f : 1f);
 
         _window = RangeWindows.Drag(_startWindow, handle, delta, _alone, _scale);
         InvalidateVisual();

@@ -783,6 +783,7 @@ public partial class GradingPanel : UserControl
             SortSpeedSlider.Value = Math.Clamp(_sort.Speed, SortSpeedSlider.Minimum, SortSpeedSlider.Maximum);
 
             SortKeyBox.SelectedIndex = (int)_sort.Key;
+            ShowSortRange();
             SortIntervalBox.SelectedIndex = (int)_sort.Interval;
             SortCrossButton.IsChecked = _sort.Cross;
             SortDescendingButton.IsChecked = _sort.Descending;
@@ -1039,6 +1040,7 @@ public partial class GradingPanel : UserControl
 
         _sort.Low = (float)SortLowSlider.Value;
         _sort.High = (float)SortHighSlider.Value;
+        ShowSortRange();
         _sort.Longest = (int)Math.Round(SortLongestSlider.Value);
         _sort.Angle = (float)SortAngleSlider.Value;
         _sort.Edge = (float)SortEdgeSlider.Value;
@@ -1530,6 +1532,69 @@ public partial class GradingPanel : UserControl
         Raise(interim: false);
     }
 
+    // ------------------------------------------------------------ Pixel Sort als Fenster (C7b)
+
+    /// <summary>Die Verteilung des Sortierwerts soll neu gemessen werden - die Karte ist offen oder der Wert anders.</summary>
+    public event Action? SortDistributionWanted;
+
+    /// <summary>Ob die Karte von Pixel Sort offen ist - nur dann lohnt die Verteilung.</summary>
+    public bool SortShown => SortBody.Visibility == Visibility.Visible;
+
+    /// <summary>Wonach Pixel Sort gerade sortiert.</summary>
+    public SortKey SortKeyShown => _sort.Key;
+
+    /// <summary>Die Verteilung des Sortierwerts im Bild, wie sie beim Sortieren ankommt.</summary>
+    public void ShowSortDistribution(float[]? bins) => SortRange.Distribution = bins;
+
+    private bool _sortRangeHooked;
+
+    /// <summary>Das Fenster im Bereichsregler, wie es in den beiden Reglern steht - und die Skala zum Sortierwert.</summary>
+    private void ShowSortRange()
+    {
+        if (SortRange is null) return;
+
+        if (!_sortRangeHooked)
+        {
+            _sortRangeHooked = true;
+            SortRange.Scale = RangeScale.Window;
+            SortRange.Changed += OnSortRangeChanged;
+            SortRange.ResetWanted += () => OnSortRangeChanged(new RangeWindow(0f, 0f, 0f, 0f), false);
+        }
+
+        SortRange.Window = new RangeWindow(_sort.Low, _sort.High, 0f, 0f);
+        SortRange.Track = _sort.Key switch
+        {
+            SortKey.Hue => RangeTrack.Hue,
+            SortKey.Saturation => RangeTrack.Saturation,
+            _ => RangeTrack.Light,
+        };
+
+        SortRangeValue.Text = $"{_sort.Low:0.00} – {_sort.High:0.00}";
+    }
+
+    /// <summary>Ein Zug am Fenster: die beiden Regler ziehen nach, das Bild auch. Doppelklick schliesst es.</summary>
+    private void OnSortRangeChanged(RangeWindow window, bool interim)
+    {
+        _sort.Low = window.Low;
+        _sort.High = window.High;
+
+        _filling = true;
+
+        try
+        {
+            SortLowSlider.Value = Math.Clamp(window.Low, SortLowSlider.Minimum, SortLowSlider.Maximum);
+            SortHighSlider.Value = Math.Clamp(window.High, SortHighSlider.Minimum, SortHighSlider.Maximum);
+        }
+        finally
+        {
+            _filling = false;
+        }
+
+        ShowSortRange();
+        UpdateValues();
+        Raise(interim);
+    }
+
     /// <summary>Genau eine Pipette ist an - oder keine.</summary>
     private void OnLevelsPickToggled(object sender, RoutedEventArgs e)
     {
@@ -1634,6 +1699,9 @@ public partial class GradingPanel : UserControl
         bool open = body.Visibility != Visibility.Visible;
         body.Visibility = open ? Visibility.Visible : Visibility.Collapsed;
         button.Content = open ? "−" : "+";
+
+        // Die Karte von Pixel Sort ist aufgegangen: Jetzt lohnt die Verteilung unter dem Fenster.
+        if (open && ReferenceEquals(body, SortBody)) SortDistributionWanted?.Invoke();
     }
 
     private void OnResetBasicClicked(object sender, RoutedEventArgs e)
@@ -1736,6 +1804,9 @@ public partial class GradingPanel : UserControl
 
         _sort.Key = (SortKey)Math.Clamp(SortKeyBox.SelectedIndex, 0, 4);
 
+        // Ein anderer Sortierwert: eine andere Skala unter dem Fenster - die Verteilung misst
+        // die Seite nach dem naechsten Durchgang neu.
+        ShowSortRange();
         Raise(interim: false);
     }
 
