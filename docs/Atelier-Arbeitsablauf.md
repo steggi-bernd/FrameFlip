@@ -929,3 +929,48 @@ Der offene Teil von Punkt 4, entschieden am 28. September:
   - Die Nachbargruppen (Tonwert, Farbstreifen, Farbrad, Ebenen, Einstellungen, Pipette,
     Texte) liefen mit 760 Zusicherungen grün.
   - Eine echte Instanz startete ohne Fehler.
+
+### C4c: Weißabgleich per Pipette, Angleichen an eine gemerkte Farbe (`feature/weissabgleich`)
+
+Der zweite Teil der Entscheidung vom 28. September: Die gemerkten Farben dienen für
+automatische Anpassungen. Beispiel ist die Temperatur eines anderen Bildes übernehmen, auch
+nur stellenweise.
+
+- **Neutral:** An der Karte Weißabgleich steht eine Pipette. Ein Klick auf eine Stelle, die
+  grau sein soll, stellt Temperatur und Tendenz so ein, dass sie es im angezeigten Bild wird.
+  Das war der offene Punkt aus C4.
+- **Angleichen:** Die zweite Pipette gibt der angeklickten Stelle die Farbe einer gemerkten.
+  - Vorlage ist die zuletzt gemerkte Farbe, oder das Feld, das man im Farbspeicher anklickt,
+    während die Pipette wartet.
+  - So übernimmt ein Bild die Temperatur eines anderen: dort eine weiße Wand ablesen, hier
+    auf die weiße Wand klicken.
+  - Verglichen wird, was man sieht: die angezeigte Farbe der Vorlage mit der Stelle nach
+    Weißabgleich und Sichtumwandlung. Die Helligkeit zählt nicht.
+- **Stellenweise:** Die Pipette stellt den Weißabgleich ein, den der Farbstreifen gerade
+  zeigt. Zeigt er eine Einstellungsebene, landet er dort, und mit ihrer Maske wirkt er nur
+  dort. Das Ziel entscheidet (C1–C3), es gibt keinen eigenen Weg.
+- **Gerechnet** wird wie bei den Rädern: Temperatur und Tendenz werden mit der Rechnung des
+  Werkzeugs selbst gesucht, innerhalb der Grenzen seiner Regler (2000 bis 15000 K,
+  Tendenz ±100). Eine Umkehrung der Kelvin-Rechnung braucht es dafür nicht.
+- **Was ankommt:**
+  - Am Weißabgleich des ganzen Bildes im Stapel: das zusammengesetzte Bild mit Belichtung,
+    Sättigung und den linearen Werkzeugen davor, derselbe Weg wie die Anzeige.
+  - An einer Ebene oder im Knotenmodus: das Bild, wie die Datei es hergibt. Dort liegt vor
+    dem Werkzeug meist nichts anderes.
+  - Der Tonwert der Grundkorrektur hinter der Sichtumwandlung bleibt beim Vergleich außen
+    vor. Die Probe misst die Wirkung im angezeigten Bild.
+- **Nebenbei behoben:** Wechselte man von einer wartenden Pipette zu einer anderen Art (Rad,
+  Tönung, Weißabgleich), blieb der Knopf der ersten sichtbar an. Jetzt geht er aus.
+- **Nicht gemerkt:** Ein Klick mit den Pipetten des Weißabgleichs kommt nicht in den
+  Farbspeicher. Sonst würde die Stelle, die man angleicht, sofort die neueste Vorlage.
+- **Probe** (`WhiteBalancePickInvariants`, 13 Zusicherungen):
+  - Die Rechnung: eine warme Stelle wird grau, und der Wert nennt warmes Licht. Grau bleibt
+    fast in Grundstellung, Angleichen trifft die Farbart, alles innerhalb der Regler.
+  - Im Atelier:
+    - Neutral wartet, stellt ein und ist fertig. Die Stelle ist im angezeigten Bild grau
+      (Kanäle höchstens 4 auseinander, vorher über 40).
+    - Angleichen wartet an der zuletzt gemerkten Farbe. Ein Feld im Speicher wird die Vorlage.
+    - Die Stelle bekommt die angezeigte Farbe der Stelle aus dem anderen Bild.
+    - An einer Einstellungsebene steht der Weißabgleich in der Ebene, nicht im ganzen Bild.
+  - Die Nachbargruppen liefen mit 579 Zusicherungen grün.
+  - Eine echte Instanz startete ohne Fehler.
