@@ -106,6 +106,31 @@ public partial class AtelierPage
     }
 
     /// <summary>
+    /// Das angezeigte Bild ohne die Sichthilfe darueber - fuer alles, was das Bild liest oder misst.
+    /// Null, wenn keine darueber liegt (auch beim Vergleich mit dem Original): Dann ist die Anzeige
+    /// selbst das Bild.
+    /// </summary>
+    private byte[]? PlainUnderAid
+        => _viewAid != ViewAid.None && !_showingOriginal && _plainPixels is { } plain && _surface is { } surface &&
+           plain.Length == surface.BackBufferStride * surface.PixelHeight ? plain : null;
+
+    /// <summary>
+    /// Wie <see cref="ApplyViewAid()"/>, nur fuer einen neu gerechneten Ausschnitt - beim Malen im
+    /// Knotenmodus. Sonst stuende der gemalte Streifen ohne Sichthilfe im Bild, bis der Pinsel ruht.
+    /// </summary>
+    private void ApplyViewAid(int x0, int y0, int width, int height)
+    {
+        if (PlainUnderAid is not { } plain || _surface is not { } surface) return;
+
+        int stride = surface.BackBufferStride;
+
+        for (int y = y0; y < y0 + height; y++)
+            Marshal.Copy(surface.BackBuffer + y * stride + x0 * 4, plain, y * stride + x0 * 4, width * 4);
+
+        ViewAids.Apply(surface.BackBuffer + y0 * stride + x0 * 4, width, height, stride, _viewAid, _clipLow, _clipHigh);
+    }
+
+    /// <summary>
     /// Legt die Sichthilfe ueber das gerade gezeichnete Bild - vorher wird es fuer die Pipette
     /// beiseitegelegt. Beim Vergleich mit dem Original liegt nichts darueber.
     /// </summary>

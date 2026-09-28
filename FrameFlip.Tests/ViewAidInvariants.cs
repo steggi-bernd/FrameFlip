@@ -134,6 +134,37 @@ public static class ViewAidInvariants
 
             page.CurvePointAt(64, 1);
             Check.That(tools.Curves.Master.Points.Count == 3, "dieselbe Stelle noch einmal: kein zweiter Punkt");
+
+            // Im Knotenmodus misst das Histogramm das fertige Bild auf der Anzeige - auch dort das
+            // Bild unter der Sichthilfe. Und ein beim Malen neu gerechneter Ausschnitt bekommt sie auch.
+            page.ConvertToNodes();
+            Pump(() => page.InNodes);
+            Pump(() => false, 0.3);
+
+            var histogram = (HistogramView)tools.FindName("Histogram");
+            var measure = typeof(AtelierPage).GetMethod("Measure", flags, Type.EmptyTypes)!;
+            int[] Luma() => ((int[])typeof(HistogramView).GetField("_luma", flags)!.GetValue(histogram)!).ToArray();
+
+            measure.Invoke(page, null);
+            var plainLuma = Luma();
+
+            page.SetViewAid(ViewAid.Clipping);
+            measure.Invoke(page, null);
+            Check.That(Screen(0) is (20, 70, 255) && Luma().SequenceEqual(plainLuma),
+                       "Knotenmodus: das Histogramm misst das Bild unter der Sichthilfe", $"{Screen(0)}");
+
+            // Ein Ausschnitt geht nur mit gewaehltem Knoten - wie beim Malen auf einer neuen Maske.
+            typeof(AtelierPage).GetMethod("MakeNodeMask", flags)!.Invoke(page, null);
+            Pump(() => false, 0.6);
+
+            typeof(AtelierPage).GetMethod("Refresh", flags, new[] { typeof(bool), typeof(bool) })!.Invoke(page, new object[] { false, false });
+            var adorner = (PlacementAdorner)page.FindName("Placement");
+            typeof(PlacementAdorner).GetField("_pendingTouched", flags)!.SetValue(adorner, new PaintBounds(0, 0, 20, H));
+            bool region = (bool)typeof(AtelierPage).GetMethod("PaintRegion", flags)!.Invoke(page, null)! &&
+                          (bool)typeof(AtelierPage).GetField("_regionPainted", flags)!.GetValue(page)!;
+            Check.That(region && Screen(0) is (20, 70, 255) && Read(0) is (0, 0, 0),
+                       "ein beim Malen neu gerechneter Ausschnitt traegt die Sichthilfe, die Pipette liest darunter",
+                       $"Ausschnitt={region} {Screen(0)} {Read(0)}");
         }
         finally
         {

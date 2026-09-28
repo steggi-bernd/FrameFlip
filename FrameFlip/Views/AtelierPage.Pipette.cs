@@ -56,7 +56,7 @@ public partial class AtelierPage
         if (frame is null || x < 0 || y < 0 || x >= frame.Width || y >= frame.Height) return null;
 
         // Liegt eine Sichthilfe ueber dem Bild, liest die Pipette das Bild darunter (W2c).
-        if (!Properties.PickSource && _viewAid != ViewAid.None && _plainPixels is { } plain && _surface is { } shown &&
+        if (!Properties.PickSource && PlainUnderAid is { } plain && _surface is { } shown &&
             x < shown.PixelWidth && y < shown.PixelHeight)
         {
             int at = y * shown.BackBufferStride + x * 4;
