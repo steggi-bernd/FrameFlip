@@ -90,6 +90,8 @@ public partial class AtelierPage
         ShowMissingLayers();
 
         // Ein neuer Graph hat keinen Betrachter - auch das Schild eines alten darf nicht bleiben.
+        // Und eine isolierte Ebene des Stapels gilt im Graphen nicht mehr.
+        EndStackSolo(render: false);
         ShowViewer();
     }
 

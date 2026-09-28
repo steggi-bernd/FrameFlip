@@ -1203,6 +1203,11 @@
     <sys:String x:Key="S_QuickObjectMask">Object as mask</sys:String>
     <sys:String x:Key="S_IsolatedLayer">Isolated: layer “{0}” – Esc ends</sys:String>
     <sys:String x:Key="S_IsolatedMask">Isolated: mask of “{0}” – Esc ends</sys:String>
+    <sys:String x:Key="S_LayerMaskMarkHint">The layer is masked. Alt+click: show the mask alone, in grey. Alt+Shift+click: as a red veil over the picture.</sys:String>
+    <sys:String x:Key="S_LayerMenuAlone">Show alone</sys:String>
+    <sys:String x:Key="S_LayerMenuMaskAlone">Show mask alone</sys:String>
+    <sys:String x:Key="S_LayerMenuMaskVeil">Show mask as veil</sys:String>
+    <sys:String x:Key="S_IsolatedVeil">Isolated: mask of “{0}” as veil – Esc ends</sys:String>
     <sys:String x:Key="S_QuickIsolateLayer">Isolate layer</sys:String>
     <sys:String x:Key="S_QuickIsolateMask">Isolate mask</sys:String>
     <sys:String x:Key="S_SelectSet">Cryptomatte: {0}</sys:String>

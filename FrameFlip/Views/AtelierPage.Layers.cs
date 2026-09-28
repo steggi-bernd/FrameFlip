@@ -309,6 +309,9 @@ public partial class AtelierPage
                                           _coarse ? CoarseStep : 1, _number);
         _frame = _composed ?? _base;
 
+        // Eine isolierte Ebene: fuer die Anzeige daneben, das Bild selbst bleibt (C6b).
+        ComposeSolo();
+
         // Was obenauf liegt, wird nach der Bildwerdung aufgetragen - es steht
         // deshalb nicht im zusammengesetzten Bild, sondern daneben.
         _overlays = _frame is null

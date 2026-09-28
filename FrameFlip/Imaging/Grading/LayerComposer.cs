@@ -15,8 +15,26 @@ namespace FrameFlip.Imaging.Grading;
 /// fertigen Bild. Wer sie hinterher zusammensetzte, addierte bereits durch AgX
 /// gegangene Bilder, und die Summe waere nicht das Original, sondern heller.
 /// </summary>
+/// <summary>Was vom Isolieren einer Ebene zu sehen ist (C6b).</summary>
+public enum SoloView
+{
+    /// <summary>Die Ebene allein: was sie vor dem Mischen beitraegt.</summary>
+    Layer,
+
+    /// <summary>Ihre Maske, grau - weiss, wo sie wirkt.</summary>
+    Mask,
+
+    /// <summary>Das ganze Bild, und wo die Maske NICHT wirkt, liegt ein roter Schleier.</summary>
+    Veil,
+}
+
+/// <summary>Eine Ebene, die allein gezeigt wird - nur fuer die Anzeige, nie im Rezept.</summary>
+public readonly record struct LayerSolo(ImageLayer Layer, SoloView View);
+
 public static class LayerComposer
 {
+    /// <summary>Die Farbe des Schleiers, in Licht: ein kraeftiges Rot, wie die Maskenansicht in Photoshop.</summary>
+    private const float VeilR = 0.8f, VeilG = 0.03f, VeilB = 0.03f;
     /// <summary>
     /// Baut das Bild aus den Ebenen. Null, wenn keine Ebene etwas beitraegt.
     /// </summary>
@@ -56,8 +74,13 @@ public static class LayerComposer
     /// gilt je Bild ein eigener Anstrich, und ohne die Nummer waere nicht zu sagen,
     /// welcher.
     /// </param>
+    /// <param name="solo">
+    /// Eine Ebene allein - oder ihre Maske (C6b). Gerechnet wird bis zu ihr, wie sonst auch; dann
+    /// kommt, was sie beitraegt, statt dass es gemischt wird. Null, wenn sie nicht im Bild steht
+    /// (ausgeblendet oder ohne Quelle).
+    /// </param>
     public static FloatFrame? Compose(LayerStack stack, IReadOnlyDictionary<string, FloatFrame> sources,
-                                      FloatFrame? into = null, int step = 1, int number = 0)
+                                      FloatFrame? into = null, int step = 1, int number = 0, LayerSolo? solo = null)
     {
         step = Math.Clamp(step, 1, 16);
 
@@ -108,6 +131,14 @@ public static class LayerComposer
         // Einstellungsebenen ist kein Bild.
         if (used.Count == 0 || width == 0) return null;
 
+        int soloIndex = solo is { } alone
+            ? used.FindIndex(u => u.Kind == StepKind.Layer && ReferenceEquals(u.Layer, alone.Layer))
+            : -1;
+
+        if (solo is not null && soloIndex < 0) return null;
+
+        var soloView = solo?.View ?? SoloView.Layer;
+
         // Eine Einstellungsebene ohne Wirkung bleibt trotzdem stehen. Sie
         // herauszunehmen waere die naheliegende Ersparnis und ein Fehler: Traegt sie
         // eine angeschnittene Ebene, haengt diese danach an einer anderen - und der
@@ -126,7 +157,7 @@ public static class LayerComposer
                     used[0].Frame!.IsSceneReferred ||
                     !used[0].Frame!.HasMatte;
 
-        if (used.Count == 1 && used[0].Kind == StepKind.Layer && bare &&
+        if (solo is null && used.Count == 1 && used[0].Kind == StepKind.Layer && bare &&
             used[0].Layer.IsNeutral && used[0].Layer.LiesOnBlack)
         {
             return used[0].Frame!;
@@ -153,6 +184,10 @@ public static class LayerComposer
         var carrying = used.FirstOrDefault(u => u.Frame is not null).Frame;
         bool sceneReferred = carrying?.IsSceneReferred ??
                              (!sources.TryGetValue("", out var file) || file.IsSceneReferred);
+
+        // Die Maske grau ist eine Anzeige, kein Licht: Sie geht den einfachen Weg, damit Weiss
+        // weiss und Grau grau bleibt, auch bei einer EXR.
+        if (soloIndex >= 0 && soloView == SoloView.Mask) sceneReferred = false;
 
         // Je Ebene einmal vorbereitet, damit die innere Schleife nur noch multipliziert.
         var plans = new Plan[used.Count];
@@ -238,6 +273,9 @@ public static class LayerComposer
                 // und zwar mit der Mischung des Traegers - genau so, wie eine
                 // Schnittmaske in Photoshop wirkt.
                 float gr = 0f, gg = 0f, gb = 0f;
+
+                // Was die Maske der isolierten Ebene hier sagt - fuer den Schleier. Unter null: keine.
+                float veil = -1f;
                 var groupMode = BlendMode.Normal;
                 bool groupDisplay = false;
                 float groupOpacity = 1f;
@@ -358,6 +396,14 @@ public static class LayerComposer
 
                         if (covered <= 0f)
                         {
+                            // Die isolierte Ebene deckt hier nicht: allein gezeigt, ist hier nichts.
+                            if (p == soloIndex && soloView != SoloView.Veil)
+                            {
+                                vr = vg = vb = va = 0f;
+                                open = false;
+                                break;
+                            }
+
                             // Ein Traeger, der hier nicht deckt, oeffnet trotzdem seine
                             // Gruppe - leer und ohne Deckkraft. Sonst fanden die
                             // angeschnittenen Ebenen darueber keine offene Gruppe vor,
@@ -440,6 +486,9 @@ public static class LayerComposer
                         ? 1f
                         : plan.Sampler.Factor(x, y, width, height, i, lr, lg, lb, underR, underG, underB);
 
+                    // Die Antwort der Maske, bevor ihre Art sie umdeutet - fuer das Isolieren.
+                    float maskFactor = factor;
+
                     // Die eigenen Werkzeuge einer Bild- oder Passebene. Eine
                     // Einstellungsebene hat ihre Korrektur oben schon angewandt - sie
                     // BESTEHT aus ihr.
@@ -469,6 +518,31 @@ public static class LayerComposer
                             lr = qr;
                             lg = qg;
                             lb = qb;
+                        }
+                    }
+
+                    // Isoliert: Was die Ebene hier beitraegt - oder was ihre Maske sagt -, und
+                    // danach nichts mehr (C6b). Der Schleier rechnet das ganze Bild weiter.
+                    if (p == soloIndex)
+                    {
+                        if (soloView == SoloView.Veil)
+                        {
+                            veil = maskFactor;
+                        }
+                        else
+                        {
+                            if (soloView == SoloView.Mask)
+                            {
+                                float grey = Srgb.Decode(Math.Clamp(maskFactor, 0f, 1f));
+                                lr = lg = lb = grey;
+                            }
+
+                            vr = lr;
+                            vg = lg;
+                            vb = lb;
+                            va = 1f;
+                            open = false;
+                            break;
                         }
                     }
 
@@ -535,6 +609,15 @@ public static class LayerComposer
                 if (open)
                     Blend(groupMode, groupDisplay, groupOpacity, vr, vg, vb, gr, gg, gb,
                           out vr, out vg, out vb);
+
+                // Der Schleier: wo die Maske nicht wirkt, halb rot darueber.
+                if (veil >= 0f)
+                {
+                    float k = (1f - Math.Clamp(veil, 0f, 1f)) * 0.5f;
+                    vr += (VeilR - vr) * k;
+                    vg += (VeilG - vg) * k;
+                    vb += (VeilB - vb) * k;
+                }
 
                 r[i] = vr;
                 g[i] = vg;
