@@ -475,6 +475,16 @@
 
                     <!-- Helligkeit, Untergrund, Pass: ein Bereich mit weichen Kanten -->
                     <StackPanel x:Name="MaskRangeBody" Visibility="Collapsed">
+                        <!-- Der Bereichsregler (C7): Von, Bis und ihre Kanten als Griffe - die
+                             Regler darunter bleiben fuer genaue Zahlen. -->
+                        <StackPanel x:Name="MaskRangeRow" Margin="0,10,0,0" ToolTip="{DynamicResource S_MaskRangeHint}">
+                            <Grid Margin="0,0,0,2">
+                                <TextBlock Text="{DynamicResource S_MaskRange}" Style="{StaticResource PanelLabel}" />
+                                <TextBlock x:Name="MaskRangeValue" Style="{StaticResource PanelValue}" />
+                            </Grid>
+                            <local:RangeSlider x:Name="MaskRange" />
+                        </StackPanel>
+
                         <Grid Margin="0,10,0,2">
                             <TextBlock x:Name="MaskLowLabel" Text="{DynamicResource S_MaskFrom}"
                                        Style="{StaticResource PanelLabel}" />
@@ -530,6 +540,16 @@
                         Grad allein koennte niemand lesen.
                     -->
                     <StackPanel x:Name="MaskColourBody" Visibility="Collapsed">
+                        <!-- Der Farbbereich als Fenster auf dem Farbkreis (C7): zwei Grenzen und
+                             ihre Kanten, die Regler darunter fuer genaue Grade. -->
+                        <StackPanel Margin="0,10,0,0" ToolTip="{DynamicResource S_MaskRangeHint}">
+                            <Grid Margin="0,0,0,2">
+                                <TextBlock Text="{DynamicResource S_MaskRange}" Style="{StaticResource PanelLabel}" />
+                                <TextBlock x:Name="MaskHueRangeValue" Style="{StaticResource PanelValue}" />
+                            </Grid>
+                            <local:RangeSlider x:Name="MaskHueRange" />
+                        </StackPanel>
+
                         <Grid Margin="0,10,0,2">
                             <TextBlock Text="{DynamicResource S_MaskHue}" Style="{StaticResource PanelLabel}" />
                             <TextBlock x:Name="MaskHueValue" Style="{StaticResource PanelValue}" />

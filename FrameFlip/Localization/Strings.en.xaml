@@ -270,6 +270,8 @@
     <sys:String x:Key="S_MaskWhite">White point</sys:String>
     <sys:String x:Key="S_MaskTo">To</sys:String>
     <sys:String x:Key="S_MaskSoft">Softness</sys:String>
+    <sys:String x:Key="S_MaskRange">Range</sys:String>
+    <sys:String x:Key="S_MaskRangeHint">Inner handles move the limit with its edge, outer handles make the edge softer or harder. Alt: drag the inner handle alone. Shift: fine. Double-click: reset.</sys:String>
     <sys:String x:Key="S_MaskInvert">Invert the mask</sys:String>
     <sys:String x:Key="S_MaskAngle">Direction</sys:String>
     <sys:String x:Key="S_MaskCentre">Centre</sys:String>

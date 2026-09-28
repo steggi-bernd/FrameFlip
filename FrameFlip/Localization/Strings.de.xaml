@@ -270,6 +270,8 @@
     <sys:String x:Key="S_MaskWhite">Weißpunkt</sys:String>
     <sys:String x:Key="S_MaskTo">Bis</sys:String>
     <sys:String x:Key="S_MaskSoft">Weichheit</sys:String>
+    <sys:String x:Key="S_MaskRange">Bereich</sys:String>
+    <sys:String x:Key="S_MaskRangeHint">Innere Griffe verschieben die Grenze samt Kante, äußere machen die Kante weicher oder härter. Alt: den inneren Griff allein ziehen. Umschalt: fein. Doppelklick: zurücksetzen.</sys:String>
     <sys:String x:Key="S_MaskInvert">Maske umkehren</sys:String>
     <sys:String x:Key="S_MaskAngle">Richtung</sys:String>
     <sys:String x:Key="S_MaskCentre">Mitte</sys:String>

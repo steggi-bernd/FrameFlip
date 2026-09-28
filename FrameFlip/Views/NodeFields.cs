@@ -21,6 +21,13 @@ public abstract record NodeField(string LabelKey)
 public sealed record SliderField(string LabelKey, double Min, double Max, Func<double> Get, Action<double> Set,
                                  double Default, string Format = "0.00") : NodeField(LabelKey);
 
+/// <summary>
+/// Ein Fenster auf einer Skala - der Bereichsregler (C7). <paramref name="Format"/> sagt, wie die
+/// Grenzen darueber stehen.
+/// </summary>
+public sealed record RangeField(string LabelKey, RangeScale Scale, Func<RangeWindow> Get, Action<RangeWindow> Set,
+                                Action Reset, string Format = "0.00") : NodeField(LabelKey);
+
 /// <summary>Eine Auswahl aus festen Moeglichkeiten.</summary>
 public sealed record ChoiceField(string LabelKey, IReadOnlyList<(string Key, int Value)> Options,
                                  Func<int> Get, Action<int> Set) : NodeField(LabelKey);
@@ -265,6 +272,20 @@ public static class NodeFields
     }
 
     /// <summary>Die Maske - je nach Art andere Regler, wie im Ebenenstreifen.</summary>
+    /// <summary>Der Bereichsregler einer Maske - dieselbe Rechnung wie im Stapel (C7).</summary>
+    private static RangeField Range(LayerMask mask, string format)
+        => new("S_MaskRange", RangeWindows.ScaleOf(mask), () => RangeWindows.Of(mask), w => RangeWindows.Apply(mask, w),
+               () => RangeWindows.Reset(mask), format);
+
+    /// <summary>"Weich" gilt beiden Kanten und fuegt ein getrenntes Paar wieder zusammen.</summary>
+    private static SliderField Soft(LayerMask mask)
+        => new("S_MaskSoft", 0, 1, () => mask.Softness, v =>
+        {
+            mask.Softness = (float)v;
+            mask.SoftLow = null;
+            mask.SoftHigh = null;
+        }, 0.1);
+
     private static NodeField[] Mask(MaskNode node, NodeFieldContext? context)
     {
         var mask = node.Mask;
@@ -277,15 +298,17 @@ public static class NodeFields
         switch (mask.Kind)
         {
             case MaskKind.Luminance or MaskKind.Underlying:
+                fields.Add(Range(mask, "0.00"));
                 fields.Add(new SliderField("S_MaskFrom", 0, 1, () => mask.Low, v => mask.Low = (float)v, 0));
                 fields.Add(new SliderField("S_MaskTo", 0, 1, () => mask.High, v => mask.High = (float)v, 1));
-                fields.Add(new SliderField("S_MaskSoft", 0, 1, () => mask.Softness, v => mask.Softness = (float)v, 0.1));
+                fields.Add(Soft(mask));
                 break;
 
             case MaskKind.Colour:
+                fields.Add(Range(mask, "0"));
                 fields.Add(new SliderField("S_MaskHue", 0, 360, () => mask.Hue, v => mask.Hue = (float)v, 0, "0°"));
                 fields.Add(new SliderField("S_MaskSpread", 1, 180, () => mask.Spread, v => mask.Spread = (float)v, 30, "0°"));
-                fields.Add(new SliderField("S_MaskSoft", 0, 1, () => mask.Softness, v => mask.Softness = (float)v, 0.1));
+                fields.Add(Soft(mask));
                 fields.Add(new SliderField("S_MaskBlack", 0, 1, () => mask.Low, v => mask.Low = (float)v, 0));
                 fields.Add(new SliderField("S_MaskWhite", 0, 1, () => mask.High, v => mask.High = (float)v, 1));
                 break;

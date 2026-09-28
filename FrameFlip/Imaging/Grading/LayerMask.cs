@@ -191,6 +191,28 @@ public sealed class LayerMask
     /// </summary>
     public float Softness { get; set; } = 0.1f;
 
+    /// <summary>
+    /// Die weiche Kante unten fuer sich - wenn das Paar am Bereichsregler getrennt wurde (C7).
+    /// Null: <see cref="Softness"/> gilt fuer beide Seiten, wie bisher.
+    ///
+    /// Ungesetzt wird sie nicht geschrieben: Ein Rezept ohne getrennte Kanten wird genau so
+    /// gespeichert wie vorher, und ein altes liest sich unveraendert.
+    /// </summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public float? SoftLow { get; set; }
+
+    /// <summary>Die weiche Kante oben fuer sich - siehe <see cref="SoftLow"/>.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public float? SoftHigh { get; set; }
+
+    /// <summary>Wie weich die untere Kante ist - getrennt eingestellt oder die gemeinsame.</summary>
+    [JsonIgnore]
+    public float LowSoftness => SoftLow ?? Softness;
+
+    /// <summary>Wie weich die obere Kante ist - getrennt eingestellt oder die gemeinsame.</summary>
+    [JsonIgnore]
+    public float HighSoftness => SoftHigh ?? Softness;
+
     // ----------------------------------------------------------------- der Verlauf
 
     /// <summary>Richtung in Grad. 0 laeuft von links nach rechts, 90 von oben nach unten.</summary>
@@ -283,6 +305,8 @@ public sealed class LayerMask
         Low = Low,
         High = High,
         Softness = Softness,
+        SoftLow = SoftLow,
+        SoftHigh = SoftHigh,
         Angle = Angle,
         Centre = Centre,
         Width = Width,
@@ -330,16 +354,24 @@ public static class Masking
     /// nicht ein Abgleich zweier.
     /// </summary>
     public static float Band(float value, float low, float high, float softness)
+        => Band(value, low, high, softness, softness);
+
+    /// <summary>
+    /// Derselbe Bereich mit je einer eigenen weichen Kante unten und oben - das getrennte Paar
+    /// des Bereichsreglers (C7). Mit zwei gleichen Kanten rechnet er genau wie vorher.
+    /// </summary>
+    public static float Band(float value, float low, float high, float softLow, float softHigh)
     {
-        softness = MathF.Max(0f, softness);
+        softLow = MathF.Max(0f, softLow);
+        softHigh = MathF.Max(0f, softHigh);
 
         float lower = value >= low
             ? 1f
-            : softness <= 0f ? 0f : Smooth((value - (low - softness)) / softness);
+            : softLow <= 0f ? 0f : Smooth((value - (low - softLow)) / softLow);
 
         float upper = value <= high
             ? 1f
-            : softness <= 0f ? 0f : Smooth(((high + softness) - value) / softness);
+            : softHigh <= 0f ? 0f : Smooth(((high + softHigh) - value) / softHigh);
 
         return lower * upper;
     }
