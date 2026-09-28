@@ -625,6 +625,36 @@ In sechs Schnitten, nach Nutzen und Abhängigkeit:
   - Im Knotenmodus misst Auto am Eingang des Knotens.
   - Gegenprobe: Gemessen am fertigen Bild schlagen genau diese Proben fehl.
 
+**W2c (`feature/sichthilfen`):**
+
+- **Sichthilfe** neben „Original“ und Zoom: ein Knopf, der zwischen Normal, Clipping und
+  Falschfarben wechselt, dazu die Taste J wie in Lightroom. Sie liegt über dem fertigen
+  Anzeigebild, nur auf dem Schirm (`ViewAids`). Export, Messung und Histogramm sehen sie nicht,
+  und die Pipette liest das Bild darunter – es wird vor dem Überdecken beiseitegelegt. Beim
+  Vergleich mit dem Original liegt nichts darüber.
+- **Clipping:** rot, wo ein Kanal die obere Grenze erreicht; blau, wo alle unter der unteren
+  liegen. Die Grenzen stehen als Bereichsregler (C7, hartes Fenster) in der Statuszeile, in
+  Grundstellung knapp innerhalb von 0 und 255.
+- **Falschfarben:** die Helligkeit der Anzeigewerte (Rec. 709) als Zonen wie auf einem
+  Kameramonitor – Violett abgesoffen, Blau Tiefen, Grün Mittelgrau, Rosa Haut (eine Blende
+  darüber), Gelb Lichter, Rot ausgefressen. Dazwischen bleibt das Bild grau, damit die Form
+  lesbar bleibt. Die Legende steht in der Statuszeile.
+- **Kurvenpunkt aus dem Bild:** Strg+Klick ins Bild setzt einen Punkt auf die gezeigte Kurve,
+  beim Ton dieser Stelle, so wie er bei den Kurven ankommt (derselbe Weg wie bei den Pipetten
+  des Tonwerts, im Stapel und im Knotenmodus). Auf der Gesamtkurve zählt die Helligkeit, auf
+  einer Kanalkurve der Kanal. Der Punkt liegt auf der Kurve – sie ändert sich erst, wenn man
+  ihn zieht; liegt dort schon einer, kommt kein zweiter dazu. Das gilt mit jedem Werkzeug,
+  solange die Karte der Kurven zu sehen ist; sonst geht der Klick weiter wie immer.
+- **Proben** (`ViewAidInvariants`, 12 Zusicherungen):
+  - Zonen der Falschfarben und die Regel des Clippings; eine graue Zone behält ihre Helligkeit.
+  - Am Verlauf von Schwarz nach Weiß: Enden blau und rot, die Mitte unverändert, die Pipette
+    liest darunter, engere Grenzen schneiden mehr ab, Mittelgrau wird grün, J führt zu Normal.
+  - Strg+Klick: ohne sichtbare Kurvenkarte nichts, mit ihr ein Punkt genau beim Ton der Stelle
+    und kein zweiter beim nochmaligen Klick.
+  - Die Nachbargruppen (23 Gruppen: Kurven, Tonwert, Farbstreifen, Pipetten, Sortieren,
+    Isolieren, Seite, Werkzeuge, Andocken, Texte) liefen mit 845 Zusicherungen grün.
+  - Eine echte Instanz startete ohne Fehler; der Knopf schaltet Normal, Clipping, Falschfarben.
+
 ## 5. KI-Werkzeuge: Last, Größe, Lizenz
 
 **Laufzeit.** ONNX Runtime (MIT-Lizenz) mit DirectML auf jeder Grafikkarte unter
