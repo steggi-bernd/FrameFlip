@@ -823,3 +823,54 @@ nur im Knotenmodus, denn nur dort gibt es den Betrachter.
   - Zweiter Klick, Esc, Esc ohne Isolieren, das Schild für einen anderen Knoten.
   - Die Einträge im Schnellfeld, ein anderes Bild.
   - Die Nachbargruppen liefen mit 356 Zusicherungen grün.
+
+### C7: Bereichsregler (`feature/bereichsregler`)
+
+Punkt 9: Ein harter Grenzwert soll sich in einen Bereich mit zwei getrennt steuerbaren
+Grenzen aufteilen lassen, als wiederverwendbarer Baustein.
+
+- **Baustein:** `RangeSlider` ist ein Fenster auf einer Skala mit vier Griffen, je zwei als
+  Paar. Die Rechnung steht getrennt in `RangeWindows` und lässt sich ohne Fenster prüfen,
+  wie die des Farbrads.
+  - Der **innere Griff** zieht sein Paar mit: Die Grenze wandert, die Kante bleibt so weich,
+    wie sie war.
+  - Der **äußere Griff** zieht allein und macht die Kante weicher oder härter.
+  - Mit **Alt** zieht auch der innere allein, das Paar trennt sich. Liegen beide Griffe
+    aufeinander (harte Kante), greift man ohne Alt das Paar und zieht es mit Alt
+    auseinander.
+  - **Umschalt** zieht fein (ein Zehntel), **Doppelklick** setzt zurück.
+  - Unter den Griffen liegt die Skala: Helligkeit als Verlauf, Farbton als Farbkreis. Was
+    nicht durchgelassen wird, liegt im Schatten, genau so weit, wie die Maske es rechnet.
+- **Skalen:** eine Strecke (Helligkeit 0 bis 1) oder ein Kreis (Farbton). Auf dem Kreis
+  reicht ein Fenster über die Null (Rot) und wandert beliebig oft herum.
+- **Modell:** Jede Kante kann ihre eigene Weichheit haben (`LayerMask.SoftLow`, `SoftHigh`).
+  - Ungesetzt gilt die gemeinsame `Softness` wie bisher.
+  - Die Felder werden nur geschrieben, wenn sie gesetzt sind. Alte Rezepte lesen sich
+    unverändert, und ein Rezept ohne getrennte Kanten wird genau so gespeichert wie vorher.
+  - Sind beide Kanten wieder gleich, ist das Paar vereint.
+  - Beim Farbbereich gilt unter dem Farbton die untere Kante, darüber die obere.
+- **Wo er steht:** Helligkeits- und Untergrundmaske sowie Farbbereich, im Ebenenstreifen
+  und als Feld am Maskenknoten.
+  - Die Zahlenregler darunter bleiben für genaue Werte, beide Seiten ziehen einander nach.
+  - Der Regler „Weich“ gilt beiden Kanten und fügt ein getrenntes Paar wieder zusammen,
+    ebenso die Knöpfe Tiefen/Mitten/Lichter.
+  - Am Knoten lässt sich ein Zug rückgängig machen.
+- **Tonwert** behält seine drei Eingangsgriffe (Entscheidung aus Abschnitt 7).
+- **Offen, C7:**
+  - Pixel-Sort-Fenster und Keying bekommen den Baustein als Nächstes. Pixel Sort hat
+    heute zwei feste Grenzen ohne Kante.
+  - Die Clipping-Anzeige aus W2c soll ihn ebenso nutzen.
+  - Das Histogramm unter der Skala fehlt noch.
+- **Probe** (`RangeSliderInvariants`, 28 Zusicherungen):
+  - Paar, äußerer Griff, Alt, Grenzen der Skala, Greifen bei harter Kante mit und ohne
+    Alt, eine weichere Gegenseite bleibt stehen.
+  - Kreis über die Null und beliebig oft herum, dieselbe Kante wie die Maske.
+  - Band mit gleichen und getrennten Kanten, Speichern ohne und mit getrennten Kanten,
+    altes Rezept, Kopie.
+  - Farbbereich im Bild unten weich, oben hart.
+  - Das Element beim Ziehen (auch fein), im Streifen mit Nachziehen der Zahlenregler,
+    „Weich“ vereint, Zurücksetzen.
+  - Am Knoten Nachziehen und Rückgängig.
+  - Die Nachbargruppen (Masken, Ebenen, Stapel, Pipette, Texte, Knoten) liefen mit 845 und
+    338 Zusicherungen grün.
+  - Eine echte Instanz mit eigener Konfiguration startete ohne Fehler.
