@@ -34,7 +34,8 @@ public static class FloatFrameProcessor
     /// <summary>
     /// Die Durchgaenge ueber das fertige Bild - der Reihe nach, auf einem Faden.
     ///
-    /// Sie laufen NUR im vollen Weg. Auf dem groben Raster waere das Ergebnis nicht
+    /// Sie laufen im vollen Weg - bis auf die, die eine grobe Fassung kennen
+    /// (<see cref="RunFrameCoarse"/>). Auf dem groben Raster waere das Ergebnis sonst nicht
     /// groeber, sondern ein anderes: Fehlerdiffusion entscheidet anhand der
     /// Nachbarschaft, welcher Punkt welchen Rest abbekommt, und ein Raster aendert
     /// die Nachbarschaft. Waehrend eines Reglerzugs bleibt der Durchgang deshalb aus
@@ -48,6 +49,19 @@ public static class FloatFrameProcessor
 
         for (int i = 0; i < passes.Length; i++)
             passes[i].Apply(destination, width, height, stride, number);
+    }
+
+    /// <summary>
+    /// Die Durchgaenge, die eine grobe Fassung kennen, auf dem Gitter der Vorschau - vor dem
+    /// Aufblasen (C7c). Die anderen bleiben beim Ziehen aus, aus dem Grund oben.
+    /// </summary>
+    private static void RunFrameCoarse(in PreparedGrading grading, IntPtr grid, int width, int height, int number, int step)
+    {
+        var passes = grading.Frame;
+
+        for (int i = 0; i < passes.Length; i++)
+            if (passes[i] is ICoarseFramePass coarse)
+                coarse.ApplyCoarse(grid, width, height, width * 4, number, step);
     }
 
     /// <summary>
@@ -200,6 +214,7 @@ public static class FloatFrameProcessor
                 }
             });
 
+            RunFrameCoarse(in grading, (IntPtr)gridPtr, gridWidth, gridHeight, number, step);
             Expand(gridPtr, gridWidth, gridHeight, target, destinationStride, width, height, step);
         }
     }
@@ -555,6 +570,7 @@ public static class FloatFrameProcessor
                 }
             });
 
+            RunFrameCoarse(in grading, (IntPtr)gridPtr, gridWidth, rows.Length, number, step);
             Expand(gridPtr, gridWidth, rows.Length, target, destinationStride, width, height, step);
         }
     }

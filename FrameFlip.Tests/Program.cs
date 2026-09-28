@@ -122,6 +122,7 @@ static int RunAll()
     WhiteBalancePickInvariants.Run();
     NodeTintPickInvariants.Run();
     SortWindowInvariants.Run();
+    SortCoarseInvariants.Run();
     AtelierProjectInvariants.Run();
     AtelierProjectPageInvariants.Run();
     SwitchLeftoverInvariants.Run();

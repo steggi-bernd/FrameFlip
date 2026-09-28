@@ -84,8 +84,9 @@ internal sealed class NodeContext
     public required IReadOnlyDictionary<PassNeed, FloatFrame?> Data { get; init; }
 
     /// <summary>
-    /// Ob die Durchgaenge ueber das fertige Bild ausbleiben - beim groben Raster und im
-    /// Sechzehn-Bit-Ausgang, genau wie im Stapel.
+    /// Ob die Durchgaenge ueber das fertige Bild ausbleiben - im Sechzehn-Bit-Ausgang, genau
+    /// wie im Stapel. Auf dem groben Raster entscheidet der Knoten: Wer eine grobe Fassung
+    /// kennt, rechnet sie, die anderen bleiben aus (C7c).
     /// </summary>
     public required bool SkipFramePasses { get; init; }
 
