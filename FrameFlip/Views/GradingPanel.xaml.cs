@@ -1471,6 +1471,65 @@ public partial class GradingPanel : UserControl
         Raise(interim: false);
     }
 
+    /// <summary>
+    /// Eine Pipette am Weissabgleich wurde gewaehlt - <c>false</c> neutral, <c>true</c> angleichen
+    /// an eine gemerkte Farbe - oder abgewaehlt (null). C4c.
+    /// </summary>
+    public event Action<WhiteBalanceTool, bool?>? WhiteBalancePickWanted;
+
+    private void OnWbPickToggled(object sender, RoutedEventArgs e)
+    {
+        if (_endingPick || sender is not ToggleButton { Tag: string tag } toggle || WbPickMatch is null) return;
+
+        if (toggle.IsChecked == true)
+        {
+            _endingPick = true;
+
+            foreach (var other in new[] { WbPickNeutral, WbPickMatch })
+                if (!ReferenceEquals(other, toggle)) other.IsChecked = false;
+
+            _endingPick = false;
+            WhiteBalancePickWanted?.Invoke(_whiteBalance, tag == "Match");
+        }
+        else
+        {
+            WhiteBalancePickWanted?.Invoke(_whiteBalance, null);
+        }
+    }
+
+    /// <summary>Die Pipette am Weissabgleich hat geklickt oder wurde verlassen - beide wieder aus.</summary>
+    public void EndWhiteBalancePick()
+    {
+        _endingPick = true;
+
+        foreach (var toggle in new[] { WbPickNeutral, WbPickMatch })
+            toggle.IsChecked = false;
+
+        _endingPick = false;
+    }
+
+    /// <summary>Setzt den Weissabgleich von aussen - die Regler ziehen nach, das Bild auch.</summary>
+    public void SetWhiteBalance(float kelvin, float tint)
+    {
+        _whiteBalance.Kelvin = kelvin;
+        _whiteBalance.Tint = tint;
+
+        _filling = true;
+
+        try
+        {
+            TemperatureSlider.Value = Math.Clamp(ToMired(_whiteBalance.Kelvin), TemperatureSlider.Minimum, TemperatureSlider.Maximum);
+            TintSlider.Value = _whiteBalance.Tint;
+        }
+        finally
+        {
+            _filling = false;
+        }
+
+        UpdateValues();
+        Raise(interim: false);
+    }
+
     /// <summary>Genau eine Pipette ist an - oder keine.</summary>
     private void OnLevelsPickToggled(object sender, RoutedEventArgs e)
     {

@@ -24,6 +24,12 @@ public partial class AtelierPage
     /// <summary>Die Ebene, deren Toenung auf eine Farbe wartet.</summary>
     private ImageLayer? _tintPick;
 
+    /// <summary>Die Pipette am Weissabgleich (C4c): neutral, oder angleichen an eine gemerkte Farbe.</summary>
+    private (WhiteBalanceTool Tool, bool Match)? _wbPick;
+
+    /// <summary>Die gemerkte Farbe, an die angeglichen wird - die neueste, bis ein Feld gewaehlt wird.</summary>
+    private SavedColour? _wbReference;
+
     /// <summary>Das Werkzeug der Maus vor der Pipette - danach geht es dorthin zurueck.</summary>
     private AtelierTool _beforeColourPick = AtelierTool.Move;
 
@@ -31,13 +37,24 @@ public partial class AtelierPage
     {
         Tools.ZonePickWanted += (tool, zone) =>
         {
-            if (zone is { } chosen) StartColourPick(() => _zonePick = (tool, chosen));
+            if (zone is { } chosen) StartColourPick(ColourPickKind.Zone, () => _zonePick = (tool, chosen));
             else EndColourPick();
         };
 
         Layers.TintPickWanted += layer =>
         {
-            if (layer is not null) StartColourPick(() => _tintPick = layer);
+            if (layer is not null) StartColourPick(ColourPickKind.Tint, () => _tintPick = layer);
+            else EndColourPick();
+        };
+
+        Tools.WhiteBalancePickWanted += (tool, match) =>
+        {
+            if (match is { } chosen)
+                StartColourPick(ColourPickKind.WhiteBalance, () =>
+                {
+                    _wbPick = (tool, chosen);
+                    _wbReference = chosen ? _settings.AtelierColours.FirstOrDefault() : null;
+                });
             else EndColourPick();
         };
 
@@ -53,15 +70,24 @@ public partial class AtelierPage
     }
 
     /// <summary>Ob eine Pipette an einem Rad oder an der Toenung wartet - fuer die Probe.</summary>
-    internal bool ColourPicking => _zonePick is not null || _tintPick is not null;
+    internal bool ColourPicking => _zonePick is not null || _tintPick is not null || _wbPick is not null;
 
-    private void StartColourPick(Action arm)
+    /// <summary>Welche Art Pipette wartet - innerhalb einer Art schaltet ihr Feld selbst um.</summary>
+    private enum ColourPickKind { Zone, Tint, WhiteBalance }
+
+    private void StartColourPick(ColourPickKind kind, Action arm)
     {
         if (!ColourPicking && _levelsPick is null) _beforeColourPick = _tool == AtelierTool.Pick ? AtelierTool.Move : _tool;
 
-        // Immer nur eine wartende Pipette: die andere geht aus.
+        // Immer nur eine wartende Pipette: die andere geht aus - mit ihrem Knopf. Der eben
+        // gedrueckte bleibt an; innerhalb eines Feldes schaltet das Feld selbst um.
+        if (kind != ColourPickKind.Zone && _zonePick is not null) Tools.EndZonePick();
+        if (kind != ColourPickKind.WhiteBalance && _wbPick is not null) Tools.EndWhiteBalancePick();
+        if (kind != ColourPickKind.Tint && _tintPick is not null) Layers.EndTintPick();
+
         _zonePick = null;
         _tintPick = null;
+        _wbPick = null;
         LeaveLevelsPickQuietly();
 
         arm();
@@ -77,8 +103,10 @@ public partial class AtelierPage
 
         _zonePick = null;
         _tintPick = null;
+        _wbPick = null;
 
         Tools.EndZonePick();
+        Tools.EndWhiteBalancePick();
         Layers.EndTintPick();
     }
 
@@ -110,6 +138,15 @@ public partial class AtelierPage
 
         if (_tintPick is { } layer) return Strings.T("S_PickForTint", layer.Name);
 
+        if (_wbPick is { } wb)
+        {
+            if (!wb.Match) return Strings.T("S_PickForWbNeutral");
+
+            return _wbReference is { } reference
+                ? Strings.T("S_PickForWbMatch", reference.From is { } from ? $"{reference.Hex} ({from})" : reference.Hex)
+                : Strings.T("S_PickForWbNoReference");
+        }
+
         return null;
     }
 
@@ -126,6 +163,37 @@ public partial class AtelierPage
 
             Tools.NeutraliseZone(zone.Zone, r, g, b);
             RememberColour(x, y);
+            LeaveColourPick();
+            return true;
+        }
+
+        if (_wbPick is { } wb)
+        {
+            // Angleichen ohne gemerkte Farbe: nichts, woran - die Pipette endet und liest nur ab.
+            if (wb.Match && _wbReference is null)
+            {
+                LeaveColourPick();
+                return false;
+            }
+
+            if (_frame is not { } frame || WhiteBalanceInputAt(wb.Tool, x, y) is not var (r, g, b)) return false;
+
+            var view = ViewFor(frame);
+
+            (float, float, float) Shown((float R, float G, float B) c)
+            {
+                var (sr, sg, sb) = c;
+                view.Apply(ref sr, ref sg, ref sb);
+                return (sr, sg, sb);
+            }
+
+            (float, float, float)? target = wb.Match && _wbReference is { } reference
+                ? (reference.ShownR / 255f, reference.ShownG / 255f, reference.ShownB / 255f)
+                : null;
+
+            var (kelvin, tint) = ColourSolve.WhiteBalance(r, g, b, Shown, target);
+
+            Tools.SetWhiteBalance(kelvin, tint);
             LeaveColourPick();
             return true;
         }
@@ -156,6 +224,13 @@ public partial class AtelierPage
     /// </summary>
     internal bool TakeStoredColour(SavedColour colour)
     {
+        // Angleichen wartet: Das Feld wird die Vorlage - der naechste Klick ins Bild gleicht an.
+        if (_wbPick is { Match: true })
+        {
+            _wbReference = colour;
+            return true;
+        }
+
         if (_tintPick is not null && ReferenceEquals(Layers.Selection, _tintPick))
         {
             Layers.TakeTint(colour.R, colour.G, colour.B);
@@ -165,6 +240,36 @@ public partial class AtelierPage
 
         Properties.Read(colour.X, colour.Y, colour.ShownR, colour.ShownG, colour.ShownB, colour.R, colour.G, colour.B, null);
         return false;
+    }
+
+    /// <summary>
+    /// Das Licht, wie es beim Weissabgleich ankommt. Am Weissabgleich des ganzen Bildes im Stapel:
+    /// das zusammengesetzte Bild mit Belichtung, Saettigung und den linearen Werkzeugen davor -
+    /// derselbe Weg wie die Anzeige. An einer Ebene oder im Knotenmodus: das Bild, wie die Datei
+    /// es hergibt - dort liegt vor dem Werkzeug meist nichts anderes.
+    /// </summary>
+    private (float R, float G, float B)? WhiteBalanceInputAt(IGradingTool tool, int x, int y)
+    {
+        bool whole = !InNodes && ToolsLayer is null && Tools.Stack.Tools.Contains(tool);
+        var frame = whole ? _frame : _base ?? _frame;
+
+        if (frame is null || x < 0 || y < 0 || x >= frame.Width || y >= frame.Height) return null;
+
+        int i = y * frame.Width + x;
+        float r = frame.R[i], g = frame.G[i], b = frame.B[i];
+
+        if (!whole) return (r, g, b);
+
+        FloatFrameProcessor.Light((float)Math.Pow(2.0, _finalAdjustments.Exposure), (float)_finalAdjustments.Saturation,
+                                  ref r, ref g, ref b);
+
+        foreach (var before in _finalGrading.SceneLinear)
+        {
+            if (ReferenceEquals(before, tool)) break;
+            before.Apply(ref r, ref g, ref b);
+        }
+
+        return (r, g, b);
     }
 
     /// <summary>Merkt die Farbe an einer Stelle im Farbspeicher - wie angezeigt und als Licht der Quelle.</summary>

@@ -68,6 +68,83 @@ public static class ColourSolve
         return ColourWheelMath.ToPoint(r / mean / scale, g / mean / scale, b / mean / scale);
     }
 
+    /// <summary>Die Grenzen des Temperaturreglers in Mired (15000 bis 2000 Kelvin) und seine Grundstellung.</summary>
+    private const float MinMired = 66.7f, MaxMired = 500f, NeutralMired = 1e6f / WhiteBalanceTool.NeutralKelvin;
+
+    /// <summary>
+    /// Der Weissabgleich - Temperatur in Kelvin und Tendenz -, bei dem ein Ton dieselbe Farbart
+    /// bekommt wie <paramref name="target"/>; ohne Ziel wird er grau (C4c).
+    ///
+    /// <paramref name="r"/>, <paramref name="g"/>, <paramref name="b"/> ist das Licht, wie es beim
+    /// Weissabgleich ankommt. <paramref name="shown"/> rechnet danach in die Anzeige, damit
+    /// verglichen wird, was man sieht - eine gemerkte Farbe ist eine gesehene. Gesucht wird wie
+    /// bei den Raedern mit der Rechnung des Werkzeugs selbst, innerhalb der Grenzen seiner Regler.
+    /// </summary>
+    public static (float Kelvin, float Tint) WhiteBalance(float r, float g, float b,
+                                                          Func<(float R, float G, float B), (float R, float G, float B)> shown,
+                                                          (float R, float G, float B)? target)
+    {
+        var goal = target ?? (1f, 1f, 1f);
+
+        float Cost(float mired, float tint)
+        {
+            var tool = new WhiteBalanceTool { Kelvin = 1e6f / mired, Tint = tint };
+            tool.Prepare();
+
+            float wr = r, wg = g, wb = b;
+            tool.Apply(ref wr, ref wg, ref wb);
+
+            var (sr, sg, sb) = shown((wr, wg, wb));
+
+            // Ein Hauch Abstand zur Grundstellung: Sind mehrere gleich gut, gewinnt die kleinste Aenderung.
+            return Chroma(sr, sg, sb, goal) + 1e-5f * (MathF.Abs(mired - NeutralMired) / 100f + MathF.Abs(tint) / 100f);
+        }
+
+        float bestMired = NeutralMired, bestTint = 0f;
+        float bestCost = Cost(bestMired, bestTint);
+
+        void Around(float cm, float ct, float reachM, float reachT, int steps)
+        {
+            for (int i = -steps; i <= steps; i++)
+            {
+                for (int j = -steps; j <= steps; j++)
+                {
+                    float m = Math.Clamp(cm + i * reachM / steps, MinMired, MaxMired);
+                    float t = Math.Clamp(ct + j * reachT / steps, -100f, 100f);
+                    float c = Cost(m, t);
+
+                    if (c < bestCost)
+                    {
+                        bestMired = m;
+                        bestTint = t;
+                        bestCost = c;
+                    }
+                }
+            }
+        }
+
+        float stepM = (MaxMired - MinMired) / 2f, stepT = 100f;
+        Around((MinMired + MaxMired) / 2f, 0f, stepM, stepT, 30);
+
+        for (int round = 0; round < 4; round++)
+        {
+            stepM /= 12f;
+            stepT /= 12f;
+            Around(bestMired, bestTint, stepM, stepT, 6);
+        }
+
+        return (1e6f / bestMired, bestTint);
+    }
+
+    /// <summary>Wie weit zwei Farbarten auseinanderliegen - die Helligkeit zaehlt nicht.</summary>
+    private static float Chroma(float r, float g, float b, (float R, float G, float B) goal)
+    {
+        float sum = r + g + b, target = goal.R + goal.G + goal.B;
+        if (sum <= 1e-6f || target <= 1e-6f) return 10f;
+
+        return MathF.Abs(r / sum - goal.R / target) + MathF.Abs(g / sum - goal.G / target) + MathF.Abs(b / sum - goal.B / target);
+    }
+
     /// <summary>
     /// Sucht ueber die Flaeche des Rades: erst grob, dann um den besten Punkt immer feiner.
     /// Ein paar tausend Rechnungen eines einzelnen Tons - weniger, als ein Bildpunkt-Durchgang kostet.

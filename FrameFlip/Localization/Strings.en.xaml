@@ -1219,6 +1219,13 @@
     <sys:String x:Key="S_ZoneLift">Shadows</sys:String>
     <sys:String x:Key="S_ZoneGamma">Midtones</sys:String>
     <sys:String x:Key="S_ZoneGain">Highlights</sys:String>
+    <sys:String x:Key="S_WbPickNeutral">Neutral</sys:String>
+    <sys:String x:Key="S_WbPickNeutralHint">Eyedropper: click a spot that should be grey – temperature and tint are set so that it is.</sys:String>
+    <sys:String x:Key="S_WbPickMatch">Match</sys:String>
+    <sys:String x:Key="S_WbPickMatchHint">Eyedropper: the spot you click takes the colour of a kept one – from another picture, say. Pick which in the colour store, otherwise the newest applies. On a layer with a mask it applies only there.</sys:String>
+    <sys:String x:Key="S_PickForWbNeutral">Eyedropper for: white balance – click a spot that should be grey</sys:String>
+    <sys:String x:Key="S_PickForWbMatch">Eyedropper for: match white balance to {0} – click the spot that should look like it</sys:String>
+    <sys:String x:Key="S_PickForWbNoReference">Eyedropper for: match white balance – no colour kept yet</sys:String>
     <sys:String x:Key="S_NodeMenuView">Show in the viewer (Ctrl+Shift+Click)</sys:String>
     <sys:String x:Key="S_NodeMenuViewOff">Viewer off – show the output again</sys:String>
     <sys:String x:Key="S_NodeLayerName">Layer name</sys:String>
