@@ -363,6 +363,12 @@
         -->
         <ContentControl x:Name="ViewControlsHome" Grid.Row="0" Visibility="Collapsed" Focusable="False">
             <StackPanel x:Name="ViewControls" Orientation="Horizontal" VerticalAlignment="Center" Margin="0,0,6,0">
+                <!-- Sichthilfe (W2c): Normal, Clipping, Falschfarben - nur in der Anzeige. Taste J. -->
+                <Button x:Name="ViewAidButton" Style="{StaticResource OverlayButton}" Margin="0,0,4,0"
+                        Click="OnViewAidClicked" ToolTip="{DynamicResource S_ViewAidHint}">
+                    <TextBlock x:Name="ViewAidText" Text="{DynamicResource S_ViewAidNone}" />
+                </Button>
+
                 <!--
                     Gedrueckt halten zeigt das Original. Als Knopf und nicht als
                     Schalter, weil der Vergleich ein Blick ist und kein Zustand -
@@ -409,6 +415,20 @@
                 -->
                 <TextBlock x:Name="SaveText" DockPanel.Dock="Right" VerticalAlignment="Center"
                            Style="{StaticResource DashLabel}" FontSize="9" />
+
+                <!-- Die Grenzen des Abschneidens als Bereichsregler (W2c, C7): unter links blau, ueber rechts rot. -->
+                <StackPanel x:Name="ClipRow" DockPanel.Dock="Right" Orientation="Horizontal" VerticalAlignment="Center"
+                            Margin="0,0,12,0" Visibility="Collapsed" ToolTip="{DynamicResource S_ClipRangeHint}">
+                    <TextBlock Text="{DynamicResource S_ClipRange}" Style="{StaticResource DashLabel}" FontSize="9"
+                               VerticalAlignment="Center" Margin="0,0,6,0" />
+                    <local:RangeSlider x:Name="ClipRange" Width="160" VerticalAlignment="Center" />
+                    <TextBlock x:Name="ClipValue" Style="{StaticResource DashLabel}" FontSize="9"
+                               VerticalAlignment="Center" Margin="6,0,0,0" />
+                </StackPanel>
+
+                <!-- Die Legende der Falschfarben (W2c). -->
+                <StackPanel x:Name="FalseColourRow" DockPanel.Dock="Right" Orientation="Horizontal"
+                            VerticalAlignment="Center" Margin="0,0,12,0" Visibility="Collapsed" />
 
                 <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
                     <Button x:Name="PreviousFrameButton" Style="{StaticResource LinkButton}" FontSize="11"

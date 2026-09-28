@@ -276,6 +276,8 @@ public partial class AtelierPage
             if (!GraphEvaluator.RenderRegion(_graph, NodeInputs(_base, 1, _regionPool), inside, _surface.BackBuffer, _surface.BackBufferStride))
                 return false;
 
+            ApplyViewAid(inside.X0, inside.Y0, inside.Width, inside.Height);
+
             _surface.AddDirtyRect(new Int32Rect(inside.X0, inside.Y0, inside.Width, inside.Height));
             _regionPainted = true;
             return true;
@@ -309,10 +311,21 @@ public partial class AtelierPage
         if (surface is null || picture is null) return;
 
         int width = surface.PixelWidth, height = surface.PixelHeight;
-        int stride = width * 4;
-        var pixels = new byte[stride * height];
+        int stride;
+        byte[] pixels;
 
-        surface.CopyPixels(pixels, stride, 0);
+        // Liegt eine Sichthilfe ueber dem Bild, wird das Bild darunter gemessen (W2c).
+        if (PlainUnderAid is { } plain)
+        {
+            pixels = plain;
+            stride = surface.BackBufferStride;
+        }
+        else
+        {
+            stride = width * 4;
+            pixels = new byte[stride * height];
+            surface.CopyPixels(pixels, stride, 0);
+        }
 
         var histogram = new Histogram();
         FrameProcessor.Measure(pixels, width, height, stride, histogram, step: 4);

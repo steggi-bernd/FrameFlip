@@ -207,6 +207,7 @@ public sealed partial class AtelierPage : UserControl
         SetUpQuickPanel();
         SetUpColourPick();
         SetUpDistributions();
+        SetUpViewAids();
         Layers.IsolateWanted += (layer, view) => IsolateStack(layer, view);
 
         _settle.Tick += (_, _) =>
@@ -768,6 +769,8 @@ public sealed partial class AtelierPage : UserControl
                 // Ein ganzes, scharfes Bild der Ausgabe - darauf darf der Pinsel Ausschnitte setzen.
                 _wholeShown = done && !_coarse && _viewer is null;
 
+                ApplyViewAid();
+
                 _surface.AddDirtyRect(new Int32Rect(0, 0, frame.Width, frame.Height));
                 return;
             }
@@ -779,6 +782,8 @@ public sealed partial class AtelierPage : UserControl
                                       _coarse ? CoarseStep : 1,
                                       _showingOriginal ? Overlays.None : _overlays, _number,
                                       Renderdata(grading));
+
+            ApplyViewAid();
 
             _surface.AddDirtyRect(new Int32Rect(0, 0, frame.Width, frame.Height));
         }

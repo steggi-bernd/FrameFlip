@@ -107,6 +107,13 @@ public partial class AtelierPage
     {
         if (key == Key.Escape) return EndViewer();
 
+        // J: die naechste Sichthilfe - wie in Lightroom (W2c).
+        if (key == Key.J)
+        {
+            NextViewAid();
+            return true;
+        }
+
         var wanted = key switch
         {
             Key.V => AtelierTool.Move,
@@ -143,6 +150,15 @@ public partial class AtelierPage
     /// </summary>
     private void OnViewportDown(object sender, MouseButtonEventArgs e)
     {
+        // Strg+Klick ins Bild: ein Punkt auf der Kurve beim Ton dieser Stelle (W2c) - mit jedem
+        // Werkzeug, solange die Karte der Kurven zu sehen ist. Sonst geht der Klick weiter wie immer.
+        if (e.ChangedButton == MouseButton.Left && Keyboard.Modifiers == ModifierKeys.Control &&
+            PixelAt(e.GetPosition(Display), out int cx, out int cy) && CurvePointAt(cx, cy))
+        {
+            e.Handled = true;
+            return;
+        }
+
         bool hand = e.ChangedButton == MouseButton.Left && _tool == AtelierTool.Hand;
         bool middle = e.ChangedButton == MouseButton.Middle;
 
