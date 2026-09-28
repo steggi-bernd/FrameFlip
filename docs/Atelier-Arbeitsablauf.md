@@ -974,3 +974,22 @@ nur stellenweise.
     - An einer Einstellungsebene steht der Weißabgleich in der Ebene, nicht im ganzen Bild.
   - Die Nachbargruppen liefen mit 579 Zusicherungen grün.
   - Eine echte Instanz startete ohne Fehler.
+
+### C4d: Tönung am Knoten aus einer Farbe (`feature/knoten-toenung`)
+
+Der offene Rest aus C4b: Der Knoten „Belichtung & Tönung“ nimmt jetzt ebenfalls eine Farbe.
+
+- **Knopf „Farbe aus dem Bild“** in den Eigenschaften des Knotens. Er macht die Maus zur
+  Pipette, die Lupe nennt den Knoten.
+- **Übernehmen:** Ein Klick ins Bild oder ein Feld aus dem Farbspeicher setzt die Tönung.
+  - Die Kanäle stehen im Verhältnis der Farbe, im Mittel eins, die Helligkeit bleibt.
+  - Die Regler des Knotens reichen bis zwei; was darüber läge, wird dort gekappt.
+  - Das ist ein Schritt für Rückgängig.
+- **Wie am Rad im Ebenenstreifen:** Es wartet nur eine Pipette. Ist inzwischen ein anderer
+  Knoten gewählt, endet sie, ohne etwas zu ändern.
+- **Probe** (`NodeTintPickInvariants`, 5 Zusicherungen):
+  - Knopf und Lupe.
+  - Die Tönung aus dem Bild mit Verhältnis und Mittel, Rückgängig.
+  - Die Farbe eines anderen Bildes aus dem Speicher.
+  - Das Ende bei einem anderen Knoten.
+  - Die Nachbargruppen liefen mit 558 Zusicherungen grün.
