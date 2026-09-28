@@ -148,6 +148,32 @@ public partial class AtelierPage
     }
 
     /// <summary>
+    /// Misst das angezeigte Bild fuer das Messgeraet im Feld (W2d) - bei einer Sichthilfe das Bild
+    /// darunter. Beim Histogramm nichts: Das misst die Seite ohnehin.
+    /// </summary>
+    private unsafe void ShowScope()
+    {
+        if (Tools.ScopeShown == ScopeKind.Histogram || _surface is not { } surface) return;
+
+        int width = surface.PixelWidth, height = surface.PixelHeight, stride = surface.BackBufferStride;
+        ScopeImage image;
+
+        if (PlainUnderAid is { } plain)
+        {
+            fixed (byte* start = plain) image = Scopes.Measure(Tools.ScopeShown, (IntPtr)start, width, height, stride);
+        }
+        else
+        {
+            surface.Lock();
+
+            try { image = Scopes.Measure(Tools.ScopeShown, surface.BackBuffer, width, height, stride); }
+            finally { surface.Unlock(); }
+        }
+
+        Tools.ShowScope(image);
+    }
+
+    /// <summary>
     /// Strg+Klick ins Bild: ein Punkt auf der gezeigten Kurve beim Ton dieser Stelle - so, wie er
     /// bei den Kurven ankommt, dieselbe Frage wie bei den Pipetten des Tonwerts. Falsch, wenn die
     /// Karte der Kurven nicht zu sehen ist.

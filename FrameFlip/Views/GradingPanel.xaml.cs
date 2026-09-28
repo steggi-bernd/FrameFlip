@@ -1748,6 +1748,57 @@ public partial class GradingPanel : UserControl
 
     private void OnResetCurveClicked(object sender, RoutedEventArgs e) => CurveField.Reset();
 
+    // ------------------------------------------------------------ Messgeraete (W2d)
+
+    /// <summary>Welches Messgeraet im Feld steht.</summary>
+    public ScopeKind ScopeShown { get; private set; } = ScopeKind.Histogram;
+
+    /// <summary>Ein anderes Messgeraet ist gewaehlt - die Seite misst das angezeigte Bild neu.</summary>
+    public event Action? ScopeWanted;
+
+    /// <summary>Das naechste Messgeraet: Histogramm, Waveform, RGB-Parade, Vektorskop.</summary>
+    public void SetScope(ScopeKind kind)
+    {
+        ScopeShown = kind;
+
+        bool histogram = kind == ScopeKind.Histogram;
+
+        Histogram.Visibility = histogram ? Visibility.Visible : Visibility.Collapsed;
+        Scope.Visibility = histogram ? Visibility.Collapsed : Visibility.Visible;
+        HistogramModeButton.Visibility = histogram ? Visibility.Visible : Visibility.Collapsed;
+        HistogramLogButton.Visibility = histogram ? Visibility.Visible : Visibility.Collapsed;
+        ClipText.Visibility = histogram ? Visibility.Visible : Visibility.Collapsed;
+
+        ScopeButton.SetResourceReference(ContentProperty, kind switch
+        {
+            ScopeKind.Waveform => "S_ScopeWaveform",
+            ScopeKind.Parade => "S_ScopeParade",
+            ScopeKind.Vectorscope => "S_ScopeVector",
+            _ => "S_ScopeHistogram",
+        });
+
+        if (!histogram) ScopeWanted?.Invoke();
+    }
+
+    private void OnScopeClicked(object sender, RoutedEventArgs e) => SetScope(ScopeShown switch
+    {
+        ScopeKind.Histogram => ScopeKind.Waveform,
+        ScopeKind.Waveform => ScopeKind.Parade,
+        ScopeKind.Parade => ScopeKind.Vectorscope,
+        _ => ScopeKind.Histogram,
+    });
+
+    /// <summary>Ein gemessenes Bild fuer das Messgeraet.</summary>
+    public void ShowScope(ScopeImage image) => Scope.Show(image);
+
+    /// <summary>Der Massstab des Histogramms: Wurzel (wie bisher) oder logarithmisch.</summary>
+    private void OnHistogramLogClicked(object sender, RoutedEventArgs e)
+    {
+        Histogram.Logarithmic = !Histogram.Logarithmic;
+        HistogramLogButton.Content = Histogram.Logarithmic ? "log" : "lin";
+        Histogram.InvalidateVisual();
+    }
+
     private void OnHistogramModeClicked(object sender, RoutedEventArgs e)
     {
         Histogram.ShowChannels = !Histogram.ShowChannels;

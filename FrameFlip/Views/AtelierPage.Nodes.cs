@@ -346,6 +346,7 @@ public partial class AtelierPage
         histogram.AboveWhite = sampled > 0 ? above / (double)sampled : 0;
 
         Tools.ShowHistogram(histogram);
+        ShowScope();
     }
 
     /// <summary>

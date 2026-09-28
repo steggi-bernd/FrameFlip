@@ -32,11 +32,22 @@
                 <Grid Margin="0,0,0,4">
                     <TextBlock x:Name="HistogramLabel" Text="{DynamicResource S_Distribution}"
                                Style="{StaticResource PanelLabel}" />
-                    <Button x:Name="HistogramModeButton" Style="{StaticResource LinkButton}"
-                            HorizontalAlignment="Right" Content="RGB" Click="OnHistogramModeClicked"
-                            ToolTip="{DynamicResource S_RgbToggle}" />
+                    <!-- Messgeraete (W2d): Histogramm, Waveform, RGB-Parade, Vektorskop - und beim
+                         Histogramm der Massstab und die Kanaele. -->
+                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+                        <Button x:Name="ScopeButton" Style="{StaticResource LinkButton}" Margin="0,0,10,0"
+                                Content="{DynamicResource S_ScopeHistogram}" Click="OnScopeClicked"
+                                ToolTip="{DynamicResource S_ScopeHint}" />
+                        <Button x:Name="HistogramLogButton" Style="{StaticResource LinkButton}" Margin="0,0,10,0"
+                                Content="lin" Click="OnHistogramLogClicked"
+                                ToolTip="{DynamicResource S_HistogramLogHint}" />
+                        <Button x:Name="HistogramModeButton" Style="{StaticResource LinkButton}"
+                                Content="RGB" Click="OnHistogramModeClicked"
+                                ToolTip="{DynamicResource S_RgbToggle}" />
+                    </StackPanel>
                 </Grid>
                 <local:HistogramView x:Name="Histogram" Height="72" />
+                <local:ScopeView x:Name="Scope" Visibility="Collapsed" />
                 <TextBlock x:Name="ClipText" Margin="0,4,0,0" FontSize="10"
                            Foreground="{StaticResource MutedBrush}" TextTrimming="CharacterEllipsis" />
             </StackPanel>

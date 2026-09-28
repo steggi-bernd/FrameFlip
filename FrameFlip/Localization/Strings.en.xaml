@@ -365,6 +365,12 @@
 
     <!-- ================================================================ Adjustment -->
     <sys:String x:Key="S_Distribution">Distribution</sys:String>
+    <sys:String x:Key="S_ScopeHistogram">Histogram</sys:String>
+    <sys:String x:Key="S_ScopeWaveform">Waveform</sys:String>
+    <sys:String x:Key="S_ScopeParade">RGB parade</sys:String>
+    <sys:String x:Key="S_ScopeVector">Vectorscope</sys:String>
+    <sys:String x:Key="S_ScopeHint">Switch scope: histogram, waveform (brightness per column), RGB parade (the same per channel), vectorscope (hue and saturation, with colour targets and skin line).</sys:String>
+    <sys:String x:Key="S_HistogramLogHint">Histogram scale: lin (square root, as before) or log – then even very few pixels show.</sys:String>
     <sys:String x:Key="S_Correction">Correction</sys:String>
     <sys:String x:Key="S_Reset">reset</sys:String>
     <sys:String x:Key="S_Exposure">Exposure</sys:String>
