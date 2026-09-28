@@ -128,6 +128,7 @@ static int RunAll()
     ViewAidInvariants.Run();
     ScopeInvariants.Run();
     EqualiseInvariants.Run();
+    MatchInvariants.Run();
     AtelierProjectInvariants.Run();
     AtelierProjectPageInvariants.Run();
     SwitchLeftoverInvariants.Run();

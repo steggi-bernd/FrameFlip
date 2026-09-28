@@ -58,6 +58,7 @@ public static class NodeCatalog
         new("S_GroupBasics", "S_Zones", () => new PointToolNode { Tool = new LiftGammaGainTool() }, "Zones"),
         new("S_GroupBasics", "S_ColourBands", () => new PointToolNode { Tool = new HslTool() }, "Bands"),
         new("S_GroupBasics", "S_Vibrance", () => new PointToolNode { Tool = new VibranceTool() }),
+        new("S_GroupBasics", "S_Match", () => new PointToolNode { Tool = new MatchTool() }, "Match"),
 
         new("S_GroupLight", "S_Dehaze", () => new LocalNode { Tool = new DehazeTool() }, "Dehaze"),
         new("S_GroupLight", "S_Bloom", () => Started(new LocalNode { Tool = new BloomTool() }), "Bloom"),
@@ -79,6 +80,7 @@ public static class NodeCatalog
         new("S_GroupFilm", "S_NodeDiffusion", () => Started(new FramePassNode { Pass = new DiffusionTool() })),
         new("S_GroupFilm", "S_Sort", () => Started(new FramePassNode { Pass = new SortTool() }), "Sort"),
         new("S_GroupFilm", "S_Grain", () => Started(new OpticsNode { Tool = new GrainTool() }), "Grain"),
+        new("S_GroupFilm", "S_Deflicker", () => new OpticsNode { Tool = new DeflickerTool() }, "Deflicker"),
 
         new("S_GroupTable", "S_Lut", () => new PointToolNode { Tool = new LutTool() }, "Lut"),
     };

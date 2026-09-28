@@ -48,6 +48,7 @@ public partial class GradingPanel
         ("S_GroupBasics", "WhiteBalance", "S_WhiteBalance", "◑"),
         ("S_GroupBasics", "Zones", "S_Zones", "◐"),
         ("S_GroupBasics", "Bands", "S_ColourBands", "⬡"),
+        ("S_GroupBasics", "Match", "S_Match", "⇄"),
 
         ("S_GroupLight", "Dehaze", "S_Dehaze", "≋"),
         ("S_GroupLight", "Bloom", "S_Bloom", "✦"),
@@ -68,6 +69,7 @@ public partial class GradingPanel
         ("S_GroupFilm", "Dither", "S_Dither", "⣿"),
         ("S_GroupFilm", "Sort", "S_Sort", "▤"),
         ("S_GroupFilm", "Grain", "S_Grain", "⁙"),
+        ("S_GroupFilm", "Deflicker", "S_Deflicker", "◒"),
 
         ("S_GroupTable", "Lut", "S_Lut", "⊞"),
     };
@@ -696,6 +698,7 @@ public partial class GradingPanel
         "WhiteBalance" => new object[] { _whiteBalance },
         "Zones" => new object[] { _zones },
         "Bands" => new object[] { _bands },
+        "Match" => new object[] { _match },
         "Dehaze" => new object[] { _dehaze },
         "Bloom" => new object[] { _bloom },
         "Halation" => new object[] { _halation },
@@ -713,6 +716,7 @@ public partial class GradingPanel
         "Dither" => new object[] { _dither, _diffusion },
         "Sort" => new object[] { _sort },
         "Grain" => new object[] { _grain },
+        "Deflicker" => new object[] { _deflicker },
         "Lut" => new object[] { _lut },
         _ => Array.Empty<object>(),
     };
@@ -798,6 +802,7 @@ public partial class GradingPanel
         "WhiteBalance" => !_whiteBalance.IsNeutral,
         "Zones" => !_zones.IsNeutral,
         "Bands" => !_bands.IsNeutral,
+        "Match" => !_match.IsNeutral,
         "Dehaze" => !_dehaze.IsNeutral,
         "Bloom" => !_bloom.IsNeutral,
         "Halation" => !_halation.IsNeutral,
@@ -815,6 +820,7 @@ public partial class GradingPanel
         "Vignette" => !_vignette.IsNeutral,
         "Dither" => !_dither.IsNeutral || !_diffusion.IsNeutral,
         "Grain" => !_grain.IsNeutral,
+        "Deflicker" => !_deflicker.IsNeutral,
         "Lut" => !_lut.IsNeutral,
         _ => false,
     };

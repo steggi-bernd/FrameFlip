@@ -25,6 +25,7 @@ public static class NodeTitles
         [HslTool.KindName] = ("Bands", "S_ColourBands"),
         [VibranceTool.KindName] = ("Basic", "S_Vibrance"),
         [LutTool.KindName] = ("Lut", "S_Lut"),
+        [MatchTool.KindName] = ("Match", "S_Match"),
         [DehazeTool.KindName] = ("Dehaze", "S_Dehaze"),
         [BloomTool.KindName] = ("Bloom", "S_Bloom"),
         [HalationTool.KindName] = ("Halation", "S_Halation"),
@@ -43,6 +44,7 @@ public static class NodeTitles
         [DiffusionTool.KindName] = ("Dither", "S_Dither"),
         [SortTool.KindName] = ("Sort", "S_Sort"),
         [GrainTool.KindName] = ("Grain", "S_Grain"),
+        [DeflickerTool.KindName] = ("Deflicker", "S_Deflicker"),
     };
 
     /// <summary>Die Kennung des Werkzeugs, das ein Knoten traegt - oder null.</summary>

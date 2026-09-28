@@ -54,6 +54,7 @@ public enum GradingStage
 [JsonDerivedType(typeof(VibranceTool), VibranceTool.KindName)]
 [JsonDerivedType(typeof(HslTool), HslTool.KindName)]
 [JsonDerivedType(typeof(LutTool), LutTool.KindName)]
+[JsonDerivedType(typeof(MatchTool), MatchTool.KindName)]
 public interface IGradingTool
 {
     /// <summary>Kennung fuer die Speicherung. Bleibt stabil, auch wenn der Anzeigename wechselt.</summary>

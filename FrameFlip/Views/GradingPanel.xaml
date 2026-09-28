@@ -540,6 +540,51 @@
             </StackPanel>
 
             <!--
+                Farbe angleichen (W2f): ein Vorbild merken - aus der Folge oder aus einer Datei -
+                und dieses Bild in seine Stimmung bringen.
+            -->
+            <Grid x:Name="MatchHead" Margin="0,16,0,0">
+                <TextBlock Text="{DynamicResource S_Match}" Style="{StaticResource PanelHeading}" />
+                <Button Style="{StaticResource LinkButton}" HorizontalAlignment="Right"
+                        Content="+" Tag="MatchBody" Click="OnSectionToggled" />
+            </Grid>
+            <StackPanel x:Name="MatchBody" Visibility="Collapsed" Margin="0,6,0,0">
+                <UniformGrid Columns="2">
+                    <Button Style="{StaticResource OverlayButton}" Margin="0,0,2,0"
+                            Content="{DynamicResource S_MatchTakeReference}" ToolTip="{DynamicResource S_MatchTakeReferenceHint}"
+                            Click="OnMatchReferenceClicked" />
+                    <Button Style="{StaticResource OverlayButton}" Margin="2,0,0,0"
+                            Content="{DynamicResource S_MatchReferenceFile}" ToolTip="{DynamicResource S_MatchReferenceFileHint}"
+                            Click="OnMatchReferenceFileClicked" />
+                </UniformGrid>
+
+                <TextBlock x:Name="MatchState" Margin="0,6,0,0" Style="{StaticResource PanelValue}"
+                           HorizontalAlignment="Left" FontSize="10" />
+
+                <Button x:Name="MatchApplyButton" Style="{StaticResource OverlayButton}" Margin="0,6,0,0"
+                        HorizontalAlignment="Left" Padding="10,3" IsEnabled="False"
+                        Content="{DynamicResource S_MatchApply}" ToolTip="{DynamicResource S_MatchApplyHint}"
+                        Click="OnMatchClicked" />
+
+                <Grid Margin="0,10,0,2">
+                    <TextBlock Text="{DynamicResource S_MatchAmount}" Style="{StaticResource PanelLabel}" />
+                    <TextBlock x:Name="MatchAmountValue" Style="{StaticResource PanelValue}" />
+                </Grid>
+                <Slider x:Name="MatchAmountSlider" Style="{StaticResource PanelSlider}"
+                        Minimum="0" Maximum="1" Value="0" SmallChange="0.02" LargeChange="0.1"
+                        ValueChanged="OnChanged" MouseDoubleClick="OnSliderReset" Tag="0" />
+
+                <ToggleButton x:Name="MatchToneButton" Style="{StaticResource OverlayToggle}" Margin="0,8,0,0"
+                              HorizontalAlignment="Left" Padding="10,3"
+                              Content="{DynamicResource S_MatchTone}" ToolTip="{DynamicResource S_MatchToneHint}"
+                              Checked="OnMatchToneChanged" Unchecked="OnMatchToneChanged" />
+
+                <TextBlock Margin="0,8,0,0" FontSize="10" TextWrapping="Wrap"
+                           Foreground="{StaticResource MutedBrush}"
+                           Text="{DynamicResource S_MatchHint}" />
+            </StackPanel>
+
+            <!--
                 Rauschminderung, Klarheit, Schaerfe - die drei mit oertlicher
                 Wirkung. Sie stehen fuer sich und nicht bei den uebrigen Reglern,
                 weil sie einen anderen Weg nehmen: Sie brauchen die Nachbarschaft
@@ -1504,6 +1549,46 @@
                 <TextBlock Margin="0,8,0,0" FontSize="10" TextWrapping="Wrap"
                            Foreground="{StaticResource MutedBrush}"
                            Text="{DynamicResource S_GrainHint}" />
+            </StackPanel>
+
+            <!--
+                Deflicker (W2f): die Helligkeit der ganzen Folge, im Hintergrund gemessen und
+                geglaettet - je Bild ein Faktor auf das Licht.
+            -->
+            <Grid x:Name="DeflickerHead" Margin="0,16,0,0">
+                <TextBlock Text="{DynamicResource S_Deflicker}" Style="{StaticResource PanelHeading}" />
+                <Button Style="{StaticResource LinkButton}" HorizontalAlignment="Right"
+                        Content="+" Tag="DeflickerBody" Click="OnSectionToggled" />
+            </Grid>
+            <StackPanel x:Name="DeflickerBody" Visibility="Collapsed" Margin="0,6,0,0">
+                <Button x:Name="DeflickerMeasureButton" Style="{StaticResource OverlayButton}"
+                        HorizontalAlignment="Left" Padding="10,3"
+                        Content="{DynamicResource S_DeflickerMeasure}" ToolTip="{DynamicResource S_DeflickerMeasureHint}"
+                        Click="OnDeflickerMeasureClicked" />
+
+                <TextBlock x:Name="DeflickerState" Margin="0,6,0,0" Style="{StaticResource PanelValue}"
+                           HorizontalAlignment="Left" FontSize="10" TextWrapping="Wrap" />
+
+                <Grid Margin="0,10,0,2">
+                    <TextBlock Text="{DynamicResource S_DeflickerAmount}" Style="{StaticResource PanelLabel}" />
+                    <TextBlock x:Name="DeflickerAmountValue" Style="{StaticResource PanelValue}" />
+                </Grid>
+                <Slider x:Name="DeflickerAmountSlider" Style="{StaticResource PanelSlider}"
+                        Minimum="0" Maximum="1" Value="0" SmallChange="0.02" LargeChange="0.1"
+                        ValueChanged="OnChanged" MouseDoubleClick="OnSliderReset" Tag="0" />
+
+                <Grid Margin="0,10,0,2">
+                    <TextBlock Text="{DynamicResource S_DeflickerWindow}" Style="{StaticResource PanelLabel}" />
+                    <TextBlock x:Name="DeflickerWindowValue" Style="{StaticResource PanelValue}" />
+                </Grid>
+                <Slider x:Name="DeflickerWindowSlider" Style="{StaticResource PanelSlider}"
+                        Minimum="3" Maximum="51" Value="9" SmallChange="2" LargeChange="6"
+                        IsSnapToTickEnabled="True" TickFrequency="2"
+                        ValueChanged="OnChanged" MouseDoubleClick="OnSliderReset" Tag="9" />
+
+                <TextBlock Margin="0,8,0,0" FontSize="10" TextWrapping="Wrap"
+                           Foreground="{StaticResource MutedBrush}"
+                           Text="{DynamicResource S_DeflickerHint}" />
             </StackPanel>
 
             <ToggleButton x:Name="GroupLut" Style="{StaticResource SectionHeader}"
