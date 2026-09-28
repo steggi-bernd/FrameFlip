@@ -1,6 +1,7 @@
 using System.IO;
 using FrameFlip.Imaging;
 using FrameFlip.Imaging.Grading;
+using FrameFlip.Imaging.Nodes;
 using FrameFlip.Localization;
 
 namespace FrameFlip.Views;
@@ -23,6 +24,9 @@ public partial class AtelierPage
 
     /// <summary>Die Ebene, deren Toenung auf eine Farbe wartet.</summary>
     private ImageLayer? _tintPick;
+
+    /// <summary>Der Knoten "Belichtung &amp; Toenung", dessen Toenung auf eine Farbe wartet (C4d).</summary>
+    private ExposureTintNode? _nodeTintPick;
 
     /// <summary>Die Pipette am Weissabgleich (C4c): neutral, oder angleichen an eine gemerkte Farbe.</summary>
     private (WhiteBalanceTool Tool, bool Match)? _wbPick;
@@ -70,7 +74,7 @@ public partial class AtelierPage
     }
 
     /// <summary>Ob eine Pipette an einem Rad oder an der Toenung wartet - fuer die Probe.</summary>
-    internal bool ColourPicking => _zonePick is not null || _tintPick is not null || _wbPick is not null;
+    internal bool ColourPicking => _zonePick is not null || _tintPick is not null || _wbPick is not null || _nodeTintPick is not null;
 
     /// <summary>Welche Art Pipette wartet - innerhalb einer Art schaltet ihr Feld selbst um.</summary>
     private enum ColourPickKind { Zone, Tint, WhiteBalance }
@@ -88,6 +92,7 @@ public partial class AtelierPage
         _zonePick = null;
         _tintPick = null;
         _wbPick = null;
+        _nodeTintPick = null;
         LeaveLevelsPickQuietly();
 
         arm();
@@ -104,6 +109,7 @@ public partial class AtelierPage
         _zonePick = null;
         _tintPick = null;
         _wbPick = null;
+        _nodeTintPick = null;
 
         Tools.EndZonePick();
         Tools.EndWhiteBalancePick();
@@ -137,6 +143,8 @@ public partial class AtelierPage
             }));
 
         if (_tintPick is { } layer) return Strings.T("S_PickForTint", layer.Name);
+
+        if (_nodeTintPick is { } node) return Strings.T("S_PickForTint", NodeTitles.For(node));
 
         if (_wbPick is { } wb)
         {
@@ -198,6 +206,23 @@ public partial class AtelierPage
             return true;
         }
 
+        if (_nodeTintPick is { } tinted)
+        {
+            // Inzwischen etwas anderes gewaehlt: Die Pipette galt dem Knoten - sie endet.
+            if (!ReferenceEquals(SelectedNode, tinted))
+            {
+                LeaveColourPick();
+                return false;
+            }
+
+            if (LinearAt(x, y) is not var (r, g, b)) return false;
+
+            TintNode(tinted, r, g, b);
+            RememberColour(x, y);
+            LeaveColourPick();
+            return true;
+        }
+
         if (_tintPick is not null)
         {
             // Inzwischen eine andere Ebene gewaehlt: Die Toenung gehoerte der alten - die Pipette endet.
@@ -231,6 +256,13 @@ public partial class AtelierPage
             return true;
         }
 
+        if (_nodeTintPick is { } tinted && ReferenceEquals(SelectedNode, tinted))
+        {
+            TintNode(tinted, colour.R, colour.G, colour.B);
+            LeaveColourPick();
+            return true;
+        }
+
         if (_tintPick is not null && ReferenceEquals(Layers.Selection, _tintPick))
         {
             Layers.TakeTint(colour.R, colour.G, colour.B);
@@ -240,6 +272,30 @@ public partial class AtelierPage
 
         Properties.Read(colour.X, colour.Y, colour.ShownR, colour.ShownG, colour.ShownB, colour.R, colour.G, colour.B, null);
         return false;
+    }
+
+    /// <summary>Der Knopf "Farbe aus dem Bild" am Knoten: Die Maus wird die Pipette fuer seine Toenung.</summary>
+    private void ArmNodeTint(ExposureTintNode node) => StartColourPick(ColourPickKind.Tint, () => _nodeTintPick = node);
+
+    /// <summary>
+    /// Die Toenung des Knotens uebernimmt eine Farbe (linear): ihre Kanaele im Verhaeltnis der
+    /// Farbe, im Mittel eins - die Helligkeit bleibt. Die Regler reichen bis zwei; was darueber
+    /// laege, wird dort gekappt. Ein Schritt fuer "Rueckgaengig".
+    /// </summary>
+    private void TintNode(ExposureTintNode node, float r, float g, float b)
+    {
+        float mean = (r + g + b) / 3f;
+        if (mean <= 1e-6f) return;
+
+        RememberNodes();
+
+        node.Tint.R = Math.Clamp(r / mean, 0f, 2f);
+        node.Tint.G = Math.Clamp(g / mean, 0f, 2f);
+        node.Tint.B = Math.Clamp(b / mean, 0f, 2f);
+
+        NodeView.InvalidateVisual();
+        AfterNodeEdit();
+        ShowNodeSettings();
     }
 
     /// <summary>

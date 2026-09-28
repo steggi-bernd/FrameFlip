@@ -92,7 +92,7 @@ public partial class AtelierPage
         change();
         NodeView.InvalidateVisual();
         AfterNodeEdit();
-    }, PassThumb);
+    }, PassThumb, ArmNodeTint);
 
     /// <summary>Die Werkzeuge, die eine Ebene haben kann - die Karten einer Ebenenkorrektur.</summary>
     private static readonly string[] LayerSections = { "Basic", "Levels", "Curve", "WhiteBalance", "Zones", "Bands", "Lut" };

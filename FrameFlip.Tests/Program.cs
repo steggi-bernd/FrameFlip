@@ -120,6 +120,7 @@ static int RunAll()
     RangeSliderInvariants.Run();
     ColourStoreInvariants.Run();
     WhiteBalancePickInvariants.Run();
+    NodeTintPickInvariants.Run();
     AtelierProjectInvariants.Run();
     AtelierProjectPageInvariants.Run();
     SwitchLeftoverInvariants.Run();
