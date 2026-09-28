@@ -90,7 +90,8 @@ public partial class AtelierPage
 
         if (node is null)
         {
-            ViewerBadge.Visibility = Visibility.Collapsed;
+            // Im Stapel kann eine Ebene isoliert sein - dann spricht das Schild von ihr (C6b).
+            if (!ShowSoloBadge()) ViewerBadge.Visibility = Visibility.Collapsed;
             return;
         }
 
@@ -143,11 +144,23 @@ public partial class AtelierPage
     /// </summary>
     private bool EndViewer()
     {
-        if (_viewer is null || _objectPick is not null || Mouse.Captured is not null) return false;
+        if (_objectPick is not null || Mouse.Captured is not null) return false;
+
+        if (_stackSolo is not null)
+        {
+            EndStackSolo(render: true);
+            return true;
+        }
+
+        if (_viewer is null) return false;
 
         SetViewer(null);
         return true;
     }
 
-    private void OnViewerClosed(object sender, RoutedEventArgs e) => SetViewer(null);
+    private void OnViewerClosed(object sender, RoutedEventArgs e)
+    {
+        if (_stackSolo is not null) EndStackSolo(render: true);
+        else SetViewer(null);
+    }
 }

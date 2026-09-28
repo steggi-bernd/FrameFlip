@@ -123,6 +123,7 @@ static int RunAll()
     NodeTintPickInvariants.Run();
     SortWindowInvariants.Run();
     SortCoarseInvariants.Run();
+    StackIsolationInvariants.Run();
     AtelierProjectInvariants.Run();
     AtelierProjectPageInvariants.Run();
     SwitchLeftoverInvariants.Run();

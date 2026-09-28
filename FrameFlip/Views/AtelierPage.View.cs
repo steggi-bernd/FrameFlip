@@ -211,5 +211,5 @@ public partial class AtelierPage
     /// andere - ein "Original", das eine selbstgebaute Mischung aus acht Passen
     /// zeigt, waere keines.
     /// </summary>
-    private FloatFrame? Shown() => _showingOriginal ? _base ?? _frame : _frame;
+    private FloatFrame? Shown() => _showingOriginal ? _base ?? _frame : _soloFrame ?? _frame;
 }

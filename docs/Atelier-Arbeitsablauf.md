@@ -1059,3 +1059,40 @@ Pixel Sort in der Vorschau ganz, und beim Loslassen sprang das Bild um.
     Fehlerdiffusion nicht.
   - Die Nachbargruppen (Pixel Sort, Startwerte, Gleichheit von Stapel und Knoten, Export
     aus Knoten, Bildweg) liefen mit 687 Zusicherungen grün.
+
+### C6b: Isolieren im Stapel (`feature/stapel-isolieren`)
+
+Die offenen Punkte aus C6: Isolieren auch im Stapel, und die Maske als roter Schleier.
+
+- **Wie:** Im Stapel gibt es keinen Betrachter. Deshalb rechnet der Composer die Ebene selbst
+  heraus (`LayerSolo`): bis zu ihr wie sonst, dann das, was sie beiträgt, statt es zu mischen.
+- **Drei Ansichten:**
+  - **Ebene allein:** was sie vor dem Mischen beiträgt. Bei einer Einstellungsebene ist das
+    das Bild darunter mit ihrer Korrektur, ohne ihre Maske.
+  - **Maske allein:** grau, weiß, wo sie wirkt. Sie wird als Anzeige gezeigt, nicht als Licht,
+    ohne Grundkorrektur und Werkzeuge darüber. Weiß bleibt so auch bei einer EXR weiß.
+  - **Maske als Schleier:** das ganze Bild, und wo die Maske nicht wirkt, liegt es halb rot,
+    wie die Maskenansicht in Photoshop.
+- **Bedienung:**
+  - Alt+Klick auf das Auge einer Ebene zeigt sie allein.
+  - Das Maskenzeichen ◐ vor der Mischung ist jetzt ein eigener Griff: Alt+Klick zeigt die
+    Maske grau, Alt+Umschalt+Klick als Schleier.
+  - Dieselben drei stehen im Menü der Zeile.
+  - Über dem Bild steht „Isoliert: … – Esc beendet“, im selben Schild wie der Betrachter.
+- **Nur die Anzeige:** Das zusammengesetzte Bild bleibt, wie es ist. Pipetten, Messung und
+  Export sehen weiter das ganze Bild, im Rezept ändert sich nichts.
+- **Ende:** Esc, dasselbe noch einmal, das Kreuz am Schild, ein anderes Bild und der
+  Knotenmodus beenden es. Wird die Ebene ausgeblendet oder gelöscht, endet es von selbst.
+- **Nicht in diesem Schnitt:** Der Schleier im Knotenmodus. Dort zeigt der Betrachter die
+  Maske grau, für den Schleier bräuchte er das ganze Bild und die Maske zugleich. Die
+  Zielzeile nennt das Isolierte weiterhin nicht, das Schild steht über dem Bild.
+- **Probe** (`StackIsolationInvariants`, 15 Zusicherungen):
+  - Der Composer: die Ebene allein, die Maske grau als Anzeige, der Schleier halb rot, der
+    Stapel unverändert, eine ausgeblendete Ebene ergibt nichts.
+  - Im Atelier:
+    - Das Menü der Zeile und das Schild.
+    - Das ganze Bild bleibt für Pipetten und Messung.
+    - Wechsel der Ansicht; Ende durch dasselbe noch einmal, durch Esc, durch Ausblenden und
+      durch ein anderes Bild.
+    - Im Knotenmodus isoliert der Betrachter.
+  - Die Nachbargruppen liefen mit 726 Zusicherungen grün.

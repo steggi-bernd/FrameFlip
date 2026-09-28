@@ -1,6 +1,7 @@
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Controls.Primitives;
+using System.Windows.Input;
 using FrameFlip.Decoding.Exr;
 using FrameFlip.Imaging;
 using FrameFlip.Imaging.Grading;
@@ -384,6 +385,15 @@ public partial class LayerPanel : UserControl
         Grid.SetColumn(eye, 0);
         grid.Children.Add(eye);
 
+        // Alt+Klick: die Ebene allein zeigen (C6b), ohne sie aus- oder einzublenden.
+        eye.PreviewMouseLeftButtonDown += (_, e) =>
+        {
+            if ((Keyboard.Modifiers & ModifierKeys.Alt) == 0) return;
+
+            e.Handled = true;
+            IsolateWanted?.Invoke(layer, SoloView.Layer);
+        };
+
         // Eine Miniatur sagt in einem Blick, was ein Name nicht sagt: ob der Pass
         // ueberhaupt etwas enthaelt. Ein leerer Glanzpass sieht schwarz aus, und das
         // ist eine Antwort - "GlossDir" ist keine.
@@ -474,16 +484,45 @@ public partial class LayerPanel : UserControl
         // unterscheiden, die ueberall wirkt - und man suchte den Grund woanders.
         var mode = new TextBlock
         {
-            Text = (layer.Mask.IsNeutral ? "" : "\u25D0 ") +
-                   Strings.T(Blending.All.First(m => m.Mode == layer.Mode).Key),
+            Text = Strings.T(Blending.All.First(m => m.Mode == layer.Mode).Key),
             FontSize = 9,
             Margin = new Thickness(6, 0, 0, 0),
             VerticalAlignment = VerticalAlignment.Center,
             Foreground = (System.Windows.Media.Brush)FindResource("MutedBrush"),
         };
 
-        Grid.SetColumn(mode, 3);
-        grid.Children.Add(mode);
+        // Ein Punkt vor der Mischung, wenn die Ebene maskiert ist - und mit Alt ein Griff an die
+        // Maske: allein grau, mit Umschalt als roter Schleier ueber dem Bild (C6b).
+        var tail = new StackPanel { Orientation = Orientation.Horizontal, VerticalAlignment = VerticalAlignment.Center };
+
+        if (!layer.Mask.IsNeutral)
+        {
+            var mark = new TextBlock
+            {
+                Text = "\u25D0",
+                FontSize = 9,
+                Margin = new Thickness(6, 0, 0, 0),
+                VerticalAlignment = VerticalAlignment.Center,
+                Foreground = (System.Windows.Media.Brush)FindResource("MutedBrush"),
+                ToolTip = Strings.T("S_LayerMaskMarkHint"),
+            };
+
+            mark.PreviewMouseLeftButtonDown += (_, e) =>
+            {
+                if ((Keyboard.Modifiers & ModifierKeys.Alt) == 0) return;
+
+                e.Handled = true;
+                IsolateWanted?.Invoke(layer, (Keyboard.Modifiers & ModifierKeys.Shift) != 0 ? SoloView.Veil : SoloView.Mask);
+            };
+
+            tail.Children.Add(mark);
+        }
+
+        mode.Margin = new Thickness(layer.Mask.IsNeutral ? 6 : 3, 0, 0, 0);
+        tail.Children.Add(mode);
+
+        Grid.SetColumn(tail, 3);
+        grid.Children.Add(tail);
 
         var item = new ListBoxItem { Content = grid, Tag = layer };
 
@@ -500,6 +539,9 @@ public partial class LayerPanel : UserControl
 
     /// <summary>Das zuletzt geoeffnete Menue einer Zeile - fuer die Probe.</summary>
     internal FlipMenu? RowMenu { get; private set; }
+
+    /// <summary>Eine Ebene soll allein gezeigt werden - oder ihre Maske (C6b). Alt+Klick oder das Menue der Zeile.</summary>
+    public event Action<ImageLayer, SoloView>? IsolateWanted;
 
     /// <summary>
     /// Das Menue einer Zeile: dieselben Griffe wie die Knoepfe unter der Liste - und
@@ -520,7 +562,16 @@ public partial class LayerPanel : UserControl
                 Raise(interim: false);
             })
             .Toggle(Strings.T("S_LayerMenuVisible"), layer.Visible, () => SetVisible(layer, !layer.Visible))
-            .Separator()
+            .Item("◧", Strings.T("S_LayerMenuAlone"), () => IsolateWanted?.Invoke(layer, SoloView.Layer), "Alt+Klick aufs Auge", enabled: layer.Visible);
+
+        // Die Maske allein oder als Schleier - nur, wenn es eine gibt (C6b).
+        if (!layer.Mask.IsNeutral)
+        {
+            menu.Item("◐", Strings.T("S_LayerMenuMaskAlone"), () => IsolateWanted?.Invoke(layer, SoloView.Mask), "Alt+Klick auf ◐", enabled: layer.Visible)
+                .Item("◍", Strings.T("S_LayerMenuMaskVeil"), () => IsolateWanted?.Invoke(layer, SoloView.Veil), "Alt+Umschalt+Klick auf ◐", enabled: layer.Visible);
+        }
+
+        menu.Separator()
             .Item("❐", Strings.T("S_DuplicateLayer"), () => OnDuplicateClicked(this, none), "Strg+J")
             .Item("✕", Strings.T("S_RemoveLayer"), () => OnRemoveClicked(this, none), "Entf", enabled: Stack.All().Count() > 1)
             .Separator()

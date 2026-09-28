@@ -207,6 +207,7 @@ public sealed partial class AtelierPage : UserControl
         SetUpQuickPanel();
         SetUpColourPick();
         SetUpDistributions();
+        Layers.IsolateWanted += (layer, view) => IsolateStack(layer, view);
 
         _settle.Tick += (_, _) =>
         {
@@ -272,6 +273,7 @@ public sealed partial class AtelierPage : UserControl
         // und ihr Klick aenderte etwas, das nicht mehr gerechnet wird.
         LeaveLevelsPick();
         LeaveColourPick();
+        EndStackSolo(render: false);
 
         _path = path;
 
@@ -740,6 +742,10 @@ public sealed partial class AtelierPage : UserControl
         try
         {
             var (adjustments, grading) = Current();
+
+            // Die Maske grau zeigt, was sie sagt - ohne Korrektur darueber (C6b).
+            if (_stackSolo is { View: SoloView.Mask } && !_showingOriginal)
+                (adjustments, grading) = (ImageAdjustments.Neutral, PreparedGrading.None);
 
             // Im Knotenmodus rechnet der Graph - ausser beim Vergleich mit dem
             // Original, das ist in beiden Modi das Bild der Datei ohne alles.

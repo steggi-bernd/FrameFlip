@@ -1203,6 +1203,11 @@
     <sys:String x:Key="S_QuickObjectMask">Objekt als Maske</sys:String>
     <sys:String x:Key="S_IsolatedLayer">Isoliert: Ebene „{0}“ – Esc beendet</sys:String>
     <sys:String x:Key="S_IsolatedMask">Isoliert: Maske von „{0}“ – Esc beendet</sys:String>
+    <sys:String x:Key="S_LayerMaskMarkHint">Die Ebene ist maskiert. Alt+Klick: die Maske allein zeigen, grau. Alt+Umschalt+Klick: als roter Schleier über dem Bild.</sys:String>
+    <sys:String x:Key="S_LayerMenuAlone">Allein zeigen</sys:String>
+    <sys:String x:Key="S_LayerMenuMaskAlone">Maske allein zeigen</sys:String>
+    <sys:String x:Key="S_LayerMenuMaskVeil">Maske als Schleier zeigen</sys:String>
+    <sys:String x:Key="S_IsolatedVeil">Isoliert: Maske von „{0}“ als Schleier – Esc beendet</sys:String>
     <sys:String x:Key="S_QuickIsolateLayer">Ebene isolieren</sys:String>
     <sys:String x:Key="S_QuickIsolateMask">Maske isolieren</sys:String>
     <sys:String x:Key="S_SelectSet">Kryptomatte: {0}</sys:String>
