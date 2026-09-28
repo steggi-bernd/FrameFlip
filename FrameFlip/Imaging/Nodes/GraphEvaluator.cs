@@ -411,7 +411,8 @@ public static partial class GraphEvaluator
             View = inputs.View,
             Sources = inputs.Sources,
             Data = inputs.Data,
-            SkipFramePasses = sixteen || step != 1,
+            // Auf dem groben Raster entscheidet der Knoten selbst - wer eine grobe Fassung kennt, rechnet (C7c).
+            SkipFramePasses = sixteen,
             Pool = inputs.Pool,
         };
 

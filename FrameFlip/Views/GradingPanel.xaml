@@ -1222,7 +1222,7 @@
 
             <!--
                 Pixel Sorting. Steht beim Rastern, weil es dieselbe Art Durchgang ist:
-                ueber den fertigen Rahmen, der Reihe nach, und beim Ziehen gar nicht.
+                ueber den fertigen Rahmen, der Reihe nach, und beim Ziehen in grober Fassung.
             -->
             <Grid x:Name="SortHead" Margin="0,16,0,0">
                 <TextBlock Text="{DynamicResource S_Sort}" Style="{StaticResource PanelHeading}" />

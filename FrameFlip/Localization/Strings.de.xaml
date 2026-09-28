@@ -160,7 +160,7 @@
     <sys:String x:Key="S_SortCross">Kreuzweise</sys:String>
     <sys:String x:Key="S_SortCrossHint">Nach dem ersten Durchgang ein zweiter, um 90 Grad gedreht - wie Kim Asendorf, erst Spalten, dann Zeilen. Das Bild zerlaeuft in beide Richtungen.</sys:String>
     <sys:String x:Key="S_SortKeyHint">Wonach verglichen wird - und was die Schwelle bedeutet. Helligkeit macht aus Laeufen Verlaeufe von dunkel nach hell, Farbton macht Baender, Saettigung trennt Blasses von Kraeftigem und laesst die Form stehen.</sys:String>
-    <sys:String x:Key="S_SortHint">Umsortiert werden nur Punkte ZWISCHEN den beiden Schwellen - das Fenster ist der Staerkeregler. Neu hinzugefuegt steht es offen; ganz geschlossen geschieht nichts. Aufgezogen zerfaellt das Bild in Laeufe, dazwischen bleibt alles stehen. Laeuft wie das Rastern erst beim Loslassen, und nur in 8-Bit-Ausgaben - PNG 16 Bit und TIFF lassen es weg.</sys:String>
+    <sys:String x:Key="S_SortHint">Umsortiert werden nur Punkte ZWISCHEN den beiden Schwellen - das Fenster ist der Staerkeregler. Neu hinzugefuegt steht es offen; ganz geschlossen geschieht nichts. Aufgezogen zerfaellt das Bild in Laeufe, dazwischen bleibt alles stehen. Beim Ziehen eines Reglers zeigt die Vorschau eine grobe Fassung, beim Loslassen das volle Bild. Nur in 8-Bit-Ausgaben - PNG 16 Bit und TIFF lassen es weg.</sys:String>
     <sys:String x:Key="S_Grain">Filmkorn</sys:String>
     <sys:String x:Key="S_GrainAmount">Stärke</sys:String>
     <sys:String x:Key="S_GrainSize">Korngröße</sys:String>
