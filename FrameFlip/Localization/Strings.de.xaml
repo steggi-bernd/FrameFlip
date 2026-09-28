@@ -1219,6 +1219,13 @@
     <sys:String x:Key="S_ZoneLift">Tiefen</sys:String>
     <sys:String x:Key="S_ZoneGamma">Mitten</sys:String>
     <sys:String x:Key="S_ZoneGain">Lichter</sys:String>
+    <sys:String x:Key="S_WbPickNeutral">Neutral</sys:String>
+    <sys:String x:Key="S_WbPickNeutralHint">Pipette: Ein Klick auf eine Stelle, die grau sein soll, stellt Temperatur und Tendenz so ein, dass sie es wird.</sys:String>
+    <sys:String x:Key="S_WbPickMatch">Angleichen</sys:String>
+    <sys:String x:Key="S_WbPickMatchHint">Pipette: Die angeklickte Stelle bekommt die Farbe einer gemerkten – etwa aus einem anderen Bild. Welche, wählst du im Farbspeicher, sonst gilt die zuletzt gemerkte. An einer Ebene mit Maske gilt es nur dort.</sys:String>
+    <sys:String x:Key="S_PickForWbNeutral">Pipette für: Weißabgleich – Klick auf eine Stelle, die grau sein soll</sys:String>
+    <sys:String x:Key="S_PickForWbMatch">Pipette für: Weißabgleich angleichen an {0} – Klick auf die Stelle, die so aussehen soll</sys:String>
+    <sys:String x:Key="S_PickForWbNoReference">Pipette für: Weißabgleich angleichen – es ist noch keine Farbe gemerkt</sys:String>
     <sys:String x:Key="S_NodeMenuView">Im Betrachter zeigen (Strg+Umschalt+Klick)</sys:String>
     <sys:String x:Key="S_NodeMenuViewOff">Betrachter aus – wieder die Ausgabe zeigen</sys:String>
     <sys:String x:Key="S_NodeLayerName">Name der Ebene</sys:String>

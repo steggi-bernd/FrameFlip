@@ -119,6 +119,7 @@ static int RunAll()
     IsolationInvariants.Run();
     RangeSliderInvariants.Run();
     ColourStoreInvariants.Run();
+    WhiteBalancePickInvariants.Run();
     AtelierProjectInvariants.Run();
     AtelierProjectPageInvariants.Run();
     SwitchLeftoverInvariants.Run();

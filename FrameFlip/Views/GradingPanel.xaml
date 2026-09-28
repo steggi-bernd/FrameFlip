@@ -348,6 +348,26 @@
                         Background="{StaticResource TrackTint}"
                         Minimum="-100" Maximum="100" Value="0" SmallChange="1" LargeChange="5"
                         ValueChanged="OnChanged" MouseDoubleClick="OnSliderReset" Tag="0" />
+
+                <!-- Pipetten (C4c): eine Stelle grau machen, oder an eine gemerkte Farbe angleichen. -->
+                <UniformGrid Columns="2" Margin="0,8,0,0">
+                    <ToggleButton x:Name="WbPickNeutral" Style="{StaticResource OverlayToggle}" Margin="0,0,2,0" Tag="Neutral"
+                                  ToolTip="{DynamicResource S_WbPickNeutralHint}"
+                                  Checked="OnWbPickToggled" Unchecked="OnWbPickToggled">
+                        <StackPanel Orientation="Horizontal">
+                            <local:IconLabel Icon="picker" />
+                            <TextBlock Text="{DynamicResource S_WbPickNeutral}" Margin="5,0,0,0" VerticalAlignment="Center" />
+                        </StackPanel>
+                    </ToggleButton>
+                    <ToggleButton x:Name="WbPickMatch" Style="{StaticResource OverlayToggle}" Margin="2,0,0,0" Tag="Match"
+                                  ToolTip="{DynamicResource S_WbPickMatchHint}"
+                                  Checked="OnWbPickToggled" Unchecked="OnWbPickToggled">
+                        <StackPanel Orientation="Horizontal">
+                            <local:IconLabel Icon="picker" />
+                            <TextBlock Text="{DynamicResource S_WbPickMatch}" Margin="5,0,0,0" VerticalAlignment="Center" />
+                        </StackPanel>
+                    </ToggleButton>
+                </UniformGrid>
             </StackPanel>
 
             <!-- Zonen -->
