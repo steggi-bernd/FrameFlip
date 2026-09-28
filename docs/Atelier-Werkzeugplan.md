@@ -695,6 +695,65 @@ In sechs Schnitten, nach Nutzen und Abhängigkeit:
   - Eine echte Instanz startete ohne Fehler; der Knopf schaltet die vier Geräte durch, „lin“
     wird zu „log“, und die Knöpfe des Histogramms verschwinden bei den anderen Geräten.
 
+**W2e (`feature/ausgleich`):**
+
+- **Zwei Werkzeuge**, weil sie verschieden rechnen:
+  - **Ausgleich** (`EqualiseTool`, Kennung `equalise`) in der Grundkorrektur hinter dem
+    Tonwert, vor den Kurven – auch in einem Stapel von früher. Ein Anzeigewerkzeug mit einer
+    gemessenen Kurve. Es läuft deshalb überall mit: im Stapel, als Knoten, an einer Ebene und im
+    Export mit 16 Bit.
+  - **Örtlicher Ausgleich** (`ClaheTool`, Kennung `clahe`) bei Licht und Details neben der
+    Klarheit. Ein Durchgang über das fertige Bild, als erster vor Rastern und Sortieren. Wie
+    diese gilt er nur für das ganze Bild und rechnet in 8 Bit; der Hinweis an der
+    Exportleiste nennt ihn mit.
+- **Ausgleich:**
+  - „Ausgleichen“ misst die Helligkeit dessen, was beim Werkzeug ankommt – derselbe Weg wie
+    Auto am Tonwert (W2b): im Stapel mit den Werkzeugen davor, im Knotenmodus am Eingang des
+    Knotens. An einer Ebene misst es, wie Auto, das fertige Bild. Die Verteilung steht danach
+    im Werkzeug und wird mit dem Rezept gespeichert.
+  - Die Kurve gilt dann für die ganze Folge. Je Bild neu gemessen, flackerte jede Folge, in
+    der sich etwas bewegt. „Neu messen“ nimmt das gerade gezeigte Bild.
+  - Beim Hinzufügen neutral (eine Korrektur). „Ausgleichen“ stellt eine Stärke von null auf
+    voll; wer die Stärke vor dem Messen hochzieht, bekommt die Messung von selbst.
+  - Stufenlos legt es jede Helligkeit dorthin, wo ihr Anteil am Bild sie hinstellt.
+  - Mit Stufen (2 bis 16) wird daraus die **Tonwerttrennung nach Quantilen**: Jede Stufe
+    deckt gleich viel Bild, ihr Ton ist der Median ihrer Punkte und bleibt, wo er war.
+  - Gerechnet wird an der Helligkeit (Rec. 709). Die Farbe wandert als Abstand zur Helligkeit
+    mit, die Kanäle werden nicht einzeln gestreckt.
+- **Örtlicher Ausgleich (CLAHE):**
+  - Das Bild wird in Kacheln geteilt (Anzahl an der langen Seite, 2 bis 16). Jede Kachel
+    wird für sich ausgeglichen, zwischen den Kachelmitten wird bilinear übergeblendet.
+  - Die Kontrastgrenze (1 bis 8) kappt jede Helligkeit beim Vielfachen ihres gleichen
+    Anteils und verteilt den Rest. Eine ruhige Fläche bleibt ruhig.
+  - Die Kacheln sind eine Anzahl, keine Größe. Auf dem Gitter der groben Vorschau rechnet er
+    deshalb dasselbe, nur gröber, und bleibt beim Ziehen sichtbar.
+- **Gefunden beim Bau** (eigener Commit): Der Hinweis an der Exportleiste wurde nur beim
+  endgültigen Durchgang gestellt, nicht nach einem Reglerzug. Wer Pixel Sort mit dem Regler
+  schloss, behielt den Hinweis; wer einen Durchgang mit dem Regler einschaltete, bekam keinen.
+  Jetzt stellt ihn auch das Ende eines Zuges. `EffectStartInvariants` prüft das (17
+  Zusicherungen, ohne den Fix schlägt die neue fehl).
+- **Proben** (`EqualiseInvariants`, 23 Zusicherungen):
+  - Ausgleich: Eine dunkle Verteilung wird gleichmäßig, halbe Stärke liegt auf halbem Weg,
+    die Farbe wandert mit, ohne Messung oder Stärke rechnet nichts.
+  - Vier Stufen: Fast jeder Punkt steht auf einem der vier Töne, jede Stufe deckt ein Viertel,
+    ihr Ton ist der Median ihrer Punkte.
+  - CLAHE: Eine gleichmäßige Fläche bleibt, ein flaues Muster bekommt örtlichen Kontrast,
+    ohne heller oder dunkler zu werden, eine engere Grenze verstärkt weniger, grob gleich
+    genau, bei 4K billiger als die Fehlerdiffusion (Zeitprüfung).
+  - Speichern und Kopieren mit Messung, Stärke, Stufen, Kacheln und Grenze.
+  - Auf der Seite: Reihenfolge Tonwert, Ausgleich, Kurven, CLAHE als erster Durchgang.
+    „Ausgleichen“ macht den dunklen Verlauf gleichmäßig hell, eine Kurve dahinter ändert die
+    Messung nicht, vier Stufen lassen wenige Töne, die Stärke ohne Messung misst von selbst.
+    CLAHE bringt den Hinweis an der Exportleiste. Im Knotenmodus misst ein Ausgleichsknoten an
+    seinem Eingang.
+  - Angepasst: `AtelierPageInvariants` zählt acht Anzeigewerkzeuge statt sieben.
+    `GradingGroupInvariants` fand, dass die Karte des örtlichen Ausgleichs an einer Ebene noch
+    offen war – sie wird jetzt mit den anderen Karten für das ganze Bild gesperrt.
+  - Die Nachbargruppen (19 Gruppen: Ausgleich, Startwerte, Tonwert, Seite, Knoten, Leiste,
+    Rezepte, Stapel, Andocken, Texte, Gruppen, Sortieren, Messgeräte, Sichthilfen, Pipetten,
+    Schnellwahl) liefen mit 654 Zusicherungen grün.
+  - Eine echte Instanz startete ohne Fehler; beide Zeichen stehen in der Palette.
+
 ## 5. KI-Werkzeuge: Last, Größe, Lizenz
 
 **Laufzeit.** ONNX Runtime (MIT-Lizenz) mit DirectML auf jeder Grafikkarte unter
