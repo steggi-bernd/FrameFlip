@@ -1151,3 +1151,36 @@ begrenzt.
   - Die Mehrfachauswahl brach dabei zuerst Proben, die eine Zeile per `IsSelected` wählen;
     eine neu gewählte Zeile ist ohne Strg oder Umschalt jetzt wieder die einzige.
   - Eine echte Instanz startete ohne Fehler.
+
+### Rückmeldungen aus dem Test vom 29. September (`fix/umkehren-vorher`)
+
+Zwei Dinge, die im Test nicht zu finden oder nicht zu bedienen waren. Die Anordnung bleibt,
+wie sie ist: Ein Versuch mit neu geordneter Bedienung (Einstellungen und Ebenen untereinander,
+Zeile „Gesamtbild“, Katalog statt Palette, Folgenleiste; Zweig `experiment/inspektor`) wurde
+ausprobiert und nicht übernommen.
+
+- **Maske umkehren:** Das ging für jede Maskenart, aber der Knopf hieß „±“ und lag in einem
+  zugeklappten Abschnitt der Ebenenliste. Er heißt jetzt „Umkehren“, und hat eine Ebene eine
+  Maske, steht ihr Abschnitt offen.
+- **Original:** Es zeigte das Original nur, solange man den Knopf hielt – ein Klick sah aus,
+  als täte der Knopf nichts. Jetzt:
+  - Ein kurzer Klick schaltet aufs Original und lässt es stehen. Ein Abzeichen am Bild sagt
+    es, solange es gilt.
+  - Zurück geht es mit dem nächsten Klick, mit der Taste O oder mit jeder Änderung am Bild.
+  - Gedrückt halten ist weiter nur ein Blick.
+  - Ohne Maus (Tastatur, Bedienhilfen) schaltet der Klick ebenso um.
+- **Offen, für W3:** eine Objektauswahl umkehren, bevor daraus eine Ebene wird, und etwas
+  ausmaskieren, also im Stapel eine Stelle durchsichtig machen, zerstörungsfrei über eine
+  (umgekehrte) Maske. Dafür geht die Maskenlogik vorher als Ganzes durch.
+- **Proben** (`FeedbackFixInvariants`, 10 Zusicherungen):
+  - Ohne Maske bleibt ihr Abschnitt zu. Mit Maske steht er offen, der Knopf heißt
+    „Umkehren“ und kehrt sie um.
+  - Beim Drücken sofort das Original mit Abzeichen. Kurz geklickt bleibt es stehen, der
+    nächste Klick schaltet zurück, gehalten ist es nur ein Blick.
+  - Die Taste O schaltet ebenso, eine Änderung am Bild zeigt wieder das Ergebnis, der Klick
+    ohne Maus schaltet um.
+  - Die Nachbargruppen (13 Gruppen: Seite, Öffnen, Knoten bearbeiten, Wechsel, Masken,
+    Isolieren, Sichthilfen, Bereichsregler, Texte, Gruppen, gemeinsame Korrektur) liefen mit
+    509 Zusicherungen grün.
+  - Eine echte Instanz startete ohne Fehler; nach einem Klick auf „Original“ steht das
+    Abzeichen.
