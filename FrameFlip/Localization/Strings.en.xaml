@@ -310,7 +310,7 @@
     <sys:String x:Key="S_MaskPass">Pass</sys:String>
     <sys:String x:Key="S_MaskGradient">Gradient</sys:String>
     <sys:String x:Key="S_MaskColour">Colour range</sys:String>
-    <sys:String x:Key="S_MaskScopeColour">Colour</sys:String>
+    <sys:String x:Key="S_MaskScopeColour">Correction</sys:String>
     <sys:String x:Key="S_MaskScopeColourHint">The mask says WHERE this layer's correction applies. The layer itself stays visible everywhere - as if a copy of it sat on top showing only that area.</sys:String>
     <sys:String x:Key="S_MaskScopeShow">Visibility</sys:String>
     <sys:String x:Key="S_MaskScopeShowHint">The mask says WHERE the layer shows. Outside it contributes nothing - right for a glow, a watermark, a second shot.</sys:String>
@@ -1332,7 +1332,7 @@
     <sys:String x:Key="S_NoDepthTool">Depth of field has to be switched on for this - it lives under Optics.</sys:String>
     <sys:String x:Key="S_Reveal">Show what is hidden</sys:String>
     <sys:String x:Key="S_RevealHint">Shows what sits in the file's transparent areas - usually the unmasked original, render noise, or remnants of the layer below. At 0 the layer is cleanly cut out, at 100% it covers everywhere. This layer's MASK decides where it shows: a cryptomatte picks an object, a depth pass picks a distance. A cleanly premultiplied file carries black there - then nothing happens.</sys:String>
-    <sys:String x:Key="S_MatteGroup">Matte</sys:String>
+    <sys:String x:Key="S_MatteGroup">Coverage haze</sys:String>
     <sys:String x:Key="S_MatteGroupHint">Two sliders on the same number, pulling opposite ways: the upper one cuts away what is barely there - against the grey veil that hides garbage. The lower one pulls coverage towards full and shows that same garbage on purpose.</sys:String>
     <sys:String x:Key="S_Dither">Dither</sys:String>
     <sys:String x:Key="S_DitherAmount">Amount</sys:String>
@@ -1365,6 +1365,10 @@
     <sys:String x:Key="S_ToolBrushShort">Paints a mask – the first stroke creates a mask layer for it. Right mouse button or Alt erases. Ctrl-drag sets the size, Ctrl with the right button the hardness. The mouse wheel zooms, Ctrl and the wheel set the spacing of the dabs.</sys:String>
     <sys:String x:Key="S_MaskPainted">Painted</sys:String>
     <sys:String x:Key="S_MaskLock">all frames</sys:String>
+    <sys:String x:Key="S_MaskScopeLabel">acts on:</sys:String>
+    <sys:String x:Key="S_MaskLockLabel">applies to:</sys:String>
+    <sys:String x:Key="S_MaskLockAll">all frames</sys:String>
+    <sys:String x:Key="S_MaskLockOne">this frame</sys:String>
     <sys:String x:Key="S_MaskLockHint">Locked, one painting applies to the whole sequence. Unlocked, each frame gets its own - then a single frame can be retouched without touching the others. On unlocking, the painting so far moves to the current frame rather than being discarded.</sys:String>
     <sys:String x:Key="S_MaskLockedNote">One painting for every frame.</sys:String>
     <sys:String x:Key="S_MaskLooseNote">A separate painting per frame - for single-frame retouching.</sys:String>

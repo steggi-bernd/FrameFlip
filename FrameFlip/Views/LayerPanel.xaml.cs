@@ -846,7 +846,7 @@ public partial class LayerPanel : UserControl
     {
         bool painted = _selected?.Mask.Kind == MaskKind.Painted;
 
-        MaskLockButton.Visibility = painted ? Visibility.Visible : Visibility.Collapsed;
+        MaskLockRow.Visibility = painted ? Visibility.Visible : Visibility.Collapsed;
         MaskLockNote.Visibility = painted ? Visibility.Visible : Visibility.Collapsed;
 
         if (!painted || _selected is null) return;
@@ -854,6 +854,7 @@ public partial class LayerPanel : UserControl
         bool locked = _selected.Mask.PaintLocked;
 
         MaskLockButton.IsChecked = locked;
+        MaskLooseButton.IsChecked = !locked;
 
         MaskLockNote.Text = Strings.T(locked ? "S_MaskLockedNote" : "S_MaskLooseNote");
     }
