@@ -507,6 +507,12 @@ public partial class MainWindow : Window
 
         bool dashboard = key == "dashboard";
 
+        // Im Atelier sagt die Statuszeile, was Maus und Tasten gerade tun; die Angaben des
+        // Players gehoeren zur Uebersicht und sagen dort nichts.
+        bool atelier = key == "atelier";
+        PlayerStatus.Visibility = atelier ? Visibility.Collapsed : Visibility.Visible;
+        AtelierHintBar.Visibility = atelier ? Visibility.Visible : Visibility.Collapsed;
+
         DashboardBody.Visibility = dashboard ? Visibility.Visible : Visibility.Collapsed;
         PageHost.Visibility = dashboard ? Visibility.Collapsed : Visibility.Visible;
 
@@ -533,6 +539,29 @@ public partial class MainWindow : Window
         };
 
         if (key == "atelier" && !_openingInAtelier) FollowDashboardIntoAtelier(_atelierPage!);
+        if (atelier) ShowAtelierHints(_atelierPage!.CurrentHints);
+    }
+
+    /// <summary>Die Tastenhilfe des Ateliers in der Statuszeile: Taste, dann was sie tut.</summary>
+    private void ShowAtelierHints(IReadOnlyList<KeyHint> hints)
+    {
+        AtelierHintBar.Children.Clear();
+
+        foreach (var hint in hints)
+        {
+            var text = new TextBlock { FontSize = 11, Margin = new Thickness(0, 0, 18, 0), VerticalAlignment = VerticalAlignment.Center };
+            text.SetResourceReference(StyleProperty, "DashMono");
+
+            var keys = new System.Windows.Documents.Run(hint.KeysText) { FontWeight = FontWeights.SemiBold };
+            keys.SetResourceReference(System.Windows.Documents.TextElement.ForegroundProperty, "DesktopAccent");
+
+            var action = new System.Windows.Documents.Run("  " + hint.Action);
+            action.SetResourceReference(System.Windows.Documents.TextElement.ForegroundProperty, "DesktopMuted");
+
+            text.Inlines.Add(keys);
+            text.Inlines.Add(action);
+            AtelierHintBar.Children.Add(text);
+        }
     }
 
     private AtelierPage Atelier()
@@ -541,6 +570,10 @@ public partial class MainWindow : Window
 
         _atelierPage = new AtelierPage(_decoders, _getSettings(), next => _persist?.Invoke(next));
         _atelierPage.ImageShown += OnAtelierImageShown;
+        _atelierPage.HintsChanged += hints =>
+        {
+            if (_page == "atelier") ShowAtelierHints(hints);
+        };
         return _atelierPage;
     }
 
