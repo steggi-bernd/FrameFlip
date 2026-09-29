@@ -256,6 +256,8 @@ public sealed class GradingStack
             Pattern = dither.Pattern, Size = dither.Size, Angle = dither.Angle,
         },
 
+        DeflickerTool deflicker => deflicker.Clone(),
+
         // Wie oben: Ein Werkzeug, das hier fehlt, wuerde geteilt statt kopiert.
         _ => throw new NotSupportedException($"Kein Kopierweg fuer {tool.GetType().Name}."),
     };
@@ -304,6 +306,7 @@ public sealed class GradingStack
         VibranceTool vibrance => new VibranceTool { Amount = vibrance.Amount },
         HslTool hsl => hsl.Clone(),
         LutTool lut => lut.Clone(),
+        MatchTool match => match.Clone(),
 
         // Ein Werkzeug, das hier fehlt, wuerde geteilt statt kopiert - und der
         // Fehler faellt erst auf, wenn eine festgehaltene Einstellung sich

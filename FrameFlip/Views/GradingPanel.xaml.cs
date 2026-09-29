@@ -53,6 +53,7 @@ public partial class GradingPanel : UserControl
     private HslTool _bands = new();
     private VibranceTool _vibrance = new();
     private LutTool _lut = new();
+    private MatchTool _match = new();
     private ClarityTool _clarity = new();
     private SharpenTool _sharpen = new();
     private NoiseTool _noise = new();
@@ -62,6 +63,7 @@ public partial class GradingPanel : UserControl
     private TextureTool _texture = new();
     private VignetteTool _vignette = new();
     private GrainTool _grain = new();
+    private DeflickerTool _deflicker = new();
 
     /// <summary>
     /// Der erste Eintrag der Rasterliste, der eine Fehlerdiffusion ist.
@@ -288,6 +290,7 @@ public partial class GradingPanel : UserControl
         ChromaticBody.IsEnabled = enabled;
         VignetteBody.IsEnabled = enabled;
         GrainBody.IsEnabled = enabled;
+        DeflickerBody.IsEnabled = enabled;
 
         // Rastern gehoert hierher wie das Korn: Es ist eine Eigenschaft des fertigen
         // BILDES und keine einer Ebene. Die Fehlerdiffusion laeuft ohnehin ueber den
@@ -419,6 +422,10 @@ public partial class GradingPanel : UserControl
         _vibrance = Take<VibranceTool>();
         _lut = Take<LutTool>();
 
+        // Farbe angleichen (W2f) steht zuletzt: Gemessen wird, wo es steht, und so gleicht das
+        // fertige Bild dem Vorbild - auch wenn davor noch Kurven und LUT wirken.
+        _match = Take<MatchTool>();
+
         // Die oertlichen Werkzeuge stehen in ihrer eigenen Liste - sie nehmen einen
         // anderen Weg durch den Bildprozessor. In welcher Reihenfolge sie dort
         // liegen, ist gleichgueltig: Der Stapel sortiert sie nach ihrer Stufe.
@@ -434,6 +441,7 @@ public partial class GradingPanel : UserControl
         // anderer Weg durch den Bildprozessor.
         _vignette = TakeOptics<VignetteTool>();
         _grain = TakeOptics<GrainTool>();
+        _deflicker = TakeOptics<DeflickerTool>();
         _dither = TakeOptics<DitherTool>();
 
         // Der oertliche Ausgleich (W2e) laeuft als erster Durchgang ueber das fertige Bild - vor dem
@@ -764,6 +772,13 @@ public partial class GradingPanel : UserControl
             ClaheAmountSlider.Value = Math.Clamp(_clahe.Amount, ClaheAmountSlider.Minimum, ClaheAmountSlider.Maximum);
             ClaheTilesSlider.Value = Math.Clamp(_clahe.Tiles, ClaheTilesSlider.Minimum, ClaheTilesSlider.Maximum);
             ClaheLimitSlider.Value = Math.Clamp(_clahe.Limit, ClaheLimitSlider.Minimum, ClaheLimitSlider.Maximum);
+
+            MatchAmountSlider.Value = Math.Clamp(_match.Amount, MatchAmountSlider.Minimum, MatchAmountSlider.Maximum);
+            MatchToneButton.IsChecked = _match.Tone;
+            ShowMatchState();
+
+            DeflickerAmountSlider.Value = Math.Clamp(_deflicker.Amount, DeflickerAmountSlider.Minimum, DeflickerAmountSlider.Maximum);
+            DeflickerWindowSlider.Value = Math.Clamp(_deflicker.Window, DeflickerWindowSlider.Minimum, DeflickerWindowSlider.Maximum);
             ClarityReachSlider.Value = Math.Clamp(_clarity.Reach,
                                                   ClarityReachSlider.Minimum, ClarityReachSlider.Maximum);
 
@@ -1065,8 +1080,14 @@ public partial class GradingPanel : UserControl
         _clahe.Tiles = (int)Math.Round(ClaheTilesSlider.Value);
         _clahe.Limit = (float)ClaheLimitSlider.Value;
 
+        _match.Amount = (float)MatchAmountSlider.Value;
+        _deflicker.Amount = (float)DeflickerAmountSlider.Value;
+        _deflicker.Window = (int)Math.Round(DeflickerWindowSlider.Value);
+
         // Die Staerke hochgezogen, bevor gemessen wurde: dann jetzt messen - sonst taete der Regler nichts.
         if (_equalise.Amount >= 0.001f && _equalise.Measured is null) EqualiseMeasureWanted?.Invoke(_equalise);
+        if (_match.Amount >= 0.001f && _match.Source is null && _match.Reference is not null) MatchWanted?.Invoke(_match);
+        if (_deflicker.Amount >= 0.001f && _deflicker.Levels is null && !_deflickerRunning) DeflickerMeasureWanted?.Invoke(_deflicker);
 
         _sharpen.Amount = (float)SharpenSlider.Value;
         _sharpen.Reach = (int)Math.Round(SharpenRadiusSlider.Value);
@@ -1211,6 +1232,10 @@ public partial class GradingPanel : UserControl
         ClaheAmountValue.Text = $"{ClaheAmountSlider.Value:0.00}";
         ClaheTilesValue.Text = $"{ClaheTilesSlider.Value:0}";
         ClaheLimitValue.Text = $"{ClaheLimitSlider.Value:0.0}";
+        MatchAmountValue.Text = $"{MatchAmountSlider.Value:0.00}";
+        DeflickerAmountValue.Text = $"{DeflickerAmountSlider.Value:0.00}";
+        DeflickerWindowValue.Text = Strings.T("S_DeflickerWindowValue", (int)Math.Round(DeflickerWindowSlider.Value));
+        ShowDeflickerState();
         SharpenValue.Text = $"{SharpenSlider.Value:0.00}";
         SharpenRadiusValue.Text = $"{SharpenRadiusSlider.Value:0}";
         SharpenThresholdValue.Text = $"{SharpenThresholdSlider.Value:0.000}";
@@ -1453,6 +1478,111 @@ public partial class GradingPanel : UserControl
         LevelsField.HistogramColour = LevelsColours[_levelsChannel];
         LevelsField.InvalidateVisual();
         ShowLevelsValues();
+    }
+
+    // ------------------------------------------------------------ Farbe angleichen und Deflicker (W2f)
+
+    /// <summary>Ein Vorbild soll gemerkt werden - aus dem gezeigten Bild (false) oder aus einer Datei (true).</summary>
+    public event Action<MatchTool, bool>? MatchReferenceWanted;
+
+    /// <summary>Dieses Bild soll ans Vorbild angeglichen werden - gemessen, was beim Werkzeug ankommt.</summary>
+    public event Action<MatchTool>? MatchWanted;
+
+    /// <summary>Die Folge soll gemessen werden - oder die laufende Messung abgebrochen (null).</summary>
+    public event Action<DeflickerTool?>? DeflickerMeasureWanted;
+
+    /// <summary>Farbe angleichen in der Karte - fuer die Probe.</summary>
+    internal MatchTool Match => _match;
+
+    /// <summary>Deflicker in der Karte - fuer die Probe.</summary>
+    internal DeflickerTool Deflicker => _deflicker;
+
+    /// <summary>Ob die Seite gerade die Folge misst.</summary>
+    private bool _deflickerRunning;
+
+    private void OnMatchReferenceClicked(object sender, RoutedEventArgs e) => MatchReferenceWanted?.Invoke(_match, false);
+
+    private void OnMatchReferenceFileClicked(object sender, RoutedEventArgs e) => MatchReferenceWanted?.Invoke(_match, true);
+
+    private void OnMatchClicked(object sender, RoutedEventArgs e) => MatchWanted?.Invoke(_match);
+
+    private void OnMatchToneChanged(object sender, RoutedEventArgs e)
+    {
+        if (_filling || !IsLoaded) return;
+
+        _match.Tone = MatchToneButton.IsChecked == true;
+        Raise(interim: false);
+    }
+
+    /// <summary>Die Seite hat ein Vorbild gemessen.</summary>
+    public void MatchReferenceSet(MatchTool tool, ColourStats stats, string name)
+    {
+        tool.Reference = stats;
+        tool.ReferenceName = name;
+
+        if (!ReferenceEquals(tool, _match)) return;
+
+        PushToControls();
+        Raise(interim: false);
+    }
+
+    /// <summary>Die Seite hat dieses Bild gemessen. Steht die Staerke auf null, wirkt es jetzt ganz.</summary>
+    public void MatchSourceSet(MatchTool tool, ColourStats stats)
+    {
+        tool.Source = stats;
+        if (tool.Amount < 0.001f) tool.Amount = 1f;
+
+        if (!ReferenceEquals(tool, _match)) return;
+
+        PushToControls();
+        Raise(interim: false);
+    }
+
+    private void ShowMatchState()
+    {
+        MatchState.Text = _match.Reference is null
+            ? Strings.T("S_MatchNoReference")
+            : Strings.T("S_MatchReferenceIs", _match.ReferenceName ?? "?");
+
+        MatchApplyButton.IsEnabled = _match.Reference is not null;
+    }
+
+    private void OnDeflickerMeasureClicked(object sender, RoutedEventArgs e)
+        => DeflickerMeasureWanted?.Invoke(_deflickerRunning ? null : _deflicker);
+
+    /// <summary>Wie weit die Messung der Folge ist. Ohne <paramref name="total"/>: vorbei - fertig oder abgebrochen.</summary>
+    public void DeflickerProgress(int done, int total)
+    {
+        _deflickerRunning = total > 0;
+        DeflickerMeasureButton.SetResourceReference(ContentProperty, _deflickerRunning ? "S_DeflickerCancel" : "S_DeflickerMeasure");
+
+        if (_deflickerRunning) DeflickerState.Text = Strings.T("S_DeflickerProgress", done, total);
+        else ShowDeflickerState();
+    }
+
+    /// <summary>Die Folge ist gemessen. Steht die Staerke auf null, wirkt der Ausgleich jetzt ganz.</summary>
+    public void DeflickerMeasured(DeflickerTool tool, Dictionary<int, float> levels)
+    {
+        tool.Levels = levels;
+        if (tool.Amount < 0.001f) tool.Amount = 1f;
+
+        if (!ReferenceEquals(tool, _deflicker)) return;
+
+        PushToControls();
+        Raise(interim: false);
+    }
+
+    private void ShowDeflickerState()
+    {
+        if (_deflickerRunning) return;
+
+        if (_deflicker.Levels is not { } levels)
+            DeflickerState.Text = Strings.T("S_DeflickerNotMeasured");
+        else if (levels.Count < 2)
+            DeflickerState.Text = Strings.T("S_DeflickerSingle");
+        else
+            DeflickerState.Text = Strings.T("S_DeflickerMeasured", levels.Count,
+                DeflickerTool.Gains(levels, _deflicker.Window, 1f).Values.Max(g => MathF.Abs(MathF.Log2(g))));
     }
 
     // ------------------------------------------------------------ Ausgleich (W2e)

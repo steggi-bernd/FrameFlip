@@ -109,14 +109,14 @@ public static class ToolCatalog
 
         ["S_Correction"] = Tone, ["S_Levels"] = Tone, ["S_Equalise"] = Tone, ["S_Curves"] = Tone, ["S_Zones"] = Tone, ["S_NodeTone"] = Tone, ["S_NodeMapRange"] = Tone,
 
-        ["S_WhiteBalance"] = Colour, ["S_ColourBands"] = Colour, ["S_Vibrance"] = Colour, ["S_NodeColorRamp"] = Colour, ["S_Lut"] = Colour,
+        ["S_WhiteBalance"] = Colour, ["S_ColourBands"] = Colour, ["S_Vibrance"] = Colour, ["S_NodeColorRamp"] = Colour, ["S_Lut"] = Colour, ["S_Match"] = Colour,
 
         ["S_Clarity"] = Details, ["S_Clahe"] = Details, ["S_Texture"] = Details, ["S_Sharpen"] = Details, ["S_Noise"] = Details, ["S_Grain"] = Details,
 
         ["S_Motion"] = Optics, ["S_Displace"] = Optics, ["S_DepthField"] = Optics, ["S_Distortion"] = Optics,
         ["S_Chromatic"] = Optics, ["S_Vignette"] = Optics,
 
-        ["S_Dehaze"] = Light, ["S_Bloom"] = Light, ["S_Halation"] = Light, ["S_NodeDiffusion"] = Light, ["S_NodeLight"] = Light,
+        ["S_Dehaze"] = Light, ["S_Bloom"] = Light, ["S_Halation"] = Light, ["S_NodeDiffusion"] = Light, ["S_NodeLight"] = Light, ["S_Deflicker"] = Light,
 
         ["S_Sort"] = Glitch, ["S_Dither"] = Glitch,
     };

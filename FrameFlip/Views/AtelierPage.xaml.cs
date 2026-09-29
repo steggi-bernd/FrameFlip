@@ -208,6 +208,7 @@ public sealed partial class AtelierPage : UserControl
         SetUpColourPick();
         SetUpDistributions();
         SetUpViewAids();
+        SetUpMatch();
         Tools.ScopeWanted += ShowScope;
         Layers.IsolateWanted += (layer, view) => IsolateStack(layer, view);
 
