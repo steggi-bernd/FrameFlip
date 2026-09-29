@@ -448,7 +448,7 @@
 
                         <ToggleButton x:Name="MaskInvertButton" Grid.Column="1"
                                       Style="{StaticResource OverlayToggle}" Margin="6,0,0,0"
-                                      MinWidth="34" Content="±"
+                                      MinWidth="34" Content="{DynamicResource S_MaskInvertShort}"
                                       Checked="OnMaskInvertChanged" Unchecked="OnMaskInvertChanged"
                                       ToolTip="{DynamicResource S_MaskInvert}" />
                     </Grid>
