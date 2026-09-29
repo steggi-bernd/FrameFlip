@@ -1184,3 +1184,18 @@ ausprobiert und nicht übernommen.
     509 Zusicherungen grün.
   - Eine echte Instanz startete ohne Fehler; nach einem Klick auf „Original“ steht das
     Abzeichen.
+
+### M4: Namen an der Maske (`feature/masken-namen`)
+
+Aus dem Maskenkonzept (Entscheidung M4, 29. September): drei Namen, die in die Irre führten.
+
+- **„Freistellung“ heißt jetzt „Deckungsschleier“.** Der Regler schneidet den grauen
+  Deckungsschleier einer Datei weg; freigestellt wird damit nichts.
+- **„wirkt auf: Korrektur / Sichtbarkeit“** statt „Farbe / Sichtbarkeit“, mit Beschriftung
+  davor. Die Maske begrenzt entweder die Korrektur der Ebene oder die Ebene selbst.
+- **„gilt für: alle Bilder / dieses Bild“** bei gemalten Masken, zwei Knöpfe statt eines
+  Schalters, der nur die eine Möglichkeit nannte. Das Verhalten ist dasselbe wie vorher.
+- **Proben** (`MaskNameInvariants`, 4 Zusicherungen): die Namen, und dass „dieses Bild“ und
+  „alle Bilder“ die gemalte Maske ent- und wieder sperren. Die Nachbargruppen (Masken,
+  gemeinsame Korrektur, Texte, Einstellungen, Tastenhilfe, Rückmeldungen) liefen mit 116
+  Zusicherungen grün. Eine echte Instanz startete ohne Fehler.
