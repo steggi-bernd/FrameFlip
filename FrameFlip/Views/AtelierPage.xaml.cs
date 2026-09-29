@@ -209,6 +209,7 @@ public sealed partial class AtelierPage : UserControl
         SetUpDistributions();
         SetUpViewAids();
         SetUpMatch();
+        SetUpExperiment();
         Tools.ScopeWanted += ShowScope;
         Layers.IsolateWanted += (layer, view) => IsolateStack(layer, view);
 
@@ -657,6 +658,8 @@ public sealed partial class AtelierPage : UserControl
     /// </summary>
     private void Refresh(bool interim, bool recompose)
     {
+        DropCompare();
+
         if (interim)
         {
             _coarse = true;

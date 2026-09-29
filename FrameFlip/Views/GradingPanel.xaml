@@ -66,7 +66,18 @@
                 Maske an der Ebene lief ins Leere. Wer eine Maske malt, um DORT etwas
                 zu aendern, braucht diesen Schalter.
             -->
-            <UniformGrid Columns="2">
+            <!-- Versuch: statt des Schalters ein Kopf, der sagt, worauf die Regler wirken. Gewaehlt wird
+                 in der Ebenenliste - die Zeile "Gesamtbild" oder eine Ebene. -->
+            <StackPanel>
+                <StackPanel Orientation="Horizontal">
+                    <TextBlock x:Name="TargetCrumb" VerticalAlignment="Bottom" Margin="0,0,6,2" FontSize="12"
+                               Foreground="{StaticResource MutedBrush}" />
+                    <TextBlock x:Name="TargetTitle" VerticalAlignment="Bottom" FontSize="16" FontWeight="Bold"
+                               Foreground="{StaticResource ForegroundBrush}" />
+                    <TextBlock x:Name="TargetKind" VerticalAlignment="Bottom" Margin="8,0,0,2" FontSize="12"
+                               Foreground="{StaticResource MutedBrush}" />
+                </StackPanel>
+            <UniformGrid Columns="2" Visibility="Collapsed">
                 <RadioButton x:Name="TargetImageButton" Style="{StaticResource OverlayToggle}"
                              FontSize="11" Margin="0,0,3,0" HorizontalAlignment="Stretch"
                              Content="{DynamicResource S_ToolsTargetImage}"
@@ -77,6 +88,7 @@
                              ToolTip="{DynamicResource S_ToolsTargetLayerHint}"
                              Checked="OnTargetChanged" />
             </UniformGrid>
+            </StackPanel>
         </Border>
 
     <!--
@@ -94,7 +106,16 @@
             Die Palette: alle Effekte als kleine Zeichen, eine Zeile je Kategorie.
             Ein Klick legt den Effekt in den Stapel darunter oder springt zu ihm.
         -->
-        <StackPanel x:Name="Palette" />
+        <StackPanel>
+            <StackPanel x:Name="Palette" Visibility="Collapsed" />
+            <!-- Versuch: statt der Palette "+ Effekt" mit dem Ziel im Namen und die Favoriten daneben. -->
+            <DockPanel x:Name="EffectBar">
+                <StackPanel x:Name="FavouriteBar" DockPanel.Dock="Right" Orientation="Horizontal" />
+                <Button x:Name="AddEffectButton" Style="{StaticResource OverlayButton}" Margin="0,0,6,0"
+                        HorizontalContentAlignment="Left" Padding="10,5"
+                        Click="OnAddEffectClicked" ToolTip="{DynamicResource S_AddEffectHint}" />
+            </DockPanel>
+        </StackPanel>
     </Border>
 
     <ScrollViewer Grid.Row="3" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
@@ -113,6 +134,11 @@
                 Im Knotenmodus: ein Hinweis und die Felder eines Knotens ohne eigene
                 Karte - Mischen, Maske, Platzieren. Sonst leer und eingeklappt.
             -->
+            <!-- Versuch: die Einstellungen der gewaehlten Ebene - Mischung, Deckkraft, Maske -, hierher
+                 gehaengt aus der Ebenenliste. -->
+            <Border x:Name="LayerToolsHost" Visibility="Collapsed" Margin="0,0,0,12" Padding="0,0,0,12"
+                    BorderBrush="{StaticResource PanelBorder}" BorderThickness="0,0,0,1" />
+
             <TextBlock x:Name="NodeHint" Visibility="Collapsed" TextWrapping="Wrap"
                        Style="{StaticResource DashLabel}" Margin="0,0,0,12" />
 

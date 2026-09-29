@@ -53,7 +53,13 @@ public partial class AtelierPage
                 // Im Knotenmodus ein Knoten - hinter den gewaehlten, wenn er einen Ausgang hat,
                 // sonst frei in die Mitte der Ansicht. Im Stapel die Karte im Farbstreifen.
                 if (InNodes && entry.Kind is { } kind) AddKind(kind);
-                else if (!InNodes && entry.Section is { } section) Tools.Show(section);
+                else if (!InNodes && entry.Section is { } section)
+                {
+                    Tools.Show(section);
+
+                    // Versuch: Die Einstellungen kommen nach vorn - sonst oeffnet sich die Karte ungesehen.
+                    Dock.Activate(PropertiesPanelId);
+                }
                 break;
 
             case ToolAction.Brush:

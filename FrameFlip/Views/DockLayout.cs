@@ -97,13 +97,12 @@ public sealed class DockLayout
 
         Right =
         {
-            new DockGroup { Panels = { "histogram" }, Active = "histogram", Weight = 1 },
-            new DockGroup { Panels = { "colour", "layers" }, Active = "colour", Weight = 4 },
-
-            // Die Ausgabe unten rechts, und bei einer Anordnung von frueher kommt sie von selbst
-            // hierher (siehe Normalise). Ihre Hoehe richtet sich nach dem Inhalt (DockHost.
-            // FitsContent) - das Gewicht zaehlt erst, wenn sie mit anderen Feldern eine Gruppe teilt.
-            new DockGroup { Panels = { "export" }, Active = "export", Weight = 0.8 },
+            // Versuch (docs/Atelier-UX-Versuch.md): Einstellungen und Ebenen untereinander, beide
+            // immer sichtbar - der haeufigste Wechsel steckt nicht mehr in einem Reiter. Die Ausgabe
+            // steht in der Folgenleiste unter dem Bild und ist kein Feld der Andockflaeche mehr.
+            new DockGroup { Panels = { "histogram" }, Active = "histogram", Weight = 0.8 },
+            new DockGroup { Panels = { "colour" }, Active = "colour", Weight = 3 },
+            new DockGroup { Panels = { "layers" }, Active = "layers", Weight = 2 },
         },
     };
 

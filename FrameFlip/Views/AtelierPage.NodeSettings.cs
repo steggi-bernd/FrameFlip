@@ -112,6 +112,8 @@ public partial class AtelierPage
         // Im Knotenmodus gibt es kein "Ebene oder Bild" - das Ziel ist der Knoten, und
         // alle Karten sind bedienbar.
         Tools.ShowTarget(null, onLayer: false, locked: false);
+        Tools.ShowNodeHead(node is null ? null : NodeTitles.For(node));
+        Tools.ShowLayerTools(false);
 
         switch (node)
         {

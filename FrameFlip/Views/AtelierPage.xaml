@@ -70,6 +70,21 @@
                          Bearbeitungsziel der Sitzung, siehe ShowTargetPath. Die Glieder baut der Code. -->
                     <DockPanel x:Name="TargetStrip" Grid.Row="0" Margin="2,0,2,6" Visibility="Collapsed"
                                Background="Transparent" ToolTip="{DynamicResource S_TargetHint}">
+                        <!-- Versuch: was das Bild zeigt - Ergebnis, Maske, Ueberlagerung - und Vorher/Nachher. -->
+                        <StackPanel x:Name="StripView" DockPanel.Dock="Right" Orientation="Horizontal" Margin="12,0,0,0">
+                            <StackPanel x:Name="SoloSwitch" Orientation="Horizontal" Margin="0,0,8,0" Visibility="Collapsed">
+                                <ToggleButton x:Name="SoloResultButton" Style="{StaticResource OverlayToggle}" Margin="0,0,2,0"
+                                              Content="{DynamicResource S_StripResult}" Click="OnStripSolo" Tag="Result"
+                                              ToolTip="{DynamicResource S_StripResultHint}" />
+                                <ToggleButton x:Name="SoloMaskButton" Style="{StaticResource OverlayToggle}" Margin="0,0,2,0"
+                                              Content="{DynamicResource S_StripMask}" Click="OnStripSolo" Tag="Mask"
+                                              ToolTip="{DynamicResource S_StripMaskHint}" />
+                                <ToggleButton x:Name="SoloVeilButton" Style="{StaticResource OverlayToggle}"
+                                              Content="{DynamicResource S_StripVeil}" Click="OnStripSolo" Tag="Veil"
+                                              ToolTip="{DynamicResource S_StripVeilHint}" />
+                            </StackPanel>
+                            <ContentControl x:Name="CompareHost" Focusable="False" />
+                        </StackPanel>
                         <!-- Aktionen am Ziel (C2): Sie legen an und verbinden, wohin die Zeile zeigt. -->
                         <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" Margin="12,0,0,0">
                             <Button x:Name="TargetCorrect" Style="{StaticResource OverlayButton}" Margin="0,0,6,0"
@@ -246,6 +261,16 @@
                                 </StackPanel>
                             </Border>
 
+                            <!-- Versuch: Vorher steht fest da, solange es gilt - geklickt bleibt es, bis man zurueckschaltet. -->
+                            <Border x:Name="CompareBadge" Visibility="Collapsed"
+                                    HorizontalAlignment="Left" VerticalAlignment="Top" Margin="12"
+                                    Background="{StaticResource PanelBackground}"
+                                    BorderBrush="{StaticResource AccentBrush}" BorderThickness="1"
+                                    CornerRadius="4" Padding="10,6">
+                                <TextBlock x:Name="CompareBadgeText" FontSize="12" Foreground="{StaticResource ForegroundBrush}"
+                                           Text="{DynamicResource S_BeforeBadge}" />
+                            </Border>
+
                             <Border x:Name="BusyBadge" Visibility="Collapsed"
                                     HorizontalAlignment="Center" VerticalAlignment="Center"
                                     Background="{StaticResource BadgeBackground}" CornerRadius="4" Padding="12,7">
@@ -290,70 +315,7 @@
                                    local:DockHost.TitleKey="S_SectionTool"
                                    local:DockHost.FitsContent="True" />
 
-            <Border x:Name="ExportBar"
-                    local:DockHost.PanelId="export"
-                    local:DockHost.TitleKey="S_SectionExport"
-                    local:DockHost.FitsContent="True"
-                    Padding="10,8" Visibility="Collapsed">
-                <StackPanel>
-                    <!-- Format und Ziel in einer Zeile, darunter wohin es geht. -->
-                    <DockPanel>
-                        <Button x:Name="TargetButton" DockPanel.Dock="Right" Margin="6,0,0,0"
-                                Style="{StaticResource OverlayButton}"
-                                Content="{DynamicResource S_ChooseTarget}" Click="OnChooseTargetClicked" />
-                        <ComboBox x:Name="FormatBox" Style="{StaticResource OverlayCombo}"
-                                  HorizontalAlignment="Stretch" SelectionChanged="OnFormatChanged"
-                                  ToolTip="{DynamicResource S_OutputFormat}" />
-                    </DockPanel>
 
-                    <TextBlock x:Name="TargetText" Margin="0,4,0,0"
-                               Style="{StaticResource DashLabel}" FontSize="9"
-                               TextTrimming="CharacterEllipsis"
-                               ToolTip="{Binding Text, RelativeSource={RelativeSource Self}}" />
-
-                    <!-- Pixel Sort und Fehlerdiffusion laufen nur in acht Bit. In einem 16-Bit-Format
-                         fehlten sie in der Ausgabe, waehrend die Vorschau sie zeigt - siehe
-                         ShowEightBitNote. -->
-                    <TextBlock x:Name="EightBitNote" Margin="0,4,0,0" FontSize="9" TextWrapping="Wrap"
-                               Foreground="{StaticResource AppWarn}" Visibility="Collapsed"
-                               Text="{DynamicResource S_EightBitOnly}" />
-
-                    <!--
-                        Schnell-Export: kein Dialog, kein Ziel noetig - in den Ordner FrameFlip
-                        neben den Bildern oder den gewaehlten Zielordner, unter dem naechsten
-                        freien Namen. Er ueberschreibt nie.
-                    -->
-                    <UniformGrid Columns="2" Margin="0,6,0,0">
-                        <Button x:Name="QuickExportButton" Style="{StaticResource OverlayButton}" Margin="0,0,4,0"
-                                Content="{DynamicResource S_QuickExport}" Click="OnQuickExportClicked"
-                                ToolTip="{DynamicResource S_QuickExportHint}" IsEnabled="False" />
-                        <Button x:Name="RunButton" Style="{StaticResource OverlayButton}" Margin="4,0,0,0"
-                                Content="{DynamicResource S_RunBatch}" Click="OnRunClicked" IsEnabled="False" />
-                    </UniformGrid>
-
-                    <Button x:Name="StopButton" Style="{StaticResource OverlayButton}" Margin="0,6,0,0"
-                            Content="{DynamicResource S_Stop}" Click="OnStopClicked" Visibility="Collapsed" />
-
-                    <!-- Leer braucht der Stand keinen Platz - die Gruppe ist so hoch wie ihr Inhalt. -->
-                    <TextBlock x:Name="BatchStatus" Margin="0,6,0,0" TextWrapping="Wrap" FontSize="9">
-                        <TextBlock.Style>
-                            <Style TargetType="TextBlock" BasedOn="{StaticResource DashLabel}">
-                                <Style.Triggers>
-                                    <Trigger Property="Text" Value="">
-                                        <Setter Property="Visibility" Value="Collapsed" />
-                                    </Trigger>
-                                </Style.Triggers>
-                            </Style>
-                        </TextBlock.Style>
-                    </TextBlock>
-
-                    <ProgressBar x:Name="BatchProgress" Height="3" Margin="0,6,0,0"
-                                 Visibility="Collapsed" Minimum="0" Maximum="1"
-                                 Background="{StaticResource PanelBorder}"
-                                 Foreground="{StaticResource DesktopAccent}"
-                                 BorderThickness="0" />
-                </StackPanel>
-            </Border>
         </local:DockHost>
 
         <!--
@@ -376,6 +338,7 @@
                     minutenlang das falsche Bild.
                 -->
                 <Button x:Name="CompareButton" Style="{StaticResource OverlayButton}" Margin="0,0,4,0"
+                        Click="OnCompareClicked"
                         PreviewMouseLeftButtonDown="OnCompareDown"
                         PreviewMouseLeftButtonUp="OnCompareUp"
                         MouseLeave="OnCompareUp"
@@ -401,65 +364,151 @@
         </ContentControl>
 
         <!--
-            Unten eine niedrige Zeile fuer das, was man ablesen will: welche Folge und welches
-            Bild, welche Datei, wie gross, was die Pipette las - und rechts Vergleich, Zoom und
-            ob gespeichert ist.
+            Versuch (docs/Atelier-UX-Versuch.md): unten die Folgenleiste - Bild oder Folge, welches Bild,
+            wofuer die Einstellungen gelten, und die Ausgabe mit ihrem Fortschritt. Darunter die
+            Statuszeile, lesbar statt in 9 Punkten.
         -->
-        <Border x:Name="StatusBar" Grid.Row="3" Grid.ColumnSpan="2" Margin="0,8,0,0"
-                Background="{StaticResource PanelBackground}" BorderBrush="{StaticResource PanelBorder}"
-                BorderThickness="1" CornerRadius="6" Padding="8,1">
-            <DockPanel LastChildFill="True">
-                <!--
-                    Das Projekt speichert sich von selbst - hier steht, ob es das schon hat. Der
-                    Knopf fuer den Moment, in dem man sicher sein will, steht oben rechts.
-                -->
-                <TextBlock x:Name="SaveText" DockPanel.Dock="Right" VerticalAlignment="Center"
-                           Style="{StaticResource DashLabel}" FontSize="9" />
+        <StackPanel x:Name="BottomArea" Grid.Row="3" Grid.ColumnSpan="2" Margin="0,8,0,0">
+            <Border x:Name="FrameBar" Background="{StaticResource PanelBackground}" BorderBrush="{StaticResource PanelBorder}"
+                    BorderThickness="1" CornerRadius="6" Padding="8,4">
+                <DockPanel LastChildFill="False">
+                    <StackPanel DockPanel.Dock="Left" Orientation="Horizontal" VerticalAlignment="Center">
+                        <ContentControl x:Name="FrameModeHost" Focusable="False" Margin="0,0,12,0" VerticalAlignment="Center" />
+                        <Button x:Name="PreviousFrameButton" Style="{StaticResource OverlayButton}" MinWidth="30"
+                                Content="‹" Click="OnPreviousFrame" Visibility="Collapsed"
+                                ToolTip="{DynamicResource S_PreviousFrameHint}" />
+                        <TextBlock x:Name="SequenceText" VerticalAlignment="Center" Margin="8,0,8,0"
+                                   FontFamily="{StaticResource MonoFont}" FontSize="13"
+                                   Foreground="{StaticResource ForegroundBrush}" />
+                        <Button x:Name="NextFrameButton" Style="{StaticResource OverlayButton}" MinWidth="30"
+                                Content="›" Click="OnNextFrame" Visibility="Collapsed"
+                                ToolTip="{DynamicResource S_NextFrameHint}" />
+                        <TextBlock x:Name="FrameScopeText" VerticalAlignment="Center" Margin="12,0,0,0"
+                                   FontSize="12" Foreground="{StaticResource MutedBrush}" />
+                    </StackPanel>
+                    <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" VerticalAlignment="Center">
+                        <TextBlock x:Name="FormatText" VerticalAlignment="Center" Margin="0,0,6,0"
+                                   FontSize="12" Foreground="{StaticResource MutedBrush}" />
+                        <TextBlock x:Name="FormatWarning" VerticalAlignment="Center" Margin="0,0,12,0" Visibility="Collapsed"
+                                   FontSize="12" Foreground="{StaticResource AppWarn}" Text="{DynamicResource S_FrameBarEightBit}"
+                                   ToolTip="{DynamicResource S_EightBitOnly}" />
+                        <StackPanel x:Name="FrameExportProgress" Width="150" Margin="0,0,12,0" VerticalAlignment="Center"
+                                    Visibility="Collapsed">
+                            <TextBlock x:Name="FrameExportText" FontSize="11" Foreground="{StaticResource MutedBrush}"
+                                       TextTrimming="CharacterEllipsis" />
+                            <ProgressBar x:Name="FrameExportBar" Height="4" Margin="0,3,0,0" Minimum="0" Maximum="1"
+                                         Background="{StaticResource PanelBorder}" Foreground="{StaticResource AccentBrush}"
+                                         BorderThickness="0" />
+                        </StackPanel>
+                        <Button x:Name="ExportOpenButton" Style="{StaticResource OverlayButton}" Padding="14,4"
+                                Content="{DynamicResource S_FrameBarExport}" IsEnabled="False" Click="OnExportOpenClicked"
+                                ToolTip="{DynamicResource S_FrameBarExportHint}" />
+                        <Popup x:Name="ExportPopup" PlacementTarget="{Binding ElementName=ExportOpenButton}" Placement="Top"
+                               StaysOpen="False" AllowsTransparency="True" VerticalOffset="-6" HorizontalOffset="-220">
+                            <Border Width="360" Background="{StaticResource PanelBackground}" BorderBrush="{StaticResource PanelBorder}"
+                                    BorderThickness="1" CornerRadius="8">
+            <Border x:Name="ExportBar"
+                    Padding="10,8" Visibility="Collapsed">
+                <StackPanel>
+                    <!-- Format und Ziel in einer Zeile, darunter wohin es geht. -->
+                    <DockPanel>
+                        <Button x:Name="TargetButton" DockPanel.Dock="Right" Margin="6,0,0,0"
+                                Style="{StaticResource OverlayButton}"
+                                Content="{DynamicResource S_ChooseTarget}" Click="OnChooseTargetClicked" />
+                        <ComboBox x:Name="FormatBox" Style="{StaticResource OverlayCombo}"
+                                  HorizontalAlignment="Stretch" SelectionChanged="OnFormatChanged"
+                                  ToolTip="{DynamicResource S_OutputFormat}" />
+                    </DockPanel>
 
-                <!-- Die Grenzen des Abschneidens als Bereichsregler (W2c, C7): unter links blau, ueber rechts rot. -->
-                <StackPanel x:Name="ClipRow" DockPanel.Dock="Right" Orientation="Horizontal" VerticalAlignment="Center"
-                            Margin="0,0,12,0" Visibility="Collapsed" ToolTip="{DynamicResource S_ClipRangeHint}">
-                    <TextBlock Text="{DynamicResource S_ClipRange}" Style="{StaticResource DashLabel}" FontSize="9"
-                               VerticalAlignment="Center" Margin="0,0,6,0" />
-                    <local:RangeSlider x:Name="ClipRange" Width="160" VerticalAlignment="Center" />
-                    <TextBlock x:Name="ClipValue" Style="{StaticResource DashLabel}" FontSize="9"
-                               VerticalAlignment="Center" Margin="6,0,0,0" />
-                </StackPanel>
+                    <TextBlock x:Name="TargetText" Margin="0,4,0,0"
+                               Style="{StaticResource DashLabel}" FontSize="11"
+                               TextTrimming="CharacterEllipsis"
+                               ToolTip="{Binding Text, RelativeSource={RelativeSource Self}}" />
 
-                <!-- Die Legende der Falschfarben (W2c). -->
-                <StackPanel x:Name="FalseColourRow" DockPanel.Dock="Right" Orientation="Horizontal"
-                            VerticalAlignment="Center" Margin="0,0,12,0" Visibility="Collapsed" />
-
-                <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                    <Button x:Name="PreviousFrameButton" Style="{StaticResource LinkButton}" FontSize="11"
-                            Content="◂" Click="OnPreviousFrame" Visibility="Collapsed"
-                            ToolTip="{DynamicResource S_PreviousFrameHint}" />
-                    <TextBlock x:Name="SequenceText" VerticalAlignment="Center" Margin="4,0,4,0"
-                               Style="{StaticResource DashLabel}" FontSize="9" />
-                    <Button x:Name="NextFrameButton" Style="{StaticResource LinkButton}" FontSize="11"
-                            Content="▸" Click="OnNextFrame" Visibility="Collapsed"
-                            ToolTip="{DynamicResource S_NextFrameHint}" />
-
-                    <TextBlock x:Name="FileText" VerticalAlignment="Center" Margin="12,0,0,0"
-                               Style="{StaticResource DashLabel}" FontSize="9"
-                               TextTrimming="CharacterEllipsis" MaxWidth="360"
-                               Text="{DynamicResource S_NoImage}" />
-                    <TextBlock x:Name="SourceText" VerticalAlignment="Center" Margin="12,0,0,0"
-                               Style="{StaticResource DashLabel}" FontSize="9" />
-                    <TextBlock x:Name="ViewText" VerticalAlignment="Center" Margin="12,0,0,0"
-                               Style="{StaticResource DashLabel}" FontSize="9" />
+                    <!-- Pixel Sort und Fehlerdiffusion laufen nur in acht Bit. In einem 16-Bit-Format
+                         fehlten sie in der Ausgabe, waehrend die Vorschau sie zeigt - siehe
+                         ShowEightBitNote. -->
+                    <TextBlock x:Name="EightBitNote" Margin="0,4,0,0" FontSize="11" TextWrapping="Wrap"
+                               Foreground="{StaticResource AppWarn}" Visibility="Collapsed"
+                               Text="{DynamicResource S_EightBitOnly}" />
 
                     <!--
-                        Was die Pipette zuletzt gelesen hat - stehend, damit sich ein zweiter
-                        Wert daneben vergleichen laesst.
+                        Schnell-Export: kein Dialog, kein Ziel noetig - in den Ordner FrameFlip
+                        neben den Bildern oder den gewaehlten Zielordner, unter dem naechsten
+                        freien Namen. Er ueberschreibt nie.
                     -->
-                    <TextBlock x:Name="PickText" VerticalAlignment="Center" Margin="12,0,0,0"
-                               Style="{StaticResource DashLabel}" FontSize="9"
-                               Foreground="{StaticResource AccentBrush}"
-                               Visibility="Collapsed" />
-                </StackPanel>
-            </DockPanel>
-        </Border>
+                    <UniformGrid Columns="2" Margin="0,6,0,0">
+                        <Button x:Name="QuickExportButton" Style="{StaticResource OverlayButton}" Margin="0,0,4,0"
+                                Content="{DynamicResource S_QuickExport}" Click="OnQuickExportClicked"
+                                ToolTip="{DynamicResource S_QuickExportHint}" IsEnabled="False" />
+                        <Button x:Name="RunButton" Style="{StaticResource OverlayButton}" Margin="4,0,0,0"
+                                Content="{DynamicResource S_RunBatch}" Click="OnRunClicked" IsEnabled="False" />
+                    </UniformGrid>
 
+                    <Button x:Name="StopButton" Style="{StaticResource OverlayButton}" Margin="0,6,0,0"
+                            Content="{DynamicResource S_Stop}" Click="OnStopClicked" Visibility="Collapsed" />
+
+                    <!-- Leer braucht der Stand keinen Platz - die Gruppe ist so hoch wie ihr Inhalt. -->
+                    <TextBlock x:Name="BatchStatus" Margin="0,6,0,0" TextWrapping="Wrap" FontSize="11">
+                        <TextBlock.Style>
+                            <Style TargetType="TextBlock" BasedOn="{StaticResource DashLabel}">
+                                <Style.Triggers>
+                                    <Trigger Property="Text" Value="">
+                                        <Setter Property="Visibility" Value="Collapsed" />
+                                    </Trigger>
+                                </Style.Triggers>
+                            </Style>
+                        </TextBlock.Style>
+                    </TextBlock>
+
+                    <ProgressBar x:Name="BatchProgress" Height="3" Margin="0,6,0,0"
+                                 Visibility="Collapsed" Minimum="0" Maximum="1"
+                                 Background="{StaticResource PanelBorder}"
+                                 Foreground="{StaticResource DesktopAccent}"
+                                 BorderThickness="0" />
+                </StackPanel>
+            </Border>
+                            </Border>
+                        </Popup>
+                    </StackPanel>
+                </DockPanel>
+            </Border>
+
+            <Border x:Name="StatusBar" Margin="0,6,0,0"
+                    Background="{StaticResource PanelBackground}" BorderBrush="{StaticResource PanelBorder}"
+                    BorderThickness="1" CornerRadius="6" Padding="8,2">
+                <DockPanel LastChildFill="True">
+                    <TextBlock x:Name="SaveText" DockPanel.Dock="Right" VerticalAlignment="Center"
+                               Style="{StaticResource DashLabel}" FontSize="11" />
+                    <StackPanel x:Name="ClipRow" DockPanel.Dock="Right" Orientation="Horizontal" VerticalAlignment="Center"
+                                Margin="0,0,12,0" Visibility="Collapsed" ToolTip="{DynamicResource S_ClipRangeHint}">
+                        <TextBlock Text="{DynamicResource S_ClipRange}" Style="{StaticResource DashLabel}" FontSize="11"
+                                   VerticalAlignment="Center" Margin="0,0,6,0" />
+                        <local:RangeSlider x:Name="ClipRange" Width="160" VerticalAlignment="Center" />
+                        <TextBlock x:Name="ClipValue" Style="{StaticResource DashLabel}" FontSize="11"
+                                   VerticalAlignment="Center" Margin="6,0,0,0" />
+                    </StackPanel>
+                    <StackPanel x:Name="FalseColourRow" DockPanel.Dock="Right" Orientation="Horizontal"
+                                VerticalAlignment="Center" Margin="0,0,12,0" Visibility="Collapsed" />
+                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                        <TextBlock x:Name="FileText" VerticalAlignment="Center"
+                                   Style="{StaticResource DashLabel}" FontSize="11"
+                                   TextTrimming="CharacterEllipsis" MaxWidth="420"
+                                   Text="{DynamicResource S_NoImage}" />
+                        <TextBlock x:Name="SourceText" VerticalAlignment="Center" Margin="14,0,0,0"
+                                   Style="{StaticResource DashLabel}" FontSize="11" />
+                        <TextBlock x:Name="ViewText" VerticalAlignment="Center" Margin="14,0,0,0"
+                                   Style="{StaticResource DashLabel}" FontSize="11" />
+                        <TextBlock x:Name="PickText" VerticalAlignment="Center" Margin="14,0,0,0"
+                                   Style="{StaticResource DashLabel}" FontSize="11"
+                                   Foreground="{StaticResource AccentBrush}"
+                                   Visibility="Collapsed" />
+                    </StackPanel>
+                </DockPanel>
+            </Border>
+        </StackPanel>
+
+        <!-- Versuch: der Katalog (Strg+K) ueber allem. -->
+        <local:CatalogView x:Name="Catalog" Grid.RowSpan="4" Grid.ColumnSpan="2" />
     </Grid>
 </UserControl>

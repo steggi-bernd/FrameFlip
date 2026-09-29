@@ -149,6 +149,9 @@ public partial class ToolBand : UserControl
     /// <summary>Umgeschaltet: true - nur dieses Bild, false - die ganze Folge.</summary>
     public event Action<bool>? FrameModeWanted;
 
+    /// <summary>Versuch: Die Suche soll der Katalog der Seite sein.</summary>
+    public event Action? SearchWanted;
+
     /// <summary>Ob der Umschalter zu sehen ist - fuer die Probe.</summary>
     internal bool FrameSwitchShown => FrameSwitch.Visibility == Visibility.Visible;
 
@@ -194,6 +197,13 @@ public partial class ToolBand : UserControl
     /// <summary>Oeffnet die Suche - mit Strg+K oder am Knopf.</summary>
     public void OpenSearch()
     {
+        // Versuch: Strg+K und der Knopf oeffnen den Katalog der Seite, wenn sie einen hat.
+        if (SearchWanted is { } wanted)
+        {
+            wanted();
+            return;
+        }
+
         SearchBox.Text = "";
         SearchResults.ItemsSource = null;
         SearchPopup.IsOpen = true;

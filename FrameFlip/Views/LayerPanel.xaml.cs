@@ -153,10 +153,9 @@ public partial class LayerPanel : UserControl
     /// ganzen Bildes - die laeuft NACH dem Zusammensetzen -, und keine Maske der Welt
     /// haette sie noch begrenzen koennen.
     /// </summary>
-    public ImageLayer? EditedLayer
-        => _selected is not null && (OnLayer || _selected.Content == LayerContent.Adjustment)
-            ? _selected
-            : null;
+    // Versuch (docs/Atelier-UX-Versuch.md): Die Auswahl IST das Ziel. Gesamtbild heisst: keine
+    // Ebene gewaehlt - die Zeile "Gesamtbild" oben, Esc oder ein Klick ins Leere.
+    public ImageLayer? EditedLayer => _selected;
 
     /// <summary>Was der Farbstreifen ueber sein Ziel wissen muss.</summary>
     public (string? Layer, bool OnIt, bool Locked) TargetState
@@ -218,8 +217,10 @@ public partial class LayerPanel : UserControl
 
         if (Stack.Layers.Count == 0) Stack.Layers.Add(BaseLayer());
 
-        _selected = Stack.Layers[^1];
+        // Versuch: nach dem Laden gilt das Gesamtbild - nichts ist gewaehlt.
+        _selected = null;
         Rebuild();
+        ShowWhole();
 
         // Eingeklappt, wenn es nichts zu waehlen und nichts zu sehen gibt: Bei einem
         // PNG ist die Liste eine Zeile lang, und zweihundert Punkte Hoehe dafuer
@@ -799,6 +800,7 @@ public partial class LayerPanel : UserControl
         _selected = layer;
         PushToControls();
         UpdateButtons();
+        ShowWhole();
         Editing?.Invoke(EditedLayer);
     }
 

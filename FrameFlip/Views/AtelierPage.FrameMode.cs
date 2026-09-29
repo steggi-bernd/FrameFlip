@@ -23,6 +23,9 @@ public partial class AtelierPage
         bool sequence = _sequence is { Count: > 1 };
 
         ToolBand.ShowFrameSwitch(single: detached || !sequence, inSequence: detached || sequence);
+
+        // Versuch: in der Folgenleiste, wofuer die Einstellungen gelten.
+        FrameScopeText.Text = Strings.T(ToolBand.SingleFrame ? "S_FrameScopeSingle" : "S_FrameScopeSequence");
     }
 
     /// <summary>

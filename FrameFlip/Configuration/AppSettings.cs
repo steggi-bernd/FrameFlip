@@ -436,6 +436,12 @@ public sealed class AppSettings
     /// </summary>
     public List<FrameFlip.Imaging.SavedColour> AtelierColours { get; set; } = new();
 
+    /// <summary>
+    /// Versuch (docs/Atelier-UX-Versuch.md): die Favoriten neben "+ Effekt", nach dem Schluessel
+    /// des Katalogs. Null heisst: noch nie eingestellt - dann die Vorgabe.
+    /// </summary>
+    public List<string>? AtelierFavourites { get; set; }
+
     /// <summary>Gespeicherte Korrektureinstellungen, im Panel auswaehlbar.</summary>
     public List<AdjustmentPreset> AdjustmentPresets { get; set; } = new();
 

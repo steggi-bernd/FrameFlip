@@ -139,6 +139,17 @@ public sealed class DockHost : Border
         LayoutChanged?.Invoke(Layout);
     }
 
+    /// <summary>Versuch: der Pfeil einer Gruppe - ein- oder ausklappen, ohne den Reiter zu wechseln.</summary>
+    private void Fold(DockZone zone, int index)
+    {
+        var groups = Layout.Zone(zone);
+        if (index < 0 || index >= groups.Count) return;
+
+        groups[index].Collapsed = !groups[index].Collapsed;
+        Rebuild();
+        LayoutChanged?.Invoke(Layout);
+    }
+
     /// <summary>
     /// Ein Klick auf einen Reiter: das Feld nach vorn - oder, wenn es schon vorn und
     /// offen liegt, seine Gruppe einklappen. Siehe <see cref="DockLayout.Toggle"/>.
@@ -745,11 +756,34 @@ public sealed class DockHost : Border
 
         double line = group.Collapsed ? 0 : 1;
 
+        // Versuch: Einklappen hat einen eigenen Griff, damit ein zweiter Klick auf den Reiter
+        // nicht mehr die ganze Gruppe verschwinden laesst.
+        FrameworkElement head = tabs;
+
+        if (!side)
+        {
+            var fold = new Button
+            {
+                Content = group.Collapsed ? "⌄" : "⌃",
+                Style = (Style)FindResource("LinkButton"),
+                Margin = new Thickness(4, 0, 6, 0),
+                VerticalAlignment = VerticalAlignment.Center,
+                ToolTip = Localization.Strings.T(group.Collapsed ? "S_DockUnfold" : "S_DockFold"),
+            };
+            fold.Click += (_, _) => Fold(zone, index);
+
+            var row = new DockPanel();
+            DockPanel.SetDock(fold, System.Windows.Controls.Dock.Right);
+            row.Children.Add(fold);
+            row.Children.Add(tabs);
+            head = row;
+        }
+
         var strip = new Border
         {
             BorderBrush = (Brush)FindResource("PanelBorder"),
             BorderThickness = side ? new Thickness(0, 0, line, 0) : new Thickness(0, 0, 0, line),
-            Child = tabs,
+            Child = head,
             ContextMenu = LayoutMenu(),
         };
 
@@ -1054,7 +1088,8 @@ public sealed class DockHost : Border
 
         if (!dragged)
         {
-            Toggle(panel);
+            // Versuch: Ein Klick holt nur nach vorn - eingeklappt wird ueber den Pfeil der Gruppe.
+            Activate(panel);
             return;
         }
 

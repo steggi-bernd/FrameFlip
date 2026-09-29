@@ -46,6 +46,14 @@ public partial class LayerPanel
     /// </summary>
     private void OnListKeyDown(object sender, KeyEventArgs e)
     {
+        // Versuch: Esc in der Liste waehlt ab - das Gesamtbild ist dann das Ziel.
+        if (e.Key == Key.Escape && _selected is not null)
+        {
+            SelectWhole();
+            e.Handled = true;
+            return;
+        }
+
         bool control = (Keyboard.Modifiers & ModifierKeys.Control) != 0;
 
         // Die vorhandenen Knopfhandler tun genau das Richtige und pruefen selbst, ob
@@ -95,6 +103,13 @@ public partial class LayerPanel
     {
         _pressAt = e.GetPosition(LayerList);
         _pressed = LayerAt(e.OriginalSource as DependencyObject);
+
+        // Versuch: ein Klick ins Leere unter den Zeilen waehlt ab.
+        if (_pressed is null && _selected is not null &&
+            ItemsControl.ContainerFromElement(LayerList, e.OriginalSource as DependencyObject) is null)
+        {
+            SelectWhole();
+        }
     }
 
     /// <summary>

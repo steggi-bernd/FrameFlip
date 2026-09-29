@@ -189,6 +189,7 @@ public partial class GradingPanel : UserControl
         }
 
         Target = onLayer ? layer : null;
+        ShowTargetHead(layer, onLayer, locked);
     }
 
     /// <summary>

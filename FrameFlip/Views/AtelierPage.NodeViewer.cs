@@ -84,6 +84,8 @@ public partial class AtelierPage
     /// <summary>Das Schild ueber dem Bild und die Markierung im Editor.</summary>
     private void ShowViewer()
     {
+        ShowSoloSwitch();
+
         var node = _viewer is var (id, _) ? _graph?.Find(id) : null;
 
         NodeView.Viewed = node is not null ? (node, _viewer!.Value.Output) : null;

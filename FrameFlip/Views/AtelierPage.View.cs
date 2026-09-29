@@ -25,20 +25,52 @@ public partial class AtelierPage
     /// minutenlang das falsche Bild - und merkt es, wenn ueberhaupt, an einer
     /// Einstellung, die sich nicht mehr erklaeren laesst.
     /// </summary>
+    // Versuch (docs/Atelier-UX-Versuch.md): ein kurzer Klick schaltet um und laesst das Original
+    // stehen, mit Abzeichen am Bild; gedrueckt halten ist weiter nur ein Blick. Der naechste Klick,
+    // die Taste O oder jede Aenderung am Bild schaltet zurueck.
     private void OnCompareDown(object sender, System.Windows.Input.MouseButtonEventArgs e)
     {
-        if (_frame is null || _showingOriginal) return;
+        if (_frame is null) return;
+
+        _comparePressed = DateTime.UtcNow;
+        if (_compareLatched || _showingOriginal) return;
 
         _showingOriginal = true;
         Render();
+        ShowCompare();
     }
 
     private void OnCompareUp(object sender, System.Windows.Input.MouseEventArgs e)
     {
+        if (e.RoutedEvent == System.Windows.Input.Mouse.MouseLeaveEvent)
+        {
+            // Nur ein gehaltener Blick endet beim Verlassen; ein eingerastetes Original bleibt.
+            if (_compareLatched || !_showingOriginal) return;
+
+            _showingOriginal = false;
+            Render();
+            ShowCompare();
+            return;
+        }
+
+        if (_compareLatched)
+        {
+            EndCompare();
+            return;
+        }
+
         if (!_showingOriginal) return;
+
+        if ((DateTime.UtcNow - _comparePressed).TotalMilliseconds < 350)
+        {
+            _compareLatched = true;
+            ShowCompare();
+            return;
+        }
 
         _showingOriginal = false;
         Render();
+        ShowCompare();
     }
 
     /// <summary>
