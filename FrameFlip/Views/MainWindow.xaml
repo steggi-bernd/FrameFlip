@@ -853,7 +853,10 @@
         <Border Grid.Row="4" Background="{StaticResource DesktopPanel}"
                 BorderBrush="{StaticResource DesktopLine}" BorderThickness="0,1,0,0">
             <Grid Margin="14,0">
-                <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                <!-- Im Atelier steht links die Tastenhilfe (docs/Atelier-Tastenhilfe.md) statt der Angaben des Players. -->
+                <StackPanel x:Name="AtelierHintBar" Orientation="Horizontal" VerticalAlignment="Center"
+                            Visibility="Collapsed" ClipToBounds="True" />
+                <StackPanel x:Name="PlayerStatus" Orientation="Horizontal" VerticalAlignment="Center">
                     <TextBlock x:Name="StatusFormat" Style="{StaticResource DashMono}" FontSize="10" />
                     <TextBlock x:Name="StatusDecode" Margin="14,0,0,0" Style="{StaticResource DashMono}"
                                FontSize="10" />

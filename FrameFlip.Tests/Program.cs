@@ -130,6 +130,7 @@ static int RunAll()
     EqualiseInvariants.Run();
     MatchInvariants.Run();
     FeedbackFixInvariants.Run();
+    AtelierHintInvariants.Run();
     AtelierProjectInvariants.Run();
     AtelierProjectPageInvariants.Run();
     SwitchLeftoverInvariants.Run();
