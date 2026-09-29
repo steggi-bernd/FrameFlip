@@ -39,6 +39,18 @@ public sealed class HistogramView : FrameworkElement
     /// <summary>Farbkanaele statt der reinen Luminanz zeigen.</summary>
     public bool ShowChannels { get; set; } = true;
 
+    /// <summary>
+    /// Logarithmisch statt mit der Wurzel (W2d): Auch ganz wenige Bildpunkte bei einem Wert werden
+    /// sichtbar - etwa ein paar ausgefressene Lichter neben einer grossen dunklen Flaeche.
+    /// </summary>
+    public bool Logarithmic { get; set; }
+
+    /// <summary>Wie hoch ein Wert steht, 0 bis 1 - im gewaehlten Massstab.</summary>
+    public static double Height01(int value, int peak, bool logarithmic)
+        => logarithmic
+            ? (value <= 0 ? 0.0 : Math.Log(1.0 + value) / Math.Log(1.0 + Math.Max(1, peak)))
+            : Math.Sqrt(Math.Min(1.0, value / (double)Math.Max(1, peak)));
+
     public HistogramView()
     {
         Height = 110;
@@ -128,7 +140,7 @@ public sealed class HistogramView : FrameworkElement
 
                 // Wurzelskalierung: linear verschwaende ein einzelner hoher Ausschlag
                 // den gesamten Rest der Verteilung im Bodensatz.
-                double normalized = Math.Sqrt(Math.Min(1.0, values[i] / (double)_peak));
+                double normalized = Height01(values[i], _peak, Logarithmic);
                 double y = h - normalized * (h - 2);
 
                 draw.LineTo(new Point(x, y), isStroked: true, isSmoothJoin: false);

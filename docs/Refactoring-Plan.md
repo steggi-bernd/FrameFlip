@@ -3,6 +3,10 @@
 Dieser Fahrplan hält die Reihenfolge und den erreichten Stand der Strukturarbeit
 fest. Jeder Schnitt baut auf einem getesteten Sicherheits- und Funktionsstand auf.
 
+**Geändert am 25. September:** S0–S2 werden vorgezogen. Projektzustand je
+Sequenz, Autosave und Maskenverlauf bauen auf der `AtelierEditingSession` auf; siehe
+[Projekte, Masken und Autosave](Projekte-und-Masken.md). S3–S6 bleiben am Ende.
+
 **Priorität nach Nutzerentscheidung vom 20. September:** Zuerst D2
 (Watch-Lebenszyklus), danach D1 (Dashboard) und die übrigen offenen Schnitte
 (Android, feldweise Protokolltypen, Relay/Bridge nur bei Bedarf).
@@ -174,6 +178,44 @@ Nach dem Merge liefen beide Prüfreihen vollständig über den gemeinsamen Stand
 einschließlich Claudes Atelier-Commits bis `1659d67`: **4.350 Zusicherungen** in
 `FrameFlip.Tests` (ein Gesamtlauf, 70 Sekunden) und **227 UI-Prüfungen**, alle
 erfolgreich.
+
+## Fortschritt am 25. September 2026
+
+- **S0 implementiert und geprüft** auf `refactor/studio-s0` (vorgezogen, siehe oben).
+  Von den drei Befunden war einer keiner mehr, zwei waren echte Fehler und sind jeweils
+  als eigener `fix:` behoben. Einzelheiten und Abnahme stehen unter
+  [Stand S0](Refactoring-Studio.md#stand-s0-25-september-2026).
+- Als Nächstes S1 (Öffnung und Lebenszyklus) und S2 (Bearbeitungssitzung mit
+  Ablage-Adapter), jeweils ein eigener Zweig.
+
+## Fortschritt am 26. September 2026
+
+Ein Zwischenschnitt außerhalb der Reihenfolge liegt auf `refactor/watch-card`, auf
+`feature/atelier` (`0f9a2ee`). Er ist die Vorbedingung für die Einstellungen nach
+Entwurf A (Phase E in [Projekte und Masken](Projekte-und-Masken.md), Punkt 12). Dort
+soll die Zuschauerseite als zweite Karte neben der App-Kopplung stehen. Ihre Logik
+steckte bisher im Hauptfenster, an den Steuerelementen der Kopplungstafel.
+
+- **Auslagerung:** `WatchCard` besitzt Schalter, Code, Adresse, Stand, Kennwort und
+  Handgriffe der Zuschauerseite. Die Steuerelemente kommen als `Parts` herein.
+  Einstellungen, Dienst, Zustimmung, Protokoll, Handgriffe und Zwischenablage liefert
+  der Wirt als `Host`. Das Hauptfenster behält seine XAML-Ereignisse und reicht sie
+  weiter, sein Anteil schrumpft um knapp 200 Zeilen.
+- **Charakterisierung** vor der Auslagerung, 16 Prüfungen am echten Hauptfenster:
+  - was die Karte ausgeschaltet, eingeschaltet ohne Dienst und mit Dienst zeigt;
+  - dass der Schalter ohne Zustimmung nichts übernimmt, zurückspringt und die Tafel fragt;
+  - dass er sonst eine Kopie über den Wirt übernimmt und ein Fehler im Hinweis der Tafel
+    steht;
+  - dass das Anzeigen des Bestands nichts übernimmt;
+  - wie das Kennwort genommen wird: zu kurz abgewiesen, getrimmt, geleert, unverändert
+    ignoriert;
+  - dass Erneuern den Wirt ruft.
+
+  Kein Netz, „Link kopieren“ wird nicht gedrückt. Die Prüfungen liefen vor und nach der
+  Auslagerung unverändert grün. Es wurde kein Fehler gefunden.
+
+Abnahme dieses Branchstands: **4.544 Zusicherungen** in `FrameFlip.Tests` und
+**227 UI-Prüfungen**, beide vollständig erfolgreich.
 
 ## Historischer Stand der ersten Desktop-Schnitte (9. September 2026)
 
@@ -361,6 +403,17 @@ sofort koppeln, ohne zusätzliche Schritte.
   Kein globaler Entwicklungsstopp und kein Warten auf ein „fertiges Studio“.
 
 ## Nächster Startpunkt
+
+**Stand 26. September, nach den Merges:** In `feature/atelier` gemergt, noch nicht in
+`main`:
+- die vorgezogenen Studio-Schnitte S0 (#26), S1 erster Teil (#27) und S2 erster Teil (#28);
+- der Zwischenschnitt `WatchCard` (#31);
+- die darauf gebauten Featurestände: Projekte (#29), Masken (#30) und die Einstellungen
+  nach Entwurf A (#32).
+
+Jeder Schnitt steht als eigener Merge-Commit in der Geschichte. Offen aus dem Studio-Teil
+sind die übrigen Teile von S1 und S2 sowie S3–S6, siehe
+[Refactoring-Studio](Refactoring-Studio.md).
 
 **D1 ist mit dem Playback-Schnitt abgeschlossen.** D2 und D1a–D1d sind in
 `feature/atelier` gemergt, noch nicht in `main`. Danach folgen die übrigen

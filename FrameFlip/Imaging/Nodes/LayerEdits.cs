@@ -386,6 +386,32 @@ public static class LayerEdits
         return (grade, mix);
     }
 
+    /// <summary>
+    /// Eine ausgeschnittene Ebene hinter <paramref name="after"/>: ein Bild, mit einer Maske
+    /// ausgeschnitten (<see cref="CutoutNode"/>), normal daraufgemischt. Liest das Bild
+    /// dasselbe, was an dieser Stelle schon zu sehen ist, sieht das Ergebnis aus wie vorher -
+    /// und der ausgeschnittene Teil ist eine Ebene fuer sich.
+    /// </summary>
+    public static (CutoutNode Cutout, MixNode Mix)? AddCutout(NodeGraph graph, Node after, Node image, string imageOutput,
+                                                              Node mask, string maskOutput)
+    {
+        if (NodeEdits.Through(after).Output is null || image.Output(imageOutput) is null || mask.Output(maskOutput) is null)
+            return null;
+
+        bool clip = ChainOf(Chains(graph), after) is { Kind: LayerChainKind.Clip };
+
+        var mix = graph.Add(new MixNode { Clip = clip });
+        var cutout = graph.Add(new CutoutNode());
+
+        NodeEdits.InsertAfter(graph, after, mix);
+
+        graph.Connect(image, imageOutput, cutout, "Bild");
+        graph.Connect(mask, maskOutput, cutout, "Maske");
+        graph.Connect(cutout, "Bild", mix, "Oben");
+
+        return (cutout, mix);
+    }
+
     /// <summary>Ob eine neue Ebene hinter diesem Knoten in einer Schnittkette laege - dann wird sie angeschnitten.</summary>
     public static bool InClip(NodeGraph graph, Node after)
         => ChainOf(Chains(graph), after) is { Kind: LayerChainKind.Clip };

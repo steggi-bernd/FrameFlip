@@ -31,11 +31,29 @@ public partial class GradingPanel : UserControl
     private bool _localOnImage = true;
 
     private CurvesTool _curves = new();
+    private LevelsTool _levels = new();
+    private EqualiseTool _equalise = new();
+
+    /// <summary>Welcher Kanal der Tonwertkorrektur bearbeitet wird: 0 gemeinsam, 1 bis 3 R, G, B.</summary>
+    private int _levelsChannel;
+
+    /// <summary>Auto am Tonwert wurde gedrueckt - die Seite misst, was bei ihm ankommt.</summary>
+    public event Action<LevelsTool, LevelsAutoKind>? LevelsAutoWanted;
+
+    /// <summary>Eine Pipette des Tonwerts wurde gewaehlt - null: wieder abgewaehlt.</summary>
+    public event Action<LevelsTool, LevelsPickKind?>? LevelsPickWanted;
+
+    /// <summary>Waehrend die Pipetten von aussen zurueckgestellt werden, meldet ihr Umschalten nichts.</summary>
+    private bool _endingPick;
+
+    /// <summary>Der Tonwert der Karte - fuer die Probe.</summary>
+    internal LevelsTool Levels => _levels;
     private WhiteBalanceTool _whiteBalance = new();
     private LiftGammaGainTool _zones = new();
     private HslTool _bands = new();
     private VibranceTool _vibrance = new();
     private LutTool _lut = new();
+    private MatchTool _match = new();
     private ClarityTool _clarity = new();
     private SharpenTool _sharpen = new();
     private NoiseTool _noise = new();
@@ -45,6 +63,7 @@ public partial class GradingPanel : UserControl
     private TextureTool _texture = new();
     private VignetteTool _vignette = new();
     private GrainTool _grain = new();
+    private DeflickerTool _deflicker = new();
 
     /// <summary>
     /// Der erste Eintrag der Rasterliste, der eine Fehlerdiffusion ist.
@@ -63,6 +82,7 @@ public partial class GradingPanel : UserControl
     private MotionBlurTool _motion = new();
     private DisplaceTool _displace = new();
     private SortTool _sort = new();
+    private ClaheTool _clahe = new();
 
     private static readonly Color[] CurveColours =
     {
@@ -90,6 +110,17 @@ public partial class GradingPanel : UserControl
         CurveField.LineColour = CurveColours[0];
         CurveField.Changed += () => Raise(interim: true);
         CurveField.Released += () => Raise(interim: false);
+
+        LevelsField.Changed += () =>
+        {
+            ShowLevelsValues();
+            Raise(interim: true);
+        };
+        LevelsField.Released += () =>
+        {
+            ShowLevelsValues();
+            Raise(interim: false);
+        };
 
         foreach (var wheel in new[] { LiftWheel, GammaWheel, GainWheel })
         {
@@ -249,6 +280,7 @@ public partial class GradingPanel : UserControl
         HalationBody.IsEnabled = enabled;
         NoiseBody.IsEnabled = enabled;
         ClarityBody.IsEnabled = enabled;
+        ClaheBody.IsEnabled = enabled;
         TextureBody.IsEnabled = enabled;
         SharpenBody.IsEnabled = enabled;
         MotionBody.IsEnabled = enabled;
@@ -258,6 +290,7 @@ public partial class GradingPanel : UserControl
         ChromaticBody.IsEnabled = enabled;
         VignetteBody.IsEnabled = enabled;
         GrainBody.IsEnabled = enabled;
+        DeflickerBody.IsEnabled = enabled;
 
         // Rastern gehoert hierher wie das Korn: Es ist eine Eigenschaft des fertigen
         // BILDES und keine einer Ebene. Die Fehlerdiffusion laeuft ohnehin ueber den
@@ -355,12 +388,43 @@ public partial class GradingPanel : UserControl
         // die dort niemand angelegt hat.
         _added.Clear();
 
+        // Der Tonwert steht vor den Kurven - auch in einem Stapel von frueher, der ihn noch
+        // nicht kennt. Angehaengt kaeme er hinter Kurven und LUT, und dieselbe Einstellung
+        // wirkte in einem alten Projekt anders als in einem neuen.
+        _levels = Stack.Tools.OfType<LevelsTool>().FirstOrDefault() ?? InsertLevels();
+
+        LevelsTool InsertLevels()
+        {
+            var created = new LevelsTool();
+            int curves = Stack.Tools.FindIndex(t => t is CurvesTool);
+
+            Stack.Tools.Insert(curves < 0 ? Stack.Tools.Count : curves, created);
+            return created;
+        }
+
+        // Der Ausgleich (W2e) steht hinter dem Tonwert und vor den Kurven - auch in einem Stapel von
+        // frueher. Gemessen wird, was bei ihm ankommt; die Kurven formen danach weiter.
+        _equalise = Stack.Tools.OfType<EqualiseTool>().FirstOrDefault() ?? InsertEqualise();
+
+        EqualiseTool InsertEqualise()
+        {
+            var created = new EqualiseTool();
+            int curves = Stack.Tools.FindIndex(t => t is CurvesTool);
+
+            Stack.Tools.Insert(curves < 0 ? Stack.Tools.Count : curves, created);
+            return created;
+        }
+
         _curves = Take<CurvesTool>();
         _whiteBalance = Take<WhiteBalanceTool>();
         _zones = Take<LiftGammaGainTool>();
         _bands = Take<HslTool>();
         _vibrance = Take<VibranceTool>();
         _lut = Take<LutTool>();
+
+        // Farbe angleichen (W2f) steht zuletzt: Gemessen wird, wo es steht, und so gleicht das
+        // fertige Bild dem Vorbild - auch wenn davor noch Kurven und LUT wirken.
+        _match = Take<MatchTool>();
 
         // Die oertlichen Werkzeuge stehen in ihrer eigenen Liste - sie nehmen einen
         // anderen Weg durch den Bildprozessor. In welcher Reihenfolge sie dort
@@ -377,7 +441,20 @@ public partial class GradingPanel : UserControl
         // anderer Weg durch den Bildprozessor.
         _vignette = TakeOptics<VignetteTool>();
         _grain = TakeOptics<GrainTool>();
+        _deflicker = TakeOptics<DeflickerTool>();
         _dither = TakeOptics<DitherTool>();
+
+        // Der oertliche Ausgleich (W2e) laeuft als erster Durchgang ueber das fertige Bild - vor dem
+        // Rastern und dem Sortieren, die sonst seine Stufen und Laeufe mit ausglichen.
+        _clahe = Stack.Frame.OfType<ClaheTool>().FirstOrDefault() ?? InsertClahe();
+
+        ClaheTool InsertClahe()
+        {
+            var created = new ClaheTool();
+            Stack.Frame.Insert(0, created);
+            return created;
+        }
+
         _diffusion = TakeFrame<DiffusionTool>();
         _sort = TakeFrame<SortTool>();
 
@@ -471,6 +548,16 @@ public partial class GradingPanel : UserControl
                               : histogram.Luma;
 
         CurveField.InvalidateVisual();
+
+        LevelsField.Background = _levelsChannel switch
+        {
+            1 => histogram.Red,
+            2 => histogram.Green,
+            3 => histogram.Blue,
+            _ => histogram.Luma,
+        };
+        LevelsField.InvalidateVisual();
+
         UpdateClipText(histogram);
     }
 
@@ -484,6 +571,7 @@ public partial class GradingPanel : UserControl
         set
         {
             CurveBody.IsEnabled = value;
+            LevelsBody.IsEnabled = value;
             WhiteBalanceBody.IsEnabled = value;
             ZonesBody.IsEnabled = value;
             BandsBody.IsEnabled = value;
@@ -640,6 +728,11 @@ public partial class GradingPanel : UserControl
 
     private void PushToControls()
     {
+        // Nach dem Laden oder Zuruecksetzen kann der Kanal ein neues Objekt sein.
+        _levels.Prepare();
+        LevelsField.Channel = _levels.Channel(_levelsChannel);
+        ShowLevelsValues();
+
         _filling = true;
 
         try
@@ -671,6 +764,21 @@ public partial class GradingPanel : UserControl
             UpdateLutText();
 
             ClaritySlider.Value = Math.Clamp(_clarity.Amount, ClaritySlider.Minimum, ClaritySlider.Maximum);
+
+            EqualiseAmountSlider.Value = Math.Clamp(_equalise.Amount, EqualiseAmountSlider.Minimum, EqualiseAmountSlider.Maximum);
+            EqualiseStepsSlider.Value = Math.Clamp(_equalise.Steps, EqualiseStepsSlider.Minimum, EqualiseStepsSlider.Maximum);
+            ShowEqualiseState();
+
+            ClaheAmountSlider.Value = Math.Clamp(_clahe.Amount, ClaheAmountSlider.Minimum, ClaheAmountSlider.Maximum);
+            ClaheTilesSlider.Value = Math.Clamp(_clahe.Tiles, ClaheTilesSlider.Minimum, ClaheTilesSlider.Maximum);
+            ClaheLimitSlider.Value = Math.Clamp(_clahe.Limit, ClaheLimitSlider.Minimum, ClaheLimitSlider.Maximum);
+
+            MatchAmountSlider.Value = Math.Clamp(_match.Amount, MatchAmountSlider.Minimum, MatchAmountSlider.Maximum);
+            MatchToneButton.IsChecked = _match.Tone;
+            ShowMatchState();
+
+            DeflickerAmountSlider.Value = Math.Clamp(_deflicker.Amount, DeflickerAmountSlider.Minimum, DeflickerAmountSlider.Maximum);
+            DeflickerWindowSlider.Value = Math.Clamp(_deflicker.Window, DeflickerWindowSlider.Minimum, DeflickerWindowSlider.Maximum);
             ClarityReachSlider.Value = Math.Clamp(_clarity.Reach,
                                                   ClarityReachSlider.Minimum, ClarityReachSlider.Maximum);
 
@@ -726,6 +834,7 @@ public partial class GradingPanel : UserControl
             SortSpeedSlider.Value = Math.Clamp(_sort.Speed, SortSpeedSlider.Minimum, SortSpeedSlider.Maximum);
 
             SortKeyBox.SelectedIndex = (int)_sort.Key;
+            ShowSortRange();
             SortIntervalBox.SelectedIndex = (int)_sort.Interval;
             SortCrossButton.IsChecked = _sort.Cross;
             SortDescendingButton.IsChecked = _sort.Descending;
@@ -964,6 +1073,22 @@ public partial class GradingPanel : UserControl
         _clarity.Amount = (float)ClaritySlider.Value;
         _clarity.Reach = (int)Math.Round(ClarityReachSlider.Value);
 
+        _equalise.Amount = (float)EqualiseAmountSlider.Value;
+        _equalise.Steps = (int)Math.Round(EqualiseStepsSlider.Value);
+
+        _clahe.Amount = (float)ClaheAmountSlider.Value;
+        _clahe.Tiles = (int)Math.Round(ClaheTilesSlider.Value);
+        _clahe.Limit = (float)ClaheLimitSlider.Value;
+
+        _match.Amount = (float)MatchAmountSlider.Value;
+        _deflicker.Amount = (float)DeflickerAmountSlider.Value;
+        _deflicker.Window = (int)Math.Round(DeflickerWindowSlider.Value);
+
+        // Die Staerke hochgezogen, bevor gemessen wurde: dann jetzt messen - sonst taete der Regler nichts.
+        if (_equalise.Amount >= 0.001f && _equalise.Measured is null) EqualiseMeasureWanted?.Invoke(_equalise);
+        if (_match.Amount >= 0.001f && _match.Source is null && _match.Reference is not null) MatchWanted?.Invoke(_match);
+        if (_deflicker.Amount >= 0.001f && _deflicker.Levels is null && !_deflickerRunning) DeflickerMeasureWanted?.Invoke(_deflicker);
+
         _sharpen.Amount = (float)SharpenSlider.Value;
         _sharpen.Reach = (int)Math.Round(SharpenRadiusSlider.Value);
         _sharpen.Threshold = (float)SharpenThresholdSlider.Value;
@@ -982,6 +1107,7 @@ public partial class GradingPanel : UserControl
 
         _sort.Low = (float)SortLowSlider.Value;
         _sort.High = (float)SortHighSlider.Value;
+        ShowSortRange();
         _sort.Longest = (int)Math.Round(SortLongestSlider.Value);
         _sort.Angle = (float)SortAngleSlider.Value;
         _sort.Edge = (float)SortEdgeSlider.Value;
@@ -1101,6 +1227,15 @@ public partial class GradingPanel : UserControl
         LutStrengthValue.Text = $"{LutStrengthSlider.Value:0.00}";
         ClarityValue.Text = $"{ClaritySlider.Value:+0.00;-0.00;0.00}";
         ClarityReachValue.Text = $"{ClarityReachSlider.Value:0}";
+        EqualiseAmountValue.Text = $"{EqualiseAmountSlider.Value:0.00}";
+        EqualiseStepsValue.Text = EqualiseStepsSlider.Value < 2 ? Strings.T("S_EqualiseStepless") : $"{EqualiseStepsSlider.Value:0}";
+        ClaheAmountValue.Text = $"{ClaheAmountSlider.Value:0.00}";
+        ClaheTilesValue.Text = $"{ClaheTilesSlider.Value:0}";
+        ClaheLimitValue.Text = $"{ClaheLimitSlider.Value:0.0}";
+        MatchAmountValue.Text = $"{MatchAmountSlider.Value:0.00}";
+        DeflickerAmountValue.Text = $"{DeflickerAmountSlider.Value:0.00}";
+        DeflickerWindowValue.Text = Strings.T("S_DeflickerWindowValue", (int)Math.Round(DeflickerWindowSlider.Value));
+        ShowDeflickerState();
         SharpenValue.Text = $"{SharpenSlider.Value:0.00}";
         SharpenRadiusValue.Text = $"{SharpenRadiusSlider.Value:0}";
         SharpenThresholdValue.Text = $"{SharpenThresholdSlider.Value:0.000}";
@@ -1319,6 +1454,468 @@ public partial class GradingPanel : UserControl
         CurveField.InvalidateVisual();
     }
 
+    private static readonly Color[] LevelsColours =
+    {
+        Color.FromArgb(0x60, 0xFF, 0xFF, 0xFF),
+        Color.FromArgb(0x70, 0xE8, 0x5A, 0x5A),
+        Color.FromArgb(0x70, 0x5A, 0xD0, 0x6E),
+        Color.FromArgb(0x70, 0x5A, 0x8C, 0xF0),
+    };
+
+    private void OnLevelsChannelPicked(object sender, RoutedEventArgs e)
+    {
+        if (sender is not ToggleButton picked || picked.Tag is not string tag) return;
+        if (!int.TryParse(tag, out int channel)) return;
+
+        // Beim Laden kommt das Checked des ersten Knopfs, bevor die anderen stehen.
+        if (LevelsBlueButton is null || LevelsField is null) return;
+
+        foreach (var button in new[] { LevelsMasterButton, LevelsRedButton, LevelsGreenButton, LevelsBlueButton })
+            if (!ReferenceEquals(button, picked)) button.IsChecked = false;
+
+        _levelsChannel = Math.Clamp(channel, 0, 3);
+        LevelsField.Channel = _levels.Channel(_levelsChannel);
+        LevelsField.HistogramColour = LevelsColours[_levelsChannel];
+        LevelsField.InvalidateVisual();
+        ShowLevelsValues();
+    }
+
+    // ------------------------------------------------------------ Farbe angleichen und Deflicker (W2f)
+
+    /// <summary>Ein Vorbild soll gemerkt werden - aus dem gezeigten Bild (false) oder aus einer Datei (true).</summary>
+    public event Action<MatchTool, bool>? MatchReferenceWanted;
+
+    /// <summary>Dieses Bild soll ans Vorbild angeglichen werden - gemessen, was beim Werkzeug ankommt.</summary>
+    public event Action<MatchTool>? MatchWanted;
+
+    /// <summary>Die Folge soll gemessen werden - oder die laufende Messung abgebrochen (null).</summary>
+    public event Action<DeflickerTool?>? DeflickerMeasureWanted;
+
+    /// <summary>Farbe angleichen in der Karte - fuer die Probe.</summary>
+    internal MatchTool Match => _match;
+
+    /// <summary>Deflicker in der Karte - fuer die Probe.</summary>
+    internal DeflickerTool Deflicker => _deflicker;
+
+    /// <summary>Ob die Seite gerade die Folge misst.</summary>
+    private bool _deflickerRunning;
+
+    private void OnMatchReferenceClicked(object sender, RoutedEventArgs e) => MatchReferenceWanted?.Invoke(_match, false);
+
+    private void OnMatchReferenceFileClicked(object sender, RoutedEventArgs e) => MatchReferenceWanted?.Invoke(_match, true);
+
+    private void OnMatchClicked(object sender, RoutedEventArgs e) => MatchWanted?.Invoke(_match);
+
+    private void OnMatchToneChanged(object sender, RoutedEventArgs e)
+    {
+        if (_filling || !IsLoaded) return;
+
+        _match.Tone = MatchToneButton.IsChecked == true;
+        Raise(interim: false);
+    }
+
+    /// <summary>Die Seite hat ein Vorbild gemessen.</summary>
+    public void MatchReferenceSet(MatchTool tool, ColourStats stats, string name)
+    {
+        tool.Reference = stats;
+        tool.ReferenceName = name;
+
+        if (!ReferenceEquals(tool, _match)) return;
+
+        PushToControls();
+        Raise(interim: false);
+    }
+
+    /// <summary>Die Seite hat dieses Bild gemessen. Steht die Staerke auf null, wirkt es jetzt ganz.</summary>
+    public void MatchSourceSet(MatchTool tool, ColourStats stats)
+    {
+        tool.Source = stats;
+        if (tool.Amount < 0.001f) tool.Amount = 1f;
+
+        if (!ReferenceEquals(tool, _match)) return;
+
+        PushToControls();
+        Raise(interim: false);
+    }
+
+    private void ShowMatchState()
+    {
+        MatchState.Text = _match.Reference is null
+            ? Strings.T("S_MatchNoReference")
+            : Strings.T("S_MatchReferenceIs", _match.ReferenceName ?? "?");
+
+        MatchApplyButton.IsEnabled = _match.Reference is not null;
+    }
+
+    private void OnDeflickerMeasureClicked(object sender, RoutedEventArgs e)
+        => DeflickerMeasureWanted?.Invoke(_deflickerRunning ? null : _deflicker);
+
+    /// <summary>Wie weit die Messung der Folge ist. Ohne <paramref name="total"/>: vorbei - fertig oder abgebrochen.</summary>
+    public void DeflickerProgress(int done, int total)
+    {
+        _deflickerRunning = total > 0;
+        DeflickerMeasureButton.SetResourceReference(ContentProperty, _deflickerRunning ? "S_DeflickerCancel" : "S_DeflickerMeasure");
+
+        if (_deflickerRunning) DeflickerState.Text = Strings.T("S_DeflickerProgress", done, total);
+        else ShowDeflickerState();
+    }
+
+    /// <summary>Die Folge ist gemessen. Steht die Staerke auf null, wirkt der Ausgleich jetzt ganz.</summary>
+    public void DeflickerMeasured(DeflickerTool tool, Dictionary<int, float> levels)
+    {
+        tool.Levels = levels;
+        if (tool.Amount < 0.001f) tool.Amount = 1f;
+
+        if (!ReferenceEquals(tool, _deflicker)) return;
+
+        PushToControls();
+        Raise(interim: false);
+    }
+
+    private void ShowDeflickerState()
+    {
+        if (_deflickerRunning) return;
+
+        if (_deflicker.Levels is not { } levels)
+            DeflickerState.Text = Strings.T("S_DeflickerNotMeasured");
+        else if (levels.Count < 2)
+            DeflickerState.Text = Strings.T("S_DeflickerSingle");
+        else
+            DeflickerState.Text = Strings.T("S_DeflickerMeasured", levels.Count,
+                DeflickerTool.Gains(levels, _deflicker.Window, 1f).Values.Max(g => MathF.Abs(MathF.Log2(g))));
+    }
+
+    // ------------------------------------------------------------ Ausgleich (W2e)
+
+    /// <summary>Der Ausgleich soll messen, was bei ihm ankommt - das weiss die Seite.</summary>
+    public event Action<EqualiseTool>? EqualiseMeasureWanted;
+
+    /// <summary>Der Ausgleich der Karte - fuer die Probe.</summary>
+    internal EqualiseTool Equalise => _equalise;
+
+    private void OnEqualiseMeasureClicked(object sender, RoutedEventArgs e) => EqualiseMeasureWanted?.Invoke(_equalise);
+
+    /// <summary>
+    /// Die Seite hat gemessen. Steht die Staerke noch auf null, wirkt der Ausgleich jetzt ganz - wer
+    /// "Ausgleichen" drueckt, will es sehen.
+    /// </summary>
+    public void EqualiseMeasured(EqualiseTool tool, float[] measured)
+    {
+        tool.Measured = measured;
+        if (tool.Amount < 0.001f) tool.Amount = 1f;
+
+        if (!ReferenceEquals(tool, _equalise)) return;
+
+        PushToControls();
+        Raise(interim: false);
+    }
+
+    private void ShowEqualiseState()
+    {
+        bool measured = _equalise.Measured is not null;
+
+        EqualiseMeasureButton.SetResourceReference(ContentProperty, measured ? "S_EqualiseMeasureAgain" : "S_EqualiseMeasure");
+        EqualiseState.SetResourceReference(TextBlock.TextProperty, measured ? "S_EqualiseMeasured" : "S_EqualiseNotMeasured");
+    }
+
+    private void OnLevelsAutoClicked(object sender, RoutedEventArgs e)
+    {
+        if (sender is not FrameworkElement { Tag: string tag } || !Enum.TryParse(tag, out LevelsAutoKind kind)) return;
+
+        LevelsAutoWanted?.Invoke(_levels, kind);
+    }
+
+    /// <summary>
+    /// Eine Pipette an einem Rad wurde gewaehlt - oder abgewaehlt (null): Der naechste Klick ins
+    /// Bild macht die Stelle in dieser Zone grau (C4b).
+    /// </summary>
+    public event Action<LiftGammaGainTool, ZoneKind?>? ZonePickWanted;
+
+    private void OnZonePickToggled(object sender, RoutedEventArgs e)
+    {
+        if (_endingPick || sender is not ToggleButton { Tag: string tag } toggle || GainPick is null) return;
+        if (!Enum.TryParse(tag, out ZoneKind zone)) return;
+
+        if (toggle.IsChecked == true)
+        {
+            _endingPick = true;
+
+            foreach (var other in new[] { LiftPick, GammaPick, GainPick })
+                if (!ReferenceEquals(other, toggle)) other.IsChecked = false;
+
+            _endingPick = false;
+            ZonePickWanted?.Invoke(_zones, zone);
+        }
+        else
+        {
+            ZonePickWanted?.Invoke(_zones, null);
+        }
+    }
+
+    /// <summary>Die Pipette am Rad hat geklickt oder wurde verlassen - alle drei wieder aus.</summary>
+    public void EndZonePick()
+    {
+        _endingPick = true;
+
+        foreach (var toggle in new[] { LiftPick, GammaPick, GainPick })
+            toggle.IsChecked = false;
+
+        _endingPick = false;
+    }
+
+    /// <summary>
+    /// Macht einen Ton in einer Zone grau: das Rad dorthin, wo die Rechnung des Bildes ihn neutral
+    /// herausgibt, bei gleicher Helligkeit. Der Ton ist der, der bei Lift, Gamma und Gain ankommt.
+    /// </summary>
+    public void NeutraliseZone(ZoneKind zone, float r, float g, float b)
+    {
+        var (wheel, slider, triplet, neutral, scale) = zone switch
+        {
+            ZoneKind.Lift => (LiftWheel, LiftBrightSlider, _zones.Lift, 0f, LiftScale),
+            ZoneKind.Gamma => (GammaWheel, GammaBrightSlider, _zones.Gamma, 1f, GammaScale),
+            _ => (GainWheel, GainBrightSlider, _zones.Gain, 1f, GainScale),
+        };
+
+        var point = ColourSolve.Neutralise(_zones, zone, r, g, b, scale);
+
+        _filling = true;
+        try { wheel.Value = point; }
+        finally { _filling = false; }
+
+        PullZone(wheel, slider, triplet, neutral, scale);
+        UpdateZoneValues();
+        Raise(interim: false);
+    }
+
+    /// <summary>
+    /// Eine Pipette am Weissabgleich wurde gewaehlt - <c>false</c> neutral, <c>true</c> angleichen
+    /// an eine gemerkte Farbe - oder abgewaehlt (null). C4c.
+    /// </summary>
+    public event Action<WhiteBalanceTool, bool?>? WhiteBalancePickWanted;
+
+    private void OnWbPickToggled(object sender, RoutedEventArgs e)
+    {
+        if (_endingPick || sender is not ToggleButton { Tag: string tag } toggle || WbPickMatch is null) return;
+
+        if (toggle.IsChecked == true)
+        {
+            _endingPick = true;
+
+            foreach (var other in new[] { WbPickNeutral, WbPickMatch })
+                if (!ReferenceEquals(other, toggle)) other.IsChecked = false;
+
+            _endingPick = false;
+            WhiteBalancePickWanted?.Invoke(_whiteBalance, tag == "Match");
+        }
+        else
+        {
+            WhiteBalancePickWanted?.Invoke(_whiteBalance, null);
+        }
+    }
+
+    /// <summary>Die Pipette am Weissabgleich hat geklickt oder wurde verlassen - beide wieder aus.</summary>
+    public void EndWhiteBalancePick()
+    {
+        _endingPick = true;
+
+        foreach (var toggle in new[] { WbPickNeutral, WbPickMatch })
+            toggle.IsChecked = false;
+
+        _endingPick = false;
+    }
+
+    /// <summary>Setzt den Weissabgleich von aussen - die Regler ziehen nach, das Bild auch.</summary>
+    public void SetWhiteBalance(float kelvin, float tint)
+    {
+        _whiteBalance.Kelvin = kelvin;
+        _whiteBalance.Tint = tint;
+
+        _filling = true;
+
+        try
+        {
+            TemperatureSlider.Value = Math.Clamp(ToMired(_whiteBalance.Kelvin), TemperatureSlider.Minimum, TemperatureSlider.Maximum);
+            TintSlider.Value = _whiteBalance.Tint;
+        }
+        finally
+        {
+            _filling = false;
+        }
+
+        UpdateValues();
+        Raise(interim: false);
+    }
+
+    // ------------------------------------------------------------ Pixel Sort als Fenster (C7b)
+
+    /// <summary>Die Verteilung des Sortierwerts soll neu gemessen werden - die Karte ist offen oder der Wert anders.</summary>
+    public event Action? SortDistributionWanted;
+
+    /// <summary>Ob die Karte von Pixel Sort offen ist - nur dann lohnt die Verteilung.</summary>
+    public bool SortShown => SortBody.Visibility == Visibility.Visible;
+
+    /// <summary>Wonach Pixel Sort gerade sortiert.</summary>
+    public SortKey SortKeyShown => _sort.Key;
+
+    /// <summary>Die Verteilung des Sortierwerts im Bild, wie sie beim Sortieren ankommt.</summary>
+    public void ShowSortDistribution(float[]? bins) => SortRange.Distribution = bins;
+
+    private bool _sortRangeHooked;
+
+    /// <summary>Das Fenster im Bereichsregler, wie es in den beiden Reglern steht - und die Skala zum Sortierwert.</summary>
+    private void ShowSortRange()
+    {
+        if (SortRange is null) return;
+
+        if (!_sortRangeHooked)
+        {
+            _sortRangeHooked = true;
+            SortRange.Scale = RangeScale.Window;
+            SortRange.Changed += OnSortRangeChanged;
+            SortRange.ResetWanted += () => OnSortRangeChanged(new RangeWindow(0f, 0f, 0f, 0f), false);
+        }
+
+        SortRange.Window = new RangeWindow(_sort.Low, _sort.High, 0f, 0f);
+        SortRange.Track = _sort.Key switch
+        {
+            SortKey.Hue => RangeTrack.Hue,
+            SortKey.Saturation => RangeTrack.Saturation,
+            _ => RangeTrack.Light,
+        };
+
+        SortRangeValue.Text = $"{_sort.Low:0.00} – {_sort.High:0.00}";
+    }
+
+    /// <summary>Ein Zug am Fenster: die beiden Regler ziehen nach, das Bild auch. Doppelklick schliesst es.</summary>
+    private void OnSortRangeChanged(RangeWindow window, bool interim)
+    {
+        _sort.Low = window.Low;
+        _sort.High = window.High;
+
+        _filling = true;
+
+        try
+        {
+            SortLowSlider.Value = Math.Clamp(window.Low, SortLowSlider.Minimum, SortLowSlider.Maximum);
+            SortHighSlider.Value = Math.Clamp(window.High, SortHighSlider.Minimum, SortHighSlider.Maximum);
+        }
+        finally
+        {
+            _filling = false;
+        }
+
+        ShowSortRange();
+        UpdateValues();
+        Raise(interim);
+    }
+
+    /// <summary>Ob die Karte der Kurven zu sehen ist - dann setzt Strg+Klick ins Bild einen Punkt (W2c).</summary>
+    public bool CurvesShown => CurveField.IsVisible;
+
+    /// <summary>Die Kurven dieses Streifens - fuer die Frage, was bei ihnen ankommt.</summary>
+    public CurvesTool Curves => _curves;
+
+    /// <summary>
+    /// Ein Punkt auf der gezeigten Kurve beim Ton eines Bildpunkts, so wie er bei den Kurven
+    /// ankommt (W2c): auf der Gesamtkurve seine Helligkeit, auf einer Kanalkurve sein Kanal. Der
+    /// Punkt liegt auf der Kurve - sie aendert sich erst, wenn man ihn zieht. Liegt dort schon
+    /// einer, bleibt es bei ihm.
+    /// </summary>
+    public bool AddCurvePoint(float r, float g, float b)
+    {
+        if (!CurvesShown || CurveField.Curve is not { } curve) return false;
+
+        float tone = ReferenceEquals(curve, _curves.Red) ? r
+                   : ReferenceEquals(curve, _curves.Green) ? g
+                   : ReferenceEquals(curve, _curves.Blue) ? b
+                   : 0.2126f * r + 0.7152f * g + 0.0722f * b;
+
+        tone = Math.Clamp(tone, 0f, 1f);
+
+        if (curve.Points.Any(p => MathF.Abs(p.X - tone) < 0.01f)) return true;
+
+        curve.Prepare();
+        curve.Points.Add(new CurvePoint(tone, curve.Evaluate(tone)));
+        curve.Points.Sort((a, c) => a.X.CompareTo(c.X));
+        curve.Prepare();
+
+        CurveField.InvalidateVisual();
+        Raise(interim: false);
+        return true;
+    }
+
+    /// <summary>Genau eine Pipette ist an - oder keine.</summary>
+    private void OnLevelsPickToggled(object sender, RoutedEventArgs e)
+    {
+        if (_endingPick || sender is not ToggleButton { Tag: string tag } toggle || LevelsPickWhite is null) return;
+        if (!Enum.TryParse(tag, out LevelsPickKind kind)) return;
+
+        if (toggle.IsChecked == true)
+        {
+            _endingPick = true;
+
+            foreach (var other in new[] { LevelsPickBlack, LevelsPickGray, LevelsPickWhite })
+                if (!ReferenceEquals(other, toggle)) other.IsChecked = false;
+
+            _endingPick = false;
+            LevelsPickWanted?.Invoke(_levels, kind);
+        }
+        else
+        {
+            LevelsPickWanted?.Invoke(_levels, null);
+        }
+    }
+
+    /// <summary>Die Pipette hat geklickt oder wurde verlassen - alle drei wieder aus.</summary>
+    public void EndLevelsPick()
+    {
+        _endingPick = true;
+
+        foreach (var toggle in new[] { LevelsPickBlack, LevelsPickGray, LevelsPickWhite })
+            toggle.IsChecked = false;
+
+        _endingPick = false;
+    }
+
+    /// <summary>Auto oder eine Pipette hat den Tonwert gestellt - die Karte zieht nach, das Bild auch.</summary>
+    public void LevelsChangedOutside()
+    {
+        _levels.Prepare();
+        LevelsField.InvalidateVisual();
+        ShowLevelsValues();
+        Raise(interim: false);
+    }
+
+    private void OnResetLevelsClicked(object sender, RoutedEventArgs e)
+    {
+        foreach (int channel in new[] { 0, 1, 2, 3 })
+        {
+            var levels = _levels.Channel(channel);
+            levels.InBlack = 0;
+            levels.InWhite = 1;
+            levels.Gamma = 1;
+            levels.OutBlack = 0;
+            levels.OutWhite = 1;
+        }
+
+        _levels.Prepare();
+        LevelsField.InvalidateVisual();
+        ShowLevelsValues();
+        Raise(interim: false);
+    }
+
+    /// <summary>Die Werte des bearbeiteten Kanals als Zahlen - auf der Skala 0 bis 255, wie man sie kennt.</summary>
+    private void ShowLevelsValues()
+    {
+        var levels = _levels.Channel(_levelsChannel);
+
+        static string Byte(float value) => Math.Round(value * 255).ToString("0", System.Globalization.CultureInfo.CurrentCulture);
+
+        LevelsValues.Text = Strings.T("S_LevelsValues", Byte(levels.InBlack),
+                                      levels.Gamma.ToString("0.00", System.Globalization.CultureInfo.CurrentCulture),
+                                      Byte(levels.InWhite), Byte(levels.OutBlack), Byte(levels.OutWhite));
+    }
+
     private void OnBandModePicked(object sender, RoutedEventArgs e)
     {
         if (sender is not ToggleButton picked || picked.Tag is not string tag) return;
@@ -1351,6 +1948,9 @@ public partial class GradingPanel : UserControl
         bool open = body.Visibility != Visibility.Visible;
         body.Visibility = open ? Visibility.Visible : Visibility.Collapsed;
         button.Content = open ? "−" : "+";
+
+        // Die Karte von Pixel Sort ist aufgegangen: Jetzt lohnt die Verteilung unter dem Fenster.
+        if (open && ReferenceEquals(body, SortBody)) SortDistributionWanted?.Invoke();
     }
 
     private void OnResetBasicClicked(object sender, RoutedEventArgs e)
@@ -1361,6 +1961,57 @@ public partial class GradingPanel : UserControl
     }
 
     private void OnResetCurveClicked(object sender, RoutedEventArgs e) => CurveField.Reset();
+
+    // ------------------------------------------------------------ Messgeraete (W2d)
+
+    /// <summary>Welches Messgeraet im Feld steht.</summary>
+    public ScopeKind ScopeShown { get; private set; } = ScopeKind.Histogram;
+
+    /// <summary>Ein anderes Messgeraet ist gewaehlt - die Seite misst das angezeigte Bild neu.</summary>
+    public event Action? ScopeWanted;
+
+    /// <summary>Das naechste Messgeraet: Histogramm, Waveform, RGB-Parade, Vektorskop.</summary>
+    public void SetScope(ScopeKind kind)
+    {
+        ScopeShown = kind;
+
+        bool histogram = kind == ScopeKind.Histogram;
+
+        Histogram.Visibility = histogram ? Visibility.Visible : Visibility.Collapsed;
+        Scope.Visibility = histogram ? Visibility.Collapsed : Visibility.Visible;
+        HistogramModeButton.Visibility = histogram ? Visibility.Visible : Visibility.Collapsed;
+        HistogramLogButton.Visibility = histogram ? Visibility.Visible : Visibility.Collapsed;
+        ClipText.Visibility = histogram ? Visibility.Visible : Visibility.Collapsed;
+
+        ScopeButton.SetResourceReference(ContentProperty, kind switch
+        {
+            ScopeKind.Waveform => "S_ScopeWaveform",
+            ScopeKind.Parade => "S_ScopeParade",
+            ScopeKind.Vectorscope => "S_ScopeVector",
+            _ => "S_ScopeHistogram",
+        });
+
+        if (!histogram) ScopeWanted?.Invoke();
+    }
+
+    private void OnScopeClicked(object sender, RoutedEventArgs e) => SetScope(ScopeShown switch
+    {
+        ScopeKind.Histogram => ScopeKind.Waveform,
+        ScopeKind.Waveform => ScopeKind.Parade,
+        ScopeKind.Parade => ScopeKind.Vectorscope,
+        _ => ScopeKind.Histogram,
+    });
+
+    /// <summary>Ein gemessenes Bild fuer das Messgeraet.</summary>
+    public void ShowScope(ScopeImage image) => Scope.Show(image);
+
+    /// <summary>Der Massstab des Histogramms: Wurzel (wie bisher) oder logarithmisch.</summary>
+    private void OnHistogramLogClicked(object sender, RoutedEventArgs e)
+    {
+        Histogram.Logarithmic = !Histogram.Logarithmic;
+        HistogramLogButton.Content = Histogram.Logarithmic ? "log" : "lin";
+        Histogram.InvalidateVisual();
+    }
 
     private void OnHistogramModeClicked(object sender, RoutedEventArgs e)
     {
@@ -1453,6 +2104,9 @@ public partial class GradingPanel : UserControl
 
         _sort.Key = (SortKey)Math.Clamp(SortKeyBox.SelectedIndex, 0, 4);
 
+        // Ein anderer Sortierwert: eine andere Skala unter dem Fenster - die Verteilung misst
+        // die Seite nach dem naechsten Durchgang neu.
+        ShowSortRange();
         Raise(interim: false);
     }
 

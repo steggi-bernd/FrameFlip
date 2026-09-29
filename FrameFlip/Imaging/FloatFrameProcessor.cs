@@ -34,7 +34,8 @@ public static class FloatFrameProcessor
     /// <summary>
     /// Die Durchgaenge ueber das fertige Bild - der Reihe nach, auf einem Faden.
     ///
-    /// Sie laufen NUR im vollen Weg. Auf dem groben Raster waere das Ergebnis nicht
+    /// Sie laufen im vollen Weg - bis auf die, die eine grobe Fassung kennen
+    /// (<see cref="RunFrameCoarse"/>). Auf dem groben Raster waere das Ergebnis sonst nicht
     /// groeber, sondern ein anderes: Fehlerdiffusion entscheidet anhand der
     /// Nachbarschaft, welcher Punkt welchen Rest abbekommt, und ein Raster aendert
     /// die Nachbarschaft. Waehrend eines Reglerzugs bleibt der Durchgang deshalb aus
@@ -48,6 +49,19 @@ public static class FloatFrameProcessor
 
         for (int i = 0; i < passes.Length; i++)
             passes[i].Apply(destination, width, height, stride, number);
+    }
+
+    /// <summary>
+    /// Die Durchgaenge, die eine grobe Fassung kennen, auf dem Gitter der Vorschau - vor dem
+    /// Aufblasen (C7c). Die anderen bleiben beim Ziehen aus, aus dem Grund oben.
+    /// </summary>
+    private static void RunFrameCoarse(in PreparedGrading grading, IntPtr grid, int width, int height, int number, int step)
+    {
+        var passes = grading.Frame;
+
+        for (int i = 0; i < passes.Length; i++)
+            if (passes[i] is ICoarseFramePass coarse)
+                coarse.ApplyCoarse(grid, width, height, width * 4, number, step);
     }
 
     /// <summary>
@@ -200,6 +214,7 @@ public static class FloatFrameProcessor
                 }
             });
 
+            RunFrameCoarse(in grading, (IntPtr)gridPtr, gridWidth, gridHeight, number, step);
             Expand(gridPtr, gridWidth, gridHeight, target, destinationStride, width, height, step);
         }
     }
@@ -555,6 +570,7 @@ public static class FloatFrameProcessor
                 }
             });
 
+            RunFrameCoarse(in grading, (IntPtr)gridPtr, gridWidth, rows.Length, number, step);
             Expand(gridPtr, gridWidth, rows.Length, target, destinationStride, width, height, step);
         }
     }
@@ -910,28 +926,10 @@ public static class FloatFrameProcessor
                                PreparedGrading grading, Histogram histogram, int step = 1,
                                int number = 0)
     {
-        var linearTools = grading.SceneLinear ?? Array.Empty<IGradingTool>();
-        var displayTools = grading.Display ?? Array.Empty<IGradingTool>();
-
-        // Die Ortswerkzeuge zaehlen mit. Eine Vignette verschiebt die halbe
-        // Verteilung nach links, und ein Histogramm, das sie nicht kennt, zeigt eine
-        // Reserve an, die es nicht mehr gibt.
-        var optics = grading.Optics ?? Array.Empty<IOpticsTool>();
-        var place = new OpticsPlace(frame.Width, frame.Height, number);
+        var pipeline = new DisplayPipeline(frame, adjustments, view, grading, number);
 
         histogram.Clear();
         step = Math.Max(1, step);
-
-        float gain = (float)Math.Pow(2.0, adjustments.Exposure);
-        float saturation = (float)adjustments.Saturation;
-
-        float black = (float)adjustments.BlackPoint;
-        float white = (float)adjustments.WhitePoint;
-        float span = white - black;
-        if (MathF.Abs(span) < 1e-6f) span = 1e-6f;
-
-        float inverseGamma = 1f / MathF.Max(0.0001f, (float)adjustments.Gamma);
-        float contrast = (float)adjustments.Contrast;
 
         long sampled = 0;
         long aboveWhite = 0;
@@ -941,37 +939,11 @@ public static class FloatFrameProcessor
             for (int x = 0; x < frame.Width; x += step)
             {
                 int i = y * frame.Width + x;
-                float vr = frame.R[i], vg = frame.G[i], vb = frame.B[i];
 
                 // Vor jeder Korrektur: liegt hier Reserve oberhalb von Weiss?
-                if (vr > 1f || vg > 1f || vb > 1f) aboveWhite++;
+                if (frame.R[i] > 1f || frame.G[i] > 1f || frame.B[i] > 1f) aboveWhite++;
 
-                vr *= gain;
-                vg *= gain;
-                vb *= gain;
-
-                if (!Same(saturation, 1f))
-                {
-                    float luma = LumaR * vr + LumaG * vg + LumaB * vb;
-                    vr = MathF.Max(0f, luma + (vr - luma) * saturation);
-                    vg = MathF.Max(0f, luma + (vg - luma) * saturation);
-                    vb = MathF.Max(0f, luma + (vb - luma) * saturation);
-                }
-
-                for (int t = 0; t < linearTools.Length; t++)
-                    linearTools[t].Apply(ref vr, ref vg, ref vb);
-
-                for (int t = 0; t < optics.Length; t++)
-                    optics[t].Apply(in place, x, y, ref vr, ref vg, ref vb);
-
-                view.Apply(ref vr, ref vg, ref vb);
-
-                vr = Tone(vr, black, span, inverseGamma, contrast);
-                vg = Tone(vg, black, span, inverseGamma, contrast);
-                vb = Tone(vb, black, span, inverseGamma, contrast);
-
-                for (int t = 0; t < displayTools.Length; t++)
-                    displayTools[t].Apply(ref vr, ref vg, ref vb);
+                pipeline.Apply(x, y, out float vr, out float vg, out float vb);
 
                 int br = ToByte(vr), bg = ToByte(vg), bb = ToByte(vb);
 
@@ -985,6 +957,121 @@ public static class FloatFrameProcessor
 
         histogram.Finish(sampled);
         histogram.AboveWhite = sampled > 0 ? aboveWhite / (double)sampled : 0;
+    }
+
+    /// <summary>
+    /// Die Anzeigewerte eines Rasters - jedes <paramref name="step"/>-te Pixel, als Gleitkomma
+    /// RGB hintereinander. Derselbe Weg wie <see cref="Measure(FloatFrame, ImageAdjustments, IViewTransform, PreparedGrading, Histogram, int, int)"/>,
+    /// nur ohne Runden auf Bytes: Auto-Tonwert und Pipetten (W2b) brauchen den Wert, nicht die Klasse.
+    /// </summary>
+    public static (float[] Rgb, int Width, int Height) Sample(FloatFrame frame, ImageAdjustments adjustments, IViewTransform view,
+                                                              PreparedGrading grading, int step, int number = 0)
+    {
+        var pipeline = new DisplayPipeline(frame, adjustments, view, grading, number);
+        step = Math.Max(1, step);
+
+        int width = (frame.Width + step - 1) / step, height = (frame.Height + step - 1) / step;
+        var rgb = new float[width * height * 3];
+
+        for (int gy = 0; gy < height; gy++)
+        {
+            for (int gx = 0; gx < width; gx++)
+            {
+                pipeline.Apply(gx * step, gy * step, out float vr, out float vg, out float vb);
+
+                int o = (gy * width + gx) * 3;
+                rgb[o] = vr;
+                rgb[o + 1] = vg;
+                rgb[o + 2] = vb;
+            }
+        }
+
+        return (rgb, width, height);
+    }
+
+    /// <summary>Der Anzeigewert eines einzelnen Punktes - fuer die Pipetten des Tonwerts.</summary>
+    public static (float R, float G, float B) SampleAt(FloatFrame frame, ImageAdjustments adjustments, IViewTransform view,
+                                                       PreparedGrading grading, int x, int y, int number = 0)
+    {
+        var pipeline = new DisplayPipeline(frame, adjustments, view, grading, number);
+        pipeline.Apply(Math.Clamp(x, 0, frame.Width - 1), Math.Clamp(y, 0, frame.Height - 1), out float r, out float g, out float b);
+        return (r, g, b);
+    }
+
+    /// <summary>
+    /// Der Weg eines Punktes von der Datei bis in die Anzeige, wie ihn Messung und Stichprobe
+    /// gehen: Belichtung, Saettigung, lineare Werkzeuge, Ortswerkzeuge, Sichtumwandlung,
+    /// Grundkorrektur, Anzeigewerkzeuge. Einmal vorbereitet, dann je Punkt.
+    /// </summary>
+    private readonly struct DisplayPipeline
+    {
+        private readonly FloatFrame _frame;
+        private readonly IViewTransform _view;
+        private readonly IGradingTool[] _linear, _display;
+        private readonly IOpticsTool[] _optics;
+        private readonly OpticsPlace _place;
+        private readonly float _gain, _saturation, _black, _span, _inverseGamma, _contrast;
+
+        public DisplayPipeline(FloatFrame frame, ImageAdjustments adjustments, IViewTransform view,
+                               PreparedGrading grading, int number)
+        {
+            _frame = frame;
+            _view = view;
+            _linear = grading.SceneLinear ?? Array.Empty<IGradingTool>();
+            _display = grading.Display ?? Array.Empty<IGradingTool>();
+
+            // Die Ortswerkzeuge zaehlen mit. Eine Vignette verschiebt die halbe
+            // Verteilung nach links, und ein Histogramm, das sie nicht kennt, zeigt eine
+            // Reserve an, die es nicht mehr gibt.
+            _optics = grading.Optics ?? Array.Empty<IOpticsTool>();
+            _place = new OpticsPlace(frame.Width, frame.Height, number);
+
+            _gain = (float)Math.Pow(2.0, adjustments.Exposure);
+            _saturation = (float)adjustments.Saturation;
+
+            _black = (float)adjustments.BlackPoint;
+            float white = (float)adjustments.WhitePoint;
+            _span = white - _black;
+            if (MathF.Abs(_span) < 1e-6f) _span = 1e-6f;
+
+            _inverseGamma = 1f / MathF.Max(0.0001f, (float)adjustments.Gamma);
+            _contrast = (float)adjustments.Contrast;
+        }
+
+        public void Apply(int x, int y, out float vr, out float vg, out float vb)
+        {
+            int i = y * _frame.Width + x;
+            vr = _frame.R[i];
+            vg = _frame.G[i];
+            vb = _frame.B[i];
+
+            vr *= _gain;
+            vg *= _gain;
+            vb *= _gain;
+
+            if (!Same(_saturation, 1f))
+            {
+                float luma = LumaR * vr + LumaG * vg + LumaB * vb;
+                vr = MathF.Max(0f, luma + (vr - luma) * _saturation);
+                vg = MathF.Max(0f, luma + (vg - luma) * _saturation);
+                vb = MathF.Max(0f, luma + (vb - luma) * _saturation);
+            }
+
+            for (int t = 0; t < _linear.Length; t++)
+                _linear[t].Apply(ref vr, ref vg, ref vb);
+
+            for (int t = 0; t < _optics.Length; t++)
+                _optics[t].Apply(in _place, x, y, ref vr, ref vg, ref vb);
+
+            _view.Apply(ref vr, ref vg, ref vb);
+
+            vr = Tone(vr, _black, _span, _inverseGamma, _contrast);
+            vg = Tone(vg, _black, _span, _inverseGamma, _contrast);
+            vb = Tone(vb, _black, _span, _inverseGamma, _contrast);
+
+            for (int t = 0; t < _display.Length; t++)
+                _display[t].Apply(ref vr, ref vg, ref vb);
+        }
     }
 
     internal static bool Same(float value, float reference) => MathF.Abs(value - reference) < 0.001f;

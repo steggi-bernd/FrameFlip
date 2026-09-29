@@ -101,9 +101,17 @@ public partial class AtelierPage
     /// </summary>
     private void OnLayersChanged(bool interim)
     {
-        _settings.Layers = Layers.Stack;
+        _recipe.Layers = Layers.Stack;
 
         ShowLayerCount();
+
+        // Eine umbenannte Ebene heisst auch in der Zielzeile so, und eine geaenderte Auswahl der
+        // Kryptomatte zeigt ihren Umriss.
+        if (!interim)
+        {
+            ShowTargetPath();
+            ShowCryptoView();
+        }
 
         string? path = _path;
 
@@ -177,6 +185,8 @@ public partial class AtelierPage
     {
         BusyBadge.Visibility = Visibility.Visible;
 
+        long opened = _source.Opened;
+
         Task.Run(() =>
         {
             var found = new Dictionary<string, FloatFrame>(StringComparer.Ordinal);
@@ -207,8 +217,8 @@ public partial class AtelierPage
 
                 // Waehrend gelesen wurde, kann eine andere Datei geoeffnet worden
                 // sein. Die Passe gehoeren dann zu einem Bild, das nicht mehr auf
-                // dem Schirm steht.
-                if (!string.Equals(path, _path, StringComparison.Ordinal)) return;
+                // dem Schirm steht - auch wenn es dieselbe Datei ist, neu geoeffnet.
+                if (!_source.IsCurrent(opened) || !string.Equals(path, _path, StringComparison.Ordinal)) return;
 
                 foreach (var (name, frame) in read) _sources[name] = frame;
 
@@ -298,6 +308,9 @@ public partial class AtelierPage
         _composed = LayerComposer.Compose(Layers.Stack, _sources, _composed,
                                           _coarse ? CoarseStep : 1, _number);
         _frame = _composed ?? _base;
+
+        // Eine isolierte Ebene: fuer die Anzeige daneben, das Bild selbst bleibt (C6b).
+        ComposeSolo();
 
         // Was obenauf liegt, wird nach der Bildwerdung aufgetragen - es steht
         // deshalb nicht im zusammengesetzten Bild, sondern daneben.

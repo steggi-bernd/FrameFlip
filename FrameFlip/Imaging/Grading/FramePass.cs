@@ -21,7 +21,8 @@ namespace FrameFlip.Imaging.Grading;
 ///
 ///   Beim Ziehen an einem Regler faellt es deshalb aus. Was man waehrend des Zuges
 ///   sieht, ist das Bild ohne diesen Durchgang; beim Loslassen kommt er dazu. Das
-///   ist dieselbe Zweiteilung wie ueberall sonst, nur faellt sie hier auf.
+///   ist dieselbe Zweiteilung wie ueberall sonst, nur faellt sie hier auf. Die
+///   Ausnahme ist, wer eine grobe Fassung kennt - siehe <see cref="ICoarseFramePass"/>.
 ///
 /// Gerechnet wird auf den FERTIGEN Anzeigewerten - Bgra32, so wie sie gleich auf dem
 /// Schirm stehen. Das ist bei Fehlerdiffusion nicht nur bequem, sondern richtig:
@@ -30,6 +31,7 @@ namespace FrameFlip.Imaging.Grading;
 [JsonPolymorphic(TypeDiscriminatorPropertyName = "kind")]
 [JsonDerivedType(typeof(DiffusionTool), DiffusionTool.KindName)]
 [JsonDerivedType(typeof(SortTool), SortTool.KindName)]
+[JsonDerivedType(typeof(ClaheTool), ClaheTool.KindName)]
 public interface IFramePass
 {
     /// <summary>Kennung fuer die Speicherung.</summary>
@@ -49,4 +51,22 @@ public interface IFramePass
     /// Glitch, der ueber die ganze Sequenz an derselben Stelle steht, ist keiner.
     /// </param>
     void Apply(IntPtr pixels, int width, int height, int stride, int number = 0);
+}
+
+/// <summary>
+/// Ein Durchgang, der auch eine grobe Fassung kennt - fuer die Vorschau beim Ziehen eines Reglers
+/// (docs/Atelier-Arbeitsablauf.md, C7c).
+///
+/// Nicht jeder kann das. Fehlerdiffusion entscheidet nach der Nachbarschaft, und ein Gitter
+/// aendert die Nachbarschaft - dort waere das grobe Ergebnis ein anderes, nicht ein groeberes, und
+/// der Durchgang bleibt beim Ziehen aus. Pixel Sort dagegen sortiert auf dem Gitter dieselben
+/// Laeufe, nur kuerzer; aufgeblasen sieht das aus wie das volle Bild, etwas weicher.
+/// </summary>
+public interface ICoarseFramePass : IFramePass
+{
+    /// <summary>
+    /// Derselbe Durchgang auf dem Gitter der groben Vorschau - jeder <paramref name="step"/>-te
+    /// Bildpunkt. Laengen in Bildpunkten gelten im selben Verhaeltnis.
+    /// </summary>
+    void ApplyCoarse(IntPtr pixels, int width, int height, int stride, int number, int step);
 }

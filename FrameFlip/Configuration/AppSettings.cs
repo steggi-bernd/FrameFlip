@@ -393,6 +393,15 @@ public sealed class AppSettings
     public string? AtelierImage { get; set; }
 
     /// <summary>
+    /// Ob das Rezept aus diesen Einstellungen schon in eine Projektdatei uebernommen wurde.
+    /// Einmal: Das Projekt, das beim ersten Start mit Projektdateien offen ist, bekommt das
+    /// bisherige Rezept; jede weitere Folge beginnt mit ihrem eigenen. Die Felder hier
+    /// bleiben stehen - als Sicherung und fuer das Vorschaufenster, das die Grundregler
+    /// weiter liest.
+    /// </summary>
+    public bool AtelierRecipeMoved { get; set; }
+
+    /// <summary>
     /// Breite der rechten Spalte im Atelier, in Punkten.
     ///
     /// Gemerkt, weil sie nicht Geschmack ist, sondern vom Bildschirm abhaengt: Auf
@@ -420,6 +429,12 @@ public sealed class AppSettings
     /// Er bleibt dann stehen, und das Atelier rechnet mit dem Stapel.
     /// </summary>
     public string? AtelierNodes { get; set; }
+
+    /// <summary>
+    /// Der Farbspeicher der Pipette (C4b): die zuletzt gelesenen Farben, die neueste vorn. Hier
+    /// und nicht im Projekt, weil sie gerade zwischen Bildern wandern sollen.
+    /// </summary>
+    public List<FrameFlip.Imaging.SavedColour> AtelierColours { get; set; } = new();
 
     /// <summary>Gespeicherte Korrektureinstellungen, im Panel auswaehlbar.</summary>
     public List<AdjustmentPreset> AdjustmentPresets { get; set; } = new();

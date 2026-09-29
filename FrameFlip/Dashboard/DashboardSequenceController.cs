@@ -51,6 +51,19 @@ internal sealed class DashboardSequenceController : IDisposable
                 Width = known.Width, Height = known.Height, SeenUtc = known.SeenUtc,
             });
         }
+        // Frueher geoeffnete Ordner, nach den Blend-Projekten und ohne die, die schon
+        // als Ausgabe oder Sitzungseintrag dastehen: je Ordner ein Eintrag.
+        foreach (var folder in _sources.Folders())
+        {
+            if (folder.Folder.Length == 0 || !_sources.FolderExists(folder.Folder)) continue;
+            if (entries.Any(e => string.Equals(e.Folder, folder.Folder, StringComparison.OrdinalIgnoreCase))) continue;
+            entries.Add(new DashboardSequenceEntry(_sources.FolderExists)
+            {
+                Name = folder.Name, Folder = folder.Folder, Seed = folder.Seed,
+                Width = folder.Width, Height = folder.Height, SeenUtc = folder.OpenedUtc,
+                Adhoc = true, Remembered = true,
+            });
+        }
         Entries = entries.AsReadOnly();
         Current = (keep is { Length: > 0 } ? Find(keep) : null)
                   ?? entries.FirstOrDefault(e => e.HasOutput) ?? entries.FirstOrDefault();
@@ -90,6 +103,20 @@ internal sealed class DashboardSequenceController : IDisposable
         };
         _adhoc.RemoveAll(a => string.Equals(a.Folder, folder, StringComparison.OrdinalIgnoreCase));
         _adhoc.Insert(0, entry);
+        return true;
+    }
+
+    /// <summary>
+    /// Nimmt einen geoeffneten Ordner aus der Liste - aus dieser Sitzung und aus den
+    /// gemerkten. Die Dateien bleiben, wo sie sind. Blend-Projekte gehoeren der
+    /// Projektseite und lassen sich hier nicht entfernen. Die Liste baut der Aufrufer
+    /// danach neu auf.
+    /// </summary>
+    internal bool Forget(DashboardSequenceEntry entry)
+    {
+        if (_disposed || !entry.Adhoc || entry.Folder.Length == 0) return false;
+        _adhoc.RemoveAll(a => string.Equals(a.Folder, entry.Folder, StringComparison.OrdinalIgnoreCase));
+        _sources.ForgetFolder(entry.Folder);
         return true;
     }
 

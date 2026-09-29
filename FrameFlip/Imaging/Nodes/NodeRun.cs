@@ -84,8 +84,9 @@ internal sealed class NodeContext
     public required IReadOnlyDictionary<PassNeed, FloatFrame?> Data { get; init; }
 
     /// <summary>
-    /// Ob die Durchgaenge ueber das fertige Bild ausbleiben - beim groben Raster und im
-    /// Sechzehn-Bit-Ausgang, genau wie im Stapel.
+    /// Ob die Durchgaenge ueber das fertige Bild ausbleiben - im Sechzehn-Bit-Ausgang, genau
+    /// wie im Stapel. Auf dem groben Raster entscheidet der Knoten: Wer eine grobe Fassung
+    /// kennt, rechnet sie, die anderen bleiben aus (C7c).
     /// </summary>
     public required bool SkipFramePasses { get; init; }
 
@@ -148,6 +149,23 @@ internal sealed class NodeContext
 
         foreach (var array in Fields(value))
             if (_owned.Contains(array)) _holds[array] = _holds.GetValueOrDefault(array) + 1;
+    }
+
+    /// <summary>
+    /// Nimmt ein Ergebnis auf, das nicht aus einem Knoten dieser Rechnung stammt, dessen
+    /// Felder aber aus dem Vorrat kommen - die zugeschnittenen Stuecke des
+    /// Zwischenspeichers im Ausschnitt. Einmal gehalten; <see cref="Drop"/> gibt sie
+    /// zurueck, sobald auch sonst niemand sie mehr haelt.
+    /// </summary>
+    internal void Adopt(object? value)
+    {
+        if (Pool is null) return;
+
+        foreach (var array in Fields(value))
+        {
+            _owned.Add(array);
+            _holds[array] = _holds.GetValueOrDefault(array) + 1;
+        }
     }
 
     /// <summary>Ein Ergebnis wird nicht mehr gebraucht. Haelt niemand mehr ein Feld, geht es zurueck.</summary>

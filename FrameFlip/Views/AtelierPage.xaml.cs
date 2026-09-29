@@ -33,6 +33,12 @@ public sealed partial class AtelierPage : UserControl
     private readonly AppSettings _settings;
     private readonly Action<AppSettings> _persist;
 
+    /// <summary>
+    /// Das Rezept - Grundregler und Werkzeuge des Bildes, Stapel, Graph. Die Seite liest und
+    /// schreibt es nur hier. Siehe <see cref="Atelier.AtelierEditingSession"/>.
+    /// </summary>
+    private readonly Atelier.AtelierEditingSession _recipe;
+
     /// <summary>Das zusammengesetzte Bild - das, worauf alle Werkzeuge wirken.</summary>
     private FloatFrame? _frame;
 
@@ -91,8 +97,12 @@ public sealed partial class AtelierPage : UserControl
     /// <summary>
     /// Die Ebene, deren Werkzeuge der Streifen gerade zeigt. Null heisst: das
     /// fertige Bild.
+    ///
+    /// Aus dem Bearbeitungsziel der Sitzung (<see cref="Atelier.EditingTarget"/>), das
+    /// <see cref="Bind"/> setzt - kein eigenes Feld mehr, das neben ihm herlaufen koennte.
     /// </summary>
-    private ImageLayer? _editing;
+    private ImageLayer? ToolsLayer
+        => !InNodes && _recipe.Target is Atelier.EditingTarget.StackLayer { Tools: true } target ? target.Layer : null;
 
     /// <summary>
     /// Die Korrektur des fertigen Bildes - unabhaengig davon, was der Streifen
@@ -119,7 +129,12 @@ public sealed partial class AtelierPage : UserControl
     {
         _decoders = decoders;
         _settings = settings;
+        _recipe = new Atelier.AtelierEditingSession(new Atelier.SettingsRecipeStore(settings));
         _persist = persist;
+
+        // Zugestellt wird wie bisher mit Invoke: Die Rueckgabe kommt vom Lesefaden und
+        // wartet, bis die Seite sie uebernommen hat.
+        _source = new Atelier.AtelierSourceSession(ReadSource, action => Dispatcher.Invoke(action));
 
         InitializeComponent();
 
@@ -141,6 +156,23 @@ public sealed partial class AtelierPage : UserControl
         Placement.Painted += OnPainted;
         Placement.MaskWanted = MakeMaskLayer;
         Properties.BrushChanged += UseBrushSettings;
+        ToolBand.Chosen += UseTool;
+        ToolBand.Leading = OpenButton();
+        ToolBand.Trailing = TakeViewControls();
+        ToolBand.FrameModeWanted += single => _ = UseFrameMode(single);
+        Properties.BrushHistoryWanted += anchor =>
+        {
+            if (PaintTarget() is { } painted) ShowMaskHistory(painted, anchor);
+        };
+        Properties.BrushEditWanted += anchor =>
+        {
+            if (PaintTarget() is { } painted) ShowMaskEditMenu(painted, anchor);
+        };
+        Placement.BrushAdjusted += () =>
+        {
+            Properties.SetBrush(Placement.BrushRadius, Placement.BrushHardness, Placement.BrushSpacing);
+            Properties.SetBrushAngle(Placement.BrushAngle);
+        };
 
         Bind(null);
 
@@ -166,6 +198,20 @@ public sealed partial class AtelierPage : UserControl
         };
 
         SetUpBatch();
+        SetUpView();
+        SetUpProjects();
+        SetUpTargetPath();
+        SetUpCryptoView();
+        SetUpPipette();
+        SetUpPropertiesFollow();
+        SetUpQuickPanel();
+        SetUpColourPick();
+        SetUpDistributions();
+        SetUpViewAids();
+        SetUpMatch();
+        SetUpHints();
+        Tools.ScopeWanted += ShowScope;
+        Layers.IsolateWanted += (layer, view) => IsolateStack(layer, view);
 
         _settle.Tick += (_, _) =>
         {
@@ -181,6 +227,10 @@ public sealed partial class AtelierPage : UserControl
             Recompose();
             Render();
             Measure();
+
+            // Ein Regler kann einen Durchgang ueber das Bild ein- oder ausgeschaltet haben - auch
+            // nach einem Zug muss der Hinweis an der Ausgabe stimmen, nicht erst beim naechsten Klick.
+            ShowEightBitNote();
 
             // Ein Zug ist zu Ende - jetzt gehoert der Stand des Graphen in die
             // Einstellungen. Waehrend des Zuges waere das bei jedem Bild ein Durchgang
@@ -212,9 +262,27 @@ public sealed partial class AtelierPage : UserControl
         Open(last);
     }
 
+    /// <summary>Wie eine Datei gelesen wird - fuer die Probe austauschbar, sonst <see cref="Load"/>.</summary>
+    internal Func<string, (FloatFrame? Frame, IReadOnlyList<ExrPass> Passes, IReadOnlyList<CryptomatteSet> Cryptomattes)>? Reader { get; set; }
+
+    /// <summary>
+    /// Das Oeffnen: laufende Anfrage, Lesen im Hintergrund, Zustellung nur dessen, was noch
+    /// gilt. Siehe <see cref="Atelier.AtelierSourceSession"/>.
+    /// </summary>
+    private readonly Atelier.AtelierSourceSession _source;
+
     /// <summary>Oeffnet ein Bild - der Weg, den auch die Projektseite nehmen kann.</summary>
     public void Open(string path)
     {
+        // Ein anderes Bild: Das Waehlen fuer eine Objektmaske galt dem alten Graphen.
+        EndObjectMask();
+
+        // Ebenso eine wartende Pipette des Tonwerts. Sie hielte das Werkzeug des alten Rezepts,
+        // und ihr Klick aenderte etwas, das nicht mehr gerechnet wird.
+        LeaveLevelsPick();
+        LeaveColourPick();
+        EndStackSolo(render: false);
+
         _path = path;
 
         // Die Bildnummer aus dem Dateinamen. Sie ist der Wurf fuer das Filmkorn,
@@ -230,16 +298,14 @@ public sealed partial class AtelierPage : UserControl
         BusyBadge.Visibility = Visibility.Visible;
         EmptyHint.Visibility = Visibility.Collapsed;
 
-        // Lesen und Auspacken dauert bei 4K spuerbar lange; auf dem Oberflaechenfaden
-        // staende dabei das ganze Fenster.
-        Task.Run(() => Load(path)).ContinueWith(task =>
-        {
-            var loaded = task.IsCompletedSuccessfully
-                ? task.Result
-                : (null, Array.Empty<ExrPass>(), Array.Empty<CryptomatteSet>());
+        _source.Open(path, loaded => Show(loaded.Path, loaded.Frame, loaded.Passes, loaded.Cryptomattes));
+    }
 
-            Dispatcher.Invoke(() => Show(path, loaded.Frame, loaded.Passes, loaded.Cryptomattes));
-        });
+    /// <summary>Liest eine Datei fuer die Quellsitzung - ueber <see cref="Reader"/>, wenn die Probe einen setzt.</summary>
+    private Atelier.AtelierSource ReadSource(string path)
+    {
+        var (frame, passes, cryptomattes) = (Reader ?? Load)(path);
+        return new Atelier.AtelierSource(path, frame, passes, cryptomattes);
     }
 
     private void Show(string path, FloatFrame? loaded, IReadOnlyList<ExrPass> passes,
@@ -253,7 +319,9 @@ public sealed partial class AtelierPage : UserControl
 
         _sources.Clear();
         _unreadable.Clear();
+        ForgetCryptoView();
         _pool.Clear();
+        _regionPool.Clear();
         _cache.Clear();
         _sourceThumbs.Clear();
         _composed = null;
@@ -279,6 +347,7 @@ public sealed partial class AtelierPage : UserControl
             CompareButton.IsEnabled = false;
             _frame = null;
             _base = null;
+            ShowTargetPath();
             ShowLayers(false);
             UpdateBatchBar();
             return;
@@ -286,6 +355,13 @@ public sealed partial class AtelierPage : UserControl
 
         _base = loaded;
         _sources[""] = loaded;
+
+        // Eine andere Folge ist ein anderes Projekt - mit seinem eigenen Rezept. Das
+        // bisherige wird dabei geschrieben. Erst hier und nicht beim Oeffnen: Eine Datei,
+        // die sich nicht lesen laesst, wechselt kein Projekt.
+        if (_projects.Enter(path)) ApplyProject();
+
+        _maskHistories.Enter(_projects.Current);
 
         // Erst jetzt gemerkt, nicht beim Oeffnen: Eine Datei, die sich nicht lesen
         // laesst, soll beim naechsten Start nicht wieder versucht werden.
@@ -301,19 +377,51 @@ public sealed partial class AtelierPage : UserControl
         // Der gespeicherte Stapel gilt nur, soweit diese Datei die Passe auch
         // fuehrt. Zwanzig ausgegraute Zeilen nach dem Wechsel auf ein PNG waeren
         // kein Hinweis, sondern ein Raetsel.
-        Layers.Load(passes, cryptomattes, Prune(_settings.Layers, passes));
+        // Eine Datei ohne fertiges Bild - Blender 5.2 mit allen Paessen, aber ohne Combined -
+        // bekommt den Stapel, der es aus den Paessen wieder zusammensetzt: Licht, darauf
+        // seine Farbe, dazu Emission und Umgebung. Sonst zeigte sie nur ihren ersten Farbpass.
+        // Nur solange das Projekt noch keinen eigenen Stapel hat; und nie bei einer Datei MIT
+        // fertigem Bild - Blenders Combined ist entrauscht, die einzelnen Paesse sind es nicht.
+        //
+        // Auch im Knotenmodus, solange der Graph nur die Umwandlung der leeren Grundebene ist:
+        // Dann wird er aus dem neuen Stapel neu umgewandelt. Wer die Datei zuerst mit nur einer
+        // Ebene sah und darum in den Knotenmodus ging, blieb sonst bei dieser einen Ebene.
+        var stack = Prune(_recipe.Layers, passes);
+        bool plainGraph = _graph is { } open && Imaging.Nodes.StackToGraph.IsPlain(open);
+
+        if ((!InNodes || plainGraph) && PassStack.IsBare(stack) && !PassStack.HasFinishedImage(passes) &&
+            PassStack.Rebuild(passes) is { Layers.Count: > 0 } rebuilt)
+        {
+            stack = rebuilt;
+
+            if (plainGraph)
+            {
+                _graph = Imaging.Nodes.StackToGraph.Convert(rebuilt, _recipe.Adjustments ?? ImageAdjustments.Neutral,
+                                              _recipe.Grading ?? new GradingStack());
+                _cache.Clear();
+                _viewer = null;
+
+                SaveNodes();
+                EnterNodes();
+            }
+        }
+
+        Layers.Load(passes, cryptomattes, stack);
 
         // Der Streifen gilt fuer jedes Bild, nicht nur fuer eine Multilayer-EXR.
         // Passe braucht das Format, Ebenen nicht: Dasselbe Bild ein zweites Mal und
         // auf Multiplizieren gestellt rechnet auf einem PNG genauso. Ob er
         // aufgeklappt beginnt, entscheidet der Streifen selbst.
         ShowLayers(true);
-        _settings.Layers = Layers.Stack;
+        _recipe.Layers = Layers.Stack;
 
         _frame = loaded;
+        ShowTargetPath();
+        ShowCryptoView();
 
         UpdateSourceText();
         FindSequence(path);
+        ShowFrameMode();
         CompareButton.IsEnabled = true;
         ApplyZoom();
         Render();
@@ -322,6 +430,9 @@ public sealed partial class AtelierPage : UserControl
         // Erst jetzt steht der Stapel da - und damit, was einem alten Graphen an
         // ausgeblendeten Ebenen fehlt.
         if (InNodes) ShowMissingLayers();
+
+        // Die Uebersicht zeigt dieselbe Folge - siehe MainWindow, Arbeitsbereich.
+        ImageShown?.Invoke(path);
 
         // Braucht der Stapel Passe, die noch nicht gelesen sind, kommen sie
         // nachtraeglich - das Bild steht schon, waehrend sie eintreffen. Im
@@ -380,21 +491,24 @@ public sealed partial class AtelierPage : UserControl
         // der Ebenenstreifen beim Oeffnen einer Datei eine Ebene waehlt.
         if (InNodes)
         {
-            _editing = null;
             ShowNodeSettings();
             return;
         }
 
         Tools.LeaveNodes();
 
-        _editing = layer;
+        // Das Ziel: die gewaehlte Ebene - und ob der Streifen ihr gilt oder dem Bild.
+        _recipe.Focus(Layers.Selection is { } chosen
+            ? new Atelier.EditingTarget.StackLayer(chosen, layer is not null)
+            : Atelier.EditingTarget.Picture);
+
         ShowPlacement();
 
         if (layer is null)
         {
-            Tools.Load(_settings.Adjustments, _settings.Grading);
-            _settings.Grading = Snapshot();
-            _settings.Adjustments = Tools.Adjustments;
+            Tools.Load(_recipe.Adjustments, _recipe.Grading);
+            _recipe.Grading = Snapshot();
+            _recipe.Adjustments = Tools.Adjustments;
 
             _finalAdjustments = Tools.Adjustments;
             _finalGrading = Tools.Prepared;
@@ -467,11 +581,11 @@ public sealed partial class AtelierPage : UserControl
             return;
         }
 
-        bool layer = _editing is not null;
+        var edited = ToolsLayer;
 
-        if (layer)
+        if (edited is not null)
         {
-            _editing!.Adjustments = Tools.Adjustments;
+            edited.Adjustments = Tools.Adjustments;
 
             // Und der Stapel dazu - genau wie beim ganzen Bild eine Zeile tiefer.
             //
@@ -484,13 +598,13 @@ public sealed partial class AtelierPage : UserControl
             // Sichtbar war das auf die verwirrendste Art, die es gibt: Saettigung und
             // Belichtung wirkten, Farbbereiche und Zonen nicht. Die einen stehen in
             // Adjustments - das wurde geschrieben -, die anderen im Stapel.
-            _editing.Tools = Snapshot();
+            edited.Tools = Snapshot();
 
-            _settings.Layers = Layers.Stack;
+            _recipe.Layers = Layers.Stack;
         }
         else
         {
-            _settings.Adjustments = Tools.Adjustments;
+            _recipe.Adjustments = Tools.Adjustments;
 
             // Und der Stapel dazu. Ihn hier zu vergessen war die zweite Haelfte eines
             // langen Fehlers: Die Aenderung kam im BILD an - _finalGrading steht ja
@@ -501,7 +615,7 @@ public sealed partial class AtelierPage : UserControl
             //
             // Im Fenster sah das aus, als taete der Regler nichts. Er tat etwas, und
             // der naechste Klick woanders nahm es ihm wieder ab.
-            _settings.Grading = Snapshot();
+            _recipe.Grading = Snapshot();
 
             _finalAdjustments = Tools.Adjustments;
             _finalGrading = Tools.Prepared;
@@ -518,7 +632,7 @@ public sealed partial class AtelierPage : UserControl
         //
         // Geprueft wird erst beim Loslassen: Waehrend des Zuges darf keine Datei im
         // Weg liegen, und die Frage kostet einen Durchgang durch die Werkzeugliste.
-        if (!interim && !layer && DataPasses().Any(name => !_sources.ContainsKey(name)))
+        if (!interim && edited is null && DataPasses().Any(name => !_sources.ContainsKey(name)))
         {
             OnLayersChanged(interim: false);
             return;
@@ -526,7 +640,7 @@ public sealed partial class AtelierPage : UserControl
 
         // Eine Einstellungsebene sitzt IM Stapel - was sie aendert, aendert das
         // zusammengesetzte Bild und nicht erst die Korrektur am Ende.
-        Refresh(interim, recompose: layer);
+        Refresh(interim, recompose: edited is not null);
     }
 
     /// <summary>
@@ -544,6 +658,9 @@ public sealed partial class AtelierPage : UserControl
     /// </summary>
     private void Refresh(bool interim, bool recompose)
     {
+        // Wer etwas aendert, will das Ergebnis sehen - ein eingerastetes Original gibt nach.
+        DropCompare();
+
         if (interim)
         {
             _coarse = true;
@@ -580,6 +697,9 @@ public sealed partial class AtelierPage : UserControl
 
         Draw(recompose);
         Measure();
+
+        // Nach jeder endgueltigen Aenderung: Wirkt jetzt ein Durchgang, den das Ausgabeformat weglaesst?
+        ShowEightBitNote();
     }
 
     /// <summary>Ein Durchgang je Bildwiederholung - mehr sieht ohnehin niemand.</summary>
@@ -634,6 +754,10 @@ public sealed partial class AtelierPage : UserControl
         {
             var (adjustments, grading) = Current();
 
+            // Die Maske grau zeigt, was sie sagt - ohne Korrektur darueber (C6b).
+            if (_stackSolo is { View: SoloView.Mask } && !_showingOriginal)
+                (adjustments, grading) = (ImageAdjustments.Neutral, PreparedGrading.None);
+
             // Im Knotenmodus rechnet der Graph - ausser beim Vergleich mit dem
             // Original, das ist in beiden Modi das Bild der Datei ohne alles.
             if (InNodes && !_showingOriginal)
@@ -641,7 +765,9 @@ public sealed partial class AtelierPage : UserControl
                 // Ergibt der Graph kein Bild - die Ausgabe haengt an nichts -, bleibt die
                 // Flaeche leer. Auf den Stapel zurueckzufallen hiesse, ein Bild zu zeigen,
                 // das niemand mehr eingestellt hat; der Editor sagt, was fehlt.
-                if (!RenderNodes(_surface.BackBuffer, _surface.BackBufferStride))
+                bool done = RenderNodes(_surface.BackBuffer, _surface.BackBufferStride);
+
+                if (!done)
                 {
                     unsafe
                     {
@@ -650,15 +776,24 @@ public sealed partial class AtelierPage : UserControl
                     }
                 }
 
+                // Ein ganzes, scharfes Bild der Ausgabe - darauf darf der Pinsel Ausschnitte setzen.
+                _wholeShown = done && !_coarse && _viewer is null;
+
+                ApplyViewAid();
+
                 _surface.AddDirtyRect(new Int32Rect(0, 0, frame.Width, frame.Height));
                 return;
             }
+
+            _wholeShown = false;
 
             FloatFrameProcessor.Apply(frame, adjustments, ViewFor(frame), grading,
                                       _surface.BackBuffer, _surface.BackBufferStride,
                                       _coarse ? CoarseStep : 1,
                                       _showingOriginal ? Overlays.None : _overlays, _number,
                                       Renderdata(grading));
+
+            ApplyViewAid();
 
             _surface.AddDirtyRect(new Int32Rect(0, 0, frame.Width, frame.Height));
         }
@@ -690,6 +825,13 @@ public sealed partial class AtelierPage : UserControl
                                     histogram, step: 4, _number);
 
         Tools.ShowHistogram(histogram);
+
+        // Die Verteilungen unter den Bereichsreglern - nur, wenn einer sie zeigt (C7b).
+        ShowSortDistribution();
+        ShowMaskDistribution();
+
+        // Und das Messgeraet, wenn eines statt des Histogramms steht (W2d).
+        ShowScope();
     }
 
     private void UpdateSourceText()

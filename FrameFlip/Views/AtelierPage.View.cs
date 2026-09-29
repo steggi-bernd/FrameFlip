@@ -14,31 +14,127 @@ public partial class AtelierPage
     /// <summary>True, solange das Original gezeigt wird.</summary>
     private bool _showingOriginal;
 
-    /// <summary>1 heisst eingepasst; sonst der Massstab in Bildpunkten je Punkt.</summary>
+    /// <summary>0 heisst eingepasst; sonst der Massstab in Punkten je Bildpunkt.</summary>
     private double _zoom;
 
+    /// <summary>Ob das Original stehen bleibt - nach einem kurzen Klick oder mit der Taste O.</summary>
+    private bool _compareLatched;
+
+    /// <summary>Wann der Knopf gedrueckt wurde: kurz heisst umschalten, lang heisst nur hinsehen.</summary>
+    private DateTime _comparePressed;
+
+    /// <summary>Ob das Original gerade stehen bleibt - fuer die Probe.</summary>
+    internal bool CompareLatched => _compareLatched;
+
     /// <summary>
-    /// Zeigt das Bild ohne jede Korrektur, solange die Maustaste haelt.
+    /// Zeigt das Bild ohne jede Korrektur - beim Druecken sofort.
     ///
-    /// Gedrueckt halten statt umschalten: Der Vergleich ist ein Blick und kein
-    /// Zustand. Wer umschaltet, vergisst zurueckzuschalten und beurteilt dann
-    /// minutenlang das falsche Bild - und merkt es, wenn ueberhaupt, an einer
-    /// Einstellung, die sich nicht mehr erklaeren laesst.
+    /// Gedrueckt halten war lange der einzige Weg, und er wurde nicht gefunden: Ein Klick zeigte
+    /// das Original nur fuer die Dauer des Klicks, und es sah aus, als taete der Knopf nichts. Jetzt
+    /// schaltet ein kurzer Klick um und laesst das Original stehen; gehalten bleibt es ein Blick.
+    /// Die Sorge von frueher - wer umschaltet, vergisst zurueckzuschalten und beurteilt minutenlang
+    /// das falsche Bild - loest das Abzeichen am Bild, und jede Aenderung schaltet von selbst zurueck.
     /// </summary>
     private void OnCompareDown(object sender, System.Windows.Input.MouseButtonEventArgs e)
     {
-        if (_frame is null || _showingOriginal) return;
+        if (_frame is null) return;
+
+        _comparePressed = DateTime.UtcNow;
+        if (_compareLatched || _showingOriginal) return;
 
         _showingOriginal = true;
         Render();
+        ShowCompare();
     }
 
     private void OnCompareUp(object sender, System.Windows.Input.MouseEventArgs e)
     {
+        if (e.RoutedEvent == System.Windows.Input.Mouse.MouseLeaveEvent)
+        {
+            // Nur ein gehaltener Blick endet beim Verlassen; ein eingerastetes Original bleibt.
+            if (_compareLatched || !_showingOriginal) return;
+
+            _showingOriginal = false;
+            Render();
+            ShowCompare();
+            return;
+        }
+
+        if (_compareLatched)
+        {
+            EndCompare();
+            return;
+        }
+
         if (!_showingOriginal) return;
+
+        if ((DateTime.UtcNow - _comparePressed).TotalMilliseconds < 350)
+        {
+            _compareLatched = true;
+            ShowCompare();
+            return;
+        }
 
         _showingOriginal = false;
         Render();
+        ShowCompare();
+    }
+
+    /// <summary>
+    /// Der Klick ohne Maus - Leertaste, Eingabe, Bedienhilfen. Mit der Maus haben Druecken und
+    /// Loslassen schon entschieden; dann kommt der Klick direkt danach und wird uebergangen.
+    /// </summary>
+    private void OnCompareClicked(object sender, RoutedEventArgs e)
+    {
+        if ((DateTime.UtcNow - _comparePressed).TotalMilliseconds < 600) return;
+
+        ToggleCompare();
+    }
+
+    /// <summary>Vorher/Nachher umschalten - die Taste O und der Klick ohne Maus.</summary>
+    internal void ToggleCompare()
+    {
+        if (_frame is null) return;
+
+        if (_compareLatched)
+        {
+            EndCompare();
+            return;
+        }
+
+        _compareLatched = true;
+        _showingOriginal = true;
+        Render();
+        ShowCompare();
+    }
+
+    private void EndCompare()
+    {
+        _compareLatched = false;
+
+        if (_showingOriginal)
+        {
+            _showingOriginal = false;
+            Render();
+        }
+
+        ShowCompare();
+    }
+
+    /// <summary>Jede Aenderung am Bild zeigt wieder das Ergebnis - sonst dreht man an einem Regler, und nichts passiert.</summary>
+    private void DropCompare()
+    {
+        if (!_compareLatched) return;
+
+        _compareLatched = false;
+        _showingOriginal = false;
+        ShowCompare();
+    }
+
+    private void ShowCompare()
+    {
+        CompareBadge.Visibility = _showingOriginal ? Visibility.Visible : Visibility.Collapsed;
+        CompareBadgeText.SetResourceReference(TextBlock.TextProperty, _compareLatched ? "S_BeforeBadgeLatched" : "S_BeforeBadge");
     }
 
     /// <summary>
@@ -78,7 +174,12 @@ public partial class AtelierPage
             return;
         }
 
-        Display.Stretch = System.Windows.Media.Stretch.None;
+        // Eingepasst gestreckt und nicht "None": Bei "None" zeichnet das Bildelement die
+        // Bitmap in ihrer eigenen Groesse, egal wie gross das Element ist - das ging nur,
+        // solange es neben dem Einpassen allein 100 % gab. Das Element ist genau so gross
+        // wie das Bild im Massstab, also gibt es keine Raender, und die Umrechnung in
+        // ImageHit liefert den Massstab aus der Elementgroesse.
+        Display.Stretch = System.Windows.Media.Stretch.Uniform;
         Display.Width = frame.Width * _zoom;
         Display.Height = frame.Height * _zoom;
         ZoomText.Text = $"{_zoom * 100:0} %";
@@ -96,6 +197,94 @@ public partial class AtelierPage
         // Der Greifrahmen rechnet in Punkten auf dem Element - beim Massstabwechsel
         // stimmt seine Umrechnung nicht mehr.
         ShowPlacement();
+    }
+
+    private void SetUpView() => ImageScroll.PreviewMouseWheel += OnViewportWheel;
+
+    /// <summary>
+    /// Das Mausrad zoomt - beim Verschieben und beim Pinsel, sonst nicht.
+    ///
+    /// Nur dort, weil es sonst anderem gehoert: ueber dem Graphen zoomt es den Graphen,
+    /// und beim Zuschneiden, Waehlen und bei der Pipette rollt es wie bisher den
+    /// Ausschnitt. Beim Pinsel stellt Strg + Rad den Abstand der Tupfer.
+    /// </summary>
+    private void OnViewportWheel(object sender, System.Windows.Input.MouseWheelEventArgs e)
+    {
+        if (_frame is null || _tool is not (AtelierTool.Move or AtelierTool.Brush)) return;
+
+        e.Handled = true;
+
+        if (_tool == AtelierTool.Brush &&
+            (System.Windows.Input.Keyboard.Modifiers & System.Windows.Input.ModifierKeys.Control) != 0)
+        {
+            StepBrushSpacing(e.Delta / 120.0);
+            return;
+        }
+
+        // Umschalt und Rad beim Pinsel: die Spitze drehen.
+        if (_tool == AtelierTool.Brush &&
+            (System.Windows.Input.Keyboard.Modifiers & System.Windows.Input.ModifierKeys.Shift) != 0)
+        {
+            Placement.StepAngle(e.Delta / 120.0);
+            return;
+        }
+
+        WheelZoom(e.GetPosition(Display), e.GetPosition(ImageScroll), e.Delta / 120.0);
+    }
+
+    /// <summary>
+    /// Zoomt um den Punkt unter dem Zeiger: Der Bildpunkt, auf den er zeigt, steht nach
+    /// dem Schritt wieder unter ihm.
+    ///
+    /// Beim Herauszoomen rastet es an der Einpassung ein und zeigt das Bild wieder
+    /// eingepasst und mittig - dieselbe Ansicht wie nach dem Oeffnen, nicht ein Bild,
+    /// das zufaellig fast so gross ist und irgendwo liegt.
+    /// </summary>
+    /// <param name="onDisplay">Der Zeiger auf dem Bildelement.</param>
+    /// <param name="inView">Derselbe Zeiger im sichtbaren Ausschnitt.</param>
+    internal void WheelZoom(System.Windows.Point onDisplay, System.Windows.Point inView, double notches)
+    {
+        var frame = _frame;
+        if (frame is null) return;
+
+        double fit = FitScale();
+        if (fit <= 0) return;
+
+        double current = _zoom == 0 ? fit : _zoom;
+        double next = ZoomSteps.Next(current, notches, fit);
+
+        if (next <= fit * (1 + 1e-9))
+        {
+            if (_zoom == 0) return;
+
+            _zoom = 0;
+            ApplyZoom();
+            return;
+        }
+
+        if (Math.Abs(next - current) < 1e-9) return;
+
+        // Der Bildpunkt unter dem Zeiger, ungerundet - gerundet wanderte das Bild bei
+        // starkem Zoom um bis zu einen Bildpunkt je Schritt.
+        ImageHit.Exact(onDisplay.X, onDisplay.Y, Display.ActualWidth, Display.ActualHeight,
+                       frame.Width, frame.Height, Display.Stretch == System.Windows.Media.Stretch.Uniform,
+                       out double u, out double v);
+
+        _zoom = next;
+        ApplyZoom();
+
+        ImageScroll.UpdateLayout();
+        ImageScroll.ScrollToHorizontalOffset(u * next - inView.X);
+        ImageScroll.ScrollToVerticalOffset(v * next - inView.Y);
+    }
+
+    /// <summary>Der Massstab des eingepassten Bildes - so wie das Bildelement es beim Einpassen zeigt.</summary>
+    private double FitScale()
+    {
+        var frame = _frame;
+        if (frame is null || frame.Width <= 0 || frame.Height <= 0) return 0;
+
+        return Math.Min(ImageScroll.ActualWidth / frame.Width, ImageScroll.ActualHeight / frame.Height);
     }
 
     /// <summary>
@@ -118,5 +307,5 @@ public partial class AtelierPage
     /// andere - ein "Original", das eine selbstgebaute Mischung aus acht Passen
     /// zeigt, waere keines.
     /// </summary>
-    private FloatFrame? Shown() => _showingOriginal ? _base ?? _frame : _frame;
+    private FloatFrame? Shown() => _showingOriginal ? _base ?? _frame : _soloFrame ?? _frame;
 }

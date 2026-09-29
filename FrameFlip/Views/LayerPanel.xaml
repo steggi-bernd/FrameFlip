@@ -44,40 +44,6 @@
             </Setter>
         </Style>
 
-        <!--
-            Der Punkt links in jeder Zeile: sichtbar oder nicht.
-
-            Ein Auge waere das gewohnte Zeichen, braucht aber eine Schriftart, auf
-            die kein Verlass ist. Ein gefuellter und ein leerer Kreis sagen dasselbe
-            und stehen auf jedem Rechner gleich.
-        -->
-        <Style x:Key="LayerEye" TargetType="ToggleButton">
-            <Setter Property="Focusable" Value="False" />
-            <Setter Property="Cursor" Value="Hand" />
-            <Setter Property="Width" Value="14" />
-            <Setter Property="Height" Value="14" />
-            <Setter Property="Template">
-                <Setter.Value>
-                    <ControlTemplate TargetType="ToggleButton">
-                        <Grid Background="Transparent">
-                            <Ellipse x:Name="Ring" Width="10" Height="10" StrokeThickness="1.2"
-                                     Stroke="{StaticResource MutedBrush}" />
-                            <Ellipse x:Name="Dot" Width="10" Height="10"
-                                     Fill="{StaticResource ForegroundBrush}" Opacity="0" />
-                        </Grid>
-                        <ControlTemplate.Triggers>
-                            <Trigger Property="IsChecked" Value="True">
-                                <Setter TargetName="Dot" Property="Opacity" Value="1" />
-                            </Trigger>
-                            <Trigger Property="IsMouseOver" Value="True">
-                                <Setter TargetName="Ring" Property="Stroke"
-                                        Value="{StaticResource AccentBrush}" />
-                            </Trigger>
-                        </ControlTemplate.Triggers>
-                    </ControlTemplate>
-                </Setter.Value>
-            </Setter>
-        </Style>
     </UserControl.Resources>
 
     <Grid>
@@ -143,6 +109,7 @@
                 -->
                 <Grid>
                     <ListBox x:Name="LayerList" MaxHeight="380" MinHeight="150" Background="Transparent"
+                             SelectionMode="Extended"
                              BorderThickness="0"
                              ItemContainerStyle="{StaticResource LayerRow}"
                              ScrollViewer.HorizontalScrollBarVisibility="Disabled"
@@ -257,6 +224,13 @@
                         <local:ColourWheel x:Name="TintWheel" Width="66" Height="66" />
                         <TextBlock Text="{DynamicResource S_LayerTint}" Style="{StaticResource PanelLabel}"
                                    HorizontalAlignment="Center" Margin="0,4,0,0" />
+                        <!-- Pipette (C4b): die Toenung uebernimmt eine Farbe aus dem Bild - oder aus dem Farbspeicher. -->
+                        <ToggleButton x:Name="TintPick" Style="{StaticResource OverlayToggle}"
+                                      HorizontalAlignment="Center" Margin="0,4,0,0"
+                                      ToolTip="{DynamicResource S_TintPickHint}"
+                                      Checked="OnTintPickToggled" Unchecked="OnTintPickToggled">
+                            <local:IconLabel Icon="picker" />
+                        </ToggleButton>
                     </StackPanel>
 
                     <StackPanel Grid.Column="1" VerticalAlignment="Center">
@@ -302,12 +276,17 @@
                             und keinen Ort -, und eine Helligkeitsmaske rechnet ohnehin
                             je Bild neu. Statisch ist allein, was von Hand kam.
                         -->
-                        <ToggleButton x:Name="MaskLockButton" Style="{StaticResource OverlayToggle}"
-                                      Visibility="Collapsed" HorizontalAlignment="Left"
-                                      Margin="0,8,0,0" Padding="8,1" FontSize="10"
-                                      Content="{DynamicResource S_MaskLock}"
-                                      Checked="OnMaskLockChanged" Unchecked="OnMaskLockChanged"
-                                      ToolTip="{DynamicResource S_MaskLockHint}" />
+                        <!-- Beide Moeglichkeiten sichtbar statt eines Schalters, dessen Name nur die eine nennt. -->
+                        <StackPanel x:Name="MaskLockRow" Orientation="Horizontal" Visibility="Collapsed"
+                                    Margin="0,8,0,0" ToolTip="{DynamicResource S_MaskLockHint}">
+                            <TextBlock Text="{DynamicResource S_MaskLockLabel}" Style="{StaticResource PanelLabel}"
+                                       VerticalAlignment="Center" Margin="0,0,6,0" />
+                            <RadioButton x:Name="MaskLockButton" GroupName="MaskLock" Style="{StaticResource OverlayToggle}"
+                                         Padding="8,1" FontSize="10" Content="{DynamicResource S_MaskLockAll}"
+                                         Checked="OnMaskLockChanged" Unchecked="OnMaskLockChanged" />
+                            <RadioButton x:Name="MaskLooseButton" GroupName="MaskLock" Style="{StaticResource OverlayToggle}"
+                                         Padding="8,1" FontSize="10" Margin="4,0,0,0" Content="{DynamicResource S_MaskLockOne}" />
+                        </StackPanel>
 
                         <TextBlock x:Name="MaskLockNote" Visibility="Collapsed"
                                    Margin="0,6,0,0" FontSize="10" TextWrapping="Wrap"
@@ -474,7 +453,7 @@
 
                         <ToggleButton x:Name="MaskInvertButton" Grid.Column="1"
                                       Style="{StaticResource OverlayToggle}" Margin="6,0,0,0"
-                                      MinWidth="34" Content="±"
+                                      MinWidth="34" Content="{DynamicResource S_MaskInvertShort}"
                                       Checked="OnMaskInvertChanged" Unchecked="OnMaskInvertChanged"
                                       ToolTip="{DynamicResource S_MaskInvert}" />
                     </Grid>
@@ -491,6 +470,8 @@
                     -->
                     <StackPanel x:Name="MaskScopeRow" Orientation="Horizontal"
                                 Visibility="Collapsed" Margin="0,8,0,0">
+                        <TextBlock Text="{DynamicResource S_MaskScopeLabel}" Style="{StaticResource PanelLabel}"
+                                   VerticalAlignment="Center" Margin="0,0,6,0" />
                         <RadioButton x:Name="ScopeColourButton" Style="{StaticResource OverlayToggle}"
                                      Content="{DynamicResource S_MaskScopeColour}"
                                      ToolTip="{DynamicResource S_MaskScopeColourHint}"
@@ -509,6 +490,16 @@
 
                     <!-- Helligkeit, Untergrund, Pass: ein Bereich mit weichen Kanten -->
                     <StackPanel x:Name="MaskRangeBody" Visibility="Collapsed">
+                        <!-- Der Bereichsregler (C7): Von, Bis und ihre Kanten als Griffe - die
+                             Regler darunter bleiben fuer genaue Zahlen. -->
+                        <StackPanel x:Name="MaskRangeRow" Margin="0,10,0,0" ToolTip="{DynamicResource S_MaskRangeHint}">
+                            <Grid Margin="0,0,0,2">
+                                <TextBlock Text="{DynamicResource S_MaskRange}" Style="{StaticResource PanelLabel}" />
+                                <TextBlock x:Name="MaskRangeValue" Style="{StaticResource PanelValue}" />
+                            </Grid>
+                            <local:RangeSlider x:Name="MaskRange" />
+                        </StackPanel>
+
                         <Grid Margin="0,10,0,2">
                             <TextBlock x:Name="MaskLowLabel" Text="{DynamicResource S_MaskFrom}"
                                        Style="{StaticResource PanelLabel}" />
@@ -564,6 +555,16 @@
                         Grad allein koennte niemand lesen.
                     -->
                     <StackPanel x:Name="MaskColourBody" Visibility="Collapsed">
+                        <!-- Der Farbbereich als Fenster auf dem Farbkreis (C7): zwei Grenzen und
+                             ihre Kanten, die Regler darunter fuer genaue Grade. -->
+                        <StackPanel Margin="0,10,0,0" ToolTip="{DynamicResource S_MaskRangeHint}">
+                            <Grid Margin="0,0,0,2">
+                                <TextBlock Text="{DynamicResource S_MaskRange}" Style="{StaticResource PanelLabel}" />
+                                <TextBlock x:Name="MaskHueRangeValue" Style="{StaticResource PanelValue}" />
+                            </Grid>
+                            <local:RangeSlider x:Name="MaskHueRange" />
+                        </StackPanel>
+
                         <Grid Margin="0,10,0,2">
                             <TextBlock Text="{DynamicResource S_MaskHue}" Style="{StaticResource PanelLabel}" />
                             <TextBlock x:Name="MaskHueValue" Style="{StaticResource PanelValue}" />

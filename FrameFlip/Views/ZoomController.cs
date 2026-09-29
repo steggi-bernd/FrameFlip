@@ -26,7 +26,7 @@ namespace FrameFlip.Views;
 public sealed class ZoomController
 {
     /// <summary>Obergrenze laut Vorgabe: 800 %.</summary>
-    public const double MaxZoom = 8.0;
+    public const double MaxZoom = ZoomSteps.Max;
 
     private Matrix _matrix = Matrix.Identity;
     private Size _content;
@@ -209,15 +209,7 @@ public sealed class ZoomController
     /// Rastet nahe 100 % und nahe der Einpassung ein. Ohne das trifft man die beiden
     /// wichtigen Stufen mit dem Mausrad nie genau.
     /// </summary>
-    private double Snap(double zoom)
-    {
-        const double tolerance = 0.08;
-        double fit = FitZoom;
-
-        if (Math.Abs(zoom - 1.0) < tolerance) return 1.0;
-        if (Math.Abs(zoom - fit) < tolerance * fit) return fit;
-        return zoom;
-    }
+    private double Snap(double zoom) => ZoomSteps.Snap(zoom, FitZoom);
 
     private Matrix Centered(double scale) => new(
         scale, 0, 0, scale,

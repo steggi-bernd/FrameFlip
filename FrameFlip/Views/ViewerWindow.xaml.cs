@@ -29,7 +29,7 @@ namespace FrameFlip.Views;
 public partial class ViewerWindow : Window, IViewerOpenTarget
 {
     private const int FallbackLookback = 8;
-    private const double ZoomStep = 1.2;      // wie QuickLook: spuerbare, gleichmaessige Schritte
+    private const double ZoomStep = ZoomSteps.Factor;      // wie QuickLook: spuerbare, gleichmaessige Schritte
     private const int RedecodeDelayMs = 150;  // Zoom-Ruhe vor dem Nachschaerfen
     private const double RedecodeThreshold = 0.12;   // erst ab 12 % Groessenunterschied neu laden
     private const int FadeMs = 120;                  // Ein- und Ausblenden des Fensters

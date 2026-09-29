@@ -629,6 +629,29 @@ public partial class ProjectsPage : UserControl
 
         if (entry.Missing > 0 && alive) tile.BorderBrush = (Brush)FindResource("AppWarn");
 
+        // Ein einzelner Eintrag laesst sich aus der Liste nehmen - derselbe Griff und dieselben
+        // Worte wie in der Sequenzliste des Dashboards. Vergessen wird nur der Eintrag, der Ordner
+        // und seine Bilder bleiben. Auch ein Eintrag, dessen Ordner verschwunden ist, bekommt ihn:
+        // Gerade der soll aus der Liste gehen koennen, ohne die ganze Liste zu leeren.
+        var menu = new ContextMenu();
+
+        if (alive)
+        {
+            var reveal = new MenuItem { Header = T("S_ShowInExplorer") };
+            reveal.Click += (_, _) => Reveal(entry.Folder);
+            menu.Items.Add(reveal);
+        }
+
+        var forget = new MenuItem { Header = T("D_MenuForget") };
+        forget.Click += (_, _) =>
+        {
+            RecentSequences.Forget(entry.Folder);
+            Reload();
+        };
+        menu.Items.Add(forget);
+
+        tile.ContextMenu = menu;
+
         return tile;
     }
 
