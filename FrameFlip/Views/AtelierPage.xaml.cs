@@ -657,6 +657,9 @@ public sealed partial class AtelierPage : UserControl
     /// </summary>
     private void Refresh(bool interim, bool recompose)
     {
+        // Wer etwas aendert, will das Ergebnis sehen - ein eingerastetes Original gibt nach.
+        DropCompare();
+
         if (interim)
         {
             _coarse = true;

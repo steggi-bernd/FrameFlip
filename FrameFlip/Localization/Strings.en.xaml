@@ -36,7 +36,9 @@
     <sys:String x:Key="S_Curves">Curves</sys:String>
     <sys:String x:Key="S_CurveHint">Click to add a point, drag to move it, right-click to remove it.</sys:String>
     <sys:String x:Key="S_ShowOriginal">Original</sys:String>
-    <sys:String x:Key="S_ShowOriginalHint">Hold to see the image without any correction</sys:String>
+    <sys:String x:Key="S_ShowOriginalHint">Click: switch to the original; it stays until you switch back (click or key O) or change something. Hold: just a quick look.</sys:String>
+    <sys:String x:Key="S_BeforeBadge">Original – the picture without any correction</sys:String>
+    <sys:String x:Key="S_BeforeBadgeLatched">Original – the picture without any correction · click “Original” or press O to switch back</sys:String>
     <sys:String x:Key="S_ViewAidNone">Normal</sys:String>
     <sys:String x:Key="S_ViewAidClipping">Clipping</sys:String>
     <sys:String x:Key="S_ViewAidFalseColour">False colour</sys:String>
@@ -333,6 +335,7 @@
     <sys:String x:Key="S_MaskRange">Range</sys:String>
     <sys:String x:Key="S_MaskRangeHint">Inner handles move the limit with its edge, outer handles make the edge softer or harder. Alt: drag the inner handle alone. Shift: fine. Double-click: reset.</sys:String>
     <sys:String x:Key="S_MaskInvert">Invert the mask</sys:String>
+    <sys:String x:Key="S_MaskInvertShort">Invert</sys:String>
     <sys:String x:Key="S_MaskAngle">Direction</sys:String>
     <sys:String x:Key="S_MaskCentre">Centre</sys:String>
     <sys:String x:Key="S_MaskWidth">Width</sys:String>

@@ -108,6 +108,13 @@ public partial class AtelierPage
         if (key == Key.Escape) return EndViewer();
 
         // J: die naechste Sichthilfe - wie in Lightroom (W2c).
+        // O: Vorher/Nachher umschalten - wie der Klick auf "Original".
+        if (key == Key.O)
+        {
+            ToggleCompare();
+            return true;
+        }
+
         if (key == Key.J)
         {
             NextViewAid();

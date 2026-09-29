@@ -17,28 +17,124 @@ public partial class AtelierPage
     /// <summary>0 heisst eingepasst; sonst der Massstab in Punkten je Bildpunkt.</summary>
     private double _zoom;
 
+    /// <summary>Ob das Original stehen bleibt - nach einem kurzen Klick oder mit der Taste O.</summary>
+    private bool _compareLatched;
+
+    /// <summary>Wann der Knopf gedrueckt wurde: kurz heisst umschalten, lang heisst nur hinsehen.</summary>
+    private DateTime _comparePressed;
+
+    /// <summary>Ob das Original gerade stehen bleibt - fuer die Probe.</summary>
+    internal bool CompareLatched => _compareLatched;
+
     /// <summary>
-    /// Zeigt das Bild ohne jede Korrektur, solange die Maustaste haelt.
+    /// Zeigt das Bild ohne jede Korrektur - beim Druecken sofort.
     ///
-    /// Gedrueckt halten statt umschalten: Der Vergleich ist ein Blick und kein
-    /// Zustand. Wer umschaltet, vergisst zurueckzuschalten und beurteilt dann
-    /// minutenlang das falsche Bild - und merkt es, wenn ueberhaupt, an einer
-    /// Einstellung, die sich nicht mehr erklaeren laesst.
+    /// Gedrueckt halten war lange der einzige Weg, und er wurde nicht gefunden: Ein Klick zeigte
+    /// das Original nur fuer die Dauer des Klicks, und es sah aus, als taete der Knopf nichts. Jetzt
+    /// schaltet ein kurzer Klick um und laesst das Original stehen; gehalten bleibt es ein Blick.
+    /// Die Sorge von frueher - wer umschaltet, vergisst zurueckzuschalten und beurteilt minutenlang
+    /// das falsche Bild - loest das Abzeichen am Bild, und jede Aenderung schaltet von selbst zurueck.
     /// </summary>
     private void OnCompareDown(object sender, System.Windows.Input.MouseButtonEventArgs e)
     {
-        if (_frame is null || _showingOriginal) return;
+        if (_frame is null) return;
+
+        _comparePressed = DateTime.UtcNow;
+        if (_compareLatched || _showingOriginal) return;
 
         _showingOriginal = true;
         Render();
+        ShowCompare();
     }
 
     private void OnCompareUp(object sender, System.Windows.Input.MouseEventArgs e)
     {
+        if (e.RoutedEvent == System.Windows.Input.Mouse.MouseLeaveEvent)
+        {
+            // Nur ein gehaltener Blick endet beim Verlassen; ein eingerastetes Original bleibt.
+            if (_compareLatched || !_showingOriginal) return;
+
+            _showingOriginal = false;
+            Render();
+            ShowCompare();
+            return;
+        }
+
+        if (_compareLatched)
+        {
+            EndCompare();
+            return;
+        }
+
         if (!_showingOriginal) return;
+
+        if ((DateTime.UtcNow - _comparePressed).TotalMilliseconds < 350)
+        {
+            _compareLatched = true;
+            ShowCompare();
+            return;
+        }
 
         _showingOriginal = false;
         Render();
+        ShowCompare();
+    }
+
+    /// <summary>
+    /// Der Klick ohne Maus - Leertaste, Eingabe, Bedienhilfen. Mit der Maus haben Druecken und
+    /// Loslassen schon entschieden; dann kommt der Klick direkt danach und wird uebergangen.
+    /// </summary>
+    private void OnCompareClicked(object sender, RoutedEventArgs e)
+    {
+        if ((DateTime.UtcNow - _comparePressed).TotalMilliseconds < 600) return;
+
+        ToggleCompare();
+    }
+
+    /// <summary>Vorher/Nachher umschalten - die Taste O und der Klick ohne Maus.</summary>
+    internal void ToggleCompare()
+    {
+        if (_frame is null) return;
+
+        if (_compareLatched)
+        {
+            EndCompare();
+            return;
+        }
+
+        _compareLatched = true;
+        _showingOriginal = true;
+        Render();
+        ShowCompare();
+    }
+
+    private void EndCompare()
+    {
+        _compareLatched = false;
+
+        if (_showingOriginal)
+        {
+            _showingOriginal = false;
+            Render();
+        }
+
+        ShowCompare();
+    }
+
+    /// <summary>Jede Aenderung am Bild zeigt wieder das Ergebnis - sonst dreht man an einem Regler, und nichts passiert.</summary>
+    private void DropCompare()
+    {
+        if (!_compareLatched) return;
+
+        _compareLatched = false;
+        _showingOriginal = false;
+        ShowCompare();
+    }
+
+    private void ShowCompare()
+    {
+        CompareBadge.Visibility = _showingOriginal ? Visibility.Visible : Visibility.Collapsed;
+        CompareBadgeText.SetResourceReference(TextBlock.TextProperty, _compareLatched ? "S_BeforeBadgeLatched" : "S_BeforeBadge");
     }
 
     /// <summary>

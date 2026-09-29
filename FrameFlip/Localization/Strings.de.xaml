@@ -36,7 +36,9 @@
     <sys:String x:Key="S_Curves">Kurven</sys:String>
     <sys:String x:Key="S_CurveHint">Klicken setzt einen Punkt, Ziehen verschiebt ihn, rechte Maustaste entfernt ihn.</sys:String>
     <sys:String x:Key="S_ShowOriginal">Original</sys:String>
-    <sys:String x:Key="S_ShowOriginalHint">Gedrückt halten, um das Bild ohne jede Korrektur zu sehen</sys:String>
+    <sys:String x:Key="S_ShowOriginalHint">Klick: aufs Original schalten, es bleibt stehen, bis man zurückschaltet (Klick oder Taste O) oder etwas ändert. Gedrückt halten: nur kurz hinsehen.</sys:String>
+    <sys:String x:Key="S_BeforeBadge">Original – das Bild ohne jede Korrektur</sys:String>
+    <sys:String x:Key="S_BeforeBadgeLatched">Original – das Bild ohne jede Korrektur · Klick auf „Original“ oder O schaltet zurück</sys:String>
     <sys:String x:Key="S_ViewAidNone">Normal</sys:String>
     <sys:String x:Key="S_ViewAidClipping">Clipping</sys:String>
     <sys:String x:Key="S_ViewAidFalseColour">Falschfarben</sys:String>
@@ -333,6 +335,7 @@
     <sys:String x:Key="S_MaskRange">Bereich</sys:String>
     <sys:String x:Key="S_MaskRangeHint">Innere Griffe verschieben die Grenze samt Kante, äußere machen die Kante weicher oder härter. Alt: den inneren Griff allein ziehen. Umschalt: fein. Doppelklick: zurücksetzen.</sys:String>
     <sys:String x:Key="S_MaskInvert">Maske umkehren</sys:String>
+    <sys:String x:Key="S_MaskInvertShort">Umkehren</sys:String>
     <sys:String x:Key="S_MaskAngle">Richtung</sys:String>
     <sys:String x:Key="S_MaskCentre">Mitte</sys:String>
     <sys:String x:Key="S_MaskWidth">Breite</sys:String>
