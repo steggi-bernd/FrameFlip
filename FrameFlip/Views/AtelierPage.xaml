@@ -246,6 +246,16 @@
                                 </StackPanel>
                             </Border>
 
+                            <!-- Das Original bleibt nach einem Klick stehen - und sagt das, solange es gilt. -->
+                            <Border x:Name="CompareBadge" Visibility="Collapsed"
+                                    HorizontalAlignment="Left" VerticalAlignment="Top" Margin="12"
+                                    Background="{StaticResource PanelBackground}"
+                                    BorderBrush="{StaticResource AccentBrush}" BorderThickness="1"
+                                    CornerRadius="4" Padding="10,6">
+                                <TextBlock x:Name="CompareBadgeText" FontSize="12" Foreground="{StaticResource ForegroundBrush}"
+                                           Text="{DynamicResource S_BeforeBadge}" />
+                            </Border>
+
                             <Border x:Name="BusyBadge" Visibility="Collapsed"
                                     HorizontalAlignment="Center" VerticalAlignment="Center"
                                     Background="{StaticResource BadgeBackground}" CornerRadius="4" Padding="12,7">
@@ -370,12 +380,12 @@
                 </Button>
 
                 <!--
-                    Gedrueckt halten zeigt das Original. Als Knopf und nicht als
-                    Schalter, weil der Vergleich ein Blick ist und kein Zustand -
-                    wer umschaltet, vergisst zurueckzuschalten und beurteilt dann
-                    minutenlang das falsche Bild.
+                    Ein kurzer Klick schaltet aufs Original und laesst es stehen, gedrueckt halten
+                    ist nur ein Blick (siehe OnCompareDown). Das Abzeichen am Bild sagt, dass es
+                    das Original ist, und jede Aenderung schaltet zurueck.
                 -->
                 <Button x:Name="CompareButton" Style="{StaticResource OverlayButton}" Margin="0,0,4,0"
+                        Click="OnCompareClicked"
                         PreviewMouseLeftButtonDown="OnCompareDown"
                         PreviewMouseLeftButtonUp="OnCompareUp"
                         MouseLeave="OnCompareUp"

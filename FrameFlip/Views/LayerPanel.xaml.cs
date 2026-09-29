@@ -2126,6 +2126,14 @@ public partial class LayerPanel : UserControl
         int kind = Array.FindIndex(MaskKinds, m => m.Kind == mask.Kind);
         MaskBox.SelectedIndex = Math.Max(0, kind);
 
+        // Hat die Ebene eine Maske, steht ihr Abschnitt offen. Zugeklappt sah man weder, dass es
+        // sie gibt, noch dass sie sich umkehren laesst - der Knopf dafuer lag darin.
+        if (mask.Kind != MaskKind.None)
+        {
+            MaskBody.Visibility = Visibility.Visible;
+            MaskFoldButton.Content = "\u2212";
+        }
+
         ShowPicks();
 
         MaskInvertButton.IsChecked = mask.Invert;
