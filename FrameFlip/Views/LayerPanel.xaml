@@ -276,12 +276,17 @@
                             und keinen Ort -, und eine Helligkeitsmaske rechnet ohnehin
                             je Bild neu. Statisch ist allein, was von Hand kam.
                         -->
-                        <ToggleButton x:Name="MaskLockButton" Style="{StaticResource OverlayToggle}"
-                                      Visibility="Collapsed" HorizontalAlignment="Left"
-                                      Margin="0,8,0,0" Padding="8,1" FontSize="10"
-                                      Content="{DynamicResource S_MaskLock}"
-                                      Checked="OnMaskLockChanged" Unchecked="OnMaskLockChanged"
-                                      ToolTip="{DynamicResource S_MaskLockHint}" />
+                        <!-- Beide Moeglichkeiten sichtbar statt eines Schalters, dessen Name nur die eine nennt. -->
+                        <StackPanel x:Name="MaskLockRow" Orientation="Horizontal" Visibility="Collapsed"
+                                    Margin="0,8,0,0" ToolTip="{DynamicResource S_MaskLockHint}">
+                            <TextBlock Text="{DynamicResource S_MaskLockLabel}" Style="{StaticResource PanelLabel}"
+                                       VerticalAlignment="Center" Margin="0,0,6,0" />
+                            <RadioButton x:Name="MaskLockButton" GroupName="MaskLock" Style="{StaticResource OverlayToggle}"
+                                         Padding="8,1" FontSize="10" Content="{DynamicResource S_MaskLockAll}"
+                                         Checked="OnMaskLockChanged" Unchecked="OnMaskLockChanged" />
+                            <RadioButton x:Name="MaskLooseButton" GroupName="MaskLock" Style="{StaticResource OverlayToggle}"
+                                         Padding="8,1" FontSize="10" Margin="4,0,0,0" Content="{DynamicResource S_MaskLockOne}" />
+                        </StackPanel>
 
                         <TextBlock x:Name="MaskLockNote" Visibility="Collapsed"
                                    Margin="0,6,0,0" FontSize="10" TextWrapping="Wrap"
@@ -465,6 +470,8 @@
                     -->
                     <StackPanel x:Name="MaskScopeRow" Orientation="Horizontal"
                                 Visibility="Collapsed" Margin="0,8,0,0">
+                        <TextBlock Text="{DynamicResource S_MaskScopeLabel}" Style="{StaticResource PanelLabel}"
+                                   VerticalAlignment="Center" Margin="0,0,6,0" />
                         <RadioButton x:Name="ScopeColourButton" Style="{StaticResource OverlayToggle}"
                                      Content="{DynamicResource S_MaskScopeColour}"
                                      ToolTip="{DynamicResource S_MaskScopeColourHint}"

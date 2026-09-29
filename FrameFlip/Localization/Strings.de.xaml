@@ -310,7 +310,7 @@
     <sys:String x:Key="S_MaskPass">Pass</sys:String>
     <sys:String x:Key="S_MaskGradient">Verlauf</sys:String>
     <sys:String x:Key="S_MaskColour">Farbbereich</sys:String>
-    <sys:String x:Key="S_MaskScopeColour">Farbe</sys:String>
+    <sys:String x:Key="S_MaskScopeColour">Korrektur</sys:String>
     <sys:String x:Key="S_MaskScopeColourHint">Die Maske sagt, WO die Korrektur dieser Ebene gilt. Die Ebene selbst bleibt ueberall zu sehen - als laege eine Kopie von ihr darueber, die nur den Bereich zeigt.</sys:String>
     <sys:String x:Key="S_MaskScopeShow">Sichtbarkeit</sys:String>
     <sys:String x:Key="S_MaskScopeShowHint">Die Maske sagt, WO die Ebene zu sehen ist. Ausserhalb traegt sie nichts bei - richtig fuer einen Glanz, ein Wasserzeichen, eine zweite Aufnahme.</sys:String>
@@ -1332,7 +1332,7 @@
     <sys:String x:Key="S_NoDepthTool">Dafür muss die Tiefenschärfe eingeschaltet sein — sie steht unter Optik.</sys:String>
     <sys:String x:Key="S_Reveal">Verborgenes zeigen</sys:String>
     <sys:String x:Key="S_RevealHint">Zeigt, was in den durchsichtigen Stellen der Datei steht — meist das unmaskierte Original, Renderrauschen oder Reste der Ebene darunter. Bei 0 ist die Ebene sauber freigestellt, bei 100 % deckt sie überall. Die MASKE dieser Ebene bestimmt, wo es erscheint: eine Kryptomatte wählt ein Objekt, ein Tiefenpass eine Entfernung. Eine sauber vormultiplizierte Datei trägt dort Schwarz — dann passiert nichts.</sys:String>
-    <sys:String x:Key="S_MatteGroup">Freistellung</sys:String>
+    <sys:String x:Key="S_MatteGroup">Deckungsschleier</sys:String>
     <sys:String x:Key="S_MatteGroupHint">Zwei Regler an derselben Zahl, in entgegengesetzte Richtungen: Der obere schneidet weg, was kaum noch da ist — gegen den grauen Schleier, unter dem Müll sitzt. Der untere zieht die Deckung zum Vollen und zeigt genau diesen Müll absichtlich.</sys:String>
     <sys:String x:Key="S_Dither">Rastern</sys:String>
     <sys:String x:Key="S_DitherAmount">Stärke</sys:String>
@@ -1365,6 +1365,10 @@
     <sys:String x:Key="S_ToolBrushShort">Malt eine Maske – beim ersten Strich entsteht dafür eine Maskenebene. Rechte Maustaste oder Alt nimmt weg. Strg und ziehen stellt die Größe ein, Strg und rechte Maustaste ziehen die Härte. Das Mausrad zoomt, Strg und Mausrad stellen den Abstand der Tupfer ein.</sys:String>
     <sys:String x:Key="S_MaskPainted">Gemalt</sys:String>
     <sys:String x:Key="S_MaskLock">für alle Bilder</sys:String>
+    <sys:String x:Key="S_MaskScopeLabel">wirkt auf:</sys:String>
+    <sys:String x:Key="S_MaskLockLabel">gilt für:</sys:String>
+    <sys:String x:Key="S_MaskLockAll">alle Bilder</sys:String>
+    <sys:String x:Key="S_MaskLockOne">dieses Bild</sys:String>
     <sys:String x:Key="S_MaskLockHint">Gesperrt gilt ein Anstrich für die ganze Sequenz. Entsperrt gilt je Bild ein eigener — dann lässt sich ein einzelnes Bild retuschieren, ohne die anderen anzufassen. Beim Entsperren wandert der bisherige Anstrich auf das aktuelle Bild, statt verworfen zu werden.</sys:String>
     <sys:String x:Key="S_MaskLockedNote">Ein Anstrich für alle Bilder.</sys:String>
     <sys:String x:Key="S_MaskLooseNote">Je Bild ein eigener Anstrich — für Einzelbildretusche.</sys:String>
