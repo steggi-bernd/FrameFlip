@@ -20,6 +20,51 @@ public static class AtelierProjectInvariants
         TheStoreWritesNextToTheSource();
         TheKeeperSwitchesAndSaves();
         TheOldRecipeGoesToItsOwnSequence();
+        TheTrialLeavesTheProjectAlone();
+    }
+
+    /// <summary>
+    /// Der Versuchsstand (FRAMEFLIP_VERSUCH, siehe docs/Atelier-Knoten-Gruppen.md) liest das
+    /// Projekt am Quellordner, schreibt aber nur unter seinen eigenen Einstellungen - die
+    /// Projektdatei der normalen App bleibt Byte fuer Byte, wie sie war.
+    /// </summary>
+    private static void TheTrialLeavesTheProjectAlone()
+    {
+        Check.Group("Projekte: der Versuch liest das Projekt und laesst es stehen");
+
+        using var place = new Place();
+        var store = new AtelierProjectStore(() => place.Fallback);
+        var key = SequenceKey.Of(Path.Combine(place.Source, "render_0001.exr"))!;
+
+        Check.That(!AtelierProjectStore.Trial, "die Gegenprobe: ohne Versuch ist er aus");
+        Check.That(store.Save(key, new AtelierProject { Frame = "normal" }), "die normale App schreibt ihr Projekt");
+
+        string primary = AtelierProjectStore.PrimaryPath(key);
+        byte[] before = File.ReadAllBytes(primary);
+
+        Environment.SetEnvironmentVariable("FRAMEFLIP_VERSUCH", "1");
+
+        try
+        {
+            Check.That(store.Load(key)?.Frame == "normal", "der Versuch liest das Projekt am Quellordner");
+
+            Check.That(store.Save(key, new AtelierProject { Frame = "versuch" }) &&
+                       File.ReadAllBytes(primary).AsSpan().SequenceEqual(before) && File.Exists(store.FallbackPath(key)),
+                       "und schreibt unter seinen Einstellungen - die Projektdatei bleibt, wie sie war");
+
+            Check.That(store.Load(key)?.Frame == "versuch", "beim naechsten Oeffnen liest er seinen eigenen Stand");
+
+            Check.That(store.SaveSide(key, "verlauf/maske.json", new byte[] { 1, 2, 3 }) &&
+                       !File.Exists(store.SidePaths(key, "verlauf/maske.json").Last()) &&
+                       store.LoadSide(key, "verlauf/maske.json") is { Length: 3 },
+                       "auch der Maskenverlauf landet nur bei ihm");
+        }
+        finally
+        {
+            Environment.SetEnvironmentVariable("FRAMEFLIP_VERSUCH", null);
+        }
+
+        Check.That(store.Load(key)?.Frame == "normal", "die normale App liest danach ihr unberuehrtes Projekt");
     }
 
     private static void TheKeyIgnoresTheNumber()

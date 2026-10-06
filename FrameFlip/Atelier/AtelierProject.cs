@@ -140,6 +140,22 @@ internal sealed class AtelierProjectStore
 
     private static string FileNameOf(SequenceKey key) => key.Name + key.Extension + FileExtension;
 
+    /// <summary>
+    /// Ein Versuchsstand (Umgebungsvariable FRAMEFLIP_VERSUCH, gesetzt von "Versuch
+    /// starten.cmd"): Er liest die Projekte am Quellordner, schreibt aber nur unter seinen
+    /// eigenen Einstellungen. Die Projektdateien der normalen App bleiben, wie sie sind -
+    /// auch wenn der Versuch einen Graphen neu anordnet.
+    /// </summary>
+    internal static bool Trial => Environment.GetEnvironmentVariable("FRAMEFLIP_VERSUCH") is { Length: > 0 };
+
+    /// <summary>Wo gelesen wird: erst am Quellordner, dann unter den Einstellungen - im Versuch umgekehrt.</summary>
+    private string[] ReadPlaces(SequenceKey key)
+        => Trial ? new[] { FallbackPath(key), PrimaryPath(key) } : new[] { PrimaryPath(key), FallbackPath(key) };
+
+    /// <summary>Wo geschrieben wird: am Quellordner, sonst unter den Einstellungen - im Versuch nur dort.</summary>
+    private string[] WritePlaces(SequenceKey key)
+        => Trial ? new[] { FallbackPath(key) } : new[] { PrimaryPath(key), FallbackPath(key) };
+
     /// <summary>Wo zuletzt irgendein Projekt geschrieben wurde - fuer die Probe der Ablage.</summary>
     public string? LastWritten { get; private set; }
 
@@ -191,7 +207,7 @@ internal sealed class AtelierProjectStore
         // Erst schreiben lassen, was noch unterwegs ist.
         WaitForWrites(TimeSpan.FromSeconds(10));
 
-        foreach (string path in new[] { PrimaryPath(key), FallbackPath(key) })
+        foreach (string path in ReadPlaces(key))
         {
             try
             {
@@ -219,10 +235,11 @@ internal sealed class AtelierProjectStore
     /// Quellordner, sonst unter den Einstellungen. <paramref name="relative"/> ist der Weg
     /// darin, etwa "verlauf/maske.json".
     /// </summary>
-    public IEnumerable<string> SidePaths(SequenceKey key, string relative)
-        => new[] { PrimaryPath(key), FallbackPath(key) }
-            .Select(project => Path.Combine(Path.GetDirectoryName(project)!,
-                                            Path.GetFileNameWithoutExtension(project) + DataExtension, relative));
+    public IEnumerable<string> SidePaths(SequenceKey key, string relative) => Beside(ReadPlaces(key), relative);
+
+    private static IEnumerable<string> Beside(IEnumerable<string> projects, string relative)
+        => projects.Select(project => Path.Combine(Path.GetDirectoryName(project)!,
+                                                   Path.GetFileNameWithoutExtension(project) + DataExtension, relative));
 
     /// <summary>Liest eine Beidatei - oder null, wenn es keine gibt oder sie sich nicht lesen laesst.</summary>
     public byte[]? LoadSide(SequenceKey key, string relative)
@@ -269,7 +286,7 @@ internal sealed class AtelierProjectStore
     /// <summary>Schreibt eine Beidatei - am Quellordner, sonst unter den Einstellungen. False, wenn beides nicht ging.</summary>
     public bool SaveSide(SequenceKey key, string relative, byte[] data)
     {
-        foreach (string path in SidePaths(key, relative))
+        foreach (string path in Beside(WritePlaces(key), relative))
         {
             try
             {
@@ -302,7 +319,7 @@ internal sealed class AtelierProjectStore
 
         string json = JsonSerializer.Serialize(project, Options);
 
-        foreach (string path in new[] { PrimaryPath(key), FallbackPath(key) })
+        foreach (string path in WritePlaces(key))
         {
             try
             {
