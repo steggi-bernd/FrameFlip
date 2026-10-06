@@ -114,11 +114,9 @@ public static class NodeCatalog
     public static void WireData(NodeGraph graph, Node node)
     {
         // Eine Passmaske bekommt ihren Pass als Kabel - man sieht, woher sie liest.
-        if (node is MaskNode { Mask: { Kind: MaskKind.Pass, Source.Length: > 0 } mask } &&
-            graph.Nodes.OfType<RenderNode>().FirstOrDefault() is { } file &&
-            NodeEdits.ShowPass(graph, file, mask.Source, on: true))
+        if (node is MaskNode { Mask: { Kind: MaskKind.Pass, Source.Length: > 0 } mask } && NodeGroups.File(graph) is not null)
         {
-            graph.Connect(file, mask.Source, node, "Pass");
+            graph.Connect(NodeGroups.PassSource(graph, mask.Source), mask.Source, node, "Pass");
             return;
         }
 
@@ -132,7 +130,7 @@ public static class NodeCatalog
             _ => null,
         };
 
-        if (output is not null && graph.Nodes.OfType<RenderNode>().FirstOrDefault() is { } render)
+        if (output is not null && NodeGroups.File(graph) is { } render)
             graph.Connect(render, output, node, "Daten");
     }
 }

@@ -349,9 +349,8 @@ public partial class AtelierPage
         _graph.Connect(after, below, node, "Untergrund");
         _graph.Connect(node, "Maske", mix, "Faktor");
 
-        ArrangeLayer(after, after, grade, mix);
-        node.X = grade.X;
-        node.Y = grade.Y - NodeLayout.Height(node) - NodeLayout.Gap;
+        // Die Maske steht in der Gruppe ihrer Ebene, in der Bahn unter dem Bildweg.
+        ArrangeLayer();
 
         NodeView.Select(node);
         NodeView.InvalidateVisual();

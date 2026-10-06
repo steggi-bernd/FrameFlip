@@ -146,6 +146,14 @@ public sealed class NodeGraph
 {
     public int Version { get; set; } = 1;
 
+    /// <summary>
+    /// Wie der Graph zuletzt angeordnet wurde - 0 in Spalten, <see cref="NodeLayout.Grouped"/>
+    /// in Gruppen. Ein aelterer Graph wird beim Oeffnen einmal neu angeordnet. Fuer das
+    /// Rechnen ohne Bedeutung.
+    /// </summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)]
+    public int Layout { get; set; }
+
     public List<Node> Nodes { get; set; } = new();
 
     public List<NodeLink> Links { get; set; } = new();

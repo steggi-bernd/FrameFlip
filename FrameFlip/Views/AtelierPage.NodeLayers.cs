@@ -233,7 +233,7 @@ public partial class AtelierPage
 
         if (LayerEdits.AddAdjustment(_graph, after) is not var (grade, mix)) return;
 
-        ArrangeLayer(after, after, grade, mix);
+        ArrangeLayer();
 
         NodeView.Select(grade);
         NodeView.InvalidateVisual();

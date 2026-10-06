@@ -21,6 +21,18 @@ public sealed class RenderNode : Node
     /// <summary>Die Passe, die als eigene Ausgaenge gebraucht werden - nach ihrem Namen in der Datei.</summary>
     public List<string> Passes { get; set; } = new();
 
+    /// <summary>
+    /// Nur dieser eine Ausgang: eine Quelle am linken Rand des Graphen, mit eigener Vorschau
+    /// - ein Pass, das Bild der Datei oder Renderdaten. Null: die ganze Datei mit allen
+    /// Ausgaengen. Ein Pass steht dabei auch in <see cref="Passes"/>, damit er gelesen wird.
+    /// Siehe docs/Atelier-Knoten-Gruppen.md.
+    /// </summary>
+    [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)]
+    public string? Only { get; set; }
+
+    /// <summary>Eine Quelle fuer einen einzelnen Pass der Datei.</summary>
+    public static RenderNode ForPass(string pass) => new() { Only = pass, Passes = { pass }, Preview = true };
+
     public override IReadOnlyList<Socket> Inputs => Array.Empty<Socket>();
 
     public override IReadOnlyList<Socket> Outputs
@@ -37,7 +49,7 @@ public sealed class RenderNode : Node
 
             foreach (string pass in Passes) outputs.Add(new Socket(pass, SocketType.Image, Source: true));
 
-            return outputs;
+            return Only is null ? outputs : outputs.Where(s => s.Name == Only).Take(1).ToList();
         }
     }
 
@@ -303,6 +315,19 @@ public sealed class MaskNode : Node
     public override IReadOnlyList<Socket> Outputs { get; } = new[] { new Socket("Maske", SocketType.Value) };
 
     internal override string? Through => null;
+
+    /// <summary>
+    /// Ob die Maske liest, was an einem Eingang ankommt. Die Ebene braucht nur die
+    /// Helligkeitsmaske, den Untergrund nur die Untergrund- und die Farbbereichsmaske
+    /// (<see cref="MaskSampler.Factor"/>); ein Verlauf, ein Anstrich, ein Pass oder eine
+    /// Kryptomatte lesen keines von beiden. Der Editor zeichnet solche Kabel blass.
+    /// </summary>
+    public bool Reads(string input) => input switch
+    {
+        "Ebene" => Mask.Kind == MaskKind.Luminance,
+        "Untergrund" => Mask.Kind is MaskKind.Underlying or MaskKind.Colour,
+        _ => true,
+    };
 
     /// <summary>Unter diesem Schluessel liegt ein Pass, der als Kabel kam - kein Pass heisst so.</summary>
     private const string WireKey = "\u0001kabel";

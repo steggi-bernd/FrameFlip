@@ -131,6 +131,9 @@ public partial class AtelierPage
     /// </summary>
     private ImageSource? QuietPreview(Node node)
     {
+        // Eine Quelle am linken Rand zeigt ihren Pass auch dann, wenn ihn niemand rechnet.
+        if (node is RenderNode { Only: { } only }) return SourceThumb(node, only);
+
         if (_graph is null || node is not (PictureNode or PlaceNode)) return null;
 
         var (_, output) = NodeEdits.Through(node);
@@ -304,7 +307,8 @@ public partial class AtelierPage
         foreach (var layer in NodeLayerList.Of(_graph))
             if (layer.Source is { } source && source is not (RenderNode or BlackNode)) source.Preview = true;
 
-        foreach (var node in _graph.Nodes.Where(n => n is MaskNode or MaskMathNode or MaskShapeNode or MapRangeNode))
+        foreach (var node in _graph.Nodes.Where(n => n is MaskNode or MaskMathNode or MaskShapeNode or MapRangeNode ||
+                                                     NodeGroups.IsSource(n)))
             node.Preview = true;
 
         NodeLayout.Arrange(_graph);

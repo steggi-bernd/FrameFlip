@@ -198,7 +198,7 @@ public static class SwitchLeftoverInvariants
             page.ConvertToNodes();
             Pump(() => page.InNodes);
 
-            var file = page.Graph!.Nodes.OfType<RenderNode>().First();
+            var file = NodeGroups.File(page.Graph)!;
             page.SetViewer((file.Id, file.Outputs[0].Name));
             Check.That(badge.Visibility == Visibility.Visible, "Vorbereitung: der Betrachter zeigt einen Knoten, das Schild steht da");
 
@@ -206,7 +206,7 @@ public static class SwitchLeftoverInvariants
             Check.That(page.InNodes && badge.Visibility != Visibility.Visible,
                        "ein anderes Projekt mit Knoten: kein Schild eines Betrachters, den es nicht mehr gibt");
 
-            file = page.Graph!.Nodes.OfType<RenderNode>().First();
+            file = NodeGroups.File(page.Graph)!;
             page.SetViewer((file.Id, file.Outputs[0].Name));
             Show(page, third);
             Check.That(!page.InNodes && badge.Visibility != Visibility.Visible,

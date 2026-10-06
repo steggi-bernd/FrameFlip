@@ -274,7 +274,8 @@ public static class LayerEdits
 
     /// <summary>
     /// Nimmt eine Ebene heraus - samt allem in ihrem Zweig, das sonst niemand liest. Die
-    /// Datei bleibt, auch wenn keine Ebene mehr aus ihr liest.
+    /// Datei bleibt, auch wenn keine Ebene mehr aus ihr liest; die Quelle eines Passes geht
+    /// mit, wenn ihn sonst niemand liest.
     /// </summary>
     public static bool Remove(NodeGraph graph, Node layer)
     {
@@ -295,7 +296,7 @@ public static class LayerEdits
 
             foreach (string id in branch)
             {
-                if (graph.Find(id) is not { } node || node is RenderNode or OutputNode) continue;
+                if (graph.Find(id) is not { } node || node is RenderNode { Only: null } or OutputNode) continue;
                 if (graph.Links.Any(l => l.From == id)) continue;
 
                 graph.Links.RemoveAll(l => l.To == id);

@@ -166,11 +166,12 @@ public static class NodeEdits
     ///
     /// Das ist der schnellste Weg zu einer Verzweigung: Die Kopie liest dasselbe wie das
     /// Original und rechnet mit denselben Einstellungen weiter; wohin ihr Bild geht,
-    /// entscheidet man danach. Die Ausgabe und die Datei gibt es nur einmal.
+    /// entscheidet man danach. Die Ausgabe und die Datei gibt es nur einmal; die Quelle
+    /// eines Passes laesst sich verdoppeln.
     /// </summary>
     public static Node? Duplicate(NodeGraph graph, Node node, double offset = 40)
     {
-        if (node is OutputNode or RenderNode) return null;
+        if (node is OutputNode or RenderNode { Only: null }) return null;
 
         var copy = graph.Add(NodeGraph.CopyOf(node));
         copy.X = node.X + offset;

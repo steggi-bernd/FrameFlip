@@ -43,12 +43,83 @@ public static class NodeParityInvariants
         RandomCases(world);
         TheGraphSurvivesSaving(world);
         WiredCases(world);
+        SourcesStandApart(world);
         CachedCases(world);
         ThePoolLeavesNoTrace(world);
         HiddenLayers(world);
         OldGraphsGetTheirHiddenLayers(world);
         LayerMoves(world);
         NothingBreaksIt(world);
+    }
+
+    // ------------------------------------------------------------ Quellen am linken Rand
+
+    /// <summary>
+    /// Jeder Pass hat seine eigene Quelle (docs/Atelier-Knoten-Gruppen.md) - und ein Graph
+    /// aus der Zeit davor, in dem alles aus dem einen Dateiknoten kommt, wird beim Oeffnen
+    /// so umgestellt. Beides rechnet dasselbe Bild wie der Stapel, und jeder Pass wird
+    /// einmal gelesen.
+    /// </summary>
+    private static void SourcesStandApart(World world)
+    {
+        Check.Group("Knoten: Quellen am linken Rand rechnen wie die eine Datei");
+
+        var stack = Base(Pass("P.a", BlendMode.Add),
+                         Masked(Pass("P.b", BlendMode.Screen),
+                                new LayerMask { Kind = MaskKind.Pass, Source = "mist", Low = 0.1f, High = 0.8f }),
+                         Group(0.8f, BlendMode.Normal, Pass("P.a", BlendMode.Multiply), Clip(Pass("P.b"))));
+
+        var graph = StackToGraph.Convert(stack, ImageAdjustments.Neutral, new GradingStack());
+        var only = graph.Nodes.OfType<RenderNode>().Where(r => r.Only is not null).Select(r => r.Only!).OrderBy(p => p, StringComparer.Ordinal).ToList();
+
+        Check.That(only.SequenceEqual(new[] { "P.a", "P.b", "mist" }) && graph.Nodes.OfType<RenderNode>().Count(r => r.Only is null) == 1,
+                   "jeder Pass hat genau eine Quelle, auch wenn ihn zwei Ebenen lesen - die Datei gibt es einmal",
+                   string.Join(", ", only));
+        Check.That(GraphEvaluator.Reads(graph).Count(r => r.Key == "P.a") == 1, "ein Pass wird einmal gelesen");
+
+        var expected = RenderStack(world, stack, ImageAdjustments.Neutral, new GradingStack(), 1, 0, sixteen: false);
+        var (differ, worst) = Diff(expected, RenderGraph(world, graph, 1, 0, sixteen: false), 1);
+
+        Check.That(differ == 0, "mit eigenen Quellen rechnet der Graph wie der Stapel", $"{differ} Bytes anders, bis {worst} Stufen");
+
+        // Ein Graph von vorher: alles kommt aus dem einen Dateiknoten.
+        var old = graph.Clone();
+        var file = NodeGroups.File(old)!;
+
+        foreach (var source in old.Nodes.OfType<RenderNode>().Where(r => r.Only is not null).ToList())
+        {
+            foreach (var link in old.Links.Where(l => l.From == source.Id)) link.From = file.Id;
+            if (!file.Passes.Contains(source.Only!)) file.Passes.Add(source.Only!);
+
+            old.Nodes.Remove(source);
+        }
+
+        old.Layout = 0;
+        string saved = old.Save();
+
+        var (differOld, _) = Diff(expected, RenderGraph(world, old, 1, 0, sixteen: false), 1);
+
+        Check.That(differOld == 0 && old.Nodes.OfType<RenderNode>().Count() == 1 && !saved.Contains("\"Only\"") && !saved.Contains("\"Layout\""),
+                   "die Gegenprobe: der Graph von vorher mit einer Datei rechnet dasselbe und kennt weder Quellen noch Anordnung");
+
+        Check.That(NodeGroups.SplitSources(old) && old.Nodes.OfType<RenderNode>().Count(r => r.Only is not null) == 3 &&
+                   file.Passes.Count == 0 && old.Problems().Count == 0,
+                   "umgestellt hat jeder Pass seine Quelle, die Datei behaelt Bild und Renderdaten",
+                   string.Join(", ", file.Passes));
+        Check.That(!NodeGroups.SplitSources(old), "ein zweites Umstellen findet nichts mehr");
+
+        var (differSplit, worstSplit) = Diff(expected, RenderGraph(world, old, 1, 0, sixteen: false), 1);
+
+        Check.That(differSplit == 0, "und das Bild bleibt dasselbe", $"{differSplit} Bytes anders, bis {worstSplit} Stufen");
+        Check.That(GraphEvaluator.Reads(old).Select(r => r.Key).OrderBy(k => k, StringComparer.Ordinal)
+                       .SequenceEqual(GraphEvaluator.Reads(graph).Select(r => r.Key).OrderBy(k => k, StringComparer.Ordinal)),
+                   "gelesen wird dasselbe wie im frisch umgewandelten Graphen");
+
+        NodeLayout.Arrange(old);
+        var loaded = NodeGraph.Load(old.Save())!;
+
+        Check.That(loaded.Layout == NodeLayout.Grouped && loaded.Nodes.OfType<RenderNode>().Count(r => r.Only is not null) == 3,
+                   "gespeichert und gelesen bleiben die Quellen und die Anordnung");
     }
 
     // ------------------------------------------------------------ Nichts bringt ihn um
@@ -1056,7 +1127,7 @@ public static class NodeParityInvariants
             withLayer.Layers.Add(Pass("P.a", BlendMode.Add));
 
             var graph = StackToGraph.Convert(below, adjust, picture);
-            var render = graph.Nodes.OfType<RenderNode>().Single();
+            var render = NodeGroups.File(graph)!;
             var top = NodeEdits.LayerTop(graph);
 
             bool built = top is not null &&
@@ -1087,10 +1158,11 @@ public static class NodeParityInvariants
 
         var wired = StackToGraph.Convert(mist, ImageAdjustments.Neutral, new GradingStack());
         var mask = wired.Nodes.OfType<MaskNode>().Single();
-        var file = wired.Nodes.OfType<RenderNode>().Single();
+        var file = NodeGroups.File(wired)!;
 
-        Check.That(wired.Into(mask.Id, "Pass") is { Output: "mist" } link && link.From == file.Id,
-                   "die umgewandelte Passmaske liest ihren Pass ueber ein Kabel von der Datei");
+        // Jeder Pass hat seine eigene Quelle am linken Rand (docs/Atelier-Knoten-Gruppen.md).
+        Check.That(wired.Into(mask.Id, "Pass") is { Output: "mist" } link && wired.Find(link.From) is RenderNode { Only: "mist" },
+                   "die umgewandelte Passmaske liest ihren Pass ueber ein Kabel von seiner Quelle");
 
         Check.That(GraphEvaluator.Reads(wired).Count(r => r.Key == "mist") == 1,
                    "und der Pass wird einmal gelesen, nicht zweimal");

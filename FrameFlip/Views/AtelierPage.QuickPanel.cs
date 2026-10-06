@@ -96,7 +96,7 @@ public partial class AtelierPage
         mix.Label = NodeTitles.MaskName(mask);
         _graph.Connect(mask, "Maske", mix, "Faktor");
 
-        ArrangeLayer(after, after, grade, mix);
+        ArrangeLayer();
 
         NodeView.Select(grade);
         NodeView.InvalidateVisual();

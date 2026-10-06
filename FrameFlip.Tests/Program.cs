@@ -89,6 +89,7 @@ static int RunAll()
     NodeExportInvariants.Run();
     NodeModeInvariants.Run();
     NodeEditInvariants.Run();
+    NodeGroupInvariants.Run();
     ContextMenuInvariants.Run();
     WheelAndSpacingInvariants.Run();
     PassRoleInvariants.Run();

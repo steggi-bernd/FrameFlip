@@ -75,6 +75,17 @@ public partial class AtelierPage
         Dock.SetAvailable("layers", _layersShown, Strings.T("S_LayersUnavailable"));
         ShowLayerCount();
 
+        // Ein Graph aus der Zeit vor den Gruppen: Jeder Pass bekommt seine Quelle am linken
+        // Rand, und alles wird einmal in Gruppen angeordnet. Am Bild aendert sich nichts.
+        if (_graph is { } older && older.Layout < NodeLayout.Grouped)
+        {
+            NodeGroups.SplitSources(older);
+            if (NodeGroups.File(older) is { } file) file.Preview = true;
+
+            NodeLayout.Arrange(older);
+            SaveNodes();
+        }
+
         NodeView.Graph = _graph;
         NodeView.Title = NodeTitles.For;
 

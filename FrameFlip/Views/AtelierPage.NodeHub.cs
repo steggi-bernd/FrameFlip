@@ -67,7 +67,7 @@ public partial class AtelierPage
             .Item("◉", Strings.T("S_HubViewer"), () => OnViewWanted(node), "Strg+Umschalt+Klick", enabled: node.Outputs.Count > 0)
             .Separator()
             .Item("＋", Strings.T("S_NodeMenuInsertAfter"), () => ShowNodeHub(at, after: node), enabled: NodeEdits.Through(node).Output is not null)
-            .Item("❐", Strings.T("S_HubDuplicate"), () => NodeView.Duplicate(node), "Umschalt+D", enabled: node is not RenderNode)
+            .Item("❐", Strings.T("S_HubDuplicate"), () => NodeView.Duplicate(node), "Umschalt+D", enabled: node is not RenderNode { Only: null })
             .Item("⌁", Strings.T("S_NodeMenuUnwire"), () =>
             {
                 RememberNodes();
@@ -310,7 +310,7 @@ public partial class AtelierPage
                 () => NodeView.TogglePreview(node), node.Preview),
         };
 
-        if (node is not RenderNode)
+        if (node is not RenderNode { Only: null })
             actions.Add(new("❐", Strings.T("S_HubDuplicate"), Strings.T("S_NodeMenuDuplicate"), () => NodeView.Duplicate(node)));
 
         actions.Add(new("✕", Strings.T("S_HubDelete"), Strings.T("S_NodeMenuDelete"), () => NodeView.Remove(node)));

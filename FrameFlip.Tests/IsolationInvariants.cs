@@ -98,7 +98,7 @@ public static class IsolationInvariants
             Check.That(!page.HandleToolKey(Key.Escape), "Esc ohne Isolieren: bleibt fuer andere frei");
 
             // Ein beliebiger Knoten im Betrachter heisst weiter "Betrachter".
-            var file = graph.Nodes.OfType<RenderNode>().First();
+            var file = NodeGroups.File(graph)!;
             page.SetViewer((file.Id, file.Outputs[0].Name));
             Check.That(badgeText.Text.StartsWith(T("S_ViewerShowing", "").Split(':')[0], StringComparison.Ordinal),
                        "ein anderer Knoten im Betrachter: das Schild sagt \"Betrachter\", nicht \"isoliert\"", badgeText.Text);

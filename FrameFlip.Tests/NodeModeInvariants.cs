@@ -75,6 +75,7 @@ public static class NodeModeInvariants
             TheSwitchKeepsThePicture(settings, picture);
             TheToolsReachTheSelectedNode(settings, picture);
             ItComesBack(settings, picture);
+            OldGraphsAreRegrouped(settings, picture, folder);
         }
         finally
         {
@@ -329,6 +330,90 @@ public static class NodeModeInvariants
 
             Check.That(Same(direct, Pixels(page)), "und die Seite zeigt, was der Graph rechnet",
                        $"{Differ(direct, Pixels(page))} Bytes anders");
+        }
+        finally
+        {
+            window.Close();
+        }
+    }
+
+    /// <summary>
+    /// Ein Graph aus der Zeit vor den Gruppen (docs/Atelier-Knoten-Gruppen.md) wird beim
+    /// Oeffnen einmal in Gruppen angeordnet - die Quellen links, die Mischen in einer Spalte -
+    /// und so gespeichert. Das Bild bleibt dasselbe.
+    /// </summary>
+    private static void OldGraphsAreRegrouped(AppSettings settings, string picture, string folder)
+    {
+        Check.Group("Knotenmodus: ein alter Graph wird beim Oeffnen in Gruppen angeordnet");
+
+        Atelier.AtelierProjectStore.WaitForWrites(TimeSpan.FromSeconds(10));
+
+        // Wo der Graph liegt: in der Projektdatei der Folge, sonst in den Einstellungen.
+        string? project = Directory.Exists(Path.Combine(folder, "FrameFlip"))
+            ? Directory.GetFiles(Path.Combine(folder, "FrameFlip"), "*.ffproj").FirstOrDefault()
+            : null;
+
+        var json = project is null ? null : System.Text.Json.Nodes.JsonNode.Parse(File.ReadAllText(project));
+        string? stored = json?["Nodes"]?.ToJsonString() ?? settings.AtelierNodes;
+
+        if (stored is null || NodeGraph.Load(stored) is not { } old)
+        {
+            Check.That(false, "es gibt einen gespeicherten Graphen");
+            return;
+        }
+
+        // Wie vor den Gruppen: keine Anordnung vermerkt, alles auf einem Haufen.
+        old.Layout = 0;
+        foreach (var node in old.Nodes) node.X = node.Y = 0;
+
+        string before = old.Save();
+
+        if (json is not null)
+        {
+            json["Nodes"] = System.Text.Json.Nodes.JsonNode.Parse(before);
+            File.WriteAllText(project!, json.ToJsonString());
+        }
+        else
+        {
+            settings.AtelierNodes = before;
+        }
+
+        Check.That(!before.Contains("\"Layout\""), "die Gegenprobe: der alte Graph kennt keine Anordnung");
+
+        var (page, window) = Open(settings, picture);
+
+        try
+        {
+            if (!Loaded(page))
+            {
+                Check.That(false, "das Bild wird geladen");
+                return;
+            }
+
+            var graph = page.Graph!;
+            var mixes = graph.Nodes.OfType<MixNode>().ToList();
+
+            Check.That(graph.Layout == NodeLayout.Grouped && graph.Nodes.OfType<PictureNode>().All(n => n.X == 0) &&
+                       mixes.Count > 1 && mixes.Select(m => m.X).Distinct().Count() == 1,
+                       "geoeffnet ist er in Gruppen angeordnet: die Bilddatei links, die Mischen in einer Spalte",
+                       string.Join(", ", mixes.Select(m => m.X)));
+
+            var left = graph.Nodes.Where(n => n.X == 0).ToList();
+
+            Check.That(NodeGroups.Of(graph).SelectMany(g => g.Members).All(n => n.X > 0) &&
+                       left.Select(n => n.Y).Distinct().Count() == left.Count,
+                       "nichts liegt mehr auf dem Haufen: die Gruppen rechts, die Quellen links untereinander");
+
+            // Und so gespeichert - sonst finge jedes Oeffnen von vorn an und verwuerfe, was man verschiebt.
+            page.Flush();
+            Atelier.AtelierProjectStore.WaitForWrites(TimeSpan.FromSeconds(10));
+
+            string? after = project is not null
+                ? System.Text.Json.Nodes.JsonNode.Parse(File.ReadAllText(project))?["Nodes"]?.ToJsonString()
+                : settings.AtelierNodes;
+
+            Check.That(after is not null && NodeGraph.Load(after)?.Layout == NodeLayout.Grouped,
+                       "und so gespeichert - beim naechsten Oeffnen bleibt, was man verschiebt");
         }
         finally
         {

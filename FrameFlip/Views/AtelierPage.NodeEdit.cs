@@ -281,16 +281,14 @@ public partial class AtelierPage
         RememberNodes();
 
         bool clip = LayerEdits.InClip(_graph, after);
-        var picture = _graph.Add(new PictureNode { Path = path, FollowSequence = false });
+        var picture = _graph.Add(new PictureNode { Path = path, FollowSequence = false, Preview = true });
 
-        if (NodeEdits.AddLayer(_graph, after, picture, "Bild", ImageProbe.ModeFor(path)) is not var (place, mix)) return;
+        if (NodeEdits.AddLayer(_graph, after, picture, "Bild", ImageProbe.ModeFor(path)) is not var (_, mix)) return;
 
         // In einer Schnittkette wird die neue Ebene angeschnitten wie ihre Nachbarn.
         mix.Clip = clip;
 
-        ArrangeLayer(after, picture, place, mix);
-        picture.X = place.X - NodeLayout.ColumnStep;
-        picture.Y = place.Y;
+        ArrangeLayer();
 
         NodeView.Select(mix);
         NodeView.InvalidateVisual();
@@ -305,21 +303,24 @@ public partial class AtelierPage
     /// </summary>
     private void AddPassLayer(string pass, Node? target = null)
     {
-        if (_graph?.Nodes.OfType<RenderNode>().FirstOrDefault() is not { } file || (target ?? LayerTarget()) is not { } after) return;
+        if (_graph is null || (target ?? LayerTarget()) is not { } after) return;
 
         RememberNodes();
 
         bool clip = LayerEdits.InClip(_graph, after);
 
-        if (!NodeEdits.ShowPass(_graph, file, pass, on: true) ||
-            NodeEdits.AddLayer(_graph, after, file, pass, PassRoles.ByName(pass, sceneLinear: true) ?? BlendMode.Add) is not var (place, mix))
+        // Jeder Pass hat seine eigene Quelle am linken Rand - liest ihn schon eine Ebene, dieselbe.
+        var source = NodeGroups.PassSource(_graph, pass);
+
+        if (NodeEdits.AddLayer(_graph, after, source, pass, PassRoles.ByName(pass, sceneLinear: true) ?? BlendMode.Add) is not var (_, mix))
         {
+            if (!_graph.Links.Any(l => l.From == source.Id)) _graph.Nodes.Remove(source);
             return;
         }
 
         mix.Clip = clip;
 
-        ArrangeLayer(after, file, place, mix);
+        ArrangeLayer();
 
         NodeView.Select(mix);
         NodeView.InvalidateVisual();
@@ -328,21 +329,15 @@ public partial class AtelierPage
     }
 
     /// <summary>
-    /// Mischen rechts neben den Knoten, auf den es kommt; Platzieren eine Spalte davor und
-    /// darueber. Kommt die Ebene aus demselben Knoten - ein Pass auf die Datei selbst -,
-    /// steht Platzieren eine Spalte weiter rechts, sonst liefe sein Kabel rueckwaerts.
+    /// Nach einer neuen Ebene: Der Graph wird in Gruppen neu angeordnet - die Ebene bekommt
+    /// ihren Rahmen an ihrer Stelle in der Folge, ihre Quelle steht links bei den anderen.
     /// </summary>
-    private void ArrangeLayer(Node after, Node source, Node place, MixNode mix)
+    private void ArrangeLayer()
     {
-        int columns = source.X >= after.X - 1 ? 2 : 1;
+        if (_graph is null) return;
 
-        mix.X = after.X + NodeLayout.ColumnStep;
-        mix.Y = after.Y;
-        NodeEdits.MakeRoom(_graph!, mix, columns * NodeLayout.ColumnStep);
-
-        mix.X = after.X + columns * NodeLayout.ColumnStep;
-        place.X = mix.X - NodeLayout.ColumnStep;
-        place.Y = after.Y - NodeLayout.Height(place) - NodeLayout.Gap;
+        NodeLayout.Arrange(_graph);
+        NodeView.InvalidateVisual();
     }
 
     /// <summary>Fragt nach einer Bilddatei. Null, wenn niemand eine waehlt.</summary>

@@ -537,7 +537,7 @@ public static class NodeEditInvariants
             // und die Seite rechnet weiter, sobald er weg ist. Dass es wirklich wirft, prueft
             // erst das Modell.
             var sourcesOnPage = (Dictionary<string, FloatFrame>)Field(page, "_sources")!;
-            string passKey = sourcesOnPage.Keys.First(k => k.Length > 0 && page.Graph!.Nodes.OfType<RenderNode>().Single().Passes.Contains(k) &&
+            string passKey = sourcesOnPage.Keys.First(k => k.Length > 0 && page.Graph!.Nodes.OfType<RenderNode>().Any(r => r.Passes.Contains(k)) &&
                                                            page.Graph.Links.Any(l => l.Output == k));
             var intact = sourcesOnPage[passKey];
             var torn = new FloatFrame
@@ -986,7 +986,7 @@ public static class NodeEditInvariants
         Check.That(copy is OpticsNode { Tool: VignetteTool { Amount: -0.6f } }, "das Original zu aendern laesst die Kopie in Ruhe");
 
         Check.That(NodeEdits.Duplicate(graph, graph.Output!) is null &&
-                   NodeEdits.Duplicate(graph, graph.Nodes.OfType<RenderNode>().Single()) is null,
+                   NodeEdits.Duplicate(graph, NodeGroups.File(graph)!) is null,
                    "Ausgabe und Datei gibt es nur einmal");
     }
 
@@ -1045,13 +1045,15 @@ public static class NodeEditInvariants
             Call(page, "AddPassLayer", diffuse, null!);
             Pump(TimeSpan.FromSeconds(3), () => !Pixels(page).AsSpan().SequenceEqual(plain));
 
-            var file = page.Graph!.Nodes.OfType<RenderNode>().Single();
+            var file = NodeGroups.File(page.Graph)!;
 
             // Ein Farbpass multipliziert - das verraet sein Name (PassRoles). Frueher kam
             // jeder Pass auf Addieren.
-            Check.That(file.Passes.Contains(diffuse) && editor.Selected is MixNode { Mode: BlendMode.Multiply } mix &&
+            // Der Pass bekommt seine eigene Quelle am linken Rand - die Datei bleibt, wie sie war.
+            Check.That(page.Graph.Nodes.OfType<RenderNode>().Any(r => r.Only == diffuse) && !file.Passes.Contains(diffuse) &&
+                       editor.Selected is MixNode { Mode: BlendMode.Multiply } mix &&
                        page.Graph.Into(mix.Id, "Oben") is { } over && page.Graph.Find(over.From) is PlaceNode,
-                       "Pass als Ebene legt einen Ausgang, Platzieren und Mischen an - ein Farbpass auf Multiplizieren");
+                       "Pass als Ebene legt eine Quelle, Platzieren und Mischen an - ein Farbpass auf Multiplizieren");
             Check.That(!Pixels(page).AsSpan().SequenceEqual(plain), "und das Bild aendert sich");
 
             // Die Ebenenliste: oben die neue Ebene, darunter das Bild der Datei - mit Miniaturen.
@@ -1112,7 +1114,7 @@ public static class NodeEditInvariants
             page.StepNodes(back: true);
             Pump(TimeSpan.FromSeconds(3), () => Pixels(page).AsSpan().SequenceEqual(plain));
 
-            Check.That(!page.Graph!.Nodes.OfType<RenderNode>().Single().Passes.Contains(diffuse) &&
+            Check.That(!page.Graph!.Nodes.OfType<RenderNode>().Any(r => r.Passes.Contains(diffuse)) &&
                        Pixels(page).AsSpan().SequenceEqual(plain),
                        "Rueckgaengig nimmt alles wieder heraus");
 
@@ -1201,9 +1203,10 @@ public static class NodeEditInvariants
             Press(buttons.Remove);
             Settle();
 
-            Check.That(page.Graph!.Nodes.Count == nodes - 2 && !page.Graph.Nodes.Any(n => n.Id == diffMix.Id) &&
+            // Die Quelle des Passes geht mit - ihn liest sonst niemand. Die Datei bleibt.
+            Check.That(page.Graph!.Nodes.Count == nodes - 3 && !page.Graph.Nodes.Any(n => n.Id == diffMix.Id) &&
                        page.Graph.Nodes.OfType<RenderNode>().Count() == 1 && editor.Selected is null,
-                       "Loeschen nimmt Mischen und Platzieren heraus - nichts Geloeschtes bleibt gewaehlt");
+                       "Loeschen nimmt Mischen, Platzieren und die Quelle heraus - nichts Geloeschtes bleibt gewaehlt");
 
             page.StepNodes(back: true);
             Pump(TimeSpan.FromSeconds(3), () => Pixels(page).AsSpan().SequenceEqual(layered));
@@ -1256,7 +1259,7 @@ public static class NodeEditInvariants
                        "Rueckgaengig raeumt beide Ebenen wieder ab");
 
             // Ein Pass als Ausgang, am Schalter der Datei.
-            editor.Select(page.Graph.Nodes.OfType<RenderNode>().Single());
+            editor.Select(NodeGroups.File(page.Graph)!);
 
             var fields = (StackPanel)colour.FindName("NodeFields");
 
@@ -1289,13 +1292,13 @@ public static class NodeEditInvariants
 
             string mistName = passes.First(p => p.Label == "Mist").Name;
 
-            Check.That(page.Graph!.Nodes.OfType<RenderNode>().Single().Output(mistName) is not null,
+            Check.That(NodeGroups.File(page.Graph)!.Output(mistName) is not null,
                        "eingeschaltet wird der Pass ein Ausgang");
             Check.That(Pixels(page).AsSpan().SequenceEqual(plain), "der nichts aendert, solange kein Kabel steckt");
 
             page.StepNodes(back: true);
 
-            Check.That(page.Graph!.Nodes.OfType<RenderNode>().Single().Output(mistName) is null,
+            Check.That(NodeGroups.File(page.Graph)!.Output(mistName) is null,
                        "und auch das laesst sich zuruecknehmen");
 
             // Kryptomatte: waehlen durch Klicken, mit Rueckgaengig.
@@ -1550,7 +1553,7 @@ public static class NodeEditInvariants
                        "nach dem letzten Ausgang ist wieder die Ausgabe zu sehen");
 
             // Die Datei hat vier Ausgaenge - der Klick geht sie der Reihe nach durch.
-            var file = page.Graph!.Nodes.OfType<RenderNode>().Single();
+            var file = NodeGroups.File(page.Graph)!;
             var seen = new List<string>();
 
             for (int k = 0; k < 4; k++)

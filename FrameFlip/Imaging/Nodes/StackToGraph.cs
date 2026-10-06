@@ -35,7 +35,9 @@ public static class StackToGraph
     public static NodeGraph Convert(LayerStack? layers, ImageAdjustments? adjustments, GradingStack? picture)
     {
         var graph = new NodeGraph();
-        var render = graph.Add(new RenderNode());
+
+        // Die Datei steht mit den anderen Quellen am linken Rand - auch sie mit Vorschau.
+        var render = graph.Add(new RenderNode { Preview = true });
 
         (Node Node, string Output) image = layers is null || layers.IsPassThrough
             ? (render, RenderNode.Picture)
@@ -70,6 +72,12 @@ public static class StackToGraph
         private (Node Node, string Output)? _group;
         private ImageLayer? _carrier;
         private (Node Node, string Output)? _carrierMask;
+
+        /// <summary>
+        /// Die Quellen am linken Rand: je Pass ein eigener Dateiknoten, der nur ihn zeigt -
+        /// derselbe fuer alle Ebenen und Masken, die diesen Pass lesen.
+        /// </summary>
+        private readonly Dictionary<string, RenderNode> _passes = new(StringComparer.Ordinal);
 
         public Walk(NodeGraph graph, RenderNode render)
         {
@@ -239,8 +247,8 @@ public static class StackToGraph
                 {
                     var source = Source(layer);
 
-                    // Die Vorschau zeigt, welche Ebene dieser Zweig ist.
-                    var place = _graph.Add(new PlaceNode { Place = layer.Place.Clone(), Preview = true });
+                    // Welche Ebene dieser Zweig ist, zeigt die Vorschau ihrer Quelle am linken Rand.
+                    var place = _graph.Add(new PlaceNode { Place = layer.Place.Clone() });
                     _graph.Connect(source.Node, source.Output, place, "Bild");
 
                     image = Scaled(layer, (place, "Bild"));
@@ -375,14 +383,24 @@ public static class StackToGraph
             {
                 if (layer.Source.Length == 0) return (_render, RenderNode.Picture);
 
-                if (!_render.Passes.Contains(layer.Source)) _render.Passes.Add(layer.Source);
-
-                return (_render, layer.Source);
+                return (Pass(layer.Source), layer.Source);
             }
 
-            var picture = _graph.Add(new PictureNode { Path = layer.Source, FollowSequence = layer.FollowSequence });
+            var picture = _graph.Add(new PictureNode { Path = layer.Source, FollowSequence = layer.FollowSequence, Preview = true });
 
             return (picture, "Bild");
+        }
+
+        /// <summary>Die Quelle eines Passes - beim ersten Mal angelegt.</summary>
+        private RenderNode Pass(string pass)
+        {
+            if (!_passes.TryGetValue(pass, out var source))
+            {
+                source = _graph.Add(RenderNode.ForPass(pass));
+                _passes[pass] = source;
+            }
+
+            return source;
         }
 
         /// <summary>Belichtung und Toenung - nur wenn es etwas zu multiplizieren gibt.</summary>
@@ -412,10 +430,7 @@ public static class StackToGraph
             // daraus ein Kabel von der Datei - man sieht, woher die Maske kommt, und
             // kann ihr einen anderen Pass anstecken.
             if (mask.Kind == MaskKind.Pass && mask.Source.Length > 0)
-            {
-                if (!_render.Passes.Contains(mask.Source)) _render.Passes.Add(mask.Source);
-                _graph.Connect(_render, mask.Source, node, "Pass");
-            }
+                _graph.Connect(Pass(mask.Source), mask.Source, node, "Pass");
 
             return (node, "Maske");
         }
@@ -502,7 +517,7 @@ public static class StackToGraph
             {
                 if (!layer.OnTop || layer.Content != LayerContent.Image) continue;
 
-                var source = graph.Add(new PictureNode { Path = layer.Source, FollowSequence = layer.FollowSequence });
+                var source = graph.Add(new PictureNode { Path = layer.Source, FollowSequence = layer.FollowSequence, Preview = true });
 
                 // Ein ausgeblendetes Wasserzeichen steht stumm da - es reicht das Bild
                 // unveraendert durch, und seine Datei wird nicht gelesen.

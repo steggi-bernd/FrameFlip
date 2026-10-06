@@ -96,7 +96,7 @@ public static class NodeTintPickInvariants
 
             // Etwas anderes gewaehlt: Die Pipette galt dem Knoten und endet.
             PickButton().RaiseEvent(new RoutedEventArgs(ButtonBase.ClickEvent));
-            editor.Select(page.Graph!.Nodes.OfType<RenderNode>().First());
+            editor.Select(NodeGroups.File(page.Graph)!);
             var before = (restored.Tint.R, restored.Tint.G, restored.Tint.B);
             Check.That(!page.ColourPickAt(5, 5) && !page.ColourPicking && before == (restored.Tint.R, restored.Tint.G, restored.Tint.B),
                        "ein anderer Knoten gewaehlt: die Pipette endet, die Toenung bleibt");

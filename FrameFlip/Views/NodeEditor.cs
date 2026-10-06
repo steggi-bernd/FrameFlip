@@ -36,6 +36,10 @@ namespace FrameFlip.Views;
 /// Ein Knoten, dessen Bildweg frei ist, faellt in ein Kabel, ueber dem er losgelassen
 /// wird - das Kabel leuchtet vorher auf. Dasselbe gilt fuer einen Effekt, der aus der
 /// Palette des Farbstreifens hereingezogen wird.
+///
+/// Um jede Ebene liegt ein Rahmen mit ihrem Namen, um das Gesamtbild auch
+/// (<see cref="NodeGroups"/>). Am Kopf eines Rahmens gepackt, wandert die ganze Gruppe -
+/// mit den Ebenen, die in ihr liegen.
 /// </summary>
 public sealed class NodeEditor : FrameworkElement
 {
@@ -219,7 +223,13 @@ public sealed class NodeEditor : FrameworkElement
         // alles sehen will, zoomt heraus.
         const double Readable = 0.55;
 
-        if (zoom < Readable && _graph.Output is { } output)
+        if (zoom < Readable && _graph.Layout == NodeLayout.Grouped)
+        {
+            // In Gruppen: oben links - die Quellen und die obersten Ebenen, wie die Liste beginnt.
+            Zoom = Readable;
+            Pan = new Vector(margin - all.X * Zoom, margin - all.Y * Zoom);
+        }
+        else if (zoom < Readable && _graph.Output is { } output)
         {
             Zoom = Readable;
             var focus = Bounds(output);
@@ -305,7 +315,10 @@ public sealed class NodeEditor : FrameworkElement
 
     // ------------------------------------------------------------ Maus
 
-    private enum Drag { None, Node, Pan, Wire }
+    private enum Drag { None, Node, Pan, Wire, Frame }
+
+    /// <summary>Die Knoten einer gezogenen Gruppe und wo sie vor dem Zug standen.</summary>
+    private List<(Node Node, Point Origin)> _dragged = new();
 
     private Drag _drag;
     private Point _start;
@@ -452,6 +465,15 @@ public sealed class NodeEditor : FrameworkElement
         }
 
         var hit = NodeAt(at);
+
+        // Der Kopf eines Rahmens waehlt die Ebene und zieht die ganze Gruppe.
+        if (hit is null && BeginFrame(at))
+        {
+            CaptureMouse();
+            e.Handled = true;
+            return;
+        }
+
         Select(hit);
 
         // Doppelklick auf einen Knoten: das Schnellfeld - und kein Zug, der Knoten bleibt liegen.
@@ -476,6 +498,79 @@ public sealed class NodeEditor : FrameworkElement
         }
 
         e.Handled = true;
+    }
+
+    /// <summary>
+    /// Packt den Rahmen, dessen Kopf unter dem Punkt liegt: Seine Ebene wird gewaehlt, und
+    /// ein Zug verschiebt die ganze Gruppe. False, wenn dort kein Kopf ist.
+    /// </summary>
+    internal bool BeginFrame(Point screen)
+    {
+        if (FrameAt(screen) is not { } frame) return false;
+
+        Select(frame.Head);
+
+        _drag = Drag.Frame;
+        _start = screen;
+        _moved = false;
+        _dragged = FrameNodes(frame).Select(n => (n, new Point(n.X, n.Y))).ToList();
+
+        return true;
+    }
+
+    /// <summary>Zieht den gepackten Rahmen mit allem darin an diesen Punkt.</summary>
+    internal void DragFrame(Point screen)
+    {
+        if (_drag != Drag.Frame) return;
+
+        var delta = screen - _start;
+
+        // Erst ab ein paar Punkten ist es ein Zug - ein Klick auf den Kopf waehlt nur.
+        if (!_moved && Math.Abs(delta.X) < 3 && Math.Abs(delta.Y) < 3) return;
+        if (!_moved) Editing?.Invoke();
+
+        _moved = true;
+
+        foreach (var (node, origin) in _dragged)
+        {
+            node.X = Math.Round(origin.X + delta.X / Zoom);
+            node.Y = Math.Round(origin.Y + delta.Y / Zoom);
+        }
+
+        InvalidateVisual();
+    }
+
+    /// <summary>Laesst den Rahmen los - hat er sich bewegt, gehoert die Lage gespeichert.</summary>
+    internal void FinishFrame()
+    {
+        if (_drag != Drag.Frame) return;
+
+        bool shifted = _moved;
+
+        EndDrag();
+        if (shifted) LayoutChanged?.Invoke();
+    }
+
+    /// <summary>Die Knoten eines Rahmens samt denen der Ebenen, die in ihm liegen.</summary>
+    private List<Node> FrameNodes(NodeGroup group)
+    {
+        var nodes = new List<Node>();
+        var seen = new HashSet<string>(StringComparer.Ordinal);
+        var open = new Stack<NodeGroup>();
+        open.Push(group);
+
+        while (open.Count > 0)
+        {
+            var next = open.Pop();
+            if (!seen.Add(next.Head.Id)) continue;
+
+            nodes.AddRange(next.Members);
+
+            foreach (var (child, _, _) in _frames)
+                if (child.Parent?.Id == next.Head.Id) open.Push(child);
+        }
+
+        return nodes;
     }
 
     private void StartPan(Point at)
@@ -576,6 +671,12 @@ public sealed class NodeEditor : FrameworkElement
             return;
         }
 
+        if (_drag == Drag.Frame)
+        {
+            DragFrame(at);
+            return;
+        }
+
         if (Selected is null) return;
 
         // Erst ab ein paar Punkten ist es ein Zug - ein Klick zum Waehlen soll nichts verschieben.
@@ -616,6 +717,12 @@ public sealed class NodeEditor : FrameworkElement
         if (_drag == Drag.Wire)
         {
             FinishWire(e.GetPosition(this));
+            return;
+        }
+
+        if (_drag == Drag.Frame)
+        {
+            FinishFrame();
             return;
         }
 
@@ -903,6 +1010,15 @@ public sealed class NodeEditor : FrameworkElement
             Selected.Y = _origin.Y;
         }
 
+        if (_drag == Drag.Frame && _moved)
+        {
+            foreach (var (node, origin) in _dragged)
+            {
+                node.X = origin.X;
+                node.Y = origin.Y;
+            }
+        }
+
         _moved = false;
         EndDrag();
     }
@@ -923,6 +1039,7 @@ public sealed class NodeEditor : FrameworkElement
         _wireSocket = null;
         _fits = null;
         _hover = null;
+        _dragged = new();
         Cursor = null;
 
         if (IsMouseCaptured) ReleaseMouseCapture();
@@ -1050,7 +1167,8 @@ public sealed class NodeEditor : FrameworkElement
     /// </summary>
     public void Duplicate(Node node)
     {
-        if (_graph is null || node is OutputNode or RenderNode) return;
+        // Die Datei gibt es einmal; eine Quelle fuer einen Pass darf man verdoppeln.
+        if (_graph is null || node is OutputNode or RenderNode { Only: null }) return;
 
         Editing?.Invoke();
         var copy = NodeEdits.Duplicate(_graph, node);
@@ -1139,6 +1257,8 @@ public sealed class NodeEditor : FrameworkElement
 
         _marked = MarkedBy(Selected);
 
+        foreach (var (group, box, _) in Frames()) DrawFrame(dc, group, box);
+
         foreach (var link in _graph.Links)
             if (!ReferenceEquals(link, _lifted)) DrawLink(dc, link);
 
@@ -1170,6 +1290,147 @@ public sealed class NodeEditor : FrameworkElement
     private static readonly Brush WarningBack = Frozen(new SolidColorBrush(Color.FromArgb(0xE6, 0x3A, 0x22, 0x22)));
     private static readonly Pen WarningEdge = Frozen(new Pen(new SolidColorBrush(Color.FromRgb(0xC0, 0x5A, 0x4A)), 1));
     private static readonly Pen Fitting = Frozen(new Pen(Brushes.White, 2));
+
+    // ------------------------------------------------------------ Rahmen
+
+    private readonly List<(NodeGroup Group, Rect Box, int Level)> _frames = new();
+
+    private static readonly Brush FrameFill = Frozen(new SolidColorBrush(Color.FromArgb(0x16, 0xA4, 0x7B, 0xF0)));
+    private static readonly Pen FrameEdge = Frozen(new Pen(new SolidColorBrush(Color.FromArgb(0x58, 0xA4, 0x7B, 0xF0)), 1));
+    private static readonly Pen FrameChosen = Frozen(new Pen(new SolidColorBrush(Color.FromArgb(0xD0, 0xA4, 0x7B, 0xF0)), 1.5));
+    private static readonly Brush PictureFill = Frozen(new SolidColorBrush(Color.FromArgb(0x12, 0xE3, 0xB3, 0x41)));
+    private static readonly Pen PictureEdge = Frozen(new Pen(new SolidColorBrush(Color.FromArgb(0x50, 0xE3, 0xB3, 0x41)), 1));
+    private static readonly Pen PictureChosen = Frozen(new Pen(new SolidColorBrush(Color.FromArgb(0xD0, 0xE3, 0xB3, 0x41)), 1.5));
+
+    private const double FrameHeader = NodeLayout.FrameHeader;
+    private const double FramePad = NodeLayout.FramePad;
+    private const double FrameNest = NodeLayout.FrameNest;
+
+    /// <summary>
+    /// Die Rahmen der Gruppen in Graphkoordinaten, aeussere zuerst - innere liegen darueber.
+    /// Ein Rahmen umgibt seine Knoten, oben Platz fuer den Kopf, und die Rahmen der Ebenen,
+    /// die in ihm liegen. Er folgt seinen Knoten, wenn man sie verschiebt.
+    /// </summary>
+    internal IReadOnlyList<(NodeGroup Group, Rect Box, int Level)> Frames()
+    {
+        _frames.Clear();
+        _frameTitles = null;
+
+        if (_graph is null) return _frames;
+
+        var groups = NodeGroups.Of(_graph);
+        if (groups.Count == 0) return _frames;
+
+        var levels = NodeLayout.Levels(groups);
+        var children = groups.Where(g => g.Parent is not null).ToLookup(g => g.Parent!.Id, StringComparer.Ordinal);
+        var boxes = new Dictionary<string, Rect>(StringComparer.Ordinal);
+
+        Rect Box(NodeGroup group, int depth)
+        {
+            if (boxes.TryGetValue(group.Head.Id, out var known)) return known;
+
+            var box = group.Members.Select(Bounds).Aggregate(Rect.Union);
+            box = new Rect(box.X - FramePad, box.Y - FramePad - FrameHeader,
+                           box.Width + 2 * FramePad, box.Height + 2 * FramePad + FrameHeader);
+
+            if (depth < 32)
+            {
+                foreach (var child in children[group.Head.Id])
+                {
+                    var inner = Box(child, depth + 1);
+                    inner.Inflate(FrameNest, FrameNest);
+                    box.Union(inner);
+                }
+            }
+
+            boxes[group.Head.Id] = box;
+            return box;
+        }
+
+        foreach (var group in groups.OrderBy(g => levels[g.Head.Id]))
+            _frames.Add((group, Box(group, 0), levels[group.Head.Id]));
+
+        return _frames;
+    }
+
+    /// <summary>Der Rahmen, dessen Kopf unter einem Punkt auf dem Schirm liegt - innere zuerst.</summary>
+    internal NodeGroup? FrameAt(Point screen)
+    {
+        if (_graph is null) return null;
+        if (_frames.Count == 0) Frames();
+
+        var at = ToGraph(screen);
+
+        for (int i = _frames.Count - 1; i >= 0; i--)
+        {
+            var (group, box, _) = _frames[i];
+
+            if (new Rect(box.X, box.Y, box.Width, FrameHeader + FramePad / 2).Contains(at)) return group;
+        }
+
+        return null;
+    }
+
+    /// <summary>Was im Kopf der Rahmen steht - je Zeichnen einmal aus der Ebenenliste gelesen.</summary>
+    private Dictionary<string, (string Title, string Detail)>? _frameTitles;
+
+    private (string Title, string Detail) FrameTitle(NodeGroup group)
+    {
+        if (group.IsPicture) return (Localization.Strings.T("S_TargetPicture"), "");
+
+        if (_frameTitles is null)
+        {
+            _frameTitles = new Dictionary<string, (string, string)>(StringComparer.Ordinal);
+
+            foreach (var layer in NodeLayerList.Of(_graph!))
+                if (layer.Mix is { } mix) _frameTitles.TryAdd(mix.Id, (layer.Name, layer.Detail));
+        }
+
+        return _frameTitles.TryGetValue(group.Head.Id, out var known) ? known : (Title?.Invoke(group.Head) ?? "", "");
+    }
+
+    private void DrawFrame(DrawingContext dc, NodeGroup group, Rect bounds)
+    {
+        var box = new Rect(ToScreen(bounds.TopLeft), new Size(bounds.Width * Zoom, bounds.Height * Zoom));
+        if (box.Right < 0 || box.Bottom < 0 || box.Left > ActualWidth || box.Top > ActualHeight) return;
+
+        bool picture = group.IsPicture;
+        bool chosen = Selected is not null && group.Members.Contains(Selected);
+        double radius = 8 * Zoom;
+
+        dc.PushOpacity(group.Head.Muted && !picture ? 0.5 : 1);
+        dc.DrawRoundedRectangle(picture ? PictureFill : FrameFill,
+                                picture ? (chosen ? PictureChosen : PictureEdge) : (chosen ? FrameChosen : FrameEdge),
+                                box, radius, radius);
+
+        double size = 13 * Zoom;
+
+        if (size >= 6)
+        {
+            var (title, detail) = FrameTitle(group);
+
+            var name = Label(title, Math.Min(size, 20), Text);
+            name.MaxTextWidth = Math.Max(1, box.Width - 20 * Zoom);
+            name.MaxLineCount = 1;
+            name.Trimming = TextTrimming.CharacterEllipsis;
+
+            var at = new Point(box.X + 10 * Zoom, box.Y + (FrameHeader * Zoom - name.Height) / 2 + 2 * Zoom);
+            dc.DrawText(name, at);
+
+            if (detail.Length > 0 && name.WidthIncludingTrailingWhitespace + 40 * Zoom < box.Width)
+            {
+                var rest = Label(detail, Math.Min(11 * Zoom, 17), Faint);
+                rest.MaxTextWidth = Math.Max(1, box.Width - name.WidthIncludingTrailingWhitespace - 34 * Zoom);
+                rest.MaxLineCount = 1;
+                rest.Trimming = TextTrimming.CharacterEllipsis;
+
+                dc.DrawText(rest, new Point(at.X + name.WidthIncludingTrailingWhitespace + 12 * Zoom,
+                                            at.Y + (name.Height - rest.Height) / 2 + 1 * Zoom));
+            }
+        }
+
+        dc.Pop();
+    }
 
     /// <summary>Das Kabel im Zug - und die Anschluesse, an die es passt.</summary>
     private void DrawWire(DrawingContext dc)
@@ -1285,7 +1546,11 @@ public sealed class NodeEditor : FrameworkElement
         var halo = new Pen(Halo, pen.Thickness + 3);
         halo.Freeze();
 
-        dc.PushOpacity(landing || lit ? 1 : from.Muted || to.Muted ? 0.35 : 0.85);
+        // Ein Kabel, das die Maske nicht liest - der Untergrund eines Verlaufs -, steckt,
+        // tut aber nichts. Blass, damit es den Blick nicht quer durch die Gruppen zieht.
+        bool idle = to is MaskNode reader && !reader.Reads(link.Input);
+
+        dc.PushOpacity(landing || lit ? 1 : idle ? 0.12 : from.Muted || to.Muted ? 0.35 : 0.85);
         dc.DrawGeometry(null, halo, path);
         dc.DrawGeometry(null, pen, path);
         dc.Pop();

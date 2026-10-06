@@ -97,7 +97,7 @@ public partial class AtelierPage
         if (LayerEdits.AddCutout(_graph, after, after, output, mask, "Maske") is not ({ } cutout, { } mix)) return null;
 
         mix.Label = Strings.T("S_CutoutLayerName");
-        ArrangeLayer(after, after, cutout, mix);
+        ArrangeLayer();
 
         NodeView.Select(mix);
         NodeView.InvalidateVisual();
