@@ -72,6 +72,10 @@ Knotenmodus bleibt, wie er ist.
 
 **Leitsatz:** Eine Maske sagt, wo etwas gilt – und sie gehört genau einem Ding.
 
+> Überarbeitet nach der Rückmeldung vom 29. September, siehe Abschnitt 7. M1 als eigene
+> Ebenenart entfällt, M3 sagt es über den Platz der Maske, M2 und M4 bleiben. Die Mockups
+> stehen im Canvas „Atelier – Masken und Ebenen“.
+
 ### M1 Ausblenden als eigene Ebenenart
 
 Eine neue Art neben der Einstellungsebene: **„Ausblenden“**. Ihre Maske sagt, was vom
@@ -136,18 +140,37 @@ einen Anstrich, der hinzufügt oder wegnimmt (Alt, rechte Maustaste – wie heut
 
 ## 6. Schnitte
 
-1. **W3a Ausblenden:** Ebenenart, Rechnung im Stapel und beim Umwandeln, Schachbrett,
-   Export-Hinweis, die drei Knöpfe an der Auswahl.
-2. **W3b Die Maske sagt, was sie tut:** Beschriftung in der Zeile, Vorgaben je Ebenenart, Namen
-   (M3, M4).
-3. **W3c Pinsel verfeinert jede Maske:** Anstrich über jeder Maskenart (M2).
-4. Danach der Rest von W3: Auswahl aus Tiefe, Normale und Bewegung, Zauberstab, Maske über die
+1. **W3a Masken als eigene Zeilen:** Die Ebene klappt auf, jede Maske ist eine Zeile darunter,
+   mehrere Masken je Ebene, verknüpft mit dazu, abziehen und Schnittmenge. Eine gewählte
+   Maskenzeile zeigt unten nur ihre Einstellungen. Der Platz sagt die Wirkung (M3): direkt an
+   der Ebene „wo sie zu sehen ist“, an den Korrekturen „wo korrigiert wird“. Der Pinsel malt in
+   die gewählte Maske oder legt an der gewählten Ebene eine gemalte Maskenzeile an, nie eine
+   neue Ebene (M2).
+2. **W3b Ausblenden als Effekt:** „Ausblenden“ in der fx-Liste einer Einstellungsebene mit
+   Maske, kombinierbar mit Korrekturen an derselben Maske. An der Auswahl „+ Korrektur“,
+   „Ausblenden“, „Nur behalten“, „Umkehren“. Schachbrett in der Vorschau, Hinweis beim Export
+   ohne Transparenz.
+3. **W3c Knoten in Gruppen:** Quellen links, je Ebene ein Rahmen, die Mischen in einer Spalte.
+   Läuft als Versuch auf `experiment/knoten-gruppen` (docs/Atelier-Knoten-Gruppen.md); danach
+   die benannten Einfügestellen und eingeklappte Rahmen.
+4. **W3d Einstellungen übernehmen:** Ebene gewählt, Pipette auf eine andere Ebenenzeile, ein
+   Feld fragt, was mitkommt (Korrekturen, Mischart und Deckkraft, Masken).
+5. Danach der Rest von W3: Auswahl aus Tiefe, Normale und Bewegung, Zauberstab, Maske über die
    Folge tragen.
 
 ## 7. Entscheidungen
 
-- **M1:** Ausblenden als eigene Ebenenart (empfohlen) – oder als dritte Wirkung am Schalter?
-- **M2:** Der Pinsel verfeinert die vorhandene Maske der gewählten Ebene, statt still eine neue
-  Ebene anzulegen (empfohlen)?
-- **M3:** Wirkung vorgegeben je Ebenenart, Schalter nur noch bei Bild und Pass?
-- **M4:** Die Namen so?
+Rückmeldung vom 29. September und 6. Oktober:
+
+- **M1:** Keine eigene Ebenenart. Eine Auswahl wird erst zur Maske, wenn ihr ein Effekt
+  gegeben wird. Transparenz ist ein solcher Effekt („Ausblenden“), und an der noch sichtbaren
+  Stelle sollen weiter Farbkorrekturen möglich sein.
+- **M2:** Bestätigt – wer eine Ebene mit Maske bearbeitet, bearbeitet diese Maske. Heute legt
+  der Pinsel bei einer nicht gemalten Maske noch eine neue Ebene „Maske“ an; das ändert W3a.
+- **M3:** Statt eines Schalters sagt der Platz der Maske in der aufgeklappten Ebene, was sie
+  begrenzt.
+- **M4:** So umgesetzt (PR #91).
+- **Neu:** Ebene und Masken einzeln ansprechbar, mehrere Masken je Ebene (W3a), Gruppen im
+  Graphen wie in Blender (W3c, als Versuch), Einstellungen per Pipette übernehmen (W3d).
+- Alle vorgeschlagenen Schnitte W3a bis W3d sind gewünscht. Der Knoten-Versuch kam zuerst,
+  weil er die Frage „vor oder nach der Maske?“ im Graphen beantworten soll.
