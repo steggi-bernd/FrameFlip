@@ -300,12 +300,42 @@ public partial class AtelierPage
             : (_finalAdjustments, _finalGrading);
 
     /// <summary>
-    /// Welches Bild gezeichnet wird: das zusammengesetzte, oder beim Vergleich das
-    /// der Datei.
+    /// Welches Bild gezeichnet wird: das zusammengesetzte, oder beim Vergleich das Original -
+    /// dieselben Ebenen ohne eigene Korrekturen (<see cref="Untouched"/>).
     ///
-    /// Auch die Schichtung faellt beim Vergleich weg. Sie ist ein Eingriff wie jeder
-    /// andere - ein "Original", das eine selbstgebaute Mischung aus acht Passen
-    /// zeigt, waere keines.
+    /// Frueher fiel beim Vergleich auch die Schichtung weg, und es stand das Bild der Datei da.
+    /// Wer sein Bild aus Passen zusammensetzt, sah dann ein anderes Bild mit anderer Farbe -
+    /// nicht sein Bild ohne Korrektur. Wie die Ebenen eingemischt werden, gehoert zum Aufbau.
     /// </summary>
-    private FloatFrame? Shown() => _showingOriginal ? _base ?? _frame : _soloFrame ?? _frame;
+    private FloatFrame? Shown() => _showingOriginal ? OriginalFrame() : _soloFrame ?? _frame;
+
+    /// <summary>Das Original im Stapel - in einem eigenen Frame, damit das Ergebnis bleibt.</summary>
+    private FloatFrame? _original;
+
+    /// <summary>Was beim Original obenauf liegt: die Wasserzeichen, ebenfalls ohne Korrektur.</summary>
+    private OverlayPlan[] _originalOverlays = Overlays.None;
+
+    /// <summary>
+    /// Setzt den Stapel ohne eigene Korrekturen zusammen. Im Knotenmodus gibt das Bild der
+    /// Datei nur die Leinwand vor - gerechnet wird beim Zeichnen, siehe RenderUntouchedNodes.
+    /// </summary>
+    private FloatFrame? OriginalFrame()
+    {
+        if (_base is null) return _frame;
+
+        _originalOverlays = Overlays.None;
+        if (InNodes) return _base;
+
+        var plain = Untouched.Of(Layers.Stack);
+
+        _original = LayerComposer.Compose(plain, _sources, _original, _coarse ? CoarseStep : 1, _number);
+        var shown = _original ?? _base;
+
+        _originalOverlays = Overlays.Prepare(plain, _sources, shown.Width, shown.Height);
+
+        // Hat der Composer eine Quelle durchgereicht, gehoert sie ihm nicht - wie beim Ergebnis.
+        if (_original is not null && !Owned(_original)) _original = null;
+
+        return shown;
+    }
 }
