@@ -1199,3 +1199,30 @@ Aus dem Maskenkonzept (Entscheidung M4, 29. September): drei Namen, die in die I
   „alle Bilder“ die gemalte Maske ent- und wieder sperren. Die Nachbargruppen (Masken,
   gemeinsame Korrektur, Texte, Einstellungen, Tastenhilfe, Rückmeldungen) liefen mit 116
   Zusicherungen grün. Eine echte Instanz startete ohne Fehler.
+
+### Original mit den Ebenen (`fix/original-mit-ebenen`)
+
+Rückmeldung vom 7. Oktober: „Original“ zeigte das Bild ohne richtig angewandte Pässe und mit
+völlig falscher Farbe. Es zeigte bewusst das Bild der Datei ohne Ebenen, nach der Regel, eine
+selbstgebaute Mischung sei kein Original. Wer sein Bild aus Pässen zusammensetzt, sah damit
+aber ein ganz anderes Bild als das eigene ohne Korrektur.
+
+- **Jetzt:** Das Original zeigt dieselben Ebenen, eingemischt wie sonst (Mischart, Deckkraft,
+  Masken, Schnittmasken, Gruppen, Lage, Deckungsschleier, Wasserzeichen). Es entfällt nur, was
+  man selbst an Farbe und Licht gedreht hat: die Korrektur an jeder Ebene, Einstellungsebenen
+  (sie bleiben stehen, aber neutral), Belichtung und Tönung je Ebene und alles am Gesamtbild.
+- **Im Knotenmodus** derselbe Graph, darin alles stumm, was die Farbe ändert: Korrekturen,
+  Belichtung und Tönung, Licht, Werkzeuge, Optik, Geometrie, Renderdaten, Tonwert und
+  Durchgänge am fertigen Bild. Mischen, Platzieren, Masken und die Sichtumwandlung bleiben.
+- Gerechnet wird über `Untouched` (`FrameFlip/Imaging/Untouched.cs`), der Stapel und der Graph
+  selbst bleiben unverändert.
+- **Proben** (`OriginalViewInvariants`, 14 Zusicherungen):
+  - Im Modell bleibt die Mischung und fällt die Korrektur weg, auch in Gruppen. Das Original
+    unterscheidet sich vom bearbeiteten Bild und vom Bild der Datei. Stapel und Graph ergeben
+    dasselbe Original.
+  - Auf der Seite ist das Original eines bearbeiteten Stapels das Bild desselben Stapels ohne
+    Korrekturen, im Stapel und im Knotenmodus, und nicht das Bild der Datei allein.
+  - Gegenprobe: Mit dem alten Verhalten schlagen drei der Seitenprüfungen an.
+  - Die Nachbargruppen (Rückmeldungen, Tastenhilfe, Knoten bearbeiten, Knotenmodus,
+    Isolieren, Sichthilfen, Seite, Parität von Graph und Export) liefen mit 584
+    Zusicherungen grün.
