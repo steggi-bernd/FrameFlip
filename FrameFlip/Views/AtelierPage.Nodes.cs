@@ -234,6 +234,42 @@ public partial class AtelierPage
         return done;
     }
 
+    /// <summary>Wohin das Original im Knotenmodus seine Zwischenbilder legt - nicht in den Vorrat des Graphen.</summary>
+    private readonly GridPool _originalPool = new();
+
+    /// <summary>
+    /// Das Original im Knotenmodus: derselbe Graph, alles stumm, was die Farbe aendert
+    /// (<see cref="Untouched"/>). Ohne Zwischenspeicher, Vorschauen und Betrachter - die
+    /// gehoeren dem Graphen, wie er eingestellt ist.
+    /// </summary>
+    private bool RenderUntouchedNodes(IntPtr target, int stride)
+    {
+        if (_graph is null || _base is null) return false;
+
+        var inputs = new GraphInputs
+        {
+            Sources = _sources,
+            Data = NodeData(),
+            View = ViewFor(_base),
+            Step = _coarse ? CoarseStep : 1,
+            Number = _number,
+            Pool = _originalPool,
+        };
+
+        try
+        {
+            return GraphEvaluator.Render(Untouched.Of(_graph), inputs, target, stride);
+        }
+        catch (Exception e) when (e is not OutOfMemoryException)
+        {
+            // Wie beim Graphen selbst: Das Original darf die Seite nicht anhalten.
+            _originalPool.Clear();
+            Configuration.SettingsStore.Trace("Original im Knotenmodus: " + e);
+
+            return false;
+        }
+    }
+
     /// <summary>Was der Graph fuer eine Rechnung dieser Seite bekommt - fuer das ganze Bild und fuer einen Ausschnitt.</summary>
     private GraphInputs NodeInputs(FloatFrame canvas, int step, GridPool? pool = null) => new()
     {

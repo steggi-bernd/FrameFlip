@@ -131,6 +131,7 @@ static int RunAll()
     EqualiseInvariants.Run();
     MatchInvariants.Run();
     FeedbackFixInvariants.Run();
+    OriginalViewInvariants.Run();
     AtelierHintInvariants.Run();
     MaskNameInvariants.Run();
     AtelierProjectInvariants.Run();
