@@ -56,6 +56,47 @@ public static class ShellChrome
     [DllImport("user32.dll")]
     private static extern bool GetMonitorInfo(IntPtr monitor, ref MONITORINFO info);
 
+    [DllImport("user32.dll")]
+    private static extern bool GetWindowRect(IntPtr window, out RECT rect);
+
+    /// <summary>
+    /// Wie weit ein maximiertes Fenster ueber den Arbeitsbereich seines Bildschirms hinausragt -
+    /// in geraeteunabhaengigen Punkten, je Seite. Null, wenn es nicht maximiert ist oder
+    /// genau passt.
+    ///
+    /// Gemessen und nicht angenommen: Windows legt ein maximiertes Fenster mit eigener Leiste
+    /// um die Breite seines Anfassrahmens ueber den Rand hinaus, und ob die Korrektur in
+    /// WM_GETMINMAXINFO greift, haengt von der Anordnung der Bildschirme ab. Auf einem
+    /// zweiten Bildschirm links vom ersten klebte der Inhalt oben und unten am Rand - die
+    /// Leisten waren um diesen Streifen abgeschnitten.
+    /// </summary>
+    public static Thickness Overhang(Window window)
+    {
+        try
+        {
+            if (window.WindowState != WindowState.Maximized) return new Thickness(0);
+
+            IntPtr handle = new WindowInteropHelper(window).Handle;
+            if (handle == IntPtr.Zero || !GetWindowRect(handle, out var rect)) return new Thickness(0);
+
+            IntPtr monitor = MonitorFromWindow(handle, MONITOR_DEFAULTTONEAREST);
+            var info = new MONITORINFO { Size = Marshal.SizeOf<MONITORINFO>() };
+            if (monitor == IntPtr.Zero || !GetMonitorInfo(monitor, ref info)) return new Thickness(0);
+
+            double scale = PresentationSource.FromVisual(window)?.CompositionTarget?.TransformToDevice.M11 ?? 1;
+            if (scale <= 0) scale = 1;
+
+            return new Thickness(Math.Max(0, info.Work.Left - rect.Left) / scale,
+                                 Math.Max(0, info.Work.Top - rect.Top) / scale,
+                                 Math.Max(0, rect.Right - info.Work.Right) / scale,
+                                 Math.Max(0, rect.Bottom - info.Work.Bottom) / scale);
+        }
+        catch (Exception)
+        {
+            return new Thickness(0);
+        }
+    }
+
     /// <summary>
     /// An ein Fenster haengen, sobald es ein Handle hat (SourceInitialized).
     /// </summary>

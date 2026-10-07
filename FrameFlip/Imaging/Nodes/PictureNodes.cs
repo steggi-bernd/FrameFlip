@@ -467,7 +467,10 @@ public sealed class FramePassNode : Node
         var image = run.Image("Bild");
         var context = run.Context;
 
-        if (image is null || Pass is null || Pass.IsNeutral || context.SkipFramePasses || context.Step != 1)
+        // Auf dem groben Gitter nur, wer eine grobe Fassung kennt (C7c) - wie im Stapel.
+        bool coarse = context.Step != 1;
+
+        if (image is null || Pass is null || Pass.IsNeutral || context.SkipFramePasses || coarse && Pass is not ICoarseFramePass)
         {
             run.Set("Bild", image);
             return;
@@ -475,7 +478,8 @@ public sealed class FramePassNode : Node
 
         Pass.Prepare();
 
-        int width = context.Width, height = context.Height;
+        // Auf dem groben Gitter ist das Bild so gross wie das Gitter, nicht wie die Datei.
+        int width = coarse ? context.GridWidth : context.Width, height = coarse ? context.GridHeight : context.Height;
         int stride = width * 4;
         var pixels = new byte[stride * height];
         var rgb = image.Rgb;
@@ -490,7 +494,10 @@ public sealed class FramePassNode : Node
         }
 
         fixed (byte* start = pixels)
-            Pass.Apply((IntPtr)start, width, height, stride, context.Number);
+        {
+            if (coarse) ((ICoarseFramePass)Pass).ApplyCoarse((IntPtr)start, width, height, stride, context.Number, context.Step);
+            else Pass.Apply((IntPtr)start, width, height, stride, context.Number);
+        }
 
         var back = context.Take(rgb.Length);
         var alpha = context.Take(a.Length);

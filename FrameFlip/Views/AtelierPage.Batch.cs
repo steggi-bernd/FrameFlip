@@ -84,22 +84,91 @@ public partial class AtelierPage
         if (_frame is null || _sequence is null || _sequence.Count == 0)
         {
             ExportBar.Visibility = Visibility.Collapsed;
+            SequenceText.Text = "";
+            PreviousFrameButton.Visibility = NextFrameButton.Visibility = Visibility.Collapsed;
             return;
         }
 
         ExportBar.Visibility = Visibility.Visible;
 
-        SequenceText.Text = _sequence.Count == 1
-            ? Strings.T("S_SingleImage")
+        // Unten in der Statuszeile: welches Bild der Folge, und die Schritte davor und danach.
+        int at = FrameIndex();
+
+        SequenceText.Text = _sequence.Count == 1 ? Strings.T("S_SingleImage")
+            : at >= 0 ? Strings.T("S_FramePosition", (at + 1).ToString(), _sequence.Count.ToString())
             : Strings.T("S_FrameCount", _sequence.Count.ToString());
+
+        var steps = _sequence.Count > 1 && at >= 0 ? Visibility.Visible : Visibility.Collapsed;
+        PreviousFrameButton.Visibility = NextFrameButton.Visibility = steps;
+        PreviousFrameButton.IsEnabled = at > 0;
+        NextFrameButton.IsEnabled = at >= 0 && at < _sequence.Count - 1;
 
         // Ohne Ziel kein Lauf: den Ordner zu erraten waere die Art Bequemlichkeit,
         // die irgendwann dreihundert Dateien an einer ueberraschenden Stelle ablegt.
         RunButton.IsEnabled = _target is not null && _running is null;
         TargetText.Text = _target ?? Strings.T("S_NoTarget");
+
+        // Der Schnell-Export braucht kein Ziel: ohne gewaehltes schreibt er in den Ordner
+        // FrameFlip neben den Bildern, und er ueberschreibt nie.
+        QuickExportButton.IsEnabled = _path is not null && _running is null;
+
+        ShowEightBitNote();
     }
 
     private void OnFormatChanged(object sender, SelectionChangedEventArgs e) => UpdateBatchBar();
+
+    /// <summary>
+    /// Ob im Rezept ein Durchgang ueber das fertige Bild wirkt - Pixel Sort oder Fehlerdiffusion.
+    /// Beide rechnen in acht Bit und laufen in einer 16-Bit-Ausgabe nicht (siehe
+    /// <see cref="FloatFrameProcessor.ApplyRgba64"/>).
+    /// </summary>
+    internal bool FramePassesActive()
+        => InNodes
+            ? _graph!.Nodes.OfType<Imaging.Nodes.FramePassNode>().Any(node => !node.Muted && node.Pass is { IsNeutral: false })
+            : _finalGrading.Frame.Length > 0;
+
+    /// <summary>
+    /// Sagt an der Ausgabe, wenn das gewaehlte Format einen solchen Durchgang weglaesst. Die
+    /// Vorschau zeigt ihn - ohne diesen Satz fehlte er in der Datei, und niemand wuesste warum.
+    /// </summary>
+    private void ShowEightBitNote()
+    {
+        bool sixteen = Selected.Image is GradeOutputFormat.Png16 or GradeOutputFormat.Tiff16;
+
+        EightBitNote.Visibility = sixteen && _frame is not null && FramePassesActive()
+            ? Visibility.Visible
+            : Visibility.Collapsed;
+    }
+
+    /// <summary>Wo das offene Bild in seiner Folge steht - oder -1.</summary>
+    private int FrameIndex()
+    {
+        if (_sequence is null || _path is null) return -1;
+
+        string open = Path.GetFullPath(_path);
+
+        for (int i = 0; i < _sequence.Frames.Count; i++)
+            if (string.Equals(Path.GetFullPath(_sequence.Frames[i].Path), open, StringComparison.OrdinalIgnoreCase)) return i;
+
+        return -1;
+    }
+
+    /// <summary>Ein Bild zurueck in der Folge - unten in der Statuszeile.</summary>
+    private void OnPreviousFrame(object sender, RoutedEventArgs e) => StepFrame(-1);
+
+    /// <summary>Ein Bild weiter in der Folge.</summary>
+    private void OnNextFrame(object sender, RoutedEventArgs e) => StepFrame(+1);
+
+    internal void StepFrame(int by)
+    {
+        int at = FrameIndex();
+        if (_sequence is null || at < 0) return;
+
+        int next = at + by;
+        if (next < 0 || next >= _sequence.Count) return;
+
+        Open(_sequence.Frames[next].Path);
+    }
 
     private void OnChooseTargetClicked(object sender, RoutedEventArgs e)
     {
@@ -125,7 +194,80 @@ public partial class AtelierPage
     {
         if (_sequence is null || _target is null || _running is not null) return;
 
+        var chosen = Selected;
+
+        await Export(_sequence.Frames.Select(f => f.Path).ToList(), _target, nameFor: null,
+                     chosen.Video is { } preset ? VideoTarget(preset) : null);
+    }
+
+    /// <summary>
+    /// Schnell-Export: ohne Dialog in den Ordner FrameFlip neben den Bildern - oder in den
+    /// gewaehlten Zielordner -, unter dem naechsten freien Namen. Ein Einzelbild wird eine
+    /// Datei, eine Sequenz ein eigener Ordner, ein Video eine Datei. Siehe QuickExport.
+    /// </summary>
+    private async void OnQuickExportClicked(object sender, RoutedEventArgs e) => await QuickExportNow();
+
+    /// <summary>Der Schnell-Export selbst - fuer die Probe ohne Knopf.</summary>
+    internal async Task QuickExportNow()
+    {
+        if (_sequence is null || _path is null || _running is not null) return;
+        if (Atelier.SequenceKey.Of(_path) is not { } key) return;
+
+        var chosen = Selected;
         var frames = _sequence.Frames.Select(f => f.Path).ToList();
+        string folder = Atelier.QuickExport.FolderFor(key, _target);
+
+        string written;
+        GradeBatchResult? result;
+
+        try
+        {
+            if (chosen.Video is { } preset)
+            {
+                string stem = Atelier.QuickExport.Claim(folder, key.Name, preset.Extension, asFolder: false);
+                written = Path.Combine(folder, stem + preset.Extension);
+                result = await Export(frames, folder, nameFor: null, written);
+            }
+            else if (frames.Count == 1)
+            {
+                // Keine Sequenz erkannt: ein einzelnes Bild, unter seinem eigenen Namen.
+                string extension = GradeBatch.Extension(chosen.Image!.Value);
+                string stem = Atelier.QuickExport.Claim(folder, key.Name, extension, asFolder: false);
+                written = Path.Combine(folder, stem + extension);
+                result = await Export(frames, folder, _ => stem, videoPath: null);
+            }
+            else
+            {
+                // Eine Sequenz: ein Ordner, darin die Bilder unter ihren Namen - so bleibt
+                // die Nummerierung, an der jede Sequenzerkennung haengt.
+                string stem = Atelier.QuickExport.Claim(folder, key.Name, "", asFolder: true);
+                written = Path.Combine(folder, stem);
+                result = await Export(frames, written, nameFor: null, videoPath: null);
+            }
+        }
+        catch (IOException ex)
+        {
+            BatchStatus.Text = ex.Message;
+            return;
+        }
+
+        LastQuickExport = written;
+
+        if (result is { Cancelled: false, Failures.Count: 0 })
+            BatchStatus.Text += " → " + written;
+    }
+
+    /// <summary>Wohin der letzte Schnell-Export ging - fuer die Probe.</summary>
+    internal string? LastQuickExport { get; private set; }
+
+    /// <summary>
+    /// Ein Lauf: die Bilder als Bildfolge in <paramref name="directory"/> - mit Namen aus
+    /// <paramref name="nameFor"/>, sonst denen der Quellen - oder als Video nach
+    /// <paramref name="videoPath"/>, wenn das Format eines ist. Null, wenn nicht gelaufen.
+    /// </summary>
+    private async Task<GradeBatchResult?> Export(IReadOnlyList<string> frames, string directory,
+                                                  Func<string, string>? nameFor, string? videoPath)
+    {
         var chosen = Selected;
 
         // Fuer ein Video braucht es ffmpeg. Das erst beim Klick zu bemerken ist
@@ -137,7 +279,7 @@ public partial class AtelierPage
             if (ffmpeg is null)
             {
                 BatchStatus.Text = Strings.T("S_NoFfmpeg");
-                return;
+                return null;
             }
         }
 
@@ -145,6 +287,7 @@ public partial class AtelierPage
         var token = _running.Token;
 
         RunButton.IsEnabled = false;
+        QuickExportButton.IsEnabled = false;
         StopButton.Visibility = Visibility.Visible;
         StopButton.IsEnabled = true;
         BatchProgress.Visibility = Visibility.Visible;
@@ -165,18 +308,21 @@ public partial class AtelierPage
         try
         {
             var result = chosen.Video is not null
-                ? await RunVideo(frames, chosen.Video, ffmpeg!, progress, token)
-                : await RunImages(frames, chosen.Image!.Value, progress, token);
+                ? await RunVideo(frames, chosen.Video, ffmpeg!, videoPath!, progress, token)
+                : await RunImages(frames, chosen.Image!.Value, directory, nameFor, progress, token);
 
             Report(result);
+            return result;
         }
         catch (OperationCanceledException)
         {
             BatchStatus.Text = Strings.T("S_BatchStopped");
+            return null;
         }
         catch (Exception ex)
         {
             BatchStatus.Text = ex.Message;
+            return null;
         }
         finally
         {
@@ -200,15 +346,17 @@ public partial class AtelierPage
     /// werden, ohne dass sich die Ausgabe auf halber Strecke aendert.
     /// </summary>
     private GradingStack FinalGrading()
-        => (_settings.Grading ?? new GradingStack()).Clone();
+        => (_recipe.Grading ?? new GradingStack()).Clone();
 
     private Task<GradeBatchResult> RunImages(IReadOnlyList<string> frames, GradeOutputFormat format,
+                                             string directory, Func<string, string>? nameFor,
                                              IProgress<GradeProgress> progress, CancellationToken token)
     {
         var request = new GradeBatchRequest
         {
             Frames = frames,
-            OutputDirectory = _target!,
+            OutputDirectory = directory,
+            NameFor = nameFor,
             Format = format,
             Adjustments = _finalAdjustments,
 
@@ -233,13 +381,13 @@ public partial class AtelierPage
     }
 
     private Task<GradeBatchResult> RunVideo(IReadOnlyList<string> frames, ExportPreset preset,
-                                            string ffmpeg, IProgress<GradeProgress> progress,
+                                            string ffmpeg, string outputPath, IProgress<GradeProgress> progress,
                                             CancellationToken token)
     {
         var request = new GradeVideoRequest
         {
             Frames = frames,
-            OutputPath = VideoTarget(preset),
+            OutputPath = outputPath,
             Preset = preset,
             Fps = _settings.Fps > 0 ? _settings.Fps : 24,
             Adjustments = _finalAdjustments,

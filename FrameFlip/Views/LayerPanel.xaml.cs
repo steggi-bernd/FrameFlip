@@ -1,6 +1,7 @@
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Controls.Primitives;
+using System.Windows.Input;
 using FrameFlip.Decoding.Exr;
 using FrameFlip.Imaging;
 using FrameFlip.Imaging.Grading;
@@ -86,6 +87,13 @@ public partial class LayerPanel : UserControl
 
         TintWheel.Changed += OnTintChanged;
         TintWheel.Released += () => Raise(interim: false);
+
+        MaskRange.Scale = RangeScale.Unit;
+        MaskHueRange.Scale = RangeScale.Hue;
+        MaskRange.Changed += OnMaskRangeChanged;
+        MaskHueRange.Changed += OnMaskRangeChanged;
+        MaskRange.ResetWanted += OnMaskRangeReset;
+        MaskHueRange.ResetWanted += OnMaskRangeReset;
 
         Rebuild();
     }
@@ -342,7 +350,7 @@ public partial class LayerPanel : UserControl
     private static string Marker(ImageLayer layer) => layer.Content switch
     {
         LayerContent.Adjustment => "≡ ",
-        LayerContent.Group => "▼ ",
+        LayerContent.Group => layer.Isolated ? "▼▣ " : "▼ ",
         LayerContent.Image => "▣ ",
         _ => "",
     };
@@ -376,6 +384,15 @@ public partial class LayerPanel : UserControl
         eye.Click += OnVisibilityClicked;
         Grid.SetColumn(eye, 0);
         grid.Children.Add(eye);
+
+        // Alt+Klick: die Ebene allein zeigen (C6b), ohne sie aus- oder einzublenden.
+        eye.PreviewMouseLeftButtonDown += (_, e) =>
+        {
+            if ((Keyboard.Modifiers & ModifierKeys.Alt) == 0) return;
+
+            e.Handled = true;
+            IsolateWanted?.Invoke(layer, SoloView.Layer);
+        };
 
         // Eine Miniatur sagt in einem Blick, was ein Name nicht sagt: ob der Pass
         // ueberhaupt etwas enthaelt. Ein leerer Glanzpass sieht schwarz aus, und das
@@ -467,18 +484,229 @@ public partial class LayerPanel : UserControl
         // unterscheiden, die ueberall wirkt - und man suchte den Grund woanders.
         var mode = new TextBlock
         {
-            Text = (layer.Mask.IsNeutral ? "" : "\u25D0 ") +
-                   Strings.T(Blending.All.First(m => m.Mode == layer.Mode).Key),
+            Text = Strings.T(Blending.All.First(m => m.Mode == layer.Mode).Key),
             FontSize = 9,
             Margin = new Thickness(6, 0, 0, 0),
             VerticalAlignment = VerticalAlignment.Center,
             Foreground = (System.Windows.Media.Brush)FindResource("MutedBrush"),
         };
 
-        Grid.SetColumn(mode, 3);
-        grid.Children.Add(mode);
+        // Ein Punkt vor der Mischung, wenn die Ebene maskiert ist - und mit Alt ein Griff an die
+        // Maske: allein grau, mit Umschalt als roter Schleier ueber dem Bild (C6b).
+        var tail = new StackPanel { Orientation = Orientation.Horizontal, VerticalAlignment = VerticalAlignment.Center };
 
-        return new ListBoxItem { Content = grid, Tag = layer };
+        if (!layer.Mask.IsNeutral)
+        {
+            var mark = new TextBlock
+            {
+                Text = "\u25D0",
+                FontSize = 9,
+                Margin = new Thickness(6, 0, 0, 0),
+                VerticalAlignment = VerticalAlignment.Center,
+                Foreground = (System.Windows.Media.Brush)FindResource("MutedBrush"),
+                ToolTip = Strings.T("S_LayerMaskMarkHint"),
+            };
+
+            mark.PreviewMouseLeftButtonDown += (_, e) =>
+            {
+                if ((Keyboard.Modifiers & ModifierKeys.Alt) == 0) return;
+
+                e.Handled = true;
+                IsolateWanted?.Invoke(layer, (Keyboard.Modifiers & ModifierKeys.Shift) != 0 ? SoloView.Veil : SoloView.Mask);
+            };
+
+            tail.Children.Add(mark);
+        }
+
+        mode.Margin = new Thickness(layer.Mask.IsNeutral ? 6 : 3, 0, 0, 0);
+        tail.Children.Add(mode);
+
+        Grid.SetColumn(tail, 3);
+        grid.Children.Add(tail);
+
+        var item = new ListBoxItem { Content = grid, Tag = layer };
+
+        // Rechtsklick: die Zeile waehlen und zeigen, was sich mit ihr tun laesst.
+        item.MouseRightButtonUp += (_, e) =>
+        {
+            e.Handled = true;
+            LayerList.SelectedItem = item;
+            ShowRowMenu(layer);
+        };
+
+        return item;
+    }
+
+    /// <summary>Das zuletzt geoeffnete Menue einer Zeile - fuer die Probe.</summary>
+    internal FlipMenu? RowMenu { get; private set; }
+
+    /// <summary>
+    /// Die gewaehlten Ebenen - mit Strg- oder Umschalt-Klick auch mehrere (C2b), in der
+    /// Reihenfolge des Stapels, von unten nach oben.
+    /// </summary>
+    public IReadOnlyList<ImageLayer> SelectedLayers
+    {
+        get
+        {
+            var chosen = LayerList.SelectedItems.OfType<ListBoxItem>().Select(i => i.Tag).OfType<ImageLayer>().ToList();
+            var order = Stack.All().ToList();
+            return chosen.OrderBy(order.IndexOf).ToList();
+        }
+    }
+
+    /// <summary>Waehlt mehrere Ebenen zugleich - der Weg der Strg-Klicks, fuer die Probe.</summary>
+    internal void SelectLayers(IEnumerable<ImageLayer> layers)
+    {
+        var wanted = layers.ToHashSet();
+
+        _choosingSeveral = true;
+
+        try
+        {
+            LayerList.SelectedItems.Clear();
+
+            foreach (var item in LayerList.Items.OfType<ListBoxItem>())
+                if (item.Tag is ImageLayer layer && wanted.Contains(layer)) LayerList.SelectedItems.Add(item);
+        }
+        finally
+        {
+            _choosingSeveral = false;
+        }
+    }
+
+    /// <summary>
+    /// Eine gemeinsame Korrektur ueber mehreren Ebenen (C2b, Entscheidung 4): Die Ebenen kommen
+    /// in eine Gruppe fuer sich, an ihren Platz, und obenauf in der Gruppe liegt eine
+    /// Einstellungsebene. Sie trifft nur diese Ebenen und ist danach gewaehlt.
+    ///
+    /// Das Bild aendert sich dabei nicht: Die Gruppe mischt sich, wie die unterste der Ebenen es
+    /// vorher tat, und die unterste liegt in ihr auf Schwarz. Nur Ebenen, die nebeneinander in
+    /// derselben Gruppe liegen - sonst wuerde das Zusammenlegen die Reihenfolge aendern.
+    /// </summary>
+    public bool CorrectTogether(IReadOnlyList<ImageLayer> layers, out string? why)
+    {
+        why = null;
+
+        if (layers.Count < 2) return false;
+
+        var owner = Owner(layers[0]);
+        var positions = layers.Select(l => owner?.IndexOf(l) ?? -1).OrderBy(i => i).ToList();
+
+        bool together = owner is not null && positions[0] >= 0 &&
+                        layers.All(l => ReferenceEquals(Owner(l), owner)) &&
+                        positions.Zip(positions.Skip(1), (a, b) => b - a).All(d => d == 1);
+
+        if (!together)
+        {
+            why = Strings.T("S_SharedCorrectionNeighbours");
+            return false;
+        }
+
+        // Eine Einstellungsebene bringt kein eigenes Bild mit - in einer Gruppe fuer sich laege
+        // sie auf Schwarz und korrigierte nichts mehr.
+        if (layers.Any(l => l.Content == LayerContent.Adjustment))
+        {
+            why = Strings.T("S_SharedCorrectionNoAdjustment");
+            return false;
+        }
+
+        var members = positions.Select(i => owner![i]).ToList();
+        var lowest = members[0];
+
+        var group = new ImageLayer
+        {
+            Content = LayerContent.Group,
+            Name = Strings.T("S_SharedCorrectionGroup"),
+            Mode = lowest.Mode,
+            BlendInDisplay = lowest.BlendInDisplay,
+            Isolated = true,
+        };
+
+        // Die unterste liegt in der Gruppe auf Schwarz - dort ist Normal, was sie vorher auf dem
+        // Stapel darunter war. Ihre Mischung traegt jetzt die Gruppe.
+        lowest.Mode = BlendMode.Normal;
+        lowest.BlendInDisplay = false;
+
+        foreach (var member in members) owner!.Remove(member);
+
+        group.Children.AddRange(members);
+
+        var correction = new ImageLayer
+        {
+            Content = LayerContent.Adjustment,
+            Name = Strings.T("S_SharedCorrection"),
+            Mode = BlendMode.Normal,
+        };
+
+        group.Children.Add(correction);
+        owner!.Insert(positions[0], group);
+
+        _selected = correction;
+
+        Rebuild();
+        Editing?.Invoke(EditedLayer);
+        Raise(interim: false);
+        return true;
+    }
+
+    /// <summary>Eine Ebene soll allein gezeigt werden - oder ihre Maske (C6b). Alt+Klick oder das Menue der Zeile.</summary>
+    public event Action<ImageLayer, SoloView>? IsolateWanted;
+
+    /// <summary>
+    /// Das Menue einer Zeile: dieselben Griffe wie die Knoepfe unter der Liste - und
+    /// Umbenennen, das es dort nicht gibt. Jede Zeile ruft den Weg, den auch ihr Knopf
+    /// nimmt; zwei Fassungen derselben Regel waeren zwei Gelegenheiten, eine zu vergessen.
+    /// </summary>
+    internal void ShowRowMenu(ImageLayer layer)
+    {
+        var none = new RoutedEventArgs();
+        var owner = Owner(layer);
+        int at = owner?.IndexOf(layer) ?? -1;
+
+        var menu = new FlipMenu(LayerList)
+            .Rename(Strings.T("S_LayerMenuRename"), layer.Name.Length > 0 ? layer.Name : Short(layer.Source), name =>
+            {
+                layer.Name = name;
+                Rebuild();
+                Raise(interim: false);
+            })
+            .Toggle(Strings.T("S_LayerMenuVisible"), layer.Visible, () => SetVisible(layer, !layer.Visible))
+            .Item("◧", Strings.T("S_LayerMenuAlone"), () => IsolateWanted?.Invoke(layer, SoloView.Layer), "Alt+Klick aufs Auge", enabled: layer.Visible);
+
+        // Die Maske allein oder als Schleier - nur, wenn es eine gibt (C6b).
+        if (!layer.Mask.IsNeutral)
+        {
+            menu.Item("◐", Strings.T("S_LayerMenuMaskAlone"), () => IsolateWanted?.Invoke(layer, SoloView.Mask), "Alt+Klick auf ◐", enabled: layer.Visible)
+                .Item("◍", Strings.T("S_LayerMenuMaskVeil"), () => IsolateWanted?.Invoke(layer, SoloView.Veil), "Alt+Umschalt+Klick auf ◐", enabled: layer.Visible);
+        }
+
+        menu.Separator()
+            .Item("❐", Strings.T("S_DuplicateLayer"), () => OnDuplicateClicked(this, none), "Strg+J")
+            .Item("✕", Strings.T("S_RemoveLayer"), () => OnRemoveClicked(this, none), "Entf", enabled: Stack.All().Count() > 1)
+            .Separator()
+            .Item("▲", Strings.T("S_MoveLayerUp"), () => OnUpClicked(this, none), "Alt+↑", enabled: owner is not null && at + 1 < owner.Count)
+            .Item("▼", Strings.T("S_MoveLayerDown"), () => OnDownClicked(this, none), "Alt+↓", enabled: at > 0)
+            .Item("⇥", Strings.T("S_MoveIntoGroup"), () => OnIndentClicked(this, none), "Strg+G")
+            .Item("⇤", Strings.T("S_MoveOutOfGroup"), () => OnOutdentClicked(this, none), "Strg+Umschalt+G",
+                  enabled: owner is not null && GroupOf(owner) is not null);
+
+        // Eine Gruppe fuer sich oder eine, die hindurchwirkt (C2b).
+        if (layer.Content == LayerContent.Group)
+        {
+            menu.Toggle(Strings.T("S_GroupIsolated"), layer.Isolated, () =>
+            {
+                layer.Isolated = !layer.Isolated;
+                Rebuild();
+                Raise(interim: false);
+            });
+        }
+
+        // Anschneiden geht, wo es der Knopf erlaubt: nicht an der untersten Ebene.
+        if (Stack.Layers.IndexOf(layer) > 0)
+            menu.Toggle(Strings.T("S_LayerMenuClip"), layer.Clipped, () => ClipButton.IsChecked = !layer.Clipped);
+
+        RowMenu = menu;
+        menu.Open();
     }
 
     /// <summary>
@@ -538,10 +766,35 @@ public partial class LayerPanel : UserControl
                                             or ".tif" or ".tiff" or ".bmp" or ".webp";
     }
 
+    /// <summary>Ob gerade bewusst mehrere Zeilen gewaehlt werden - dann bleibt die Auswahl, wie sie ist.</summary>
+    private bool _choosingSeveral;
+
     private void OnSelectionChanged(object sender, SelectionChangedEventArgs e)
     {
         if (_filling) return;
-        if (LayerList.SelectedItem is not ListBoxItem item || item.Tag is not ImageLayer layer) return;
+
+        // Mehrere Zeilen nur mit Strg oder Umschalt - oder wenn sie bewusst gewaehlt werden (C2b).
+        // Sonst gilt, was immer galt: Eine neu gewaehlte Zeile ist DIE gewaehlte.
+        var added = e.AddedItems.OfType<ListBoxItem>().LastOrDefault();
+        bool several = _choosingSeveral || (Keyboard.Modifiers & (ModifierKeys.Control | ModifierKeys.Shift)) != 0;
+
+        if (added is not null && !several && LayerList.SelectedItems.Count > 1)
+        {
+            _filling = true;
+
+            try
+            {
+                LayerList.SelectedItems.Clear();
+                added.IsSelected = true;
+            }
+            finally
+            {
+                _filling = false;
+            }
+        }
+
+        var chosen = added ?? LayerList.SelectedItem as ListBoxItem;
+        if (chosen is not ListBoxItem item || item.Tag is not ImageLayer layer) return;
 
         _selected = layer;
         PushToControls();
@@ -593,7 +846,7 @@ public partial class LayerPanel : UserControl
     {
         bool painted = _selected?.Mask.Kind == MaskKind.Painted;
 
-        MaskLockButton.Visibility = painted ? Visibility.Visible : Visibility.Collapsed;
+        MaskLockRow.Visibility = painted ? Visibility.Visible : Visibility.Collapsed;
         MaskLockNote.Visibility = painted ? Visibility.Visible : Visibility.Collapsed;
 
         if (!painted || _selected is null) return;
@@ -601,6 +854,7 @@ public partial class LayerPanel : UserControl
         bool locked = _selected.Mask.PaintLocked;
 
         MaskLockButton.IsChecked = locked;
+        MaskLooseButton.IsChecked = !locked;
 
         MaskLockNote.Text = Strings.T(locked ? "S_MaskLockedNote" : "S_MaskLooseNote");
     }
@@ -738,7 +992,9 @@ public partial class LayerPanel : UserControl
             Content = LayerContent.Image,
             Source = path,
             Name = Short(path),
-            Mode = BlendMode.Normal,
+            // Glare, Bloom und was sonst auf Schwarz liegt, kommt gleich dazu - nur hier,
+            // beim Anlegen. Siehe PassRoles.
+            Mode = ImageProbe.ModeFor(path),
         });
     }
 
@@ -835,7 +1091,11 @@ public partial class LayerPanel : UserControl
         {
             Source = pass?.Name ?? "",
             Name = pass?.ShortName ?? Strings.T("S_LayerColour"),
-            Mode = Stack.Layers.Count == 0 ? BlendMode.Normal : BlendMode.Add,
+            // Die unterste traegt; darueber verraet der Name, was der Pass tut - Licht
+            // kommt dazu, Verschattung und Farbe multiplizieren. Nur beim Anlegen.
+            Mode = Stack.Layers.Count == 0 ? BlendMode.Normal
+                 : pass is { } named ? PassRoles.ByName(named.Name, sceneLinear: true) ?? BlendMode.Add
+                 : BlendMode.Add,
         };
 
         Stack.Layers.Add(layer);
@@ -1073,6 +1333,56 @@ public partial class LayerPanel : UserControl
 
         UpdateValues();
         Raise(interim: true);
+    }
+
+    /// <summary>Die Pipette an der Toenung wurde gewaehlt - mit der Ebene - oder abgewaehlt (null).</summary>
+    public event Action<ImageLayer?>? TintPickWanted;
+
+    private bool _endingTintPick;
+
+    private void OnTintPickToggled(object sender, RoutedEventArgs e)
+    {
+        if (_endingTintPick) return;
+
+        // Ohne Ebene gibt es keine Toenung, die etwas uebernehmen koennte.
+        if (TintPick.IsChecked == true && _selected is null)
+        {
+            EndTintPick();
+            return;
+        }
+
+        TintPickWanted?.Invoke(TintPick.IsChecked == true ? _selected : null);
+    }
+
+    /// <summary>Die Pipette an der Toenung hat eine Farbe genommen oder wurde verlassen.</summary>
+    public void EndTintPick()
+    {
+        _endingTintPick = true;
+        try { TintPick.IsChecked = false; }
+        finally { _endingTintPick = false; }
+    }
+
+    /// <summary>
+    /// Die Toenung der gewaehlten Ebene uebernimmt eine Farbe (linear): das Rad in ihre Richtung,
+    /// so weit es reicht. Falsch ohne Ebene.
+    /// </summary>
+    public bool TakeTint(float r, float g, float b)
+    {
+        if (_selected is null) return false;
+
+        var point = ColourSolve.TintOf(r, g, b, TintScale);
+        var (tr, tg, tb) = ColourWheelMath.ToChannels(point, 0f, 1f, TintScale);
+
+        _selected.Tint.R = tr;
+        _selected.Tint.G = tg;
+        _selected.Tint.B = tb;
+
+        _filling = true;
+        try { TintWheel.Value = point; }
+        finally { _filling = false; }
+
+        Raise(interim: false);
+        return true;
     }
 
     private void OnTintChanged()
@@ -1468,6 +1778,37 @@ public partial class LayerPanel : UserControl
         Raise(interim: false);
     }
 
+    /// <summary>
+    /// Setzt Farbton und Breite der Farbbereich-Maske der gewaehlten Ebene - von der Pipette (C4).
+    /// False, wenn die gewaehlte Ebene keinen Farbbereich hat.
+    /// </summary>
+    public bool SetColourRange(float hue, float spread)
+    {
+        if (_selected is null || _selected.Mask.Kind != MaskKind.Colour) return false;
+
+        _selected.Mask.Hue = hue;
+        _selected.Mask.Spread = spread;
+
+        _filling = true;
+        try { PushMaskToControls(); }
+        finally { _filling = false; }
+
+        Raise(interim: false);
+        return true;
+    }
+
+    /// <summary>Setzt die gewaehlten Objekte der Kryptomatte-Maske - fuer das Waehlen im Bild mit Umschalt und Alt (C3b).</summary>
+    public void SetPicks(IEnumerable<CryptoPick> picks)
+    {
+        if (_selected is null || _selected.Mask.Kind != MaskKind.Cryptomatte) return;
+
+        _selected.Mask.Picks = picks.Select(p => p.Clone()).ToList();
+
+        ShowPicks();
+        Rebuild();
+        Raise(interim: false);
+    }
+
     private void OnCryptoPickToggled(object sender, RoutedEventArgs e)
     {
         bool on = CryptoPickButton.IsChecked == true;
@@ -1670,6 +2011,13 @@ public partial class LayerPanel : UserControl
         mask.Hue = (float)MaskHueSlider.Value;
         mask.Spread = (float)MaskSpreadSlider.Value;
 
+        // Der Regler "Weich" gilt beiden Kanten: Er fuegt ein getrenntes Paar wieder zusammen (C7).
+        if (ReferenceEquals(sender, MaskSoftSlider))
+        {
+            mask.SoftLow = null;
+            mask.SoftHigh = null;
+        }
+
         // Von darf Bis nicht ueberholen - sonst laesst die Maske nichts mehr durch,
         // und das sieht aus, als waere die Ebene verschwunden.
         if (mask.Low > mask.High)
@@ -1725,6 +2073,12 @@ public partial class LayerPanel : UserControl
         MaskZoneRow.Visibility = kind is MaskKind.Luminance or MaskKind.Underlying
             ? Visibility.Visible
             : Visibility.Collapsed;
+
+        // Der Bereichsregler dort, wo die beiden Regler ein Fenster sind - nicht an Schwarz- und Weisspunkt.
+        MaskRangeRow.Visibility = MaskZoneRow.Visibility;
+
+        // Mit der Art kann sich die Verteilung aendern, die unter ihm liegt.
+        if (MaskDistributionKind is not null) MaskDistributionWanted?.Invoke();
         MaskGradientBody.Visibility = gradient ? Visibility.Visible : Visibility.Collapsed;
         MaskSourceBox.Visibility = source ? Visibility.Visible : Visibility.Collapsed;
         MaskInvertButton.IsEnabled = kind != MaskKind.None;
@@ -1773,6 +2127,14 @@ public partial class LayerPanel : UserControl
         int kind = Array.FindIndex(MaskKinds, m => m.Kind == mask.Kind);
         MaskBox.SelectedIndex = Math.Max(0, kind);
 
+        // Hat die Ebene eine Maske, steht ihr Abschnitt offen. Zugeklappt sah man weder, dass es
+        // sie gibt, noch dass sie sich umkehren laesst - der Knopf dafuer lag darin.
+        if (mask.Kind != MaskKind.None)
+        {
+            MaskBody.Visibility = Visibility.Visible;
+            MaskFoldButton.Content = "\u2212";
+        }
+
         ShowPicks();
 
         MaskInvertButton.IsChecked = mask.Invert;
@@ -1809,6 +2171,81 @@ public partial class LayerPanel : UserControl
         MaskWidthValue.Text = $"{MaskWidthSlider.Value:0.00}";
         MaskHueValue.Text = $"{MaskHueSlider.Value:0} °";
         MaskSpreadValue.Text = $"±{MaskSpreadSlider.Value:0} °";
+
+        if (_selected?.Mask is not { } mask) return;
+
+        // Getrennte Kanten: beide Werte, sonst der eine.
+        if (mask.SoftLow is not null || mask.SoftHigh is not null)
+            MaskSoftValue.Text = $"{mask.LowSoftness:0.00} · {mask.HighSoftness:0.00}";
+
+        var window = RangeWindows.Of(mask);
+
+        if (mask.Kind == MaskKind.Colour)
+        {
+            MaskHueRange.Window = window;
+            MaskHueRangeValue.Text = RangeText(window, "0", " °");
+        }
+        else if (mask.Kind is MaskKind.Luminance or MaskKind.Underlying)
+        {
+            MaskRange.Window = window;
+            MaskRangeValue.Text = RangeText(window, "0.00", "");
+        }
+    }
+
+    /// <summary>Die Verteilung unter dem Bereichsregler soll neu gemessen werden - eine andere Maske oder Art.</summary>
+    public event Action? MaskDistributionWanted;
+
+    /// <summary>
+    /// Welche Verteilung der Bereichsregler der gewaehlten Maske braucht: Helligkeit, Untergrund
+    /// oder Farbton - oder keine.
+    /// </summary>
+    public MaskKind? MaskDistributionKind => _selected?.Mask.Kind is MaskKind.Luminance or MaskKind.Underlying or MaskKind.Colour
+        ? _selected.Mask.Kind
+        : null;
+
+    /// <summary>Die Verteilung des Bildes unter dem Bereichsregler der Maske (C7b).</summary>
+    public void ShowMaskDistribution(float[]? bins)
+    {
+        if (_selected?.Mask.Kind == MaskKind.Colour) MaskHueRange.Distribution = bins;
+        else MaskRange.Distribution = bins;
+    }
+
+    /// <summary>"0,20 – 0,80" - und die Kanten, wenn es welche gibt.</summary>
+    private static string RangeText(RangeWindow window, string format, string unit)
+    {
+        string text = $"{window.Low.ToString(format)}{unit} – {window.High.ToString(format)}{unit}";
+
+        return window.SoftLow > 0f || window.SoftHigh > 0f
+            ? text + $"  ({window.SoftLow.ToString(format)} · {window.SoftHigh.ToString(format)})"
+            : text;
+    }
+
+    /// <summary>Ein Zug am Bereichsregler: das Fenster in die Maske, die Regler darunter ziehen nach.</summary>
+    private void OnMaskRangeChanged(RangeWindow window, bool interim)
+    {
+        if (_selected is null) return;
+
+        RangeWindows.Apply(_selected.Mask, window);
+
+        _filling = true;
+        try { PushMaskToControls(); }
+        finally { _filling = false; }
+
+        Raise(interim);
+    }
+
+    /// <summary>Doppelklick auf den Bereichsregler: das Fenster in Grundstellung.</summary>
+    private void OnMaskRangeReset()
+    {
+        if (_selected is null) return;
+
+        RangeWindows.Reset(_selected.Mask);
+
+        _filling = true;
+        try { PushMaskToControls(); }
+        finally { _filling = false; }
+
+        Raise(interim: false);
     }
 
     /// <summary>
@@ -1835,6 +2272,8 @@ public partial class LayerPanel : UserControl
         mask.Low = low;
         mask.High = high;
         mask.Softness = 0.15f;
+        mask.SoftLow = null;
+        mask.SoftHigh = null;
 
         _filling = true;
 

@@ -1,6 +1,7 @@
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Controls.Primitives;
+using FrameFlip.Imaging.Grading;
 using FrameFlip.Localization;
 
 namespace FrameFlip.Views;
@@ -21,13 +22,73 @@ namespace FrameFlip.Views;
 /// </summary>
 public partial class PropertiesPanel : UserControl
 {
-    public PropertiesPanel() => InitializeComponent();
+    public PropertiesPanel()
+    {
+        InitializeComponent();
+
+        SizeChanged += (_, _) => ArrangeFor(ActualWidth);
+
+        BrushShapeBox.ItemsSource = new[]
+        {
+            new IconChoice("round", Strings.T("S_BrushRound")),
+            new IconChoice("square", Strings.T("S_BrushSquare")),
+        };
+
+        ShowBrushGroups();
+    }
+
+    /// <summary>
+    /// Schmal - in einer Seitenzone - steht der Name des Werkzeugs ueber den Gruppen statt
+    /// links daneben, wo er eine ganze Spalte fraesse.
+    /// </summary>
+    private void ArrangeFor(double width)
+    {
+        bool narrow = width > 0 && width < 520;
+
+        DockPanel.SetDock(ToolNamePanel, narrow ? Dock.Top : Dock.Left);
+        ToolNamePanel.Margin = narrow ? new Thickness(0, 8, 0, 2) : new Thickness(0, 0, 16, 0);
+    }
+
+    /// <summary>Das Werkzeug der Zeile, das der Pinsel gerade ist - Art oder Stempel.</summary>
+    public string BrushToolKey => BrushArea switch
+    {
+        PaintArea.Rectangle => "rectangle",
+        PaintArea.Ellipse => "ellipse",
+        PaintArea.Lasso => "lasso",
+        _ => BrushShape == BrushShape.Stamp ? "stamp" : "brush",
+    };
 
     /// <summary>Jemand moechte die gelesene Entfernung als Scharfstellung.</summary>
     public event Action<float>? FocusWanted;
 
     /// <summary>Eine Pinseleinstellung hat sich geaendert.</summary>
     public event Action? BrushChanged;
+
+    /// <summary>Der Verlauf der bemalten Maske soll aufgehen - am Knopf, der ihn will.</summary>
+    public event Action<FrameworkElement>? BrushHistoryWanted;
+
+    /// <summary>Die bemalte Maske soll bearbeitet werden - fuellen, umkehren, ausweiten ...</summary>
+    public event Action<FrameworkElement>? BrushEditWanted;
+
+    /// <summary>
+    /// Ob die Knoepfe fuer Verlauf und Bearbeitung der Maske zu sehen sind - nur, wenn der
+    /// Pinsel auf einer gemalten Maske im Graphen liegt.
+    /// </summary>
+    public void ShowBrushHistory(bool shown)
+    {
+        BrushHistoryButton.Visibility = shown ? Visibility.Visible : Visibility.Collapsed;
+        BrushEditButton.Visibility = BrushHistoryButton.Visibility;
+    }
+
+    /// <summary>Der Knopf fuer die Bearbeitung der Maske - fuer die Probe.</summary>
+    internal Button EditButton => BrushEditButton;
+
+    private void OnBrushEdit(object sender, RoutedEventArgs e) => BrushEditWanted?.Invoke(BrushEditButton);
+
+    /// <summary>Der Knopf fuer den Maskenverlauf - fuer die Probe.</summary>
+    internal Button HistoryButton => BrushHistoryButton;
+
+    private void OnBrushHistory(object sender, RoutedEventArgs e) => BrushHistoryWanted?.Invoke(BrushHistoryButton);
 
     /// <summary>Der Pinselradius in Bildpunkten.</summary>
     public float BrushRadius => (float)BrushSizeSlider.Value / 2f;
@@ -40,6 +101,212 @@ public partial class PropertiesPanel : UserControl
 
     /// <summary>Bis wohin ein Strich ueberhaupt auftraegt.</summary>
     public float BrushOpacity => (float)BrushOpacitySlider.Value;
+
+    /// <summary>Der Abstand der Tupfer als Anteil des Radius.</summary>
+    public float BrushSpacing => (float)BrushSpacingSlider.Value;
+
+    /// <summary>Eckig, Stempel oder rund.</summary>
+    public BrushShape BrushShape
+        => BrushStampToggle.IsChecked == true ? BrushShape.Stamp
+         : BrushSquareToggle.IsChecked == true ? BrushShape.Square
+         : BrushShape.Round;
+
+    /// <summary>Die geladene Stempelspitze - null, solange keine gewaehlt ist.</summary>
+    public StampTip? BrushStamp { get; private set; }
+
+    /// <summary>Zufaellige Drehung je Stempeltupfer, 0 bis 1.</summary>
+    public float BrushJitter => (float)BrushJitterSlider.Value;
+
+    /// <summary>Streuung der Stempeltupfer, 0 bis 1.</summary>
+    public float BrushScatter => (float)BrushScatterSlider.Value;
+
+    /// <summary>Eine Spitze fuer den Stempel - aus der Datei oder fuer die Probe. Schaltet den Stempel ein.</summary>
+    internal void UseStamp(StampTip tip, string? name = null)
+    {
+        BrushStamp = tip;
+        BrushTipButton.ToolTip = name is null ? Strings.T("S_BrushTipHint") : $"{name} – {tip.Width} × {tip.Height}";
+        BrushStampToggle.IsChecked = true;
+
+        if (IsLoaded) BrushChanged?.Invoke();
+    }
+
+    private void OnBrushTipClicked(object sender, RoutedEventArgs e)
+    {
+        var dialog = new Microsoft.Win32.OpenFileDialog
+        {
+            Title = Strings.T("S_BrushTipLoad"),
+            Filter = "Bilder|*.png;*.tif;*.tiff;*.bmp;*.jpg;*.jpeg;*.webp|Alle Dateien|*.*",
+            CheckFileExists = true,
+        };
+
+        if (dialog.ShowDialog(Window.GetWindow(this)) != true) return;
+
+        if (StampTip.Load(dialog.FileName) is { } tip) UseStamp(tip, System.IO.Path.GetFileName(dialog.FileName));
+        else Told(Strings.T("S_BrushTipUnreadable"));
+    }
+
+    /// <summary>Der Winkel der Spitze in Grad.</summary>
+    public float BrushAngle => (float)BrushAngleSlider.Value;
+
+    /// <summary>Breite zu Hoehe der Spitze.</summary>
+    public float BrushAspect => (float)BrushAspectSlider.Value;
+
+    /// <summary>Der Winkel folgt dem Strich.</summary>
+    public bool BrushFollow => BrushFollowToggle.IsChecked == true;
+
+    /// <summary>Wie weit die eckige Spitze zum Karo gezogen ist, 0 bis 1.</summary>
+    public float BrushSquish => (float)BrushSquishSlider.Value;
+
+    /// <summary>Malt der Pinsel Zuege oder zieht er Flaechen auf.</summary>
+    public PaintArea BrushArea
+        => BrushModeRectangle.IsChecked == true ? PaintArea.Rectangle
+         : BrushModeEllipse.IsChecked == true ? PaintArea.Ellipse
+         : BrushModeLasso.IsChecked == true ? PaintArea.Lasso
+         : PaintArea.None;
+
+    private bool _choosingMode;
+
+    /// <summary>
+    /// Der Pinsel aus der Werkzeugleiste: Zug oder Flaeche, und beim Stempel die Spitze.
+    /// Ohne geladene Spitze fragt der Stempel nach einer.
+    /// </summary>
+    public void ChooseBrush(PaintArea area, BrushShape? shape)
+    {
+        var mode = area switch
+        {
+            PaintArea.Rectangle => BrushModeRectangle,
+            PaintArea.Ellipse => BrushModeEllipse,
+            PaintArea.Lasso => BrushModeLasso,
+            _ => BrushModeStroke,
+        };
+
+        mode.IsChecked = true;
+
+        if (shape == BrushShape.Stamp)
+        {
+            BrushStampToggle.IsChecked = true;
+            if (BrushStamp is null) Told(Strings.T("S_ToolStampNeedsTip"));
+        }
+        else if (area == PaintArea.None)
+        {
+            // "Pinsel" ist der Pinsel ohne Stempel - eckig oder rund, wie eingestellt.
+            BrushStampToggle.IsChecked = false;
+        }
+
+        ShowBrushGroups();
+    }
+
+    /// <summary>Genau eine Art ist an: Die gewaehlte schaltet die anderen ab und laesst sich selbst nicht abschalten.</summary>
+    private void OnBrushMode(object sender, RoutedEventArgs e)
+    {
+        // Der erste Knopf steht im XAML auf an - sein Checked kommt beim Laden, bevor die
+        // anderen Knoepfe da sind. Dann gibt es noch nichts abzuschalten.
+        if (_choosingMode || BrushModeLasso is null) return;
+
+        _choosingMode = true;
+
+        foreach (var mode in new[] { BrushModeStroke, BrushModeRectangle, BrushModeEllipse, BrushModeLasso })
+            mode.IsChecked = ReferenceEquals(mode, sender);
+
+        _choosingMode = false;
+
+        ShowBrushGroups();
+        if (IsLoaded) BrushChanged?.Invoke();
+    }
+
+    /// <summary>
+    /// Zeigt nur, was zum gewaehlten Werkzeug gehoert (Phase U3). Rechteck, Ellipse und Lasso
+    /// fuellen - Spitze, Staerke, Abstand, Form und Druck haben dort nichts zu sagen. Das Karo
+    /// gibt es nur eckig, Spitze, Zufall und Streuung nur beim Stempel, und dann nicht die
+    /// Wahl rund oder eckig. Die Toleranz nur mit der Kante.
+    /// </summary>
+    private void ShowBrushGroups()
+    {
+        if (BrushModeLasso is null || BrushEdgeRow is null) return;
+
+        bool stroke = BrushArea == PaintArea.None;
+
+        static void Show(UIElement element, bool shown) => element.Visibility = shown ? Visibility.Visible : Visibility.Collapsed;
+
+        Show(BrushTipRow, stroke);
+        Show(BrushFlowRow, stroke);
+        Show(BrushSpacingRow, stroke);
+        Show(BrushShapeRow, stroke);
+        Show(BrushPressureRow, stroke);
+        Show(BrushStampRow, BrushShape == BrushShape.Stamp);
+        Show(BrushTipShapes, BrushShape != BrushShape.Stamp);
+        Show(BrushSquishRow, BrushShape == BrushShape.Square);
+        Show(BrushEdgeRow, BrushEdge);
+
+        // Rund ist, was nicht eckig ist - der Schalter und das Auswahlfeld zeigen es nur an.
+        BrushRoundToggle.IsChecked = BrushSquareToggle.IsChecked != true;
+
+        _showingShape = true;
+        BrushShapeBox.SelectedIndex = BrushSquareToggle.IsChecked == true ? 1 : 0;
+        _showingShape = false;
+    }
+
+    private bool _showingShape;
+
+    /// <summary>Rund oder eckig aus dem Auswahlfeld - es stellt nur die Schalter, die den Stand halten.</summary>
+    private void OnBrushShapeChosen(object sender, SelectionChangedEventArgs e)
+    {
+        if (_showingShape || BrushRoundToggle is null || BrushSquareToggle is null) return;
+
+        if (BrushShapeBox.SelectedIndex == 1) BrushSquareToggle.IsChecked = true;
+        else BrushRoundToggle.IsChecked = true;
+    }
+
+    /// <summary>Der Strich bleibt auf der Flaeche, auf der er ansetzt - aus Tiefe und Normale.</summary>
+    public bool BrushEdge => BrushEdgeToggle.IsChecked == true;
+
+    /// <summary>Wie weit die Flaeche vom Ansatz abweichen darf, 0 bis 1.</summary>
+    public float BrushEdgeTolerance => (float)BrushEdgeSlider.Value;
+
+    /// <summary>Worauf der Druck eines Stifts wirkt - in der Reihenfolge der Auswahl: aus, Groesse, Staerke, beides.</summary>
+    public BrushPressure BrushPressureTo => BrushPressureBox.SelectedIndex switch
+    {
+        0 => BrushPressure.None,
+        2 => BrushPressure.Flow,
+        3 => BrushPressure.Size | BrushPressure.Flow,
+        _ => BrushPressure.Size,
+    };
+
+    private void OnBrushPressureChanged(object sender, SelectionChangedEventArgs e)
+    {
+        if (!IsLoaded) return;
+
+        BrushChanged?.Invoke();
+    }
+
+    /// <summary>Der Strich bleibt auf dem Objekt, auf dem er beginnt.</summary>
+    public bool BrushObject => BrushObjectToggle.IsChecked == true;
+
+    private void OnBrushToggle(object sender, RoutedEventArgs e)
+    {
+        // Rund oder eckig: Rund schaltet eckig ab und laesst sich selbst nicht abschalten -
+        // es ist das, was bleibt, wenn eckig aus ist (ShowBrushGroups).
+        if (ReferenceEquals(sender, BrushRoundToggle) && BrushRoundToggle.IsChecked == true) BrushSquareToggle.IsChecked = false;
+
+        // Eckig oder Stempel - eine Spitze hat nur eine Form.
+        if (ReferenceEquals(sender, BrushSquareToggle) && BrushSquareToggle.IsChecked == true) BrushStampToggle.IsChecked = false;
+        if (ReferenceEquals(sender, BrushStampToggle) && BrushStampToggle.IsChecked == true) BrushSquareToggle.IsChecked = false;
+
+        // Objekt oder Flaeche - beides zugleich hiesse zwei Begrenzungen, und der Strich
+        // traegt nur eine.
+        if (ReferenceEquals(sender, BrushObjectToggle) && BrushObject) BrushEdgeToggle.IsChecked = false;
+        if (ReferenceEquals(sender, BrushEdgeToggle) && BrushEdge) BrushObjectToggle.IsChecked = false;
+
+        ShowBrushGroups();
+
+        if (!IsLoaded) return;
+
+        BrushChanged?.Invoke();
+    }
+
+    /// <summary>Die Spitze von aussen - wenn am Bild mit Umschalt und Rad gedreht wurde.</summary>
+    public void SetBrushAngle(float angle)
+        => BrushAngleSlider.Value = Math.Clamp(angle, BrushAngleSlider.Minimum, BrushAngleSlider.Maximum);
 
     private void OnBrushChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
     {
@@ -60,12 +327,28 @@ public partial class PropertiesPanel : UserControl
         e.Handled = true;
     }
 
+    /// <summary>
+    /// Setzt Groesse, Haerte und Abstand von aussen - wenn sie am Bild mit Strg gezogen
+    /// oder gedreht wurden. Die Regler ziehen mit, als haette man an ihnen gedreht.
+    /// </summary>
+    public void SetBrush(float radius, float hardness, float spacing)
+    {
+        BrushSizeSlider.Value = Math.Clamp(radius * 2, BrushSizeSlider.Minimum, BrushSizeSlider.Maximum);
+        BrushHardnessSlider.Value = Math.Clamp(hardness, BrushHardnessSlider.Minimum, BrushHardnessSlider.Maximum);
+        BrushSpacingSlider.Value = Math.Clamp(spacing, BrushSpacingSlider.Minimum, BrushSpacingSlider.Maximum);
+    }
+
     private void ShowBrushValues()
     {
         BrushSizeValue.Text = $"{BrushSizeSlider.Value:0}";
         BrushHardnessValue.Text = $"{BrushHardnessSlider.Value:0.00}";
         BrushFlowValue.Text = $"{BrushFlowSlider.Value:0.00}";
         BrushOpacityValue.Text = $"{BrushOpacitySlider.Value:0.00}";
+        BrushSpacingValue.Text = $"{BrushSpacingSlider.Value * 100:0} %";
+        BrushAngleValue.Text = $"{BrushAngleSlider.Value:0}°";
+        BrushAspectValue.Text = $"1:{BrushAspectSlider.Value:0.##}";
+        BrushSquishValue.Text = $"{BrushSquishSlider.Value * 100:0} %";
+        BrushEdgeValue.Text = $"{BrushEdgeSlider.Value * 100:0} %";
     }
 
     private float? _depth;
@@ -96,12 +379,12 @@ public partial class PropertiesPanel : UserControl
             _ => "S_ToolMoveShort",
         });
 
-        // Die Leiste kuerzt den Satz, wenn der Platz nicht reicht - ganz steht er im
-        // Hinweis. Ein Satz, der mitten im Wort aufhoert und nirgends vollstaendig zu
-        // lesen ist, waere schlimmer als keiner.
-        ToolHint.ToolTip = ToolHint.Text;
+        // Der Satz steht nicht mehr in der Leiste, sondern im Hinweis am Namen des Werkzeugs -
+        // die Leiste war mit ihm ueberladen (Entscheidung 9, Feinschliff).
+        ToolName.ToolTip = ToolHint.Text;
 
         PickBody.Visibility = tool == AtelierTool.Pick ? Visibility.Visible : Visibility.Collapsed;
+        SelectBody.Visibility = tool == AtelierTool.Select ? Visibility.Visible : Visibility.Collapsed;
 
         BrushBody.Visibility = tool == AtelierTool.Brush ? Visibility.Visible : Visibility.Collapsed;
 
@@ -117,10 +400,18 @@ public partial class PropertiesPanel : UserControl
     /// dann faellt die Zeile weg, statt eine Null zu zeigen. Eine Null waere eine
     /// Entfernung, und "keine Entfernung bekannt" ist etwas anderes als "null Meter".
     /// </summary>
+    /// <summary>Ob die Pipette die Quelle liest statt des angezeigten Ergebnisses (C4).</summary>
+    public bool PickSource => PickFromSource.IsChecked == true;
+
     public void Read(int x, int y, int r, int g, int b, float lr, float lg, float lb, float? depth)
     {
         PickWhere.Text = $"{x}, {y}";
         PickByte.Text = $"{r} / {g} / {b}";
+
+        var (hue, saturation, value) = Imaging.ColourReadout.Hsv((byte)r, (byte)g, (byte)b);
+        PickHex.Text = Imaging.ColourReadout.Hex((byte)r, (byte)g, (byte)b);
+        PickHsv.Text = $"{hue}° {saturation}% {value}%";
+        PickSwatch.Background = new System.Windows.Media.SolidColorBrush(System.Windows.Media.Color.FromRgb((byte)r, (byte)g, (byte)b));
         PickLight.Text = $"{lr:0.###}  {lg:0.###}  {lb:0.###}";
 
         _depth = depth;
@@ -131,6 +422,102 @@ public partial class PropertiesPanel : UserControl
         if (depth is { } metres) PickDepth.Text = $"{metres:0.###}";
 
         FocusNote.Visibility = Visibility.Collapsed;
+    }
+
+    /// <summary>Ein Feld im Farbspeicher wurde angeklickt.</summary>
+    public event Action<Imaging.SavedColour>? StoredColourChosen;
+
+    /// <summary>Ein Feld im Farbspeicher soll weg - Rechtsklick.</summary>
+    public event Action<Imaging.SavedColour>? StoredColourRemoved;
+
+    /// <summary>Die gemerkten Farben als kleine Felder, die neueste vorn (C4b).</summary>
+    public void ShowStore(IReadOnlyList<Imaging.SavedColour> colours)
+    {
+        PickStore.Children.Clear();
+        PickStoreRow.Visibility = colours.Count > 0 ? Visibility.Visible : Visibility.Collapsed;
+
+        foreach (var colour in colours)
+        {
+            var swatch = new System.Windows.Controls.Border
+            {
+                Width = 14,
+                Height = 14,
+                CornerRadius = new CornerRadius(3),
+                Margin = new Thickness(0, 0, 3, 0),
+                BorderThickness = new Thickness(1),
+                BorderBrush = (System.Windows.Media.Brush)FindResource("PanelBorder"),
+                Background = new System.Windows.Media.SolidColorBrush(
+                    System.Windows.Media.Color.FromRgb(colour.ShownR, colour.ShownG, colour.ShownB)),
+                Cursor = System.Windows.Input.Cursors.Hand,
+                ToolTip = colour.From is { } from ? $"{colour.Hex} · {from} ({colour.X}, {colour.Y})" : colour.Hex,
+                Tag = colour,
+            };
+
+            swatch.MouseLeftButtonUp += (_, e) =>
+            {
+                e.Handled = true;
+                StoredColourChosen?.Invoke(colour);
+            };
+
+            swatch.MouseRightButtonUp += (_, e) =>
+            {
+                e.Handled = true;
+                StoredColourRemoved?.Invoke(colour);
+            };
+
+            PickStore.Children.Add(swatch);
+        }
+    }
+
+    /// <summary>Die Felder im Farbspeicher - fuer die Probe.</summary>
+    internal int StoredShown => PickStore.Children.Count;
+
+    /// <summary>Ein gewaehltes Objekt soll aus der Auswahl - sein Kreuz in der Leiste.</summary>
+    public event Action<Imaging.Grading.CryptoPick>? PickRemoveWanted;
+
+    /// <summary>
+    /// Was beim Waehlen gilt (C3): an welcher Kryptomatte gewaehlt wird, was gewaehlt ist - als
+    /// Chips mit Kreuz - und was unter dem Zeiger liegt. Ohne Kryptomatte-Maske als Ziel steht
+    /// statt der Chips, dass die Objekte nur angezeigt werden.
+    /// </summary>
+    internal void ShowSelection(string? set, IReadOnlyList<Imaging.Grading.CryptoPick>? picks, string? hover)
+    {
+        SelectSet.Text = set is null ? string.Empty : Strings.T("S_SelectSet", set);
+        SelectSet.Visibility = set is null ? Visibility.Collapsed : Visibility.Visible;
+        SelectHover.Text = string.IsNullOrEmpty(hover) ? "–" : hover;
+
+        SelectPicks.Children.Clear();
+
+        if (picks is null)
+        {
+            var none = new TextBlock { Text = Strings.T("S_SelectNoTarget"), FontSize = 11, VerticalAlignment = VerticalAlignment.Center };
+            none.SetResourceReference(TextBlock.ForegroundProperty, "MutedBrush");
+            SelectPicks.Children.Add(none);
+            return;
+        }
+
+        foreach (var pick in picks)
+        {
+            var name = new TextBlock { Text = pick.Name.Length > 0 ? pick.Name : "?", FontSize = 11, VerticalAlignment = VerticalAlignment.Center };
+            name.SetResourceReference(TextBlock.ForegroundProperty, "AccentBrush");
+
+            var remove = new Button { Content = "✕", FontSize = 10, Margin = new Thickness(4, 0, 0, 0), ToolTip = Strings.T("S_SelectRemovePick") };
+            remove.SetResourceReference(StyleProperty, "LinkButton");
+            System.Windows.Automation.AutomationProperties.SetName(remove, Strings.T("S_SelectRemovePick"));
+            remove.Click += (_, _) => PickRemoveWanted?.Invoke(pick);
+
+            var chip = new Border
+            {
+                Child = new StackPanel { Orientation = Orientation.Horizontal, Children = { name, remove } },
+                Padding = new Thickness(7, 1, 3, 1),
+                Margin = new Thickness(0, 0, 4, 0),
+                CornerRadius = new CornerRadius(5),
+                BorderThickness = new Thickness(1),
+            };
+            chip.SetResourceReference(Border.BorderBrushProperty, "AccentBrush");
+
+            SelectPicks.Children.Add(chip);
+        }
     }
 
     /// <summary>Sagt, was aus dem Uebernehmen geworden ist.</summary>

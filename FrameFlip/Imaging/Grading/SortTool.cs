@@ -80,11 +80,11 @@ public enum SortInterval
 /// Asendorf, ein zweiter Durchgang quer zum ersten, der das Bild kreuzweise
 /// zerschmelzen laesst.
 ///
-/// Laeuft auf den FERTIGEN Anzeigewerten und beim Ziehen gar nicht - siehe
+/// Laeuft auf den FERTIGEN Anzeigewerten, beim Ziehen in grober Fassung - siehe
 /// <see cref="IFramePass"/>. Die Linien untereinander sind aber unabhaengig und werden
 /// deshalb nebeneinander gerechnet; nur INNERHALB einer Linie zaehlt die Reihenfolge.
 /// </summary>
-public sealed class SortTool : IFramePass
+public sealed class SortTool : ICoarseFramePass
 {
     public const string KindName = "pixelsort";
 
@@ -160,6 +160,9 @@ public sealed class SortTool : IFramePass
 
     private float _low, _high, _edge, _skip;
     private int _longest;
+
+    /// <summary>Wie viele Bildpunkte ein Punkt des Gitters vertritt - 1 im vollen Durchgang (C7c).</summary>
+    private int _coarse = 1;
     private SortKey _key;
     private SortInterval _interval;
     private bool _descending;
@@ -177,6 +180,19 @@ public sealed class SortTool : IFramePass
         _key = Key;
         _interval = Interval;
         _descending = Descending;
+    }
+
+    /// <summary>
+    /// Pixel Sort auf dem Gitter der groben Vorschau (C7c): dieselben Laeufe, im Verhaeltnis kuerzer.
+    /// Was ein Lauf hoechstens misst, gilt in Bildpunkten des Bildes - auf dem Gitter also ein
+    /// <paramref name="step"/>-tel davon.
+    /// </summary>
+    public void ApplyCoarse(IntPtr pixels, int width, int height, int stride, int number, int step)
+    {
+        _coarse = Math.Max(1, step);
+
+        try { Apply(pixels, width, height, stride, number); }
+        finally { _coarse = 1; }
     }
 
     public void Apply(IntPtr pixels, int width, int height, int stride, int number = 0)
@@ -347,9 +363,10 @@ public sealed class SortTool : IFramePass
     /// </summary>
     private int LimitFor(int line, int begin, int seed)
     {
-        if (_interval != SortInterval.Random) return _longest;
+        if (_interval != SortInterval.Random)
+            return _longest <= 0 || _coarse == 1 ? _longest : Math.Max(1, (int)MathF.Round(_longest / (float)_coarse));
 
-        int mean = _longest > 0 ? _longest : RandomDefault;
+        float mean = (_longest > 0 ? _longest : RandomDefault) / (float)_coarse;
 
         return Math.Max(2, (int)MathF.Round(mean * (0.25f + 1.5f * GlitchNoise.Unit(line, begin, seed, 11))));
     }
@@ -410,11 +427,17 @@ public sealed class SortTool : IFramePass
     }
 
     /// <summary>Der Wert, nach dem verglichen wird - und der die Schwelle entscheidet.</summary>
-    private float KeyOf(byte red, byte green, byte blue)
+    private float KeyOf(byte red, byte green, byte blue) => KeyOf(_key, red, green, blue);
+
+    /// <summary>
+    /// Der Sortierwert eines Anzeigewerts, 0 bis 1. Fuer sich, damit das Histogramm unter dem
+    /// Fenster (C7b) genau dieselbe Frage stellt wie das Sortieren.
+    /// </summary>
+    public static float KeyOf(SortKey key, byte red, byte green, byte blue)
     {
         float r = red / 255f, g = green / 255f, b = blue / 255f;
 
-        switch (_key)
+        switch (key)
         {
             case SortKey.Brightness:
                 return 0.2126f * r + 0.7152f * g + 0.0722f * b;
@@ -430,7 +453,7 @@ public sealed class SortTool : IFramePass
         float low = MathF.Min(r, MathF.Min(g, b));
         float chroma = high - low;
 
-        if (_key == SortKey.Saturation) return high <= 1e-6f ? 0f : chroma / high;
+        if (key == SortKey.Saturation) return high <= 1e-6f ? 0f : chroma / high;
 
         // Farbton, auf 0 bis 1 gelegt. Grau hat keinen - es kommt auf null und
         // sammelt sich damit an einem Ende, was richtig ist: Es gehoert nirgends

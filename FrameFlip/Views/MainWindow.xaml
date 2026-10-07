@@ -191,8 +191,11 @@
                             </Button>
                         </Grid>
 
-                        <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto"
-                                      HorizontalScrollBarVisibility="Disabled" Padding="8,0,8,10">
+                        <!-- Ordner und Bilder lassen sich hierher ziehen - sie werden Eintraege. -->
+                        <ScrollViewer x:Name="SequenceScroll" Grid.Row="1" VerticalScrollBarVisibility="Auto"
+                                      HorizontalScrollBarVisibility="Disabled" Padding="8,0,8,10"
+                                      Background="Transparent" AllowDrop="True"
+                                      Drop="OnSequencesDropped" DragOver="OnSequencesDragOver">
                             <StackPanel x:Name="SequenceList" />
                         </ScrollViewer>
 
@@ -257,11 +260,15 @@
                           ClipToBounds="True">
                         <Viewbox Margin="18" Stretch="Uniform">
                             <Viewbox.Style><Style TargetType="Viewbox"><Style.Triggers><DataTrigger Binding="{Binding Source, ElementName=StageImage}" Value="{x:Null}"><Setter Property="Visibility" Value="Hidden"/></DataTrigger></Style.Triggers></Style></Viewbox.Style>
+                            <!-- Das Bild fuellt den Rahmen bis in die Ecken - der Rahmen nimmt sein
+                                 Seitenverhaeltnis an. ClipToBounds schneidet rechteckig, die Ecken des
+                                 Bildes standen darum ueber die runden des Rahmens. Der Zuschnitt innen
+                                 folgt dem Eckradius (10) weniger dem Rand (1), fuer jedes Format. -->
                             <Border x:Name="StageFrame" Width="1000" Height="562" CornerRadius="10"
                                     Background="{StaticResource DashCard}"
                                     BorderBrush="{StaticResource DesktopLine}" BorderThickness="1"
                                     ClipToBounds="True">
-                                <Grid>
+                                <Grid x:Name="StageContent" views:RoundedClip.Radius="9">
                                     <Image x:Name="StageImage" Stretch="Uniform"
                                            RenderOptions.BitmapScalingMode="HighQuality" />
 
@@ -443,7 +450,7 @@
                                 </StackPanel></Viewbox>
                                 <WrapPanel MaxWidth="{Binding ActualWidth, ElementName=TransportControls}"><WrapPanel x:Name="PlayChips" MaxWidth="{Binding ActualWidth, ElementName=TransportControls}" Margin="0,0,8,8" />
 
-                                    <ComboBox x:Name="RateBox" Style="{StaticResource DashRateBox}"
+                                    <ComboBox x:Name="RateBox" Style="{StaticResource DashRateBox}" Tag="fps"
                                               Margin="2,0,0,8" VerticalAlignment="Center"
                                               ToolTip="{DynamicResource D_RateHint}"
                                               AutomationProperties.Name="{DynamicResource D_Rate}"
@@ -712,10 +719,19 @@
                                     <views:QrCodeView x:Name="WatchCode" LightModules="True" />
                                 </Border>
 
-                                <TextBlock x:Name="WatchAddress" Margin="0,12,0,0"
-                                           HorizontalAlignment="Center" TextAlignment="Center"
-                                           TextWrapping="Wrap" Style="{StaticResource DashMono}"
-                                           FontSize="11" Foreground="{StaticResource DesktopInk}" />
+                                <!-- Die Adresse ist der Knopf, der sie kopiert - siehe WatchCard. -->
+                                <Button x:Name="WatchAddressCopy" Style="{StaticResource CopyField}" Margin="0,7,0,0"
+                                        HorizontalAlignment="Center" Visibility="Collapsed"
+                                        ToolTip="{DynamicResource S_CopyAddressHint}"
+                                        AutomationProperties.Name="{DynamicResource S_CopyAddress}">
+                                    <DockPanel>
+                                        <views:IconLabel DockPanel.Dock="Right" Icon="copy" Margin="8,0,0,0"
+                                                         TextElement.Foreground="{StaticResource DesktopMuted}" />
+                                        <TextBlock x:Name="WatchAddress" TextAlignment="Center" TextWrapping="Wrap"
+                                                   VerticalAlignment="Center" Style="{StaticResource DashMono}"
+                                                   FontSize="11" Foreground="{StaticResource DesktopInk}" />
+                                    </DockPanel>
+                                </Button>
 
                                 <TextBlock x:Name="WatchHint" Margin="0,8,0,0" TextWrapping="Wrap"
                                            TextAlignment="Center" FontSize="10.5" LineHeight="16"
@@ -837,7 +853,10 @@
         <Border Grid.Row="4" Background="{StaticResource DesktopPanel}"
                 BorderBrush="{StaticResource DesktopLine}" BorderThickness="0,1,0,0">
             <Grid Margin="14,0">
-                <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                <!-- Im Atelier steht links die Tastenhilfe (docs/Atelier-Tastenhilfe.md) statt der Angaben des Players. -->
+                <StackPanel x:Name="AtelierHintBar" Orientation="Horizontal" VerticalAlignment="Center"
+                            Visibility="Collapsed" ClipToBounds="True" />
+                <StackPanel x:Name="PlayerStatus" Orientation="Horizontal" VerticalAlignment="Center">
                     <TextBlock x:Name="StatusFormat" Style="{StaticResource DashMono}" FontSize="10" />
                     <TextBlock x:Name="StatusDecode" Margin="14,0,0,0" Style="{StaticResource DashMono}"
                                FontSize="10" />

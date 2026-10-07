@@ -411,10 +411,20 @@ public static class GradingGroupInvariants
 
             // --- Was etwas tut, traegt den Strich --------------------------------
             var vignette = panel.Stack.Optics.OfType<VignetteTool>().First();
+            var grain = panel.Stack.Optics.OfType<GrainTool>().First();
 
             static bool Marked(ToggleButton tile)
                 => tile.Content is Grid face &&
                    face.Children.OfType<Border>().Any(bar => bar.Visibility == Visibility.Visible);
+
+            // Effekte kommen mit einem sichtbaren Startwert (EffectStart). Fuer den Strich und das
+            // Ausschalten zaehlt, ob eine Karte etwas TUT - darum hier beide auf null gestellt.
+            Check.That(!vignette.IsNeutral && !grain.IsNeutral, "Vignette und Korn kamen mit ihrem Startwert in den Stapel");
+
+            vignette.Amount = 0f;
+            grain.Amount = 0f;
+            panel.Load(panel.Adjustments, panel.Stack);
+            panel.UpdateLayout();
 
             Check.That(!Marked(tiles["Vignette"]), "solange sie nichts tut, traegt sie keinen Strich");
 
@@ -425,7 +435,7 @@ public static class GradingGroupInvariants
             Check.That(Marked(tiles["Vignette"]), "sobald sie etwas tut, schon");
             Check.That(Shown("Vignette"), "und ihre Karte bleibt nach dem Laden im Stapel");
             Check.That(!Shown("Grain"),
-                       "eine hinzugefuegte, aber unberuehrte Karte nicht - sie gehoerte zum alten Ziel");
+                       "eine hinzugefuegte Karte, die nichts tut, nicht - sie gehoerte zum alten Ziel");
 
             // --- Ausschalten: die Einstellung bleibt -----------------------------
             var power = FindPower(CardOf(cards, "Vignette")!);

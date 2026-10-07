@@ -1317,6 +1317,14 @@
                             </Track.IncreaseRepeatButton>
                         </Track>
                     </Grid>
+                    <!-- Gibt es nichts zu rollen, bleibt der Platz frei, aber leer. So kann eine
+                         Seite ihren Rollbalken immer stehen lassen und springt nicht zur Seite,
+                         sobald ihr Inhalt laenger wird als das Fenster. -->
+                    <ControlTemplate.Triggers>
+                        <Trigger Property="IsEnabled" Value="False">
+                            <Setter TargetName="PART_Track" Property="Visibility" Value="Hidden" />
+                        </Trigger>
+                    </ControlTemplate.Triggers>
                 </ControlTemplate>
             </Setter.Value>
         </Setter>
@@ -1350,6 +1358,71 @@
                 </Setter>
             </Trigger>
         </Style.Triggers>
+    </Style>
+
+    <!--
+        Der Punkt links in jeder Zeile einer Ebenenliste: sichtbar oder nicht.
+        Im Thema, weil ihn der Ebenenstreifen und die Ebenenliste der Knoten teilen.
+
+        Ein Auge waere das gewohnte Zeichen, braucht aber eine Schriftart, auf
+        die kein Verlass ist. Ein gefuellter und ein leerer Kreis sagen dasselbe
+        und stehen auf jedem Rechner gleich.
+    -->
+    <Style x:Key="LayerEye" TargetType="ToggleButton">
+        <Setter Property="Focusable" Value="False" />
+        <Setter Property="Cursor" Value="Hand" />
+        <Setter Property="Width" Value="14" />
+        <Setter Property="Height" Value="14" />
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="ToggleButton">
+                    <Grid Background="Transparent">
+                        <Ellipse x:Name="Ring" Width="10" Height="10" StrokeThickness="1.2"
+                                 Stroke="{StaticResource MutedBrush}" />
+                        <Ellipse x:Name="Dot" Width="10" Height="10"
+                                 Fill="{StaticResource ForegroundBrush}" Opacity="0" />
+                    </Grid>
+                    <ControlTemplate.Triggers>
+                        <Trigger Property="IsChecked" Value="True">
+                            <Setter TargetName="Dot" Property="Opacity" Value="1" />
+                        </Trigger>
+                        <Trigger Property="IsMouseOver" Value="True">
+                            <Setter TargetName="Ring" Property="Stroke"
+                                    Value="{StaticResource AccentBrush}" />
+                        </Trigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <!--
+        Hinweise beim Darueberfahren im Stil der Oberflaeche - dunkel, mit feinem Rand und
+        runden Ecken - statt des hellen Windows-Kaestchens, das aus jedem Feld herausfiel.
+        Lange Saetze brechen um: Seit die Beschreibungen aus den Leisten in die Hinweise
+        gewandert sind, stehen dort ganze Absaetze.
+    -->
+    <Style TargetType="ToolTip">
+        <Setter Property="OverridesDefaultStyle" Value="True" />
+        <Setter Property="HasDropShadow" Value="False" />
+        <Setter Property="Foreground" Value="{StaticResource ForegroundBrush}" />
+        <Setter Property="FontSize" Value="11" />
+        <Setter Property="MaxWidth" Value="340" />
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="ToolTip">
+                    <Border Background="{StaticResource PanelBackground}" BorderBrush="{StaticResource PanelBorder}"
+                            BorderThickness="1" CornerRadius="6" Padding="9,6">
+                        <Border.Resources>
+                            <DataTemplate DataType="{x:Type sys:String}">
+                                <TextBlock Text="{Binding}" TextWrapping="Wrap" />
+                            </DataTemplate>
+                        </Border.Resources>
+                        <ContentPresenter />
+                    </Border>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
     </Style>
 
 </ResourceDictionary>

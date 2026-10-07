@@ -6,6 +6,12 @@ public enum DockZone
     Left,
     Right,
     Bottom,
+
+    /// <summary>
+    /// Ueber dem Bild, ueber die ganze Breite - der Platz der Werkzeugeinstellungen
+    /// (Entscheidung 10). Wie unten liegen die Gruppen nebeneinander.
+    /// </summary>
+    Top,
 }
 
 /// <summary>
@@ -55,6 +61,7 @@ public sealed class DockLayout
     public List<DockGroup> Left { get; set; } = new();
     public List<DockGroup> Right { get; set; } = new();
     public List<DockGroup> Bottom { get; set; } = new();
+    public List<DockGroup> Top { get; set; } = new();
 
     /// <summary>Breite der linken Zone in Punkten.</summary>
     public double LeftWidth { get; set; } = 300;
@@ -66,8 +73,14 @@ public sealed class DockLayout
     public double BottomHeight { get; set; } = 240;
 
     /// <summary>
-    /// Die Anordnung, mit der man anfaengt: rechts oben die Verteilung, darunter Farbe
-    /// und Ebenen als Reiter.
+    /// Hoehe der oberen Zone in Punkten - nur, wenn dort ein Feld liegt, das nicht so hoch
+    /// ist wie sein Inhalt. Die Werkzeugeinstellungen bestimmen ihre Hoehe selbst.
+    /// </summary>
+    public double TopHeight { get; set; } = 200;
+
+    /// <summary>
+    /// Die Anordnung, mit der man anfaengt: oben die Werkzeugeinstellungen, rechts oben die
+    /// Verteilung, darunter Farbe und Ebenen als Reiter, unten rechts die Ausgabe.
     ///
     /// Die Verteilung oben, wie in jedem Entwicklungsprogramm - man sieht beim
     /// Ziehen eines Reglers hin, was mit den Lichtern passiert. Und als eigene Gruppe,
@@ -75,10 +88,22 @@ public sealed class DockLayout
     /// </summary>
     public static DockLayout Default() => new()
     {
+        // Die Einstellungen des gewaehlten Werkzeugs als Leiste ueber dem Bild - und wer
+        // sie anders will, zieht sie an eine Seite (Entscheidung 10).
+        Top =
+        {
+            new DockGroup { Panels = { "tool" }, Active = "tool", Weight = 1 },
+        },
+
         Right =
         {
             new DockGroup { Panels = { "histogram" }, Active = "histogram", Weight = 1 },
             new DockGroup { Panels = { "colour", "layers" }, Active = "colour", Weight = 4 },
+
+            // Die Ausgabe unten rechts, und bei einer Anordnung von frueher kommt sie von selbst
+            // hierher (siehe Normalise). Ihre Hoehe richtet sich nach dem Inhalt (DockHost.
+            // FitsContent) - das Gewicht zaehlt erst, wenn sie mit anderen Feldern eine Gruppe teilt.
+            new DockGroup { Panels = { "export" }, Active = "export", Weight = 0.8 },
         },
     };
 
@@ -87,8 +112,12 @@ public sealed class DockLayout
     {
         DockZone.Left => Left,
         DockZone.Bottom => Bottom,
+        DockZone.Top => Top,
         _ => Right,
     };
+
+    /// <summary>Ob die Gruppen einer Zone nebeneinander liegen - oben und unten - statt untereinander.</summary>
+    public static bool IsHorizontal(DockZone zone) => zone is DockZone.Bottom or DockZone.Top;
 
     /// <summary>Alle Zonen mit ihren Gruppen.</summary>
     public IEnumerable<(DockZone Zone, List<DockGroup> Groups)> Zones()
@@ -96,6 +125,7 @@ public sealed class DockLayout
         yield return (DockZone.Left, Left);
         yield return (DockZone.Right, Right);
         yield return (DockZone.Bottom, Bottom);
+        yield return (DockZone.Top, Top);
     }
 
     /// <summary>
@@ -198,12 +228,45 @@ public sealed class DockLayout
     }
 
     /// <summary>
+    /// Bringt EIN Feld an seinen Platz in der Grundanordnung zurueck, ohne die anderen anzufassen:
+    /// als Reiter zu einem Feld, mit dem es dort eine Gruppe teilt, sonst als eigene Gruppe an
+    /// seiner Stelle in seiner Zone. Wer ein Feld verloren hat, soll nicht die ganze Anordnung
+    /// zuruecksetzen muessen.
+    /// </summary>
+    public void Home(string panel)
+    {
+        var fresh = Default();
+        if (fresh.Find(panel) is not { } home) return;
+
+        var partner = fresh.Zone(home.Zone)[home.Group].Panels.FirstOrDefault(p => p != panel && Find(p) is not null);
+
+        if (partner is not null && Find(partner) is { } together)
+        {
+            Move(panel, together.Zone, together.Group, asTab: true);
+            return;
+        }
+
+        // Eine eigene Gruppe - schon dort, allein, heisst: nur nach vorn holen und aufklappen.
+        if (Find(panel) is { } now && now.Zone == home.Zone && Zone(now.Zone)[now.Group].Panels.Count == 1)
+        {
+            var group = Zone(now.Zone)[now.Group];
+            group.Active = panel;
+            group.Collapsed = false;
+            return;
+        }
+
+        Move(panel, home.Zone, Math.Min(home.Group, Zone(home.Zone).Count), asTab: false);
+    }
+
+    /// <summary>
     /// Stellt die Zusage her: jedes bekannte Feld genau einmal, keine leeren Gruppen,
     /// in jeder Gruppe liegt ein Feld vorn, das auch zu ihr gehoert.
     ///
     /// Unbekannte Felder fallen weg - eine aeltere oder neuere Fassung kann Felder
     /// kennen, die es hier nicht gibt. Fehlende kommen dorthin, wo sie in der
-    /// Grundanordnung stehen; gibt es die Gruppe dort nicht mehr, in eine neue rechts.
+    /// Grundanordnung stehen - zu einem Feld, mit dem sie dort eine Gruppe teilen, sonst
+    /// als eigene Gruppe in dieselbe Zone. So kommen die Werkzeugeinstellungen bei einer
+    /// Anordnung von frueher nach oben.
     /// </summary>
     public void Normalise(IReadOnlyCollection<string> known)
     {
@@ -228,14 +291,15 @@ public sealed class DockLayout
 
         foreach (string missing in known.Where(p => !seen.Contains(p)))
         {
-            var home = Default().Find(missing);
+            var fresh = Default();
+            var home = fresh.Find(missing);
 
-            if (home is { } spot && spot.Zone == DockZone.Right)
+            if (home is { } spot)
             {
                 // Zu einem Feld der Grundanordnung, das mit ihm in derselben Gruppe
                 // stand - wenn es noch zusammen irgendwo liegt.
-                var partner = Default().Right[spot.Group].Panels
-                                       .FirstOrDefault(p => p != missing && seen.Contains(p));
+                var partner = fresh.Zone(spot.Zone)[spot.Group].Panels
+                                   .FirstOrDefault(p => p != missing && seen.Contains(p));
 
                 if (partner is not null && Find(partner) is { } at)
                 {
@@ -245,13 +309,14 @@ public sealed class DockLayout
                 }
             }
 
-            Right.Add(new DockGroup { Panels = { missing }, Active = missing, Weight = 1 });
+            Zone(home?.Zone ?? DockZone.Right).Add(new DockGroup { Panels = { missing }, Active = missing, Weight = 1 });
             seen.Add(missing);
         }
 
         LeftWidth = Clean(LeftWidth, 300);
         RightWidth = Clean(RightWidth, 320);
         BottomHeight = Clean(BottomHeight, 240);
+        TopHeight = Clean(TopHeight, 200);
 
         static double Clean(double value, double fallback)
             => value is > 120 and < 3000 ? value : fallback;
@@ -263,9 +328,11 @@ public sealed class DockLayout
         Left = Left.Select(CloneGroup).ToList(),
         Right = Right.Select(CloneGroup).ToList(),
         Bottom = Bottom.Select(CloneGroup).ToList(),
+        Top = Top.Select(CloneGroup).ToList(),
         LeftWidth = LeftWidth,
         RightWidth = RightWidth,
         BottomHeight = BottomHeight,
+        TopHeight = TopHeight,
     };
 
     private static DockGroup CloneGroup(DockGroup group) => new()

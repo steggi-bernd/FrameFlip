@@ -100,6 +100,23 @@ public sealed class ExrHeader
         = new Dictionary<string, byte[]>();
 
     /// <summary>
+    /// Bei einer mehrteiligen Datei die lesbaren Teile, jeder mit seinem eigenen Kopf -
+    /// sonst null. Der Kopf selbst ist dann ihre Zusammenfassung: die Kanaele aller Teile in
+    /// einer Liste, Groesse und Kompression des ersten. Wer nur Kanalnamen braucht - Paesse,
+    /// Farbe, Kryptomatte -, merkt davon nichts.
+    /// </summary>
+    public IReadOnlyList<ExrHeader>? Parts { get; init; }
+
+    /// <summary>Die Nummer dieses Teils in einer mehrteiligen Datei - jeder Block beginnt mit ihr.</summary>
+    public int? PartIndex { get; init; }
+
+    /// <summary>Der Name dieses Teils, etwa "Depth" - fuer Fehlermeldungen.</summary>
+    public string? PartName { get; init; }
+
+    /// <summary>Wie viele Bloecke der Teil hat, wie sein Kopf es sagt. In einer mehrteiligen Datei Pflicht.</summary>
+    public int? ChunkCount { get; init; }
+
+    /// <summary>
     /// Wie viele Zeilen in einem Block stecken. Das ist keine Eigenschaft der Datei,
     /// sondern des Verfahrens: ZIP komprimiert immer 16 Zeilen am Stueck, ZIPS eine
     /// einzelne. Aus dieser Zahl folgt die Laenge der Offset-Tabelle.

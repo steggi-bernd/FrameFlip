@@ -13,7 +13,7 @@ namespace FrameFlip.Tests;
 /// </summary>
 public static class DockLayoutInvariants
 {
-    private static readonly string[] Known = { "histogram", "colour", "layers" };
+    private static readonly string[] Known = { "histogram", "colour", "layers", "export", "tool" };
 
     public static void Run()
     {
@@ -85,6 +85,32 @@ public static class DockLayoutInvariants
                    "Farbe und Ebenen teilen sich darunter eine Gruppe als Reiter");
 
         Check.That(layout.Right[1].Active == "colour", "und vorn liegt die Farbe");
+
+        Check.That(layout.Find("export") is { Zone: DockZone.Right, Group: 2 } && layout.Right.Count == 3,
+                   "die Ausgabe steht rechts unten, als eigene Gruppe");
+
+        // Eine Anordnung von frueher kennt die Ausgabe nicht - sie kommt von selbst dorthin.
+        var older = new DockLayout
+        {
+            Right =
+            {
+                new DockGroup { Panels = { "histogram" }, Active = "histogram", Weight = 1 },
+                new DockGroup { Panels = { "colour", "layers" }, Active = "colour", Weight = 4 },
+            },
+        };
+        older.Normalise(Known);
+        Check.That(older.Find("export") is { Zone: DockZone.Right, Group: 2 },
+                   "eine Anordnung von frueher bekommt die Ausgabe unten rechts dazu");
+
+        // Entscheidung 10: die Werkzeugeinstellungen oben, als eigene Gruppe - auch bei einer
+        // Anordnung von frueher, die sie nicht kennt.
+        Check.That(layout.Find("tool") is { Zone: DockZone.Top, Group: 0 } && layout.Top.Count == 1,
+                   "die Werkzeugeinstellungen stehen oben");
+        Check.That(older.Find("tool") is { Zone: DockZone.Top } && older.Right.Count == 3,
+                   "eine Anordnung von frueher bekommt sie oben dazu - und rechts bleibt, was dort stand");
+        Check.That(DockLayout.IsHorizontal(DockZone.Top) && DockLayout.IsHorizontal(DockZone.Bottom) &&
+                   !DockLayout.IsHorizontal(DockZone.Left),
+                   "oben und unten liegen Gruppen nebeneinander, an den Seiten untereinander");
     }
 
     /// <summary>
@@ -162,8 +188,9 @@ public static class DockLayoutInvariants
         fresh.Move("colour", DockZone.Bottom, 0, asTab: false);
         fresh.Normalise(Known);
 
-        Check.That(fresh.Find("colour") is { Zone: DockZone.Bottom } && fresh.Right.Count == 0,
-                   "auch unter das Bild - und die rechte Zone ist dann leer");
+        Check.That(fresh.Find("colour") is { Zone: DockZone.Bottom } &&
+                   fresh.Right.Count == 1 && fresh.Right[0].Panels.SequenceEqual(new[] { "export" }),
+                   "auch unter das Bild - und rechts bleibt nur die Ausgabe");
     }
 
     /// <summary>
@@ -182,7 +209,7 @@ public static class DockLayoutInvariants
         layout.Move("histogram", DockZone.Right, 2, asTab: false);
         layout.Normalise(Known);
 
-        Check.That(layout.Right.Count == 2, "es bleiben zwei Gruppen", $"{layout.Right.Count}");
+        Check.That(layout.Right.Count == 3, "es bleiben drei Gruppen", $"{layout.Right.Count}");
         Check.That(layout.Right[1].Panels.SequenceEqual(new[] { "histogram" }),
                    "und die Verteilung steht jetzt unten, wie gewollt",
                    string.Join(" | ", layout.Right.Select(g => string.Join(",", g.Panels))));
@@ -245,6 +272,7 @@ public static class DockLayoutInvariants
 
         layout.Toggle("layers");
         layout.Toggle("histogram");
+        layout.Toggle("export");
 
         Check.That(layout.IsFolded(DockZone.Right), "ist alles eingeklappt, ist die Zone nur noch ein Streifen");
         Check.That(!layout.IsFolded(DockZone.Left), "eine leere Zone ist nicht eingeklappt, sondern gar nicht da");
@@ -260,7 +288,7 @@ public static class DockLayoutInvariants
         layout.Move("histogram", DockZone.Right, 1, asTab: true);
         layout.Normalise(Known);
 
-        Check.That(layout.Right.Count == 1 && layout.Right[0] is { Collapsed: false, Active: "histogram" },
+        Check.That(layout.Right.Count == 2 && layout.Right[0] is { Collapsed: false, Active: "histogram" },
                    "wer in eine eingeklappte Gruppe zieht, klappt sie auf",
                    string.Join(" | ", layout.Right.Select(g => $"{string.Join(",", g.Panels)}{(g.Collapsed ? " (zu)" : "")}")));
     }
@@ -273,8 +301,10 @@ public static class DockLayoutInvariants
 
         layout.Move("layers", DockZone.Left, 0, asTab: false);
         layout.Move("histogram", DockZone.Bottom, 0, asTab: false);
+        layout.Move("export", DockZone.Top, 1, asTab: false);
         layout.LeftWidth = 280;
         layout.BottomHeight = 190;
+        layout.TopHeight = 150;
         layout.Normalise(Known);
 
         var read = JsonSerializer.Deserialize<DockLayout>(JsonSerializer.Serialize(layout))!;
@@ -288,6 +318,9 @@ public static class DockLayoutInvariants
 
         Check.Near(read.LeftWidth, 280, 1e-9, "die Breite links");
         Check.Near(read.BottomHeight, 190, 1e-9, "und die Hoehe unten");
+        Check.That(read.Top.Count == 2 && read.Find("export") is { Zone: DockZone.Top, Group: 1 } &&
+                   Math.Abs(read.TopHeight - 150) < 1e-9 && layout.Clone().Top.Count == 2,
+                   "auch oben: die Ausgabe neben den Werkzeugeinstellungen, die Hoehe - und die Kopie");
 
         var copy = layout.Clone();
 

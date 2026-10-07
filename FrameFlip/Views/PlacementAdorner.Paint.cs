@@ -1,8 +1,10 @@
+using System.Globalization;
 using System.Windows;
 using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
 using FrameFlip.Imaging.Grading;
+using FrameFlip.Localization;
 
 using Brush = System.Windows.Media.Brush;
 using Color = System.Windows.Media.Color;
@@ -31,7 +33,9 @@ public sealed partial class PlacementAdorner
     private PaintedMask? _mask;
     private bool _painting;
     private bool _erasing;
-    private Point _lastStroke;
+
+    /// <summary>Der laufende Zug - er setzt die Tupfer, der Adorner liefert nur den Weg.</summary>
+    private PaintStroke? _stroke;
 
     private WriteableBitmap? _wash;
     private bool _washStale = true;
@@ -58,8 +62,308 @@ public sealed partial class PlacementAdorner
     /// <summary>Bis wohin ein Strich ueberhaupt auftraegt. 0 bis 1.</summary>
     public float BrushOpacity { get; set; } = 1f;
 
+    /// <summary>Der Abstand zweier Tupfer als Anteil des Radius - siehe <see cref="PaintStroke.Spacing"/>.</summary>
+    public float BrushSpacing { get; set; } = PaintStroke.DefaultSpacing;
+
+    /// <summary>Rund oder eckig.</summary>
+    public BrushShape BrushShape { get; set; } = BrushShape.Round;
+
+    /// <summary>Breite zu Hoehe der Spitze.</summary>
+    public float BrushAspect { get; set; } = 1f;
+
+    /// <summary>Der Winkel der Spitze in Grad.</summary>
+    public float BrushAngle { get; set; }
+
+    /// <summary>Der Winkel folgt dem Strich.</summary>
+    public bool BrushFollow { get; set; }
+
+    /// <summary>Wie weit eine eckige Spitze zum Karo gezogen ist, 0 bis 1 - siehe <see cref="PaintStroke.Squish"/>.</summary>
+    public float BrushSquish { get; set; }
+
+    /// <summary>Worauf der Druck eines Stifts wirkt. Die Maus hat keinen und merkt davon nichts.</summary>
+    public BrushPressure BrushPressureTo { get; set; } = BrushPressure.Size;
+
+    /// <summary>Die Spitze des Stempelpinsels - null, solange keine geladen ist.</summary>
+    public StampTip? BrushStamp { get; set; }
+
+    /// <summary>Zufaellige Drehung je Stempeltupfer, 0 bis 1.</summary>
+    public float BrushJitter { get; set; }
+
+    /// <summary>Streuung der Stempeltupfer neben dem Weg, 0 bis 1.</summary>
+    public float BrushScatter { get; set; }
+
+    /// <summary>Malt der Pinsel Zuege oder zieht er Flaechen auf - Rechteck, Ellipse, Lasso.</summary>
+    public PaintArea BrushArea { get; set; }
+
+    /// <summary>
+    /// Die Flaeche, die gerade aufgezogen wird: beim Lasso der Weg, sonst nur der Ansatz -
+    /// oder null, wenn keine aufgezogen wird.
+    /// </summary>
+    private List<float>? _area;
+
+    /// <summary>Wo die Maus beim Aufziehen gerade steht, in Bildpunkten.</summary>
+    private float _areaX, _areaY;
+
+    /// <summary>
+    /// Das Ende des letzten Zugs und die Maske, auf der er lag: Von hier aus zieht Umschalt
+    /// und Klick eine gerade Linie.
+    /// </summary>
+    private (float X, float Y)? _lineFrom;
+    private PaintedMask? _lineMask;
+
+    /// <summary>
+    /// Die Ecken der Flaeche, die gerade aufgezogen wird - oder null, solange sie zu klein
+    /// ist. Umschalt macht aus dem Rechteck ein Quadrat und aus der Ellipse einen Kreis.
+    /// </summary>
+    internal List<float>? AreaPath(bool even)
+        => _area is null ? null : AreaCorners(BrushArea, _area, _areaX, _areaY, even);
+
+    /// <summary>
+    /// Die Ecken einer Flaeche aus dem, was die Maus bisher getan hat: <paramref name="drawn"/>
+    /// beginnt mit dem Ansatz, beim Lasso folgt der Weg; (<paramref name="x"/>, <paramref name="y"/>)
+    /// ist, wo sie jetzt steht. Null, solange die Flaeche zu klein ist.
+    /// </summary>
+    internal static List<float>? AreaCorners(PaintArea area, IReadOnlyList<float> drawn, float x, float y, bool even)
+    {
+        if (area == PaintArea.None || drawn.Count < 2) return null;
+
+        float x0 = drawn[0], y0 = drawn[1];
+
+        if (area == PaintArea.Lasso)
+        {
+            var lasso = new List<float>(drawn);
+            if (lasso[^2] != x || lasso[^1] != y) { lasso.Add(x); lasso.Add(y); }
+
+            return lasso.Count >= 6 && MathF.Abs(Shoelace(lasso)) >= 4f ? lasso : null;
+        }
+
+        float dx = x - x0, dy = y - y0;
+
+        if (even)
+        {
+            float side = MathF.Max(MathF.Abs(dx), MathF.Abs(dy));
+            dx = dx < 0 ? -side : side;
+            dy = dy < 0 ? -side : side;
+        }
+
+        if (MathF.Abs(dx) < 1f || MathF.Abs(dy) < 1f) return null;
+
+        float left = MathF.Min(x0, x0 + dx), top = MathF.Min(y0, y0 + dy);
+        float right = MathF.Max(x0, x0 + dx), bottom = MathF.Max(y0, y0 + dy);
+
+        return area == PaintArea.Rectangle
+            ? PaintStroke.RectanglePath(left, top, right, bottom)
+            : PaintStroke.EllipsePath((left + right) / 2f, (top + bottom) / 2f, (right - left) / 2f, (bottom - top) / 2f);
+    }
+
+    /// <summary>Die doppelte Flaeche eines Vielecks - fuer "ist das Lasso mehr als ein Strich".</summary>
+    private static float Shoelace(IReadOnlyList<float> path)
+    {
+        float sum = 0f;
+        int n = path.Count / 2;
+
+        for (int i = 0, j = n - 1; i < n; j = i++)
+            sum += path[2 * j] * path[2 * i + 1] - path[2 * i] * path[2 * j + 1];
+
+        return sum;
+    }
+
+    /// <summary>
+    /// Der Druck des Stifts bei dieser Meldung, 0 bis 1 - oder null bei der Maus, bei
+    /// Beruehrung mit dem Finger und bei einem Stift ohne Drucksensor. Windows meldet auch
+    /// einen Stift als Maus; der Druck steht dann an den Stiftpunkten der Meldung.
+    /// </summary>
+    internal static float? PenPressure(MouseEventArgs e, IInputElement relativeTo)
+    {
+        var pen = e.StylusDevice;
+        if (pen is null) return null;
+
+        var points = pen.GetStylusPoints(relativeTo);
+        if (points.Count == 0 || !points.Description.HasProperty(StylusPointProperties.NormalPressure)) return null;
+
+        return points[points.Count - 1].PressureFactor;
+    }
+
+    /// <summary>
+    /// Woran ein Strich gebunden wird, der an dieser Stelle des Bildes beginnt - die
+    /// gepackte Deckung eines Objekts, oder null fuer ungebunden. Beim Ansetzen gefragt.
+    /// </summary>
+    public Func<float, float, string?>? LimitWanted { get; set; }
+
+    /// <summary>
+    /// Umschalt und das Rad am Bild: dreht die Spitze in Schritten von 15 Grad. Die Regler
+    /// ziehen ueber <see cref="BrushAdjusted"/> nach.
+    /// </summary>
+    internal void StepAngle(double notches)
+    {
+        float angle = BrushAngle + (float)Math.Round(notches) * 15f;
+        BrushAngle = ((angle % 180f) + 180f) % 180f;
+
+        BrushAdjusted?.Invoke();
+        InvalidateVisual();
+    }
+
+    /// <summary>Der zuletzt beendete Zug - fuer die Probe.</summary>
+    internal PaintStroke? LastStroke { get; private set; }
+
+    /// <summary>Was seit dem letzten <see cref="TakeTouched"/> bemalt wurde, in Bildpunkten der Leinwand.</summary>
+    private PaintBounds _pendingTouched = PaintBounds.Empty;
+
+    /// <summary>
+    /// Gibt heraus, was seit dem letzten Mal bemalt wurde, und beginnt von vorn - damit
+    /// die Seite nur diesen Teil des Bildes neu rechnet.
+    /// </summary>
+    internal PaintBounds TakeTouched()
+    {
+        var touched = _pendingTouched;
+        _pendingTouched = PaintBounds.Empty;
+        return touched;
+    }
+
     /// <summary>Es wurde gemalt. <c>interim</c> heisst: der Strich laeuft noch.</summary>
     public event Action<bool>? Painted;
+
+    /// <summary>Groesse oder Haerte wurden am Bild gezogen - die Regler sollen nachziehen.</summary>
+    public event Action? BrushAdjusted;
+
+    /// <summary>Was ein Zug mit gedrueckter Strg-Taste einstellt - oder Strg und das Rad.</summary>
+    internal enum BrushKnob { None, Size, Hardness, Spacing }
+
+    private BrushKnob _knob;
+
+    /// <summary>Wo der Zug begann - dort bleibt der Ring stehen, waehrend er sich aendert.</summary>
+    private Point _knobAnchor;
+
+    private float _knobStart;
+
+    /// <summary>Wie viel Haerte ein Schirmpunkt nach rechts bringt: 200 Punkte von weich bis hart.</summary>
+    private const double HardnessPerPoint = 1.0 / 200;
+
+    /// <summary>Der groesste Radius, den die Regler zulassen - 400 Punkte Durchmesser.</summary>
+    private const float MaxRadius = 200f;
+
+    /// <summary>Ob gerade Groesse oder Haerte gezogen wird - fuer die Probe.</summary>
+    internal BrushKnob Knob => _knob;
+
+    /// <summary>
+    /// Ob gerade Groesse oder Haerte gezogen werden - dann gehoert die Maus dem Ring.
+    /// Die Anzeige des Abstands gehoert ihr nicht; sie kommt vom Rad und steht nur da.
+    /// </summary>
+    internal bool KnobDragged => _knob is BrushKnob.Size or BrushKnob.Hardness;
+
+    /// <summary>
+    /// Beginnt das Einstellen am Bild: Strg und linke Taste die Groesse, Strg und rechte
+    /// die Haerte. Waagrecht gezogen - nach rechts groesser und haerter. Gemalt wird
+    /// dabei nicht, und eine Maske entsteht auch keine.
+    /// </summary>
+    internal void BeginKnob(Point at, BrushKnob knob)
+    {
+        _knob = knob;
+        _knobAnchor = at;
+        _knobStart = knob == BrushKnob.Size ? BrushRadius : BrushHardness;
+
+        CaptureMouse();
+        InvalidateVisual();
+    }
+
+    /// <summary>
+    /// Der Zug geht weiter. Bei der Groesse folgt die Kante des Rings der Maus: Ein
+    /// Schirmpunkt nach rechts ist ein Schirmpunkt mehr Radius, gleich wie weit das
+    /// Bild gerade vergroessert ist.
+    /// </summary>
+    internal void MoveKnob(Point at)
+    {
+        double dx = at.X - _knobAnchor.X;
+
+        if (_knob == BrushKnob.Size)
+            BrushRadius = (float)Math.Clamp(_knobStart + dx / Math.Max(ReachOnScreen, 1e-6), 1, MaxRadius);
+        else if (_knob == BrushKnob.Hardness)
+            BrushHardness = (float)Math.Clamp(_knobStart + dx * HardnessPerPoint, 0, 1);
+        else
+            return;
+
+        BrushAdjusted?.Invoke();
+        InvalidateVisual();
+    }
+
+    internal void EndKnob()
+    {
+        if (_knob == BrushKnob.None) return;
+
+        // Nur Groesse und Haerte fangen die Maus. Der Abstand kommt vom Rad und darf
+        // einen laufenden Strich nicht loslassen.
+        bool captured = _knob is BrushKnob.Size or BrushKnob.Hardness;
+
+        _knob = BrushKnob.None;
+        _knobFade?.Stop();
+
+        if (captured) ReleaseMouseCapture();
+        InvalidateVisual();
+    }
+
+    /// <summary>Laesst die Anzeige des Abstands nach dem letzten Dreh am Rad wieder verschwinden.</summary>
+    private System.Windows.Threading.DispatcherTimer? _knobFade;
+
+    /// <summary>
+    /// Strg und das Rad: der Abstand der Tupfer. Bis zur Haelfte des Radius in Schritten
+    /// von 5 %, bis zum Radius in 10 %, darueber in 25 % - unten entscheidet ein Schritt
+    /// zwischen glatt und perlig, oben nur noch, wie weit die Perlen auseinander liegen.
+    /// Der Ring zeigt waehrenddessen, wo die Tupfer eines Striches saessen.
+    /// </summary>
+    internal void StepSpacing(double notches, Point at)
+    {
+        int steps = (int)Math.Round(notches);
+        if (steps == 0) steps = Math.Sign(notches);
+
+        float spacing = BrushSpacing;
+
+        for (int i = 0; i < Math.Abs(steps); i++)
+        {
+            bool up = steps > 0;
+
+            // Die Stufe richtet sich nach der Seite, auf die es geht: 50 % hinauf ist ein
+            // Schritt von 10, hinunter einer von 5.
+            float from = up ? spacing + 1e-4f : spacing - 1e-4f;
+            float step = from < 0.5f ? 0.05f : from < 1f ? 0.1f : 0.25f;
+
+            spacing = MathF.Round((spacing + (up ? step : -step)) * 100f) / 100f;
+        }
+
+        BrushSpacing = Math.Clamp(spacing, PaintStroke.MinSpacing, PaintStroke.MaxSpacing);
+
+        // Ein laufender Zug an Groesse oder Haerte behaelt seine Anzeige.
+        if (_knob is BrushKnob.None or BrushKnob.Spacing)
+        {
+            _knob = BrushKnob.Spacing;
+            _knobAnchor = at;
+
+            if (_knobFade is null)
+            {
+                _knobFade = new System.Windows.Threading.DispatcherTimer { Interval = TimeSpan.FromMilliseconds(900) };
+                _knobFade.Tick += (_, _) =>
+                {
+                    _knobFade.Stop();
+                    if (_knob == BrushKnob.Spacing) EndKnob();
+                };
+            }
+
+            _knobFade.Stop();
+            _knobFade.Start();
+        }
+
+        BrushAdjusted?.Invoke();
+        InvalidateVisual();
+    }
+
+    /// <summary>Faengt Strg plus Maustaste ab - dann wird eingestellt statt gemalt.</summary>
+    private bool KnobPressed(MouseButtonEventArgs e, BrushKnob knob)
+    {
+        if ((Keyboard.Modifiers & ModifierKeys.Control) == 0) return false;
+
+        BeginKnob(e.GetPosition(this), knob);
+        e.Handled = true;
+        return true;
+    }
 
     /// <summary>
     /// Woher eine Maske kommt, wenn noch keine da ist - beim ERSTEN Strich gefragt.
@@ -115,28 +419,32 @@ public sealed partial class PlacementAdorner
     }
 
     /// <summary>Merkt sich, welcher Bereich der Maske einen Strich abbekommen hat.</summary>
-    private void Touched(float imageX, float imageY, float radius)
+    private void Touched(PaintBounds bounds)
     {
-        if (_mask is null) return;
+        if (_mask is null || bounds.IsEmpty) return;
 
-        int r = (int)MathF.Ceiling(radius / PaintedMask.Coarse) + 1;
+        _pendingTouched = _pendingTouched.Union(bounds);
 
-        int cx = (int)(imageX / PaintedMask.Coarse);
-        int cy = (int)(imageY / PaintedMask.Coarse);
+        // Ein Maskenpunkt Rand auf jeder Seite: Die weiche Kante des Tupfers faellt bis
+        // auf null, und der Punkt, auf den sie fast null legt, gehoert noch dazu.
+        int x0 = (int)MathF.Floor(bounds.X0 / PaintedMask.Coarse) - 1;
+        int y0 = (int)MathF.Floor(bounds.Y0 / PaintedMask.Coarse) - 1;
+        int x1 = (int)MathF.Ceiling(bounds.X1 / PaintedMask.Coarse) + 1;
+        int y1 = (int)MathF.Ceiling(bounds.Y1 / PaintedMask.Coarse) + 1;
 
         if (_dirtyX1 < 0)
         {
-            _dirtyX0 = cx - r;
-            _dirtyY0 = cy - r;
-            _dirtyX1 = cx + r;
-            _dirtyY1 = cy + r;
+            _dirtyX0 = x0;
+            _dirtyY0 = y0;
+            _dirtyX1 = x1;
+            _dirtyY1 = y1;
         }
         else
         {
-            _dirtyX0 = Math.Min(_dirtyX0, cx - r);
-            _dirtyY0 = Math.Min(_dirtyY0, cy - r);
-            _dirtyX1 = Math.Max(_dirtyX1, cx + r);
-            _dirtyY1 = Math.Max(_dirtyY1, cy + r);
+            _dirtyX0 = Math.Min(_dirtyX0, x0);
+            _dirtyY0 = Math.Min(_dirtyY0, y0);
+            _dirtyX1 = Math.Max(_dirtyX1, x1);
+            _dirtyY1 = Math.Max(_dirtyY1, y1);
         }
 
         _washStale = true;
@@ -167,14 +475,238 @@ public sealed partial class PlacementAdorner
         // Der Pinselkreis am Zeiger - sonst weiss niemand, wie gross er ist, und der
         // Zeiger selbst ist ausgeblendet. Er haengt NICHT an der Maske: Vor dem
         // ersten Strich gibt es noch keine, und genau dann braucht man ihn am meisten.
+        if (_knob != BrushKnob.None)
+        {
+            RenderKnob(context);
+            return;
+        }
+
+        // Beim Aufziehen einer Flaeche: ihr Umriss statt des Rings.
+        if (_painting && _area is not null)
+        {
+            if (AreaPath((Keyboard.Modifiers & ModifierKeys.Shift) != 0) is { } corners)
+            {
+                var figure = new PathFigure { StartPoint = Screen(corners[0], corners[1]), IsClosed = true };
+
+                for (int i = 2; i + 1 < corners.Count; i += 2)
+                    figure.Segments.Add(new LineSegment(Screen(corners[i], corners[i + 1]), true));
+
+                var outline = new PathGeometry(new[] { figure });
+                context.DrawGeometry(null, Shadow, outline);
+                context.DrawGeometry(null, new Pen(Ring, 1), outline);
+            }
+
+            return;
+        }
+
         if (!IsMouseOver) return;
 
         var at = Mouse.GetPosition(this);
         double radius = BrushRadius * ReachOnScreen;
 
-        context.DrawEllipse(null, Shadow, at, radius + 1, radius + 1);
-        context.DrawEllipse(null, new Pen(Ring, 1), at, radius, radius);
+        // Mit Umschalt: gestrichelt, wohin eine gerade Linie ginge.
+        if (BrushArea == PaintArea.None && !_painting && (Keyboard.Modifiers & ModifierKeys.Shift) != 0 &&
+            _lineFrom is { } from && ReferenceEquals(_lineMask, _mask))
+        {
+            var dashed = new Pen(Ring, 1) { DashStyle = DashStyles.Dash };
+            context.DrawLine(dashed, Screen(from.X, from.Y), at);
+        }
+
+        if (BrushShape == BrushShape.Round && BrushAspect <= 1f)
+        {
+            context.DrawEllipse(null, Shadow, at, radius + 1, radius + 1);
+            context.DrawEllipse(null, new Pen(Ring, 1), at, radius, radius);
+            return;
+        }
+
+        // Eckig oder gestreckt: der Umriss der Spitze, gedreht - so, wie sie auftraegt.
+        // Waehrend eines Strichs, dessen Winkel dem Weg folgt, im Winkel des naechsten
+        // Tupfers und nicht im eingestellten - sonst zeigt der Ring hochkant, was quer malt.
+        float angle = _painting && _stroke is { Follow: true } stroke ? stroke.TipAngle : BrushAngle;
+        var tip = TipOutline(at, radius, angle);
+
+        context.DrawGeometry(null, Shadow, tip);
+        context.DrawGeometry(null, new Pen(Ring, 1), tip);
     }
+
+    /// <summary>
+    /// Der Umriss der eingestellten Spitze um <paramref name="at"/>, in Schirmpunkten und
+    /// gedreht: Kreis, Ellipse, Rechteck oder Karo. <paramref name="scale"/> verkleinert ihn
+    /// um die Mitte - fuer die harte Kante.
+    /// </summary>
+    internal Geometry TipOutline(Point at, double radius, float angle, double scale = 1)
+    {
+        double halfW = radius * scale;
+        double halfH = Math.Max(0.5, radius / Math.Max(1f, BrushAspect)) * scale;
+
+        Geometry tip;
+
+        // Der Stempel zeigt den Rahmen seiner Spitze - lange Seite gleich Durchmesser.
+        if (BrushShape == BrushShape.Stamp && BrushStamp is { } stamp)
+        {
+            float longest = Math.Max(stamp.Width, stamp.Height);
+            halfW *= stamp.Width / longest;
+            halfH = Math.Max(0.5, radius * scale * stamp.Height / longest / Math.Max(1f, BrushAspect));
+        }
+
+        if (BrushShape is BrushShape.Square or BrushShape.Stamp)
+        {
+            var corners = new BrushTip(BrushShape.Square, BrushAspect, angle, BrushShape == BrushShape.Square ? BrushSquish : 0f)
+                .Corners(halfW, halfH);
+            var figure = new PathFigure { StartPoint = new Point(at.X + corners[0].X, at.Y + corners[0].Y), IsClosed = true };
+
+            for (int i = 1; i < corners.Length; i++)
+                figure.Segments.Add(new LineSegment(new Point(at.X + corners[i].X, at.Y + corners[i].Y), true));
+
+            tip = new PathGeometry(new[] { figure });
+        }
+        else
+        {
+            tip = new EllipseGeometry(at, halfW, halfH);
+        }
+
+        tip.Transform = new RotateTransform(angle, at.X, at.Y);
+        return tip;
+    }
+
+    /// <summary>
+    /// Waehrend Groesse oder Haerte gezogen werden: der Ring an der Stelle, an der der
+    /// Zug begann, gefuellt mit dem Abfall des Pinsels - innen deckend bis zur harten
+    /// Kante, dann auslaufend. Daneben die beiden Zahlen, die gezogene hervorgehoben.
+    /// </summary>
+    private void RenderKnob(DrawingContext context)
+    {
+        var at = _knobAnchor;
+        double radius = Math.Max(1, BrushRadius * ReachOnScreen);
+        double hard = Math.Clamp(BrushHardness, 0f, 0.999f);
+
+        var fill = new RadialGradientBrush
+        {
+            GradientStops =
+            {
+                new GradientStop(Color.FromArgb(0x70, 0xFF, 0xFF, 0xFF), 0),
+                new GradientStop(Color.FromArgb(0x70, 0xFF, 0xFF, 0xFF), hard),
+                new GradientStop(Color.FromArgb(0x00, 0xFF, 0xFF, 0xFF), 1),
+            },
+        };
+        fill.Freeze();
+
+        // Die harte Kante als eigener, gestrichelter Ring.
+        var dashed = new Pen(Ring, 1) { DashStyle = DashStyles.Dash };
+        dashed.Freeze();
+
+        bool round = BrushShape == BrushShape.Round && BrushAspect <= 1f;
+
+        if (round)
+        {
+            context.DrawEllipse(fill, null, at, radius, radius);
+            context.DrawEllipse(null, Shadow, at, radius + 1, radius + 1);
+            context.DrawEllipse(null, new Pen(Ring, 1.5), at, radius, radius);
+            context.DrawEllipse(null, dashed, at, radius * hard, radius * hard);
+        }
+        else
+        {
+            // Eckig oder gestreckt: derselbe Umriss wie am Zeiger. Ein Verlauf laesst sich
+            // nicht in ein Rechteck biegen - der Abfall steht als zwei Stufen da, deckend
+            // bis zur harten Kante, blasser bis zum Rand.
+            var outer = TipOutline(at, radius, BrushAngle);
+            var inner = TipOutline(at, radius, BrushAngle, hard);
+
+            context.DrawGeometry(SoftFill, null, outer);
+            context.DrawGeometry(HardFill, null, inner);
+            context.DrawGeometry(null, Shadow, outer);
+            context.DrawGeometry(null, new Pen(Ring, 1.5), outer);
+            context.DrawGeometry(null, dashed, inner);
+        }
+
+        // Beim Abstand: die Tupfer eines waagrechten Strichs durch den Ring, so dicht,
+        // wie er sie setzen wird. Unter drei Schirmpunkten Abstand verschwimmen sie
+        // ohnehin zu einem Band - dann reicht der Ring.
+        if (_knob == BrushKnob.Spacing)
+        {
+            double step = BrushRadius * BrushSpacing * ReachOnScreen;
+
+            if (step >= 3)
+            {
+                int reach = Math.Min(14, (int)(radius * 3 / step));
+
+                for (int k = -reach; k <= reach; k++)
+                {
+                    if (k == 0) continue;
+
+                    var ghost = new Point(at.X + k * step, at.Y);
+
+                    if (round) context.DrawEllipse(null, Ghost, ghost, radius, radius);
+                    else context.DrawGeometry(null, Ghost, TipOutline(ghost, radius, BrushAngle));
+                }
+            }
+        }
+
+        var lines = new[]
+        {
+            KnobLabel(Strings.T("S_BrushSize") + " " + (BrushRadius * 2).ToString("0", CultureInfo.CurrentCulture),
+                      _knob == BrushKnob.Size),
+            KnobLabel(Strings.T("S_BrushHardness") + " " + BrushHardness.ToString("0.00", CultureInfo.CurrentCulture),
+                      _knob == BrushKnob.Hardness),
+            KnobLabel(Strings.T("S_BrushSpacing") + " " + (BrushSpacing * 100).ToString("0", CultureInfo.CurrentCulture) + " %",
+                      _knob == BrushKnob.Spacing),
+        };
+
+        double wide = lines.Max(l => l.Width) + 16;
+        double high = lines.Sum(l => l.Height) + 4 * (lines.Length - 1) + 8;
+
+        // Rechts vom Ring, ausser er ragt dort aus dem Bild - dann links. Beim Abstand
+        // stehen rechts und links die Tupfer, dann steht die Anzeige darueber.
+        double x = at.X + radius + 12;
+        double y = at.Y - high / 2 + 4;
+
+        if (_knob == BrushKnob.Spacing)
+        {
+            x = at.X - wide / 2;
+            y = at.Y - radius - high - 8 + 4;
+        }
+        else if (x + wide > ActualWidth)
+        {
+            x = at.X - radius - 12 - wide;
+        }
+
+        context.DrawRoundedRectangle(KnobBack, null, new Rect(x, y - 4, wide, high), 4, 4);
+
+        foreach (var line in lines)
+        {
+            context.DrawText(line, new Point(x + 8, y));
+            y += line.Height + 4;
+        }
+    }
+
+    private static readonly Pen Ghost = FrozenPen(Color.FromArgb(0x90, 0xFF, 0xFF, 0xFF), 1);
+
+    private static readonly Brush SoftFill = FrozenBrush(Color.FromArgb(0x30, 0xFF, 0xFF, 0xFF));
+    private static readonly Brush HardFill = FrozenBrush(Color.FromArgb(0x48, 0xFF, 0xFF, 0xFF));
+
+    private static Brush FrozenBrush(Color colour)
+    {
+        var brush = new SolidColorBrush(colour);
+        brush.Freeze();
+        return brush;
+    }
+
+    private static Pen FrozenPen(Color color, double thickness)
+    {
+        var pen = new Pen(new SolidColorBrush(color), thickness);
+        pen.Freeze();
+        return pen;
+    }
+
+    private static readonly Brush KnobBack = Frozen(Color.FromArgb(0xD8, 0x18, 0x18, 0x1E));
+    private static readonly Brush KnobActive = Frozen(Color.FromArgb(0xFF, 0xFF, 0xFF, 0xFF));
+    private static readonly Brush KnobQuiet = Frozen(Color.FromArgb(0xFF, 0xA8, 0xA8, 0xB4));
+
+    private FormattedText KnobLabel(string text, bool active) => new(
+        text, CultureInfo.CurrentCulture, FlowDirection.LeftToRight,
+        new Typeface(new System.Windows.Media.FontFamily("Segoe UI"), FontStyles.Normal, active ? FontWeights.SemiBold : FontWeights.Normal,
+                     FontStretches.Normal),
+        12, active ? KnobActive : KnobQuiet, VisualTreeHelper.GetDpi(this).PixelsPerDip);
 
     /// <summary>
     /// Baut den Schleier - einmal je Aenderung und nicht je Bildwiederholung.
@@ -249,17 +781,99 @@ public sealed partial class PlacementAdorner
         // Die rechte Taste nimmt weg, Alt ebenso - siehe OnMouseRightButtonDown.
         _erasing = erase || (Keyboard.Modifiers & ModifierKeys.Alt) != 0;
 
-        _lastStroke = new Point(x, y);
+        // Ein neuer Strich beginnt mit leerer Rechnung - was ein frueherer liegen liess,
+        // hat das ganze Bild danach schon gezeigt.
+        _pendingTouched = PaintBounds.Empty;
 
-        _mask.Stroke(x, y, BrushRadius, _erasing ? 0f : 1f, BrushFlow,
-                     BrushHardness, BrushOpacity);
+        // Eine Flaeche wird erst beim Loslassen gefuellt - bis dahin steht nur ihr Umriss da.
+        if (BrushArea != PaintArea.None)
+        {
+            _area = new List<float> { x, y };
+            _areaX = x;
+            _areaY = y;
 
-        Touched(x, y, BrushRadius);
+            e.Handled = true;
+            CaptureMouse();
+            InvalidateVisual();
+            return;
+        }
+
+        float? pressure = PenPressure(e, this);
+
+        // Umschalt und Klick: eine gerade Linie vom Ende des letzten Zugs auf derselben Maske.
+        if ((Keyboard.Modifiers & ModifierKeys.Shift) != 0 && _lineFrom is { } from && ReferenceEquals(_lineMask, _mask))
+        {
+            _stroke = NewStroke(from.X, from.Y, pen: pressure is not null);
+            Touched(_stroke.Begin(_mask, from.X, from.Y, pressure ?? 1f));
+            Touched(_stroke.To(_mask, x, y, pressure ?? 1f));
+        }
+        else
+        {
+            _stroke = NewStroke(x, y, pen: pressure is not null);
+            Touched(_stroke.Begin(_mask, x, y, pressure ?? 1f));
+        }
         Painted?.Invoke(true);
 
         e.Handled = true;
         CaptureMouse();
     }
+
+    /// <summary>
+    /// Die Flaeche ist aufgezogen: gefuellt, festgehalten und als Strich gemerkt, damit der
+    /// Maskenverlauf sie nachspielt wie jeden Zug. Zu klein - ein Klick ohne Ziehen - fuellt
+    /// sie nichts.
+    /// </summary>
+    private void AreaUp(MouseButtonEventArgs e)
+    {
+        var corners = AreaPath((Keyboard.Modifiers & ModifierKeys.Shift) != 0);
+        float x = _area![0], y = _area[1];
+        _area = null;
+
+        LastStroke = null;
+
+        if (_mask is not null && corners is not null)
+        {
+            var stroke = NewStroke(x, y, area: BrushArea, path: corners);
+            Touched(stroke.Fill(_mask));
+            Painted?.Invoke(true);
+
+            LastStroke = stroke;
+            _mask.Keep();
+            Painted?.Invoke(false);
+        }
+
+        e.Handled = true;
+        InvalidateVisual();
+    }
+
+    /// <summary>
+    /// Ein neuer Strich mit allem, was gerade eingestellt ist - und der heutigen Rechnung.
+    /// Mit einem Stift, dessen Druck auf etwas wirkt, zeichnet er den Druck je Punkt auf.
+    /// </summary>
+    internal PaintStroke NewStroke(float x, float y, bool pen = false, PaintArea area = PaintArea.None, List<float>? path = null) => new()
+    {
+        Area = area,
+        Path = path ?? new List<float>(),
+        Radius = BrushRadius,
+        Hardness = BrushHardness,
+        Flow = BrushFlow,
+        Opacity = BrushOpacity,
+        Spacing = BrushSpacing,
+        Erase = _erasing,
+        Shape = BrushShape,
+        Aspect = BrushAspect,
+        Angle = BrushAngle,
+        Squish = BrushShape == BrushShape.Square ? BrushSquish : 0f,
+        Follow = BrushFollow,
+        Limit = LimitWanted?.Invoke(x, y),
+        Version = PaintStroke.CurrentVersion,
+        Stamp = BrushShape == BrushShape.Stamp ? BrushStamp : null,
+        Jitter = BrushShape == BrushShape.Stamp ? BrushJitter : 0f,
+        Scatter = BrushShape == BrushShape.Stamp ? BrushScatter : 0f,
+        Seed = BrushShape == BrushShape.Stamp ? Random.Shared.Next() : 0,
+        PressureTo = BrushPressureTo,
+        Pressure = pen && BrushPressureTo != BrushPressure.None ? new List<float>() : null,
+    };
 
     /// <summary>Der Ring muss dem Zeiger folgen, auch wenn nicht gemalt wird.</summary>
     protected override void OnMouseEnter(MouseEventArgs e)
@@ -276,36 +890,46 @@ public sealed partial class PlacementAdorner
         if (_mode == AdornerMode.Paint) InvalidateVisual();
     }
 
-    private void PaintMove(float x, float y)
+    private void PaintMove(float x, float y, float pressure = 1f)
     {
-        if (!_painting || _mask is null)
+        // Groesse und Haerte werden gerade gezogen - dann wird nicht gemalt. Die Anzeige
+        // des Abstands haelt einen Strich dagegen nicht auf.
+        if (_knob is BrushKnob.Size or BrushKnob.Hardness) return;
+
+        // Eine Flaeche wird aufgezogen: nur der Umriss folgt, beim Lasso sammelt sich der Weg.
+        if (_painting && _area is not null)
+        {
+            if (BrushArea == PaintArea.Lasso)
+            {
+                float lx = _area[^2], ly = _area[^1];
+                if ((x - lx) * (x - lx) + (y - ly) * (y - ly) >= 2.25f) { _area.Add(x); _area.Add(y); }
+            }
+
+            _areaX = x;
+            _areaY = y;
+            InvalidateVisual();
+            return;
+        }
+
+        if (!_painting || _mask is null || _stroke is null)
         {
             // Der Kreis folgt dem Zeiger, auch wenn nicht gemalt wird.
             InvalidateVisual();
             return;
         }
 
-        // Zwischen zwei Mausmeldungen liegen bei schneller Bewegung viele Bildpunkte.
-        // Ohne Zwischenschritte ergaebe ein Strich eine Perlenkette statt einer Linie.
-        double dx = x - _lastStroke.X;
-        double dy = y - _lastStroke.Y;
-        double away = Math.Sqrt(dx * dx + dy * dy);
+        // Die Tupfer zwischen zwei Mausmeldungen setzt der Zug, im Abstand des Pinsels.
+        // Liegt die Meldung naeher als ein Abstand, entsteht kein Tupfer - dann gibt
+        // es auch nichts neu zu rechnen, nur der Ring folgt.
+        var touched = _stroke.To(_mask, x, y, pressure);
 
-        int steps = Math.Max(1, (int)(away / Math.Max(1f, BrushRadius * 0.25f)));
-
-        for (int s = 1; s <= steps; s++)
+        if (touched.IsEmpty)
         {
-            float t = (float)s / steps;
-
-            _mask.Stroke((float)(_lastStroke.X + dx * t), (float)(_lastStroke.Y + dy * t),
-                         BrushRadius, _erasing ? 0f : 1f, BrushFlow,
-                         BrushHardness, BrushOpacity);
+            InvalidateVisual();
+            return;
         }
 
-        Touched((float)_lastStroke.X, (float)_lastStroke.Y, BrushRadius + (float)away);
-
-        _lastStroke = new Point(x, y);
-
+        Touched(touched);
         Painted?.Invoke(true);
     }
 
@@ -315,6 +939,28 @@ public sealed partial class PlacementAdorner
 
         _painting = false;
         ReleaseMouseCapture();
+
+        if (_area is not null)
+        {
+            AreaUp(e);
+            return;
+        }
+
+        // Ein Klick ohne Bewegung mit einem Winkel, der dem Strich folgt: Sein Tupfer kommt jetzt.
+        if (_mask is not null && _stroke?.Finish(_mask) is { IsEmpty: false } last)
+        {
+            Touched(last);
+            Painted?.Invoke(true);
+        }
+
+        LastStroke = _stroke;
+        _stroke = null;
+
+        if (LastStroke is { Path.Count: >= 2 } done)
+        {
+            _lineFrom = (done.Path[^2], done.Path[^1]);
+            _lineMask = _mask;
+        }
 
         // Beim Loslassen einmal endgueltig: Das ist das Zeichen, voll zu rechnen und
         // den Anstrich festzuhalten.

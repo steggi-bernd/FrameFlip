@@ -6,6 +6,7 @@
     <Grid>
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
             <RowDefinition Height="*" />
             <RowDefinition Height="Auto" />
         </Grid.RowDefinitions>
@@ -14,56 +15,19 @@
             <ColumnDefinition Width="*" />
         </Grid.ColumnDefinitions>
 
-        <!-- Kopfzeile: was offen ist, und womit gerechnet wird -->
-        <Grid Grid.Row="0" Grid.ColumnSpan="4" Margin="0,0,0,10">
-            <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                <Button x:Name="OpenButton" Style="{StaticResource OverlayButton}"
-                        Content="{DynamicResource S_OpenImage}" Click="OnOpenClicked" />
+        <!--
+            Oben: Bild oeffnen und die Werkzeugleiste in einem - Kategorien und Suche, darunter
+            die Werkzeuge der gewaehlten. Was frueher eine eigene Kopfzeile trug - Datei,
+            Speicherstand, Vergleich, Zoom -, steht jetzt unten in der Statuszeile.
+        -->
+        <!-- "Bild oeffnen" setzt der Code vorn hinein (ToolBand.Leading) - benennen laesst es sich hier nicht. -->
+        <local:ToolBand x:Name="ToolBand" Grid.Row="0" Grid.ColumnSpan="2" Margin="0,0,0,8" />
 
-                <TextBlock x:Name="FileText" VerticalAlignment="Center" Margin="12,0,0,0"
-                           Style="{StaticResource DashLabel}"
-                           TextTrimming="CharacterEllipsis" MaxWidth="460"
-                           Text="{DynamicResource S_NoImage}" />
-            </StackPanel>
-
-            <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center">
-                <!--
-                    Gedrueckt halten zeigt das Original. Als Knopf und nicht als
-                    Schalter, weil der Vergleich ein Blick ist und kein Zustand -
-                    wer umschaltet, vergisst zurueckzuschalten und beurteilt dann
-                    minutenlang das falsche Bild.
-                -->
-                <Button x:Name="CompareButton" Style="{StaticResource OverlayButton}"
-                        Content="{DynamicResource S_ShowOriginal}" Margin="0,0,10,0"
-                        PreviewMouseLeftButtonDown="OnCompareDown"
-                        PreviewMouseLeftButtonUp="OnCompareUp"
-                        MouseLeave="OnCompareUp"
-                        IsEnabled="False"
-                        ToolTip="{DynamicResource S_ShowOriginalHint}" />
-
-                <Button x:Name="ZoomButton" Style="{StaticResource LinkButton}"
-                        Margin="0,0,14,0" MinWidth="52" Click="OnZoomClicked"
-                        ToolTip="{DynamicResource S_ZoomHint}">
-                    <TextBlock x:Name="ZoomText" FontSize="9" TextAlignment="Right" Text="Fit" />
-                </Button>
-
-                <TextBlock x:Name="SourceText" VerticalAlignment="Center" Margin="0,0,14,0"
-                           Style="{StaticResource DashLabel}" FontSize="9" />
-                <TextBlock x:Name="ViewText" VerticalAlignment="Center"
-                           Style="{StaticResource DashLabel}" FontSize="9" />
-
-                <!--
-                    Was die Pipette zuletzt gelesen hat. In der Kopfzeile und nicht
-                    als Wolke am Zeiger: Ein Wert, den man ablesen will, will man
-                    meistens mit einem zweiten vergleichen, und dafuer muss der
-                    erste stehenbleiben.
-                -->
-                <TextBlock x:Name="PickText" VerticalAlignment="Center" Margin="14,0,0,0"
-                           Style="{StaticResource DashLabel}" FontSize="9"
-                           Foreground="{StaticResource AccentBrush}"
-                           Visibility="Collapsed" />
-            </StackPanel>
-        </Grid>
+        <!--
+            Die Einstellungen des gewaehlten Werkzeugs - als Leiste unter der Werkzeugzeile,
+            ueber die ganze Breite, und nicht mehr ueber dem Bild.
+        -->
+        <!-- Die Einstellungen des Werkzeugs sind ein Feld der Andockflaeche (Entscheidung 10) - siehe unten. -->
 
         <!--
             Die Werkzeugspalte: was die Maus im Bild tut.
@@ -73,7 +37,7 @@
             das Bild besteht, liegt. Das ist keine Anordnung aus Gewohnheit, sondern
             die Leserichtung des Vorgangs: Werkzeug, Bild, Aufbau.
         -->
-        <local:ToolColumn x:Name="MouseTools" Grid.Row="1" Grid.Column="0"
+        <local:ToolColumn x:Name="MouseTools" Grid.Row="2" Grid.Column="0"
                           Margin="0,0,10,0" />
 
         <!-- Das Bild -->
@@ -86,7 +50,7 @@
             Anordnung beim Laden; ihre Namen und Handler bleiben dieselben, gleich wo
             sie gerade haengen.
         -->
-        <local:DockHost x:Name="Dock" Grid.Row="1" Grid.Column="1">
+        <local:DockHost x:Name="Dock" Grid.Row="2" Grid.Column="1">
             <local:DockHost.Center>
                 <!--
                     Das Bild, und darueber die Leiste des gewaehlten Werkzeugs.
@@ -102,7 +66,26 @@
                         <RowDefinition Height="*" />
                     </Grid.RowDefinitions>
 
-                    <local:PropertiesPanel x:Name="Properties" Grid.Row="0" Margin="0,0,0,8" />
+                    <!-- Woran gerade gearbeitet wird (docs/Atelier-Arbeitsablauf.md, C1) - aus dem
+                         Bearbeitungsziel der Sitzung, siehe ShowTargetPath. Die Glieder baut der Code. -->
+                    <DockPanel x:Name="TargetStrip" Grid.Row="0" Margin="2,0,2,6" Visibility="Collapsed"
+                               Background="Transparent" ToolTip="{DynamicResource S_TargetHint}">
+                        <!-- Aktionen am Ziel (C2): Sie legen an und verbinden, wohin die Zeile zeigt. -->
+                        <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" Margin="12,0,0,0">
+                            <Button x:Name="TargetCorrect" Style="{StaticResource OverlayButton}" Margin="0,0,6,0"
+                                    Content="{DynamicResource S_TargetAddCorrection}"
+                                    ToolTip="{DynamicResource S_TargetAddCorrectionHint}" Click="OnTargetCorrect" />
+                            <Button x:Name="TargetEffect" Style="{StaticResource OverlayButton}"
+                                    Content="{DynamicResource S_TargetAddEffect}"
+                                    ToolTip="{DynamicResource S_TargetAddEffectHint}" Click="OnTargetEffect" />
+                        </StackPanel>
+                        <TextBlock x:Name="TargetNote" DockPanel.Dock="Right" VerticalAlignment="Center"
+                                   Margin="12,0,0,0" FontSize="11" TextTrimming="CharacterEllipsis"
+                                   Foreground="{StaticResource MutedBrush}" />
+                        <local:IconLabel DockPanel.Dock="Left" Icon="target" Margin="0,0,8,0"
+                                         TextElement.Foreground="{StaticResource MutedBrush}" />
+                        <WrapPanel x:Name="TargetPathPanel" VerticalAlignment="Center" />
+                    </DockPanel>
 
                     <Border Grid.Row="1" Background="#FF101010" CornerRadius="4"
                             ClipToBounds="True"
@@ -124,7 +107,20 @@
                                 <Grid>
                                     <Image x:Name="Display" Stretch="Uniform"
                                            RenderOptions.BitmapScalingMode="HighQuality"
-                                           MouseLeftButtonDown="OnImageClicked" />
+                                           MouseLeftButtonDown="OnImageClicked"
+                                           MouseMove="OnCryptoHover" MouseLeave="OnCryptoHoverLeft" />
+
+                                    <!-- Rueckmeldung beim Waehlen (C3): die gewaehlten Objekte umrandet,
+                                         das unter dem Zeiger hell ueberlagert. Genau so gross wie das Bild,
+                                         beim Einpassen wie beim Zoom - siehe AtelierPage.CryptoView. -->
+                                    <Image x:Name="CryptoSelection" IsHitTestVisible="False" Stretch="Fill"
+                                           Width="{Binding ActualWidth, ElementName=Display}"
+                                           Height="{Binding ActualHeight, ElementName=Display}"
+                                           RenderOptions.BitmapScalingMode="Linear" />
+                                    <Image x:Name="CryptoHover" IsHitTestVisible="False" Stretch="Fill"
+                                           Width="{Binding ActualWidth, ElementName=Display}"
+                                           Height="{Binding ActualHeight, ElementName=Display}"
+                                           RenderOptions.BitmapScalingMode="Linear" />
 
                                     <local:PlacementAdorner x:Name="Placement" />
                                 </Grid>
@@ -137,6 +133,40 @@
                                 Blender.
                             -->
                             <local:NodeEditor x:Name="NodeView" Visibility="Collapsed" />
+
+                            <!-- Der Name des Objekts am Zeiger (C3). Ohne Treffer fuer die Maus. -->
+                            <Canvas x:Name="CryptoHoverLayer" IsHitTestVisible="False">
+                                <!-- Die Lupe der Pipette (C4): elf mal elf Bildpunkte, die Farbe in der
+                                     Mitte und ihre Werte, dazu wofuer die Pipette gerade liest. -->
+                                <Border x:Name="PickLoupe" Visibility="Collapsed"
+                                        Background="{StaticResource PanelBackground}"
+                                        BorderBrush="{StaticResource PanelBorder}" BorderThickness="1"
+                                        CornerRadius="6" Padding="8">
+                                    <StackPanel>
+                                        <UniformGrid x:Name="LoupeGrid" Rows="11" Columns="11" Width="88" Height="88" />
+                                        <StackPanel Orientation="Horizontal" Margin="0,6,0,0">
+                                            <Border x:Name="LoupeSwatch" Width="16" Height="16" CornerRadius="3"
+                                                    BorderThickness="1" BorderBrush="{StaticResource PanelBorder}" Margin="0,0,6,0" />
+                                            <TextBlock x:Name="LoupeHex" FontSize="11" VerticalAlignment="Center"
+                                                       FontFamily="{StaticResource MonoFont}"
+                                                       Foreground="{StaticResource ForegroundBrush}" />
+                                        </StackPanel>
+                                        <TextBlock x:Name="LoupeValues" FontSize="10" Margin="0,4,0,0"
+                                                   FontFamily="{StaticResource MonoFont}"
+                                                   Foreground="{StaticResource MutedBrush}" />
+                                        <TextBlock x:Name="LoupeFor" FontSize="10" Margin="0,4,0,0" MaxWidth="160"
+                                                   TextWrapping="Wrap" Foreground="{StaticResource AccentBrush}" />
+                                    </StackPanel>
+                                </Border>
+
+                                <Border x:Name="CryptoHoverName" Visibility="Collapsed"
+                                        Background="{StaticResource PanelBackground}"
+                                        BorderBrush="{StaticResource PanelBorder}" BorderThickness="1"
+                                        CornerRadius="5" Padding="8,3">
+                                    <TextBlock x:Name="CryptoHoverText" FontSize="12"
+                                               Foreground="{StaticResource ForegroundBrush}" />
+                                </Border>
+                            </Canvas>
 
                             <!--
                                 Das Angebot umzuschalten. Ein eigenes Feld und keine
@@ -195,6 +225,37 @@
                                 </StackPanel>
                             </Border>
 
+                            <!--
+                                Die Objektmaske wartet auf einen Klick (R4): was er bewirkt, und
+                                wie man aufhoert. Oben und nicht ueber dem Bild, wo man klicken will.
+                            -->
+                            <Border x:Name="ObjectBadge" Visibility="Collapsed"
+                                    HorizontalAlignment="Center" VerticalAlignment="Top" Margin="12"
+                                    Background="{StaticResource PanelBackground}"
+                                    BorderBrush="{StaticResource AccentBrush}" BorderThickness="1"
+                                    CornerRadius="6" Padding="10,6">
+                                <StackPanel Orientation="Horizontal">
+                                    <local:IconLabel Icon="object" Margin="0,0,8,0"
+                                                     TextElement.Foreground="{StaticResource AccentBrush}" />
+                                    <TextBlock x:Name="ObjectBadgeText" VerticalAlignment="Center" FontSize="12"
+                                               MaxWidth="520" TextWrapping="Wrap" Margin="0,0,10,0"
+                                               Foreground="{StaticResource ForegroundBrush}" />
+                                    <Button Style="{StaticResource OverlayButton}"
+                                            Content="{DynamicResource S_ObjectPickDone}"
+                                            Click="OnObjectPickDone" />
+                                </StackPanel>
+                            </Border>
+
+                            <!-- Das Original bleibt nach einem Klick stehen - und sagt das, solange es gilt. -->
+                            <Border x:Name="CompareBadge" Visibility="Collapsed"
+                                    HorizontalAlignment="Left" VerticalAlignment="Top" Margin="12"
+                                    Background="{StaticResource PanelBackground}"
+                                    BorderBrush="{StaticResource AccentBrush}" BorderThickness="1"
+                                    CornerRadius="4" Padding="10,6">
+                                <TextBlock x:Name="CompareBadgeText" FontSize="12" Foreground="{StaticResource ForegroundBrush}"
+                                           Text="{DynamicResource S_BeforeBadge}" />
+                            </Border>
+
                             <Border x:Name="BusyBadge" Visibility="Collapsed"
                                     HorizontalAlignment="Center" VerticalAlignment="Center"
                                     Background="{StaticResource BadgeBackground}" CornerRadius="4" Padding="12,7">
@@ -222,57 +283,193 @@
             <ContentControl x:Name="HistogramSlot"
                             local:DockHost.PanelId="histogram"
                             local:DockHost.TitleKey="S_Distribution" />
+            <!--
+                Die Ausgabe: Format, Ziel, der Schnell-Export und der Lauf ueber die Folge. Als
+                Feld der Andockflaeche - in der Grundanordnung unten rechts, und wer mag, zieht
+                es woanders hin.
+            -->
+            <!--
+                Die Einstellungen des gewaehlten Werkzeugs (Entscheidung 10): in der
+                Grundanordnung oben als Leiste ueber dem Bild, und wer mag, zieht sie an eine
+                Seite - dort stehen die Gruppen untereinander. So hoch wie ihr Inhalt.
+            -->
+            <!-- Oben buendig: In einer hohen Gruppe - als Reiter neben der Farbe - stuenden die
+                 Regler sonst mitten in leerer Flaeche. -->
+            <local:PropertiesPanel x:Name="Properties" VerticalAlignment="Top"
+                                   local:DockHost.PanelId="tool"
+                                   local:DockHost.TitleKey="S_SectionTool"
+                                   local:DockHost.FitsContent="True" />
+
+            <Border x:Name="ExportBar"
+                    local:DockHost.PanelId="export"
+                    local:DockHost.TitleKey="S_SectionExport"
+                    local:DockHost.FitsContent="True"
+                    Padding="10,8" Visibility="Collapsed">
+                <StackPanel>
+                    <!-- Format und Ziel in einer Zeile, darunter wohin es geht. -->
+                    <DockPanel>
+                        <Button x:Name="TargetButton" DockPanel.Dock="Right" Margin="6,0,0,0"
+                                Style="{StaticResource OverlayButton}"
+                                Content="{DynamicResource S_ChooseTarget}" Click="OnChooseTargetClicked" />
+                        <ComboBox x:Name="FormatBox" Style="{StaticResource OverlayCombo}"
+                                  HorizontalAlignment="Stretch" SelectionChanged="OnFormatChanged"
+                                  ToolTip="{DynamicResource S_OutputFormat}" />
+                    </DockPanel>
+
+                    <TextBlock x:Name="TargetText" Margin="0,4,0,0"
+                               Style="{StaticResource DashLabel}" FontSize="9"
+                               TextTrimming="CharacterEllipsis"
+                               ToolTip="{Binding Text, RelativeSource={RelativeSource Self}}" />
+
+                    <!-- Pixel Sort und Fehlerdiffusion laufen nur in acht Bit. In einem 16-Bit-Format
+                         fehlten sie in der Ausgabe, waehrend die Vorschau sie zeigt - siehe
+                         ShowEightBitNote. -->
+                    <TextBlock x:Name="EightBitNote" Margin="0,4,0,0" FontSize="9" TextWrapping="Wrap"
+                               Foreground="{StaticResource AppWarn}" Visibility="Collapsed"
+                               Text="{DynamicResource S_EightBitOnly}" />
+
+                    <!--
+                        Schnell-Export: kein Dialog, kein Ziel noetig - in den Ordner FrameFlip
+                        neben den Bildern oder den gewaehlten Zielordner, unter dem naechsten
+                        freien Namen. Er ueberschreibt nie.
+                    -->
+                    <UniformGrid Columns="2" Margin="0,6,0,0">
+                        <Button x:Name="QuickExportButton" Style="{StaticResource OverlayButton}" Margin="0,0,4,0"
+                                Content="{DynamicResource S_QuickExport}" Click="OnQuickExportClicked"
+                                ToolTip="{DynamicResource S_QuickExportHint}" IsEnabled="False" />
+                        <Button x:Name="RunButton" Style="{StaticResource OverlayButton}" Margin="4,0,0,0"
+                                Content="{DynamicResource S_RunBatch}" Click="OnRunClicked" IsEnabled="False" />
+                    </UniformGrid>
+
+                    <Button x:Name="StopButton" Style="{StaticResource OverlayButton}" Margin="0,6,0,0"
+                            Content="{DynamicResource S_Stop}" Click="OnStopClicked" Visibility="Collapsed" />
+
+                    <!-- Leer braucht der Stand keinen Platz - die Gruppe ist so hoch wie ihr Inhalt. -->
+                    <TextBlock x:Name="BatchStatus" Margin="0,6,0,0" TextWrapping="Wrap" FontSize="9">
+                        <TextBlock.Style>
+                            <Style TargetType="TextBlock" BasedOn="{StaticResource DashLabel}">
+                                <Style.Triggers>
+                                    <Trigger Property="Text" Value="">
+                                        <Setter Property="Visibility" Value="Collapsed" />
+                                    </Trigger>
+                                </Style.Triggers>
+                            </Style>
+                        </TextBlock.Style>
+                    </TextBlock>
+
+                    <ProgressBar x:Name="BatchProgress" Height="3" Margin="0,6,0,0"
+                                 Visibility="Collapsed" Minimum="0" Maximum="1"
+                                 Background="{StaticResource PanelBorder}"
+                                 Foreground="{StaticResource DesktopAccent}"
+                                 BorderThickness="0" />
+                </StackPanel>
+            </Border>
         </local:DockHost>
 
-        <!-- Die Sequenz ausgeben -->
-        <Border x:Name="ExportBar" Grid.Row="2" Grid.ColumnSpan="2" Margin="0,12,0,0"
-                Background="{StaticResource PanelBackground}"
-                BorderBrush="{StaticResource PanelBorder}" BorderThickness="1" CornerRadius="4"
-                Padding="12,10" Visibility="Collapsed">
-            <Grid>
-                <Grid.RowDefinitions>
-                    <RowDefinition Height="Auto" />
-                    <RowDefinition Height="Auto" />
-                </Grid.RowDefinitions>
+        <!--
+            Original, Zoom und Speichern - oben rechts neben der Suche (ToolBand.Trailing). Sie
+            stehen hier nur, weil benannte Knoepfe nicht als Inhalt der Werkzeugleiste im XAML
+            stehen duerfen (MC3093); der Konstruktor setzt sie dorthin.
+        -->
+        <ContentControl x:Name="ViewControlsHome" Grid.Row="0" Visibility="Collapsed" Focusable="False">
+            <StackPanel x:Name="ViewControls" Orientation="Horizontal" VerticalAlignment="Center" Margin="0,0,6,0">
+                <!-- Sichthilfe (W2c): Normal, Clipping, Falschfarben - nur in der Anzeige. Taste J. -->
+                <Button x:Name="ViewAidButton" Style="{StaticResource OverlayButton}" Margin="0,0,4,0"
+                        Click="OnViewAidClicked" ToolTip="{DynamicResource S_ViewAidHint}">
+                    <TextBlock x:Name="ViewAidText" Text="{DynamicResource S_ViewAidNone}" />
+                </Button>
 
-                <StackPanel Grid.Row="0" Orientation="Horizontal" VerticalAlignment="Center">
-                    <TextBlock x:Name="SequenceText" VerticalAlignment="Center"
-                               Style="{StaticResource DashLabel}" MinWidth="150" />
+                <!--
+                    Ein kurzer Klick schaltet aufs Original und laesst es stehen, gedrueckt halten
+                    ist nur ein Blick (siehe OnCompareDown). Das Abzeichen am Bild sagt, dass es
+                    das Original ist, und jede Aenderung schaltet zurueck.
+                -->
+                <Button x:Name="CompareButton" Style="{StaticResource OverlayButton}" Margin="0,0,4,0"
+                        Click="OnCompareClicked"
+                        PreviewMouseLeftButtonDown="OnCompareDown"
+                        PreviewMouseLeftButtonUp="OnCompareUp"
+                        MouseLeave="OnCompareUp"
+                        IsEnabled="False"
+                        AutomationProperties.Name="{DynamicResource S_ShowOriginal}"
+                        ToolTip="{DynamicResource S_ShowOriginalHint}">
+                    <local:IconLabel Icon="eye" Text="{DynamicResource S_ShowOriginal}" />
+                </Button>
 
-                    <ComboBox x:Name="FormatBox" Style="{StaticResource OverlayCombo}"
-                              Width="150" Margin="14,0,0,0"
-                              SelectionChanged="OnFormatChanged"
-                              ToolTip="{DynamicResource S_OutputFormat}" />
+                <Button x:Name="ZoomButton" Style="{StaticResource OverlayButton}" Margin="0,0,4,0"
+                        MinWidth="48" Click="OnZoomClicked"
+                        ToolTip="{DynamicResource S_ZoomHint}">
+                    <TextBlock x:Name="ZoomText" TextAlignment="Center" Text="Fit" />
+                </Button>
 
-                    <Button x:Name="TargetButton" Style="{StaticResource OverlayButton}"
-                            Margin="8,0,0,0" Content="{DynamicResource S_ChooseTarget}"
-                            Click="OnChooseTargetClicked" />
+                <Button x:Name="SaveButton" Style="{StaticResource OverlayButton}" Margin="0,0,4,0"
+                        Click="OnSaveClicked" IsEnabled="False"
+                        AutomationProperties.Name="{DynamicResource S_ProjectSave}"
+                        ToolTip="{DynamicResource S_ProjectSaveHint}">
+                    <local:IconLabel Icon="save" Text="{DynamicResource S_ProjectSave}" />
+                </Button>
+            </StackPanel>
+        </ContentControl>
 
-                    <TextBlock x:Name="TargetText" VerticalAlignment="Center" Margin="10,0,0,0"
-                               Style="{StaticResource DashLabel}" FontSize="9"
-                               TextTrimming="CharacterEllipsis" MaxWidth="320" />
+        <!--
+            Unten eine niedrige Zeile fuer das, was man ablesen will: welche Folge und welches
+            Bild, welche Datei, wie gross, was die Pipette las - und rechts Vergleich, Zoom und
+            ob gespeichert ist.
+        -->
+        <Border x:Name="StatusBar" Grid.Row="3" Grid.ColumnSpan="2" Margin="0,8,0,0"
+                Background="{StaticResource PanelBackground}" BorderBrush="{StaticResource PanelBorder}"
+                BorderThickness="1" CornerRadius="6" Padding="8,1">
+            <DockPanel LastChildFill="True">
+                <!--
+                    Das Projekt speichert sich von selbst - hier steht, ob es das schon hat. Der
+                    Knopf fuer den Moment, in dem man sicher sein will, steht oben rechts.
+                -->
+                <TextBlock x:Name="SaveText" DockPanel.Dock="Right" VerticalAlignment="Center"
+                           Style="{StaticResource DashLabel}" FontSize="9" />
+
+                <!-- Die Grenzen des Abschneidens als Bereichsregler (W2c, C7): unter links blau, ueber rechts rot. -->
+                <StackPanel x:Name="ClipRow" DockPanel.Dock="Right" Orientation="Horizontal" VerticalAlignment="Center"
+                            Margin="0,0,12,0" Visibility="Collapsed" ToolTip="{DynamicResource S_ClipRangeHint}">
+                    <TextBlock Text="{DynamicResource S_ClipRange}" Style="{StaticResource DashLabel}" FontSize="9"
+                               VerticalAlignment="Center" Margin="0,0,6,0" />
+                    <local:RangeSlider x:Name="ClipRange" Width="160" VerticalAlignment="Center" />
+                    <TextBlock x:Name="ClipValue" Style="{StaticResource DashLabel}" FontSize="9"
+                               VerticalAlignment="Center" Margin="6,0,0,0" />
                 </StackPanel>
 
-                <StackPanel Grid.Row="0" Orientation="Horizontal" HorizontalAlignment="Right"
-                            VerticalAlignment="Center">
-                    <TextBlock x:Name="BatchStatus" VerticalAlignment="Center" Margin="0,0,12,0"
+                <!-- Die Legende der Falschfarben (W2c). -->
+                <StackPanel x:Name="FalseColourRow" DockPanel.Dock="Right" Orientation="Horizontal"
+                            VerticalAlignment="Center" Margin="0,0,12,0" Visibility="Collapsed" />
+
+                <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                    <Button x:Name="PreviousFrameButton" Style="{StaticResource LinkButton}" FontSize="11"
+                            Content="◂" Click="OnPreviousFrame" Visibility="Collapsed"
+                            ToolTip="{DynamicResource S_PreviousFrameHint}" />
+                    <TextBlock x:Name="SequenceText" VerticalAlignment="Center" Margin="4,0,4,0"
+                               Style="{StaticResource DashLabel}" FontSize="9" />
+                    <Button x:Name="NextFrameButton" Style="{StaticResource LinkButton}" FontSize="11"
+                            Content="▸" Click="OnNextFrame" Visibility="Collapsed"
+                            ToolTip="{DynamicResource S_NextFrameHint}" />
+
+                    <TextBlock x:Name="FileText" VerticalAlignment="Center" Margin="12,0,0,0"
+                               Style="{StaticResource DashLabel}" FontSize="9"
+                               TextTrimming="CharacterEllipsis" MaxWidth="360"
+                               Text="{DynamicResource S_NoImage}" />
+                    <TextBlock x:Name="SourceText" VerticalAlignment="Center" Margin="12,0,0,0"
+                               Style="{StaticResource DashLabel}" FontSize="9" />
+                    <TextBlock x:Name="ViewText" VerticalAlignment="Center" Margin="12,0,0,0"
                                Style="{StaticResource DashLabel}" FontSize="9" />
 
-                    <Button x:Name="RunButton" Style="{StaticResource OverlayButton}"
-                            Content="{DynamicResource S_RunBatch}" Click="OnRunClicked"
-                            IsEnabled="False" MinWidth="120" />
-
-                    <Button x:Name="StopButton" Style="{StaticResource OverlayButton}"
-                            Margin="8,0,0,0" Content="{DynamicResource S_Stop}"
-                            Click="OnStopClicked" Visibility="Collapsed" MinWidth="90" />
+                    <!--
+                        Was die Pipette zuletzt gelesen hat - stehend, damit sich ein zweiter
+                        Wert daneben vergleichen laesst.
+                    -->
+                    <TextBlock x:Name="PickText" VerticalAlignment="Center" Margin="12,0,0,0"
+                               Style="{StaticResource DashLabel}" FontSize="9"
+                               Foreground="{StaticResource AccentBrush}"
+                               Visibility="Collapsed" />
                 </StackPanel>
-
-                <ProgressBar x:Name="BatchProgress" Grid.Row="1" Height="3" Margin="0,10,0,0"
-                             Visibility="Collapsed" Minimum="0" Maximum="1"
-                             Background="{StaticResource PanelBorder}"
-                             Foreground="{StaticResource DesktopAccent}"
-                             BorderThickness="0" />
-            </Grid>
+            </DockPanel>
         </Border>
+
     </Grid>
 </UserControl>

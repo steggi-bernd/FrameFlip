@@ -21,6 +21,13 @@ public abstract record NodeField(string LabelKey)
 public sealed record SliderField(string LabelKey, double Min, double Max, Func<double> Get, Action<double> Set,
                                  double Default, string Format = "0.00") : NodeField(LabelKey);
 
+/// <summary>
+/// Ein Fenster auf einer Skala - der Bereichsregler (C7). <paramref name="Format"/> sagt, wie die
+/// Grenzen darueber stehen.
+/// </summary>
+public sealed record RangeField(string LabelKey, RangeScale Scale, Func<RangeWindow> Get, Action<RangeWindow> Set,
+                                Action Reset, string Format = "0.00") : NodeField(LabelKey);
+
 /// <summary>Eine Auswahl aus festen Moeglichkeiten.</summary>
 public sealed record ChoiceField(string LabelKey, IReadOnlyList<(string Key, int Value)> Options,
                                  Func<int> Get, Action<int> Set) : NodeField(LabelKey);
@@ -59,8 +66,10 @@ public sealed record InfoField(string Text) : NodeField("");
 /// <param name="Passes">Die Passe, die ein Ausgang der Datei werden koennen - wie sie in der Datei heissen, und wie in der Liste.</param>
 /// <param name="Change">Fuehrt eine Aenderung am Aufbau aus - mit Rueckgaengig, Nachlesen und Neurechnen.</param>
 /// <param name="Thumb">Die Miniatur eines Passes - oder keine, solange sie noch entsteht.</param>
+/// <param name="PickTint">Macht die Maus zur Pipette fuer die Toenung dieses Knotens (C4d) - oder null, wo es keine gibt.</param>
 public sealed record NodeFieldContext(NodeGraph Graph, IReadOnlyList<(string Name, string Label)> Passes,
-                                      Action<Action> Change, Func<string, ImageSource?>? Thumb = null);
+                                      Action<Action> Change, Func<string, ImageSource?>? Thumb = null,
+                                      Action<ExposureTintNode>? PickTint = null);
 
 /// <summary>
 /// Was sich an einem Knoten einstellen laesst, der keine eigene Karte im Farbstreifen
@@ -110,13 +119,7 @@ public static class NodeFields
             new SliderField("S_NodeSoften", 0, 50, () => shape.Soften, v => shape.Soften = (float)Math.Round(v, 1), 0, "0.0"),
         },
         PlaceNode place => Place(place.Place),
-        ExposureTintNode tint => new NodeField[]
-        {
-            new SliderField("S_Exposure", -6, 6, () => tint.Exposure, v => tint.Exposure = (float)v, 0, "+0.00;-0.00;0"),
-            new SliderField("S_NodeTintRed", 0, 2, () => tint.Tint.R, v => tint.Tint.R = (float)v, 1),
-            new SliderField("S_NodeTintGreen", 0, 2, () => tint.Tint.G, v => tint.Tint.G = (float)v, 1),
-            new SliderField("S_NodeTintBlue", 0, 2, () => tint.Tint.B, v => tint.Tint.B = (float)v, 1),
-        },
+        ExposureTintNode tint => Tint(tint, context),
         LightNode light => new NodeField[]
         {
             new SliderField("S_Exposure", -6, 6, () => light.Exposure, v => light.Exposure = v, 0, "+0.00;-0.00;0"),
@@ -265,6 +268,42 @@ public static class NodeFields
     }
 
     /// <summary>Die Maske - je nach Art andere Regler, wie im Ebenenstreifen.</summary>
+    /// <summary>
+    /// Belichtung und Toenung - und eine Pipette, mit der die Toenung eine Farbe aus dem Bild
+    /// oder aus dem Farbspeicher uebernimmt, wie am Rad im Ebenenstreifen (C4d).
+    /// </summary>
+    private static NodeField[] Tint(ExposureTintNode tint, NodeFieldContext? context)
+    {
+        var fields = new List<NodeField>
+        {
+            new SliderField("S_Exposure", -6, 6, () => tint.Exposure, v => tint.Exposure = (float)v, 0, "+0.00;-0.00;0"),
+            new SliderField("S_NodeTintRed", 0, 2, () => tint.Tint.R, v => tint.Tint.R = (float)v, 1),
+            new SliderField("S_NodeTintGreen", 0, 2, () => tint.Tint.G, v => tint.Tint.G = (float)v, 1),
+            new SliderField("S_NodeTintBlue", 0, 2, () => tint.Tint.B, v => tint.Tint.B = (float)v, 1),
+        };
+
+        // Die Pipette aendert beim Druecken noch nichts - erst der Klick ins Bild. Deshalb
+        // "Aufbau": Der Streifen meldet danach keine Aenderung.
+        if (context?.PickTint is { } pick)
+            fields.Add(new ButtonField("S_NodeTintPick", () => pick(tint)) { Structural = true });
+
+        return fields.ToArray();
+    }
+
+    /// <summary>Der Bereichsregler einer Maske - dieselbe Rechnung wie im Stapel (C7).</summary>
+    private static RangeField Range(LayerMask mask, string format)
+        => new("S_MaskRange", RangeWindows.ScaleOf(mask), () => RangeWindows.Of(mask), w => RangeWindows.Apply(mask, w),
+               () => RangeWindows.Reset(mask), format);
+
+    /// <summary>"Weich" gilt beiden Kanten und fuegt ein getrenntes Paar wieder zusammen.</summary>
+    private static SliderField Soft(LayerMask mask)
+        => new("S_MaskSoft", 0, 1, () => mask.Softness, v =>
+        {
+            mask.Softness = (float)v;
+            mask.SoftLow = null;
+            mask.SoftHigh = null;
+        }, 0.1);
+
     private static NodeField[] Mask(MaskNode node, NodeFieldContext? context)
     {
         var mask = node.Mask;
@@ -277,15 +316,17 @@ public static class NodeFields
         switch (mask.Kind)
         {
             case MaskKind.Luminance or MaskKind.Underlying:
+                fields.Add(Range(mask, "0.00"));
                 fields.Add(new SliderField("S_MaskFrom", 0, 1, () => mask.Low, v => mask.Low = (float)v, 0));
                 fields.Add(new SliderField("S_MaskTo", 0, 1, () => mask.High, v => mask.High = (float)v, 1));
-                fields.Add(new SliderField("S_MaskSoft", 0, 1, () => mask.Softness, v => mask.Softness = (float)v, 0.1));
+                fields.Add(Soft(mask));
                 break;
 
             case MaskKind.Colour:
+                fields.Add(Range(mask, "0"));
                 fields.Add(new SliderField("S_MaskHue", 0, 360, () => mask.Hue, v => mask.Hue = (float)v, 0, "0°"));
                 fields.Add(new SliderField("S_MaskSpread", 1, 180, () => mask.Spread, v => mask.Spread = (float)v, 30, "0°"));
-                fields.Add(new SliderField("S_MaskSoft", 0, 1, () => mask.Softness, v => mask.Softness = (float)v, 0.1));
+                fields.Add(Soft(mask));
                 fields.Add(new SliderField("S_MaskBlack", 0, 1, () => mask.Low, v => mask.Low = (float)v, 0));
                 fields.Add(new SliderField("S_MaskWhite", 0, 1, () => mask.High, v => mask.High = (float)v, 1));
                 break;

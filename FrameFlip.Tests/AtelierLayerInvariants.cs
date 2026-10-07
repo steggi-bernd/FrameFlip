@@ -31,16 +31,20 @@ public static class AtelierLayerInvariants
 
         try
         {
-            TheStripAppears(path);
-            TheSharedLoaderRebuilds(path);
-            APlainImageLayersToo(folder);
-            EachLayerKeepsItsOwnTools(path);
-            TheFrameOnlyGrabsWhenItShould(path);
-            TheToolDecidesWhatTheMouseDoes(path);
-            TheDockRemembersHowItStood(path);
-            ShowingALayerShowsItAtOnce(folder);
-            TheReportedSessionComesBack(folder);
-            RasterReachesTheAtelier(folder);
+            // Jede Probe beginnt ohne Projekt: Die Datei ist dieselbe, und ihr Projekt
+            // brachte sonst das Rezept der vorigen Probe mit.
+            void Fresh() => Forget(folder);
+
+            Fresh(); TheStripAppears(path);
+            Fresh(); TheSharedLoaderRebuilds(path);
+            Fresh(); APlainImageLayersToo(folder);
+            Fresh(); EachLayerKeepsItsOwnTools(path);
+            Fresh(); TheFrameOnlyGrabsWhenItShould(path);
+            Fresh(); TheToolDecidesWhatTheMouseDoes(path);
+            Fresh(); TheDockRemembersHowItStood(path);
+            Fresh(); ShowingALayerShowsItAtOnce(folder);
+            Fresh(); TheReportedSessionComesBack(folder);
+            Fresh(); RasterReachesTheAtelier(folder);
         }
         finally
         {
@@ -113,8 +117,11 @@ public static class AtelierLayerInvariants
 
             Check.That(strip.Stack.Layers.Count == 16, "der Passestapel steht",
                        $"{strip.Stack.Layers.Count}");
-            Check.That(settings.Layers is not null && settings.Layers.Layers.Count == 16,
-                       "und wird fuer das naechste Mal gemerkt");
+            // Gemerkt wird im Projekt der Folge, nicht mehr in den Einstellungen.
+            page.Flush();
+            var remembered = page.Projects.Current is { } key ? page.Projects.Store.Load(key)?.Layers : null;
+            Check.That(remembered is not null && remembered.Layers.Count == 16,
+                       "und wird fuer das naechste Mal gemerkt - im Projekt der Folge");
         }
         finally
         {
@@ -452,8 +459,8 @@ public static class AtelierLayerInvariants
 
             exposure.Value = 0.75;
 
-            Check.That(settings.Adjustments is not null, "der Regler gehoert wieder dem Bild");
-            Check.Near(settings.Adjustments!.Exposure, 0.75, 0.001, "und landet dort");
+            Check.That(page.Recipe.Adjustments is not null, "der Regler gehoert wieder dem Bild");
+            Check.Near(page.Recipe.Adjustments!.Exposure, 0.75, 0.001, "und landet dort - im Rezept des Projekts");
             Check.Near(first.Adjustments!.Exposure, -2.0, 0.001,
                        "die Ebenen bleiben davon unberuehrt");
             Check.Near(second.Adjustments!.Exposure, 1.5, 0.001, "beide");
@@ -674,7 +681,8 @@ public static class AtelierLayerInvariants
             },
         };
 
-        var settings = new AppSettings { Layers = saved };
+        // Das Rezept gehoert zu diesem Bild - nur dessen Folge uebernimmt es.
+        var settings = new AppSettings { Layers = saved, AtelierImage = picture };
         var page = new AtelierPage(FrameDecoderRegistry.CreateDefault(() => null), settings, _ => { });
 
         var window = new Window
@@ -1152,10 +1160,18 @@ public static class AtelierLayerInvariants
             // Gemessen an der Spalte, nicht in Pixeln: Auf einem Bildschirm mit 768
             // Zeilen (so der CI-Rechner) stutzt Windows das 900 hohe Fenster, und die
             // Spalte ist kuerzer. Hier sind es rund drei Viertel, beim alten Fehler
-            // war es ein Drittel.
-            Check.That(colourHeight > dock.ActualHeight * 0.6,
+            // war es ein Drittel. Die Ausgabe darunter hat ihre eigene, feste Hoehe
+            // (so hoch wie ihr Inhalt) - gemessen wird an dem, was die Spalte uebrig hat.
+            var output = (FrameworkElement)page.FindName("ExportBar");
+            var tool = (FrameworkElement)page.FindName("Properties");
+            double below = tool.IsVisible ? tool.TranslatePoint(new System.Windows.Point(0, tool.ActualHeight), dock).Y : 0;
+            double column = (output.IsVisible
+                ? output.TranslatePoint(new System.Windows.Point(0, 0), dock).Y
+                : dock.ActualHeight) - below;
+
+            Check.That(colourHeight > column * 0.6,
                        "und die ist fast die ganze Spalte, nicht ein Drittel davon",
-                       $"{colourHeight:0} von {dock.ActualHeight:0}");
+                       $"{colourHeight:0} von {column:0}");
 
             // Und nun der Grund fuer das Andocken: die Ebenen nach links, als eigenes
             // Feld. Danach stehen Farbe UND Ebenen gleichzeitig da.
@@ -1196,6 +1212,64 @@ public static class AtelierLayerInvariants
                        dock.Layout.Find("histogram") is { Zone: DockZone.Right, Group: 0 },
                        "und wer sich verzogen hat, kommt zur Grundanordnung zurueck");
 
+            // Die Ausgabe unten rechts ist so hoch wie ihr Inhalt: Ein Anteil der Zone
+            // schnitte ihre Knoepfe in einem kleinen Fenster ab und liesse in einem grossen
+            // leere Flaeche stehen. Ohne Bild ist sie leer - darum hier sichtbar gemacht.
+            var export = (FrameworkElement)page.FindName("ExportBar");
+            export.Visibility = Visibility.Visible;
+            page.UpdateLayout();
+
+            double ExportTop() => export.TranslatePoint(new System.Windows.Point(0, 0), dock).Y;
+            double ExportGap() => dock.ActualHeight - (ExportTop() + export.ActualHeight);
+
+            Check.That(ExportGap() is > -0.5 and < 4, "die Ausgabe steht ganz unten, vollstaendig und ohne Luft darunter",
+                       $"Abstand zum Rand {ExportGap():0.0}, Hoehe {export.ActualHeight:0}");
+
+            double top = ExportTop();
+            var heavy = dock.Layout.Clone();
+            heavy.Right[2].Weight = 20;
+            dock.Load(heavy);
+            page.UpdateLayout();
+
+            Check.Near(ExportTop(), top, 0.5, "ein Gewicht macht sie nicht groesser - ihre Hoehe ist die ihres Inhalts");
+
+            export.Visibility = Visibility.Collapsed;
+            dock.ResetLayout();
+            page.UpdateLayout();
+
+            // Entscheidung 10: Die Werkzeugeinstellungen sind ein Feld der Andockflaeche - oben
+            // als Leiste ueber die ganze Breite, so hoch wie ihr Inhalt, ueber dem Bild.
+            var options = (PropertiesPanel)page.FindName("Properties");
+            options.Show(AtelierTool.Brush);
+            page.UpdateLayout();
+
+            var toolArea = options.TransformToAncestor(dock).TransformBounds(new Rect(options.RenderSize));
+            var picture = ((FrameworkElement)dock.Center!).TransformToAncestor(dock).TransformBounds(new Rect(dock.Center!.RenderSize));
+
+            Check.That(dock.Layout.Find("tool") is { Zone: DockZone.Top } && toolArea.Top < 4 &&
+                       toolArea.Width > dock.ActualWidth - 60 && toolArea.Bottom <= picture.Top &&
+                       Math.Abs(options.ActualHeight - options.DesiredSize.Height) < 1,
+                       "die Werkzeugeinstellungen stehen oben ueber die ganze Breite, ganz und ueber dem Bild",
+                       $"{toolArea} ueber {picture}, Flaeche {dock.ActualWidth:0}, Hoehe {options.ActualHeight:0.0} zu {options.DesiredSize.Height:0.0}");
+
+            // An die Seite gezogen: Die Gruppen stehen untereinander, und nichts ragt heraus.
+            dock.MovePanel("tool", DockZone.Right, 0, asTab: false);
+            page.UpdateLayout();
+
+            toolArea = options.TransformToAncestor(dock).TransformBounds(new Rect(options.RenderSize));
+            var size = (FrameworkElement)options.FindName("BrushSizeSlider");
+            var pressure = (FrameworkElement)options.FindName("BrushPressureBox");
+            double Right(FrameworkElement e) => e.TranslatePoint(new System.Windows.Point(e.ActualWidth, 0), options).X;
+
+            Check.That(dock.Layout.Find("tool") is { Zone: DockZone.Right, Group: 0 } &&
+                       toolArea.Width <= dock.Layout.RightWidth + 1 && toolArea.Height > 120 &&
+                       size.IsVisible && Right(size) <= options.ActualWidth + 0.5 && Right(pressure) <= options.ActualWidth + 0.5,
+                       "an die Seite gezogen: die Gruppen stehen untereinander, nichts ragt heraus",
+                       $"{toolArea}, Groesse bis {Right(size):0}, Druck bis {Right(pressure):0}");
+
+            dock.ResetLayout();
+            page.UpdateLayout();
+
             // Nun dieselben Wege mit der Zielsuche, die auch die Maus nimmt - an
             // Punkten, die aus den Feldern selbst gerechnet sind. Die Geometrie der
             // Ziele ist, was beim Ziehen schiefgehen kann.
@@ -1207,7 +1281,8 @@ public static class AtelierLayerInvariants
             Check.That(dock.DropAt("layers", In(colour, 0.5, 0.97)), "am unteren Rand der Farbe ist ein Ziel");
             page.UpdateLayout();
 
-            Check.That(dock.Layout.Right.Count == 3 &&
+            // Die Ausgabe steht als eigene Gruppe unten rechts - eine Gruppe mehr.
+            Check.That(dock.Layout.Right.Count == 4 &&
                        dock.Layout.Right[1].Panels.SequenceEqual(new[] { "colour" }) &&
                        dock.Layout.Right[2].Panels.SequenceEqual(new[] { "layers" }),
                        "ein Reiter an den eigenen Rand gezogen teilt die Gruppe",
@@ -1220,7 +1295,7 @@ public static class AtelierLayerInvariants
             Check.That(dock.DropAt("histogram", In(strip, 0.5, -12)), "die Reiterleiste ist ein Ziel");
             page.UpdateLayout();
 
-            Check.That(dock.Layout.Right.Count == 2 &&
+            Check.That(dock.Layout.Right.Count == 3 &&
                        dock.Layout.Right[1].Panels.SequenceEqual(new[] { "layers", "histogram" }) &&
                        dock.Layout.Right[1].Active == "histogram",
                        "auf die Reiterleiste gezogen wird es ein Reiter - und liegt vorn",
@@ -1267,6 +1342,7 @@ public static class AtelierLayerInvariants
                        $"{histogramHigh:0} -> {slot.ActualHeight:0}");
 
             dock.Toggle("histogram");
+            dock.Toggle("export");
             page.UpdateLayout();
 
             Check.That(centre.ActualWidth > pictureWide + 250,
@@ -1416,6 +1492,42 @@ public static class AtelierLayerInvariants
                        "und legt dabei keine Ebene an - erst der Strich tut das",
                        $"{strip.Stack.Layers.Count} statt {before}");
 
+            // Groesse und Haerte am Bild: Strg und ziehen. Nach rechts groesser und
+            // haerter, die Regler oben ziehen mit, und gemalt wird dabei nichts.
+            var brushPanel = (PropertiesPanel)page.FindName("Properties");
+            var centre = new System.Windows.Point(frame.ActualWidth / 2, frame.ActualHeight / 2);
+            float radius = frame.BrushRadius, hardness = frame.BrushHardness;
+
+            frame.BeginKnob(centre, PlacementAdorner.BrushKnob.Size);
+            frame.MoveKnob(centre + new System.Windows.Vector(40, 0));
+
+            Check.That(frame.BrushRadius > radius && Math.Abs(brushPanel.BrushRadius - frame.BrushRadius) < 0.01f,
+                       "Strg und nach rechts ziehen macht den Pinsel groesser - und der Regler zieht mit",
+                       $"{radius:0.0} -> {frame.BrushRadius:0.0}, Regler {brushPanel.BrushRadius:0.0}");
+
+            frame.MoveKnob(centre + new System.Windows.Vector(-100000, 0));
+
+            Check.That(frame.BrushRadius >= 1 && Math.Abs(brushPanel.BrushRadius - frame.BrushRadius) < 0.01f,
+                       "und nach links kleiner - aber nie unter einen Punkt", $"{frame.BrushRadius:0.0}");
+
+            frame.EndKnob();
+            frame.BeginKnob(centre, PlacementAdorner.BrushKnob.Hardness);
+            frame.MoveKnob(centre + new System.Windows.Vector(-60, 0));
+
+            Check.That(frame.BrushHardness < hardness && Math.Abs(brushPanel.BrushHardness - frame.BrushHardness) < 0.001f,
+                       "Strg und rechte Taste stellen die Haerte ein - ebenso mit dem Regler",
+                       $"{hardness:0.00} -> {frame.BrushHardness:0.00}");
+
+            frame.MoveKnob(centre + new System.Windows.Vector(100000, 0));
+            frame.EndKnob();
+
+            Check.That(frame.BrushHardness == 1f && frame.Knob == PlacementAdorner.BrushKnob.None &&
+                       strip.Stack.Layers.Count == before,
+                       "hoechstens ganz hart - und beim Einstellen entsteht keine Maskenebene",
+                       $"{frame.BrushHardness:0.00}, {strip.Stack.Layers.Count} Ebenen");
+
+            brushPanel.SetBrush(radius, hardness, PaintStroke.DefaultSpacing);
+
             page.HandleToolKey(System.Windows.Input.Key.V);
             page.UpdateLayout();
 
@@ -1546,6 +1658,21 @@ public static class AtelierLayerInvariants
     }
 
     /// <summary>Waehlt eine Ebene so aus, wie ein Klick in die Liste es taete.</summary>
+    /// <summary>Vergisst die Projekte im Ordner - mit dem Ordner FrameFlip, in dem sie liegen.</summary>
+    private static void Forget(string folder)
+    {
+        // Eine Seite, die gerade geschlossen wurde, schreibt ihr Projekt erst, wenn der
+        // Dispatcher ihr Unloaded zustellt - erst das abwarten, dann das Schreiben.
+        for (int i = 0; i < 5; i++)
+            System.Windows.Threading.Dispatcher.CurrentDispatcher.Invoke(() => { }, System.Windows.Threading.DispatcherPriority.ContextIdle);
+
+        Atelier.AtelierProjectStore.WaitForWrites(TimeSpan.FromSeconds(10));
+
+        string projects = Path.Combine(folder, Atelier.AtelierProjectStore.FolderName);
+        try { if (Directory.Exists(projects)) Directory.Delete(projects, recursive: true); }
+        catch (IOException) { /* ein liegengebliebener Rest faellt beim naechsten Lauf auf */ }
+    }
+
     private static void Select(LayerPanel strip, ImageLayer layer)
     {
         var list = (System.Windows.Controls.ListBox)strip.FindName("LayerList");

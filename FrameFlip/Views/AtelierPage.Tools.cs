@@ -36,11 +36,20 @@ public partial class AtelierPage
     {
         if (_switchingTool) return;
 
+        // Die Werkzeugzeile zeigt gedrueckt, als was der Pinsel malt - und nichts, wenn die Maus
+        // etwas anderes tut.
+        ToolBand.MarkActive(tool == AtelierTool.Brush ? Properties.BrushToolKey : null);
+
         _switchingTool = true;
 
         try
         {
             _tool = tool;
+
+            // Ein anderes Werkzeug beendet das Waehlen fuer eine Objektmaske - und die Pipette des Tonwerts.
+            if (tool != AtelierTool.Select) EndObjectMask();
+            if (tool != AtelierTool.Pick) EndLevelsPick();
+            if (tool != AtelierTool.Pick) EndColourPick();
 
             // "Auswaehlen" IST der Auswahlmodus des Maskenbereichs. Wer das
             // Werkzeug wechselt, verlaesst ihn damit auch dort - sonst bliebe im
@@ -78,6 +87,12 @@ public partial class AtelierPage
         // Und die Knoten: Sie liegen nur ueber dem Bild, solange ihr Werkzeug gilt.
         ShowNodeMode();
 
+        // Beim Waehlen: was gewaehlt ist und was unter dem Zeiger liegt - sonst nichts davon.
+        ShowCryptoView();
+
+        // Die Lupe gehoert der Pipette.
+        if (tool != AtelierTool.Pick) HidePipette();
+
         if (tool == AtelierTool.Nodes && InNodes) NodeView.Focus();
     }
 
@@ -90,6 +105,22 @@ public partial class AtelierPage
     /// </summary>
     public bool HandleToolKey(Key key)
     {
+        if (key == Key.Escape) return EndViewer();
+
+        // J: die naechste Sichthilfe - wie in Lightroom (W2c).
+        // O: Vorher/Nachher umschalten - wie der Klick auf "Original".
+        if (key == Key.O)
+        {
+            ToggleCompare();
+            return true;
+        }
+
+        if (key == Key.J)
+        {
+            NextViewAid();
+            return true;
+        }
+
         var wanted = key switch
         {
             Key.V => AtelierTool.Move,
@@ -126,6 +157,15 @@ public partial class AtelierPage
     /// </summary>
     private void OnViewportDown(object sender, MouseButtonEventArgs e)
     {
+        // Strg+Klick ins Bild: ein Punkt auf der Kurve beim Ton dieser Stelle (W2c) - mit jedem
+        // Werkzeug, solange die Karte der Kurven zu sehen ist. Sonst geht der Klick weiter wie immer.
+        if (e.ChangedButton == MouseButton.Left && Keyboard.Modifiers == ModifierKeys.Control &&
+            PixelAt(e.GetPosition(Display), out int cx, out int cy) && CurvePointAt(cx, cy))
+        {
+            e.Handled = true;
+            return;
+        }
+
         bool hand = e.ChangedButton == MouseButton.Left && _tool == AtelierTool.Hand;
         bool middle = e.ChangedButton == MouseButton.Middle;
 
@@ -179,28 +219,6 @@ public partial class AtelierPage
     /// Programm vergleichen. Eine davon wegzulassen hiesse, sich auf eine der beiden
     /// Fragen festzulegen, die jemand haben koennte.
     /// </summary>
-    private void ReadAt(int x, int y)
-    {
-        var frame = _frame;
-        if (frame is null) return;
-
-        int i = y * frame.Width + x;
-
-        if (i < 0 || i >= frame.R.Length) return;
-
-        float r = frame.R[i], g = frame.G[i], b = frame.B[i];
-
-        int br = (int)MathF.Round(Math.Clamp(Srgb.Encode(r), 0f, 1f) * 255f);
-        int bg = (int)MathF.Round(Math.Clamp(Srgb.Encode(g), 0f, 1f) * 255f);
-        int bb = (int)MathF.Round(Math.Clamp(Srgb.Encode(b), 0f, 1f) * 255f);
-
-        string label = (string)(TryFindResource("S_PickReadout") ?? "read");
-
-        PickText.Text = $"{label}  {x},{y}   {br}/{bg}/{bb}   {r:0.###} {g:0.###} {b:0.###}";
-        PickText.Visibility = Visibility.Visible;
-
-        Properties.Read(x, y, br, bg, bb, r, g, b, DepthAt(i));
-    }
 
     /// <summary>
     /// Die Entfernung an einer Stelle - null, wenn die Datei keine fuehrt.

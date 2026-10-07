@@ -147,7 +147,7 @@ Only the alpha channel of exports changes, and only in those cases.
    render data, and took no moved alpha from them; clipped layers leaked outside placed
    carriers; groups and clipping reported the wrong coverage; hiding the picture layer
    while an adjustment layer was visible crashed the composer.
-2. **Overlay.** The node button in the tool column shows the graph over the dimmed picture.
+2. **Overlay.** The node button in the tool column shows the graph over the picture (dimmed at first; since section 9 the picture stays undimmed).
    You can show, move, zoom and select nodes. The selected node's settings appear in the
    colour panel. The first thing to try in the app.
 
@@ -384,3 +384,269 @@ Only the alpha channel of exports changes, and only in those cases.
      all readers follow when inserting, not just those above; delete leaves the branch.
    - In the page: dropping, the buttons, blend mode and opacity change picture and list,
      and undo restores the bytes.
+
+9. **Safety and clarity** (feedback after section 8).
+
+   *Done (2026-09-25).*
+   - **No self-connection, no lost wires.** The editor already refused a node wired to
+     itself, and any loop. But a wire grabbed at a connected input and dropped on a socket
+     that does not fit (its own node's output, or any socket of the same direction) was
+     treated as dropped into empty space: the connection was gone, and the picture went
+     black. That looked like a crash. Now any socket that does not fit puts the wire back
+     and says why. Only empty space disconnects.
+   - **A failing computation is named, not swallowed.** The app swallows unhandled errors,
+     so an exception while computing the graph left the picture frozen. The page now
+     catches it, clears cache and pool, shows the error in the editor and suggests Ctrl+Z.
+     The next successful computation clears it.
+   - **The picture stays true.** The 60 % black veil behind the nodes is gone, because it
+     falsified exactly what one grades with the graph open. Node bodies are opaque anyway;
+     wires get a dark halo so they stay visible on bright pictures.
+   - **Brush size and hardness on the picture.** Ctrl with the left button dragged
+     sideways sets the size, Ctrl with the right button the hardness. The ring stays where
+     the drag began and shows the brush falloff, with both values beside it. The sliders
+     follow live. Nothing is painted, and no mask layer is created.
+
+   Tests:
+   - 1500 random editing steps on random graphs (connect, disconnect, insert, delete,
+     duplicate, mute, move layers, viewer on any output). After each step the graph is
+     computed, laid out, listed and saved. None throws, none builds a loop, and no node
+     accepts itself.
+   - On the page: every node wired to itself in both directions loses no wire, and 80
+     random drags with computing behind them throw nothing. A torn pass picture (arrays
+     shorter than it claims) throws in the model, shows as an error on the page and clears
+     once the picture is whole again. Without the safety net that test turns red.
+   - The brush knobs move size and hardness both ways within their limits, the sliders
+     follow, and no mask layer appears.
+
+10. **The hub and the layer menus** (feedback after section 9).
+
+    *Done (2026-09-25).*
+    - **The hub replaces the right-click menu** in the node editor (right-click or
+      Shift+A) and the plus of the layer list. It is drawn in the app's own style instead
+      of the Windows menu. At the top is a search: type and press Enter. It searches all
+      categories, ignores case, and "ae" finds "ä". On the left are the categories, with
+      the view actions below them (all previews, arrange, show all, rebuild, viewer off).
+      On the right are the tiles:
+      - Layers: the passes of the file with thumbnails (click adds it as a layer,
+        Shift+click as a mask), new layers (adjustment layer, image as layer, image file),
+        the building blocks, and the layers in the graph with thumbnails to jump to.
+      - Masks: the mask kinds, every pass as a mask, the cryptomattes of the file.
+      - The effects in palette order with the palette's glyphs. They can also be dragged
+        into the editor, freely or onto a wire.
+      - Picture, convert, and "recent" (what was taken last, newest first).
+      At the bottom are the selected node's actions (mute, viewer, preview, duplicate,
+      delete), each with a short name.
+    - **Right-clicking a wire** opens the hub with a note: new nodes drop into that wire.
+    - **The layer lists get a menu per row**, in the same style. The stack strip offers
+      rename (new there), visible, duplicate, remove, up, down, into or out of a group,
+      and clip. Each entry takes the same path as its button. The node list offers
+      rename, visible, show in the graph, alone in the viewer (what flows into the Mix's
+      top), duplicate and delete with the branch, up, down, and clipped. Entries that
+      cannot act (the top layer up, out of no group) are greyed out and do nothing.
+
+    Tests:
+    - Hub: a right-click on the wire into the output finds "vignet" in the search, and
+      Enter inserts the vignette into that wire. All passes stand as tiles; a click adds
+      one as a layer, Shift+click another as a mask; "recent" lists both, newest first.
+      The bottom bar mutes the selected node.
+    - Menus: the stack row menu renames, hides, clips and duplicates, and omits what
+      cannot act. The node row menu renames the Mix, duplicates the layer with its
+      branch, and shows the Mix's top input alone in the viewer. The test found that
+      swapping the rename row for its text field threw in WPF; it is now removed and
+      inserted instead.
+
+11. **Fixes after trying it** (feedback after section 10).
+
+    *Done (2026-09-25).*
+    - **The brush in node mode** only caught the mouse while a painted mask node was
+      selected. Otherwise it was dead, and so were the Ctrl drags for size and hardness.
+      Now it always catches. With a painted mask selected, or a layer whose factor
+      comes from one, it paints that mask. Otherwise the first stroke creates a mask
+      layer, as in the stack: an adjustment layer with a painted mask above the selected
+      layer (or on top of the layers). It is named like the stack's, changes nothing until
+      its correction is turned, and the mask is selected so painting continues.
+    - **A layer chosen in the hub** only jumped to it. Now a click adds its picture as a
+      new node: an image file as a new image file node, a pass as a Place wired from the
+      file (which exists only once). A layer without a picture of its own (adjustment,
+      group) is duplicated with its branch. Shift+click jumps to it as before.
+    - **The hub opened on pressing the right button**, so releasing it landed in the
+      hub's search field, whose built-in Windows menu popped up over it. The hub now
+      opens on release, beside the pointer rather than under it, and allows no Windows
+      menu at all.
+    - **Backspace deletes nodes**, like Del and X.
+    - **The visibility mark** in the node layer list is the same dot and ring as in the
+      stack strip (the style moved to the theme); the boxed button with a dash is gone.
+
+    Tests: the hub opens on release and not on press; a layer tile adds a Place with the
+    file's wire, Shift jumps; Backspace deletes; the brush catches without a mask, the Ctrl
+    drag sets the size, the first stroke adds exactly three nodes (correction, Mix,
+    painted mask) and leaves the picture unchanged, the next stroke and the selected
+    layer paint the same mask. The old test that demanded a dead brush now demands the
+    opposite.
+
+12. **Undo everywhere, snappier edits, node menu, clearer marks** (feedback after 11).
+
+    *Done (2026-09-25).*
+    - **Ctrl+Z / Ctrl+Y / Ctrl+Shift+Z** act on the whole page in node mode, not only while
+      the editor has the keyboard focus (after a click in the layer list, the colour strip
+      or the hub it lay elsewhere). A text field keeps its own undo.
+    - **Value edits are steps too:** a slider in the colour strip, blend mode and opacity in
+      the layer list, a brush stroke, moving a Place. Each gesture is one step. What goes
+      into the history is the last kept state, because the change has already happened
+      when it is reported; a report without a change (a panel filling itself when a node
+      is chosen) leaves no step.
+    - **Snappier edits.** A build step did the full computation at once and held the page
+      until the whole picture was done (22 ms of 27 ms at 640x360, many times that at
+      1080p or 4K). It now takes the path of a slider: the editor shows the change at once,
+      the picture follows coarsely in the next frame and sharp after a pause (180 ms). A
+      build step now costs about 3 ms. The graph cache also forms its keys only for what
+      lies before the selected node, and none without a selection; forming them for every
+      node made a full pass almost twice as slow as without a cache.
+    - **Right-click on a node** opens its own menu: rename, muted, preview, viewer, insert
+      after (opens the hub; the chosen node goes behind this one), duplicate, disconnect
+      all wires, delete. Right-click on empty space or a wire opens the hub, as before.
+    - **Node marks.** The preview switch is a small picture (filled with a hill when on, a
+      faint frame when off) instead of an eye that was crossed out on almost every node. A
+      muted node gets a grey header, a "muted" tag instead of a sign after the title, and
+      a dashed line showing the path the picture takes past it, as in Blender.
+
+    Tests: a stroke on a painted mask is taken back by Ctrl+Z with the focus in the layer
+    list, a text field keeps Ctrl+Z; blend mode and opacity are separate steps before the
+    layers; a slider move is its own step before the node; after a build step the page
+    computes coarse first and sharp shortly after; right-click on a node opens its menu,
+    on empty space the hub; "insert after" places the vignette behind the node.
+
+
+13. **Right-click menus outside the editor** (the ideas from 10, now built).
+
+    *Done (2026-09-25).*
+    - **Picture in the Atelier:** pick the colour here (switches to the pick tool and reads
+      the point), one row per Cryptomatte of the file with "object here as mask", compare
+      with the original, 100 % / fit. The object mask is the same kind of layer the brush
+      makes on its first stroke: an adjustment layer whose Cryptomatte picks exactly that
+      object, named after it. In node mode it arrives as correction, Mix and mask node on
+      the factor; in stack mode as a mask layer in the strip. Compare shows the original
+      until the next click or key press; it is a glance, not a switch that stays on. 100 %
+      puts the clicked point in the middle. Not with the brush, where the right button
+      erases.
+    - **Layer lists** (from 10): rename, duplicate, delete, clip, into a group, show in the
+      graph.
+    - **Tool cards in the colour strip:** on/off (the values stay), reset, copy settings,
+      paste settings. Paste is offered only on a card of the same kind, once something has
+      been copied. What is copied is a copy: turning the card afterwards does not change it.
+    - **Dashboard:** a picture in the film strip offers open in the Atelier, show in
+      Explorer and copy path. The shown sequence offers the same for its current picture;
+      another sequence has no picture chosen yet and offers only Explorer and the path.
+
+    Tests: the picture menu offers pick, one object row per Cryptomatte, compare and 100 %;
+    the object mask in node mode and in the stack picks exactly the object under the
+    pointer and is named after it; compare returns on the next click; 100 % and back. The
+    card menu copies, pastes, switches off and on and resets; the dashboard menu opens the
+    picture in the Atelier. Explorer and the clipboard are not triggered by the tests.
+
+14. **Painting recomputes only what the brush touched** (from the plan in
+    [Projekte und Masken](Projekte-und-Masken.md), phase A).
+
+    *Done (2026-09-25).* A brush tick in node mode used to render the whole picture on the
+    coarse grid (4K: 33 ms, and blurred until release). `GraphEvaluator.RenderRegion` now
+    evaluates the same graph with the touched rectangle as its grid, at full resolution,
+    and writes it in place (4K, radius 80: 4.6 ms). What lies before the selected node comes
+    from the graph cache and is cut to the rectangle; only point-wise nodes are recomputed
+    (mix, mask, colour, place, light, tone, optics, value nodes, and grading without local,
+    geometry, data or frame tools). Optics (vignette, grain, dither) need the position of a
+    pixel but no neighbours, so they count as point-wise. Anything spatial behind the mask,
+    a missing whole picture to paint on, or no selection makes it refuse, and the page
+    renders as before.
+
+    *Smoother still (same day, after "still stutters now and then").* Three costs that hit
+    every stroke, independent of the rectangle:
+    - Every mouse report asked the undo history whether a step was due, and wrote the
+      whole graph with all painted masks as text to find out (0.4 ms with six masks, many
+      times per frame with a fast mouse). The step is the whole stroke; it is remembered
+      once, on release.
+    - Release rendered the whole picture at once, a fifth of a second at 4K between two
+      strokes. Now release only writes what the last ticks left, and the whole picture (for
+      previews and histogram) follows once the brush has rested for 0.7 s. If a tick fell
+      back to the coarse whole picture, release renders sharp at once, as before.
+    - The rectangles came from the page's pool, which holds four sizes; their changing
+      sizes pushed out the whole-picture grids. They now use their own pool, and the
+      rectangle is snapped outward to 32 pixels so its sizes repeat.
+
+    Measured at 4K with six painted masks: 0.013 ms per mouse report, 3.1 ms per tick
+    with vignette and grain behind the mask, 1.1 ms on release (the whole picture, 171 ms,
+    follows at rest).
+
+    Tests: the rectangle written into the old picture equals the new whole picture byte for
+    byte, with the mask, its mix or the output selected, with vignette and grain in the
+    mask layer and at the end, and with pooled grids that still hold an older rectangle;
+    sharpening behind the mask is refused and leaves the picture untouched; on the page,
+    a brush tick changes the picture without a coarse pass and matches a full pass
+    afterwards, a stroke of many reports adds exactly one undo step on release, the picture
+    at release already holds the stroke's last piece, and the whole picture follows at
+    rest - at once after a coarse tick.
+
+15. **Masks as elements of their own** (from the plan in
+    [Projekte und Masken](Projekte-und-Masken.md), phase D, points 3, 4, 10 and 11).
+
+    *Done (2026-09-26).*
+    - **Mask menu:** the menu of a mask node offers cut out as layer, detach, duplicate and
+      connect to layer; a painted mask also offers its history. Detach removes the mask
+      from the factor of its layers, which then act everywhere; the mask stays as a free
+      node. Duplicate makes a free copy with an id of its own (`LayerMask.Id`, a fixed id
+      that history and "shared with" hang on). Connect lists the other layers; a layer that
+      had a mask before gets this one instead. In the picture menu, node mode adds "object
+      here as layer" per Cryptomatte.
+    - **Cut out as layer** uses the new `CutoutNode` (image times mask gives an image with
+      coverage) and puts a normal mix directly above the mask's first layer, or on top of
+      the layers for a free mask. What is cut out is what that point already shows: the same
+      image that flows into the new mix from below. So the picture stays byte for byte the
+      same, at soft mask edges and under every blend mode. Cutting the layer's own image
+      would double it at a soft edge (by m(1-m)(S-B)), and cutting the file's picture would
+      lose what the layers below did to it. The original layer keeps its mask.
+    - **In the graph:** wires that carry a mask are dashed and have their own colour. A mix
+      with a mask shows a tab above its header with a small picture of the mask and its
+      name. A mask node says "free" when it is plugged in nowhere and "-> n layers" when
+      several layers use it. A selected mask outlines its layers in the graph and in the
+      layer list. `MaskUse` answers who uses a mask for the menu, the graph and the list.
+    - **Layer list:** free masks get a section "Masks" below the layers, with the same menu
+      as on the node plus show in graph and delete.
+    - **Mask history** (`MaskHistory`, `MaskHistoryKeeper`): every stroke is recorded on
+      release. A new state appears once 1 % of the mask's cells differ from the last
+      state (a tenth at first; finer on request); the same spot painted ten times counts once. At most 20 states. Every fifth
+      state is a snapshot, the others hold only their strokes, which are replayed from the
+      snapshot before. On recording, the stroke is replayed on the previous mask and
+      compared: if the mask changed any other way (undo, restore, a stroke in the stack),
+      the next state is a snapshot. Histories are stored per mask id (and per frame for
+      unlocked masks) next to the project file, in `FrameFlip/<name>.ffdata/verlauf/`, and
+      written in the background when a state appears. "Mask history ..." lists the states
+      with small pictures; a click restores one as a single undo step. What changed since
+      the last state is kept as a state first. Recording costs 0.9 ms on release at 4K.
+      The history is also reached from the context menu of a layer in the layer list
+      (with the other handles of its mask) and from a button in the brush panel. Since
+      almost every stroke now makes a state, the history is turned into text on the
+      background writer; states never change after they are made, so a list copy suffices.
+
+    - **Moving the cut-out** (same day): `CutoutNode` has a placement of its own. The mask
+      selects at the old spot, and what it selected moves; the original stays underneath.
+      With the cut-out layer (or its cutout node) selected, the placement frame of the move
+      tool drags the piece, one undo step. The piece is as large as the canvas and sampled
+      backwards, bilinear between grid points. Moved, the node reads outside a region, so
+      region rendering while painting refuses it and renders whole; unmoved it stays safe.
+
+    Not done: mask rasters still live in the project file (3.3 planned them by content in
+    `.ffdata`); only the history is stored there.
+
+    Tests: cutting out keeps the picture byte for byte under normal, screen and multiply,
+    for a mask with a layer and for a free one; changing the cut-out layer changes the
+    picture only where the mask is; region rendering with a cutout matches the whole
+    picture; detach, duplicate (new id, free), connect and "object here as layer" on the
+    page, each one undo step and the picture unchanged; mask wires, tags, the mix tab and
+    the highlight in graph and list. History: replay equals painting, a state per tenth of
+    area with unique cells, every state returns byte for byte (snapshots at 1, 6, 11),
+    foreign changes and restores lead to snapshots, 27 states trim to 20 and stay correct,
+    save and load in JSON and in the folder next to the project, recording under 10 ms at
+    4K, and on the page: painting makes states, the menu shows them newest first, a click
+    restores one as an undo step and Ctrl+Z takes it back. Moving: the piece lands byte for
+    byte 60 pixels to the right, the original stays, nothing else changes, region rendering
+    refuses a moved cutout, the placement survives saving; on the page the frame drags the
+    selected cut-out layer as one undo step.

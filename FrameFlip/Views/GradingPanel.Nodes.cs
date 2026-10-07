@@ -75,14 +75,27 @@ public partial class GradingPanel
         TargetBar.Visibility = Visibility.Visible;
         PaletteBar.Visibility = Visibility.Visible;
         NodeHint.Visibility = Visibility.Collapsed;
+        _fieldRefresh.Clear();
         NodeFields.Children.Clear();
         NodeFields.Visibility = Visibility.Collapsed;
 
         ShowActive();
     }
 
+    /// <summary>
+    /// Wie jede Zeile ihren Wert neu liest. Zwei Zeilen koennen denselben Wert zeigen - der
+    /// Bereichsregler und die Regler Von und Bis -, und was die eine aendert, zeigt die andere.
+    /// </summary>
+    private readonly List<Action> _fieldRefresh = new();
+
+    private void RefreshFields()
+    {
+        foreach (var refresh in _fieldRefresh) refresh();
+    }
+
     private void BuildFields(IReadOnlyList<NodeField> fields)
     {
+        _fieldRefresh.Clear();
         NodeFields.Children.Clear();
         NodeFields.Visibility = fields.Count > 0 ? Visibility.Visible : Visibility.Collapsed;
 
@@ -104,6 +117,7 @@ public partial class GradingPanel
     private UIElement? Row(NodeField field) => field switch
     {
         SliderField slider => SliderRow(slider),
+        RangeField range => RangeRow(range),
         ChoiceField choice => ChoiceRow(choice),
         SwitchField toggle => SwitchRow(toggle),
         ButtonField button => ButtonRow(button),
@@ -155,12 +169,23 @@ public partial class GradingPanel
 
         Show(field.Get());
 
+        _fieldRefresh.Add(() =>
+        {
+            _filling = true;
+
+            try { slider.Value = Math.Clamp(field.Get(), field.Min, field.Max); }
+            finally { _filling = false; }
+
+            Show(field.Get());
+        });
+
         slider.ValueChanged += (_, e) =>
         {
             if (_filling) return;
 
             field.Set(e.NewValue);
             Show(e.NewValue);
+            RefreshFields();
 
             // Wie an jedem Regler: waehrend des Zuges grob, das Loslassen holt der
             // Zeitgeber der Seite nach.
@@ -172,6 +197,56 @@ public partial class GradingPanel
 
         panel.Children.Add(head);
         panel.Children.Add(slider);
+
+        return panel;
+    }
+
+    /// <summary>Der Bereichsregler: Beschriftung, die Grenzen als Zahl, darunter die Griffe (C7).</summary>
+    private UIElement RangeRow(RangeField field)
+    {
+        var panel = new StackPanel { ToolTip = Strings.T("S_MaskRangeHint") };
+
+        var head = new Grid { Margin = new Thickness(0, 0, 0, 2) };
+        head.Children.Add(new TextBlock { Text = Strings.T(field.LabelKey), Style = (Style)FindResource("PanelLabel") });
+
+        var value = new TextBlock { Style = (Style)FindResource("PanelValue") };
+        head.Children.Add(value);
+
+        var range = new RangeSlider { Scale = field.Scale };
+
+        void Show()
+        {
+            var window = field.Get();
+            range.Window = window;
+
+            string text = $"{window.Low.ToString(field.Format, CultureInfo.CurrentCulture)} – " +
+                          $"{window.High.ToString(field.Format, CultureInfo.CurrentCulture)}";
+
+            value.Text = window.SoftLow > 0f || window.SoftHigh > 0f
+                ? text + $"  ({window.SoftLow.ToString(field.Format, CultureInfo.CurrentCulture)} · " +
+                         $"{window.SoftHigh.ToString(field.Format, CultureInfo.CurrentCulture)})"
+                : text;
+        }
+
+        Show();
+        _fieldRefresh.Add(Show);
+
+        range.Changed += (window, interim) =>
+        {
+            field.Set(window);
+            RefreshFields();
+            Raise(interim);
+        };
+
+        range.ResetWanted += () =>
+        {
+            field.Reset();
+            RefreshFields();
+            Raise(interim: false);
+        };
+
+        panel.Children.Add(head);
+        panel.Children.Add(range);
 
         return panel;
     }

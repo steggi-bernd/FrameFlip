@@ -42,16 +42,20 @@ public partial class GradingPanel
     private static readonly (string Tab, string Prefix, string Key, string Glyph)[] Sections =
     {
         ("S_GroupBasics", "Basic", "S_Correction", "☀"),
+        ("S_GroupBasics", "Levels", "S_Levels", "⊿"),
+        ("S_GroupBasics", "Equalise", "S_Equalise", "≡"),
         ("S_GroupBasics", "Curve", "S_Curves", "∿"),
         ("S_GroupBasics", "WhiteBalance", "S_WhiteBalance", "◑"),
         ("S_GroupBasics", "Zones", "S_Zones", "◐"),
         ("S_GroupBasics", "Bands", "S_ColourBands", "⬡"),
+        ("S_GroupBasics", "Match", "S_Match", "⇄"),
 
         ("S_GroupLight", "Dehaze", "S_Dehaze", "≋"),
         ("S_GroupLight", "Bloom", "S_Bloom", "✦"),
         ("S_GroupLight", "Halation", "S_Halation", "◎"),
         ("S_GroupLight", "Noise", "S_Noise", "░"),
         ("S_GroupLight", "Clarity", "S_Clarity", "◈"),
+        ("S_GroupLight", "Clahe", "S_Clahe", "▣"),
         ("S_GroupLight", "Texture", "S_Texture", "▦"),
         ("S_GroupLight", "Sharpen", "S_Sharpen", "△"),
 
@@ -65,9 +69,14 @@ public partial class GradingPanel
         ("S_GroupFilm", "Dither", "S_Dither", "⣿"),
         ("S_GroupFilm", "Sort", "S_Sort", "▤"),
         ("S_GroupFilm", "Grain", "S_Grain", "⁙"),
+        ("S_GroupFilm", "Deflicker", "S_Deflicker", "◒"),
 
         ("S_GroupTable", "Lut", "S_Lut", "⊞"),
     };
+
+    /// <summary>Das Zeichen einer Palettenkachel - fuer den Hub im Knoteneditor, der dieselben Zeichen zeigt.</summary>
+    internal static string? GlyphOf(string section)
+        => Sections.FirstOrDefault(s => s.Prefix == section).Glyph;
 
     /// <summary>
     /// Die Kategorien, deren Werkzeuge dem GANZEN Bild gelten. An einer Ebene werden
@@ -272,12 +281,26 @@ public partial class GradingPanel
     /// zeigen, wenn sie ihr eine Entfernung gibt - und weil die Probe denselben Weg
     /// gehen soll wie die Maus.
     /// </summary>
+    /// <summary>Ob die Karte eines Effekts im Farbstreifen steht - fuer die Probe.</summary>
+    internal bool IsShown(string prefix) => _added.Contains(prefix);
+
     public void Show(string prefix)
     {
         if (!_cards.TryGetValue(prefix, out var card)) return;
 
+        // Neu hinzugefuegt, ein Effekt kommt mit sichtbarem Startwert (EffectStart) - nur wenn er
+        // noch nichts tut. Bei einer Karte mit zwei Werkzeugen (Rastern: Raster und Diffusion auf
+        // demselben Regler) bekommt ihn nur das erste, das die Karte in Grundstellung zeigt.
+        bool fresh = !_added.Contains(prefix) && !Doing(prefix);
+
         _added.Add(prefix);
         _folded.Remove(prefix);
+
+        if (fresh && ToolsOf(prefix).FirstOrDefault() is { } first && EffectStart.Apply(first))
+        {
+            PushToControls();
+            Raise(interim: false);
+        }
 
         ShowActive();
 
@@ -412,6 +435,14 @@ public partial class GradingPanel
             // darin galt. Die Knoepfe melden ihren Klick selbst und markieren ihn.
             head.MouseLeftButtonUp += OnCardHeadClicked;
 
+            // Rechtsklick: dieselben Griffe wie die Knoepfe im Kopf - und Kopieren und
+            // Einfuegen, um Einstellungen zwischen Ebenen oder Knoten mitzunehmen.
+            head.MouseRightButtonUp += (_, e) =>
+            {
+                e.Handled = true;
+                ShowCardMenu(prefix, head);
+            };
+
             var host = new Border
             {
                 Padding = new Thickness(12, 2, 12, 12),
@@ -474,8 +505,11 @@ public partial class GradingPanel
     {
         if (sender is not ToggleButton { Tag: string prefix } power) return;
 
-        bool on = power.IsChecked == true;
+        SetPower(prefix, power.IsChecked == true);
+    }
 
+    private void SetPower(string prefix, bool on)
+    {
         foreach (string kind in KindsOf(prefix))
         {
             Stack.Bypassed.Remove(kind);
@@ -484,6 +518,101 @@ public partial class GradingPanel
 
         Raise(interim: false);
         ShowActive();
+    }
+
+    /// <summary>Das zuletzt geoeffnete Menue einer Karte - fuer die Probe.</summary>
+    internal FlipMenu? CardMenu { get; private set; }
+
+    /// <summary>
+    /// Was zuletzt kopiert wurde: die Karte und ihre Werte. Fuer alle Farbstreifen
+    /// gemeinsam - kopiert an einer Ebene oder einem Knoten, eingefuegt an einem anderen.
+    /// </summary>
+    private static (string Prefix, object[] Tools, ImageAdjustments? Adjust)? _copied;
+
+    /// <summary>Das Menue einer Karte: ein- und ausschalten, zuruecksetzen, kopieren, einfuegen, entfernen.</summary>
+    internal void ShowCardMenu(string prefix, UIElement target)
+    {
+        var menu = new FlipMenu(target);
+
+        if (prefix != "Basic") menu.Toggle(Strings.T("S_CardMenuOn"), !IsOff(prefix), () => SetPower(prefix, IsOff(prefix)));
+
+        menu.Item("↺", Strings.T("S_CardMenuReset"), () =>
+            {
+                ResetSection(prefix);
+                Raise(interim: false);
+                ShowActive();
+            })
+            .Item("⧉", Strings.T("S_CardMenuCopy"), () => CopySection(prefix))
+            .Item("⎘", Strings.T("S_CardMenuPaste"), () => PasteSection(prefix), enabled: _copied?.Prefix == prefix);
+
+        if (prefix != "Basic") menu.Separator().Item("✕", Strings.T("S_CardMenuRemove"), () => RemoveSection(prefix));
+
+        CardMenu = menu;
+        menu.Open();
+    }
+
+    /// <summary>Merkt sich die Werte einer Karte - als Kopien, damit spaeteres Drehen sie nicht mitnimmt.</summary>
+    private void CopySection(string prefix)
+        => _copied = (prefix, ToolsOf(prefix).Select(CloneTool).ToArray(), prefix == "Basic" ? Adjustments : null);
+
+    /// <summary>Setzt kopierte Werte auf dieselbe Karte hier - jedes Mal als frische Kopie.</summary>
+    private void PasteSection(string prefix)
+    {
+        if (_copied is not { } copied || copied.Prefix != prefix) return;
+
+        if (copied.Adjust is { } adjust) Adjustments = adjust;
+
+        foreach (var (target, source) in ToolsOf(prefix).Zip(copied.Tools))
+            CopyValues(target, CloneTool(source));
+
+        _added.Add(prefix);
+        PushToControls();
+        Raise(interim: false);
+        ShowActive();
+    }
+
+    /// <summary>Wie das Kreuz im Kopf: zuruecksetzen und die Karte wegnehmen.</summary>
+    private void RemoveSection(string prefix)
+    {
+        ResetSection(prefix);
+
+        _added.Remove(prefix);
+
+        foreach (string kind in KindsOf(prefix)) Stack.Bypassed.Remove(kind);
+
+        Raise(interim: false);
+        ShowActive();
+    }
+
+    /// <summary>
+    /// Eine Kopie eines Werkzeugs - ueber den Kopierweg des Werkzeugstapels, der jede Art
+    /// kennt und nichts teilt.
+    /// </summary>
+    private static object CloneTool(object tool) => tool switch
+    {
+        IGradingTool g => new GradingStack { Tools = { g } }.Clone().Tools[0],
+        ILocalTool l => new GradingStack { Local = { l } }.Clone().Local[0],
+        IOpticsTool o => new GradingStack { Optics = { o } }.Clone().Optics[0],
+        IGeometryTool m => new GradingStack { Geometry = { m } }.Clone().Geometry[0],
+        IDataTool d => new GradingStack { Data = { d } }.Clone().Data[0],
+        IFramePass f => new GradingStack { Frame = { f } }.Clone().Frame[0],
+        _ => tool,
+    };
+
+    /// <summary>Schreibt die Werte eines Werkzeugs in ein anderes derselben Art.</summary>
+    private static void CopyValues(object target, object source)
+    {
+        var type = target.GetType();
+        if (source.GetType() != type) return;
+
+        foreach (var property in type.GetProperties(System.Reflection.BindingFlags.Public |
+                                                    System.Reflection.BindingFlags.Instance))
+        {
+            if (!property.CanRead || !property.CanWrite) continue;
+            if (property.GetIndexParameters().Length > 0) continue;
+
+            property.SetValue(target, property.GetValue(source));
+        }
     }
 
     /// <summary>Zuruecksetzen: alle Werte auf Anfang, die Karte bleibt.</summary>
@@ -563,15 +692,19 @@ public partial class GradingPanel
     private IEnumerable<object> ToolsOf(string prefix) => prefix switch
     {
         "Basic" => new object[] { _vibrance },
+        "Levels" => new object[] { _levels },
+        "Equalise" => new object[] { _equalise },
         "Curve" => new object[] { _curves },
         "WhiteBalance" => new object[] { _whiteBalance },
         "Zones" => new object[] { _zones },
         "Bands" => new object[] { _bands },
+        "Match" => new object[] { _match },
         "Dehaze" => new object[] { _dehaze },
         "Bloom" => new object[] { _bloom },
         "Halation" => new object[] { _halation },
         "Noise" => new object[] { _noise },
         "Clarity" => new object[] { _clarity },
+        "Clahe" => new object[] { _clahe },
         "Texture" => new object[] { _texture },
         "Sharpen" => new object[] { _sharpen },
         "Motion" => new object[] { _motion },
@@ -583,6 +716,7 @@ public partial class GradingPanel
         "Dither" => new object[] { _dither, _diffusion },
         "Sort" => new object[] { _sort },
         "Grain" => new object[] { _grain },
+        "Deflicker" => new object[] { _deflicker },
         "Lut" => new object[] { _lut },
         _ => Array.Empty<object>(),
     };
@@ -662,15 +796,19 @@ public partial class GradingPanel
     private bool Doing(string prefix) => prefix switch
     {
         "Basic" => !Adjustments.IsNeutral || !_vibrance.IsNeutral,
+        "Levels" => !_levels.IsNeutral,
+        "Equalise" => !_equalise.IsNeutral,
         "Curve" => !_curves.IsNeutral,
         "WhiteBalance" => !_whiteBalance.IsNeutral,
         "Zones" => !_zones.IsNeutral,
         "Bands" => !_bands.IsNeutral,
+        "Match" => !_match.IsNeutral,
         "Dehaze" => !_dehaze.IsNeutral,
         "Bloom" => !_bloom.IsNeutral,
         "Halation" => !_halation.IsNeutral,
         "Noise" => !_noise.IsNeutral,
         "Clarity" => !_clarity.IsNeutral,
+        "Clahe" => !_clahe.IsNeutral,
         "Texture" => !_texture.IsNeutral,
         "Sharpen" => !_sharpen.IsNeutral,
         "Motion" => !_motion.IsNeutral,
@@ -682,6 +820,7 @@ public partial class GradingPanel
         "Vignette" => !_vignette.IsNeutral,
         "Dither" => !_dither.IsNeutral || !_diffusion.IsNeutral,
         "Grain" => !_grain.IsNeutral,
+        "Deflicker" => !_deflicker.IsNeutral,
         "Lut" => !_lut.IsNeutral,
         _ => false,
     };

@@ -33,7 +33,8 @@ internal readonly struct MaskSampler
     /// <summary>Der Anstrich, der fuer dieses Bild gilt - siehe LayerMask.</summary>
     private readonly PaintedMask? Paint;
 
-    private readonly float MaskLow, MaskHigh, MaskSoftness;
+    /// <summary>Der Bereich und seine weichen Kanten, unten und oben je fuer sich (C7).</summary>
+    private readonly float MaskLow, MaskHigh, MaskSoftLow, MaskSoftHigh;
 
     /// <summary>Der gesuchte Farbton und seine Weite - nur fuer die Farbbereichsmaske.</summary>
     private readonly float MaskHue, MaskSpread;
@@ -58,7 +59,8 @@ internal readonly struct MaskSampler
         MaskSpread = mask.Spread;
         MaskLow = mask.Low;
         MaskHigh = mask.High;
-        MaskSoftness = mask.Softness;
+        MaskSoftLow = mask.LowSoftness;
+        MaskSoftHigh = mask.HighSoftness;
 
         // Winkel und Breite einmal je Bild in das umrechnen, was die innere
         // Schleife braucht - bei 4K waeren es sonst 25 Millionen Sinusse.
@@ -240,12 +242,17 @@ internal readonly struct MaskSampler
 
                 if (hue < 0f) hue += 360f;
 
-                float away = MathF.Abs(hue - MaskHue);
-                if (away > 180f) away = 360f - away;
+                // Mit Vorzeichen: unter dem gesuchten Farbton gilt die untere Kante, darueber
+                // die obere - getrennt am Bereichsregler (C7), sonst beide gleich.
+                float signed = hue - MaskHue;
+                if (signed > 180f) signed -= 360f;
+                else if (signed <= -180f) signed += 360f;
+
+                float away = MathF.Abs(signed);
 
                 // Weich ueber die Kante hinaus. Der Weichzeichner ist derselbe Regler
                 // wie bei der Helligkeitsmaske und zaehlt hier in halben Kreisen.
-                float edge = MaskSoftness * 180f;
+                float edge = (signed < 0f ? MaskSoftLow : MaskSoftHigh) * 180f;
 
                 float inside = edge <= 1e-4f
                     ? away <= MaskSpread ? 1f : 0f
@@ -269,7 +276,7 @@ internal readonly struct MaskSampler
                 return 1f;
         }
 
-        return Fit(Masking.Band(value, MaskLow, MaskHigh, MaskSoftness),
+        return Fit(Masking.Band(value, MaskLow, MaskHigh, MaskSoftLow, MaskSoftHigh),
                    MaskInvert);
     }
 
