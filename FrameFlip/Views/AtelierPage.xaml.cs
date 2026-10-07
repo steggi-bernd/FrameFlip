@@ -758,14 +758,16 @@ public sealed partial class AtelierPage : UserControl
             if (_stackSolo is { View: SoloView.Mask } && !_showingOriginal)
                 (adjustments, grading) = (ImageAdjustments.Neutral, PreparedGrading.None);
 
-            // Im Knotenmodus rechnet der Graph - ausser beim Vergleich mit dem
-            // Original, das ist in beiden Modi das Bild der Datei ohne alles.
-            if (InNodes && !_showingOriginal)
+            // Im Knotenmodus rechnet der Graph - beim Vergleich mit dem Original derselbe
+            // Graph ohne eigene Korrekturen.
+            if (InNodes)
             {
                 // Ergibt der Graph kein Bild - die Ausgabe haengt an nichts -, bleibt die
                 // Flaeche leer. Auf den Stapel zurueckzufallen hiesse, ein Bild zu zeigen,
                 // das niemand mehr eingestellt hat; der Editor sagt, was fehlt.
-                bool done = RenderNodes(_surface.BackBuffer, _surface.BackBufferStride);
+                bool done = _showingOriginal
+                    ? RenderUntouchedNodes(_surface.BackBuffer, _surface.BackBufferStride)
+                    : RenderNodes(_surface.BackBuffer, _surface.BackBufferStride);
 
                 if (!done)
                 {
@@ -777,7 +779,7 @@ public sealed partial class AtelierPage : UserControl
                 }
 
                 // Ein ganzes, scharfes Bild der Ausgabe - darauf darf der Pinsel Ausschnitte setzen.
-                _wholeShown = done && !_coarse && _viewer is null;
+                _wholeShown = done && !_coarse && _viewer is null && !_showingOriginal;
 
                 ApplyViewAid();
 
@@ -790,7 +792,7 @@ public sealed partial class AtelierPage : UserControl
             FloatFrameProcessor.Apply(frame, adjustments, ViewFor(frame), grading,
                                       _surface.BackBuffer, _surface.BackBufferStride,
                                       _coarse ? CoarseStep : 1,
-                                      _showingOriginal ? Overlays.None : _overlays, _number,
+                                      _showingOriginal ? _originalOverlays : _overlays, _number,
                                       Renderdata(grading));
 
             ApplyViewAid();
