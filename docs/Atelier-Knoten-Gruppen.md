@@ -33,10 +33,22 @@ Möglichkeiten im Graphen zu verlieren.
 - **Rahmen am Kopf packen.** Ein Klick auf den Kopf wählt die Ebene, Ziehen verschiebt die
   ganze Gruppe samt der Ebenen darin. Rückgängig nimmt den Zug zurück. Die Rahmen ergeben
   sich aus den Kabeln und wandern mit, wenn man einzelne Knoten verschiebt.
-- **Ruhende Kabel blass.** Eine Maske hat die Eingänge „Ebene“ und „Untergrund“, liest sie
-  aber nur bei Helligkeit (Ebene), Untergrund und Farbbereich (Untergrund). Bei Verlauf,
-  Gemalt, Pass und Objekten stecken die Kabel, tun aber nichts. Sie liefen quer durch die
-  Gruppen und sind jetzt kaum zu sehen.
+- **Masken knapp.** Eine Maske zeigt nur die Eingänge, die sie liest: Helligkeit die Ebene,
+  Untergrund und Farbbereich den Untergrund, eine Passmaske ihren Pass. Verlauf, Gemalt und
+  Objekte zeigen keinen. Die Kabel an verborgenen Eingängen stecken weiter, tun aber nichts
+  und liefen vorher quer durch die Gruppen. Die Vorschau einer Maske ist kleiner, der Knoten
+  rund ein Drittel niedriger.
+- **Oben oben.** Am Mischen steht „Oben“ zuoberst, darunter „Unten“, dann „Faktor“. Vorher
+  stand „Unten“ oben. Gespeichert wird nach Namen, alte Graphen lesen sich unverändert; der
+  Bildweg und das, was ein stummes Mischen durchreicht, bleibt „Unten“.
+- **Eine neue Maske kommt an die gewählte Ebene.** Gewählt sein kann ihr Mischen, ein Knoten
+  ihrer Gruppe oder ihre Quelle links. Der Pinsel und „Objekt hier als Maske“ legen die Maske
+  dann in den Faktor dieser Ebene, sie begrenzt, wo die Ebene zu sehen ist. Vorher entstand
+  immer eine neue Maskenebene oben auf dem Stapel, die auf alles darunter wirkte. Hat die
+  Ebene schon eine Maske, kommt die neue über eine Maskenrechnung dazu (das Größere: sichtbar,
+  wo eine der beiden es sagt). Der Pinsel findet die gemalte Maske auch hinter dieser Rechnung.
+  Ohne gewählte Ebene bleibt es die Maskenebene, ebenso für eine Auswahl, an der man Farbe
+  dreht – dort sagt die Maske, wo korrigiert wird.
 
 ## Alte Graphen
 
@@ -59,6 +71,8 @@ taten das schon vorher. Eine von Hand geschobene Lage geht dabei verloren.
   gespeichert, sondern aus `LayerEdits.Chains` und `LayerEdits.Branch` abgeleitet: Ein Knoten
   gehört zur innersten Ebene, deren Zweig ihn enthält.
 - `NodeLayout.Arrange`: die Anordnung oben, statt der bisherigen in umbrochenen Spalten.
+- `NodeLayout.ShownInputs`, `MaskNode.Reads`: welche Eingänge eine Maske zeigt.
+- `AtelierPage.LayerAt`, `AttachMask`: welche Ebene gemeint ist, und die Maske an ihr.
 - Eine Ebene zu löschen nimmt jetzt auch die Quelle ihres Passes mit, wenn ihn sonst
   niemand liest. Die Datei bleibt.
 
@@ -75,6 +89,17 @@ Versuch einen Graphen umstellt. Bilder öffnet man über „Bild öffnen“ oder
 
 Am besten nach der normalen App starten, dann behält diese die Blender-Brücke.
 
+## Rückmeldung vom 7. Oktober
+
+- Übersichtlicher als vorher.
+- „Oben“ stand unten und „Unten“ oben – getauscht.
+- Masken kamen immer an die Bildebene, nicht an den gewählten Pass, und landeten als neue
+  Gruppen ganz oben – jetzt an die gewählte Ebene.
+- Der Maskenblock war zu groß – knapper, ohne die Eingänge, die er nicht liest.
+- „Original“ zeigte das Bild der Datei ohne Pässe und mit falscher Farbe. Das betraf auch die
+  normale App und ist dort behoben (`fix/original-mit-ebenen`): Das Original zeigt dieselben
+  Ebenen ohne eigene Korrekturen. Der Versuch hat den Stand mit übernommen.
+
 ## Noch nicht drin
 
 - Rahmen einklappen (zugeklappt eine Zeile mit dem, was geändert ist).
@@ -89,7 +114,10 @@ Am besten nach der normalen App starten, dann behält diese die Blender-Brücke.
 - `NodeGroupInvariants`: eine Gruppe je Ebene in der Folge der Ebenenliste, Quellen in
   keiner Gruppe, Verschachtelung, Anordnung (Quellen links, Mischen in einer Spalte,
   nichts überdeckt etwas), Rahmen umgeben ihre Knoten, nebeneinander ohne Überlappung,
-  Ziehen am Kopf verschiebt genau die Gruppe.
+  Ziehen am Kopf verschiebt genau die Gruppe. Dazu „Oben“ oben, knappe Masken, und über die
+  echte Seite: Mit gewählter Quelle oder gewähltem Platzieren kommt die Maske in den Faktor
+  der Ebene, eine zweite kommt dazu, der Pinsel findet die gemalte wieder, ohne Wahl entsteht
+  eine Maskenebene.
 - `NodeParityInvariants`, „Quellen am linken Rand“: eigene Quellen und ein umgestellter
   alter Graph rechnen byte-gleich mit dem Stapel und lesen dasselbe.
 - `NodeModeInvariants`, „ein alter Graph wird beim Öffnen in Gruppen angeordnet“: über die
