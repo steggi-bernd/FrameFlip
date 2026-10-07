@@ -184,7 +184,9 @@ public partial class AtelierPage
 
         string name = string.Join(", ", selection.Picks.Select(p => p.Name.Length > 0 ? p.Name : "?"));
 
-        if (InNodes) return AddNodeMaskLayer(mask, name) is not null;
+        // Eine Auswahl, an der man Farbe dreht, wird eine Korrekturebene - die Maske sagt dort, wo
+        // korrigiert wird, und gehoert nicht in die Sichtbarkeit der gewaehlten Ebene.
+        if (InNodes) return AddNodeMaskLayer(mask, name, onLayer: false) is not null;
 
         Layers.AddAdjustment();
         if (Layers.Selection is not { } made) return false;

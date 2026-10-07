@@ -36,11 +36,68 @@ public partial class AtelierPage
         => _cryptomattes.FirstOrDefault(s => s.ShortName.Contains("obj", StringComparison.OrdinalIgnoreCase))
            ?? _cryptomattes.FirstOrDefault();
 
-    /// <summary>Die Ebene, die in der Liste gewaehlt ist - ihr Mischen. Die Grundlage hat keines.</summary>
-    private MixNode? ChosenLayer()
-        => _graph is not null && SelectedNode is MixNode mix && LayerEdits.ChainOf(LayerEdits.Chains(_graph), mix) is not null
-            ? mix
-            : null;
+    /// <summary>Die gewaehlte Ebene - ihr Mischen. Die Grundlage hat keines.</summary>
+    private MixNode? ChosenLayer() => LayerAt(SelectedNode);
+
+    /// <summary>
+    /// Zu welcher Ebene ein Knoten gehoert: Ein Mischen ist sie selbst, ein Knoten in ihrer
+    /// Gruppe gehoert zu ihr (<see cref="NodeGroups"/>), eine Quelle zur obersten Ebene, die sie
+    /// liest. Frueher zaehlte nur ein gewaehltes Mischen - wer den Pass links oder das
+    /// Platzieren gewaehlt hatte, bekam seine Maske als neue Ebene ganz oben.
+    /// </summary>
+    private MixNode? LayerAt(Node? node)
+    {
+        if (_graph is null || node is null) return null;
+
+        var chains = LayerEdits.Chains(_graph);
+        MixNode? Listed(Node? head) => head is MixNode mix && LayerEdits.ChainOf(chains, mix) is not null ? mix : null;
+
+        if (node is MixNode) return Listed(node);
+
+        var groups = NodeGroups.Of(_graph).Where(g => !g.IsPicture).ToList();
+
+        if (groups.FirstOrDefault(g => g.Members.Contains(node)) is { } own) return Listed(own.Head);
+
+        if (!NodeGroups.IsSource(node)) return null;
+
+        var readers = _graph.Links.Where(l => l.From == node.Id).Select(l => l.To).ToHashSet(StringComparer.Ordinal);
+
+        return Listed(groups.FirstOrDefault(g => g.Members.Any(m => readers.Contains(m.Id)))?.Head);
+    }
+
+    /// <summary>
+    /// Eine neue Maske an einer Ebene (Rueckmeldung vom 7. Oktober): Sie kommt in den Faktor
+    /// des Mischens und begrenzt, wo die Ebene zu sehen ist - statt einer neuen Maskenebene
+    /// oben auf dem Stapel, die auf alles darunter wirkt. Hat die Ebene schon eine Maske, kommt
+    /// die neue dazu: Die Ebene ist zu sehen, wo eine der beiden es sagt (das Groessere).
+    /// </summary>
+    private MaskNode AttachMask(MixNode layer, LayerMask mask)
+    {
+        var node = _graph!.Add(new MaskNode { Mask = mask, Preview = true });
+        node.Mask.EnsureId();
+
+        // Was eine Maske lesen kann: die Ebene selbst und was darunter liegt - wie beim Umwandeln.
+        if (_graph.Into(layer.Id, "Oben") is { } over && _graph.Find(over.From) is { } image)
+            _graph.Connect(image, over.Output, node, "Ebene");
+
+        if (_graph.Into(layer.Id, "Unten") is { } under && _graph.Find(under.From) is { } below)
+            _graph.Connect(below, under.Output, node, "Untergrund");
+
+        if (_graph.Into(layer.Id, "Faktor") is { } existing && _graph.Find(existing.From) is { } old)
+        {
+            var both = _graph.Add(new MaskMathNode { Operation = MaskOperation.Maximum });
+
+            _graph.Connect(old, existing.Output, both, "A");
+            _graph.Connect(node, "Maske", both, "B");
+            _graph.Connect(both, "Maske", layer, "Faktor");
+        }
+        else
+        {
+            _graph.Connect(node, "Maske", layer, "Faktor");
+        }
+
+        return node;
+    }
 
     /// <summary>
     /// Beginnt das Waehlen: Das Werkzeug wird "Auswaehlen", und ueber dem Bild steht, was ein
@@ -142,19 +199,11 @@ public partial class AtelierPage
         }
         else
         {
-            var mask = _graph.Add(new MaskNode
-            {
-                Mask = new LayerMask { Kind = MaskKind.Cryptomatte, Source = pick.Set.Prefix, Levels = levels },
-                Preview = true,
-            });
+            var fresh = new LayerMask { Kind = MaskKind.Cryptomatte, Source = pick.Set.Prefix, Levels = levels };
+            fresh.TogglePick(name, id);
 
-            mask.Mask.TogglePick(name, id);
-            mask.Mask.EnsureId();
-
-            _graph.Connect(mask, "Maske", layer, "Faktor");
-
-            mask.X = layer.X - NodeLayout.ColumnStep;
-            mask.Y = layer.Y + NodeLayout.Height(layer) + NodeLayout.Gap;
+            AttachMask(layer, fresh);
+            ArrangeLayer();
         }
 
         NodeView.InvalidateVisual();

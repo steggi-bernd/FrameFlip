@@ -1,4 +1,11 @@
+using System.IO;
 using System.Windows;
+using System.Windows.Controls;
+using System.Windows.Media;
+using System.Windows.Media.Imaging;
+using System.Windows.Threading;
+using FrameFlip.Configuration;
+using FrameFlip.Decoding;
 using FrameFlip.Imaging;
 using FrameFlip.Imaging.Grading;
 using FrameFlip.Imaging.Nodes;
@@ -22,6 +29,192 @@ public static class NodeGroupInvariants
         TheGroupsFollowTheLayers();
         TheLayoutReadsLeftToRight();
         TheFramesCanBeMoved();
+        TheNodesReadTheRightWay();
+        MasksGoToTheChosenLayer();
+    }
+
+    // ------------------------------------------------------------ Rueckmeldung vom 7. Oktober
+
+    /// <summary>
+    /// Am Mischen steht "Oben" oben und "Unten" darunter - frueher umgekehrt. Der Bildweg und
+    /// das, was ein stummes Mischen durchreicht, bleibt "Unten". Eine Maske zeigt nur die
+    /// Eingaenge, die sie liest, und ist kleiner.
+    /// </summary>
+    private static void TheNodesReadTheRightWay()
+    {
+        Check.Group("Knoten in Gruppen: Oben oben, Masken knapp");
+
+        var mix = new MixNode();
+
+        Check.That(mix.Inputs[0].Name == "Oben" && mix.Inputs[1].Name == "Unten" && mix.Inputs[2].Name == "Faktor",
+                   "am Mischen steht Oben oben, darunter Unten, dann der Faktor");
+        Check.That(NodeEdits.Through(mix) == ("Unten", "Bild"), "der Bildweg fuehrt weiter durch Unten");
+
+        var gradient = new MaskNode { Mask = new LayerMask { Kind = MaskKind.Gradient }, Preview = true };
+        var luminance = new MaskNode { Mask = new LayerMask { Kind = MaskKind.Luminance }, Preview = true };
+        var underlying = new MaskNode { Mask = new LayerMask { Kind = MaskKind.Underlying }, Preview = true };
+        var pass = new MaskNode { Mask = new LayerMask { Kind = MaskKind.Pass, Source = "mist" }, Preview = true };
+
+        Check.That(NodeLayout.ShownInputs(gradient).Count == 0 &&
+                   NodeLayout.ShownInputs(luminance).Select(s => s.Name).SequenceEqual(new[] { "Ebene" }) &&
+                   NodeLayout.ShownInputs(underlying).Select(s => s.Name).SequenceEqual(new[] { "Untergrund" }) &&
+                   NodeLayout.ShownInputs(pass).Select(s => s.Name).SequenceEqual(new[] { "Pass" }),
+                   "eine Maske zeigt nur die Eingaenge, die sie liest");
+
+        double before = NodeLayout.Header + 2 * NodeLayout.Pad + 2 * NodeLayout.Row + NodeLayout.PreviewHeight + NodeLayout.Pad;
+
+        Check.That(NodeLayout.Height(gradient) < before * 0.7,
+                   "und ist um rund ein Drittel kleiner als vorher", $"{NodeLayout.Height(gradient)} statt {before}");
+
+        // Ein verborgener Eingang behaelt sein Kabel - es tut, was es vorher tat.
+        var graph = StackToGraph.Convert(Stack(), ImageAdjustments.Neutral, new GradingStack());
+        var masked = graph.Nodes.OfType<MaskNode>().First(m => m.Mask.Kind == MaskKind.Gradient);
+
+        Check.That(graph.Into(masked.Id, "Untergrund") is not null && graph.Problems().Count == 0,
+                   "das Kabel an einem verborgenen Eingang steckt weiter, der Graph bleibt rechenbar");
+    }
+
+    /// <summary>
+    /// Eine neue Maske trifft die gewaehlte Ebene - auch wenn ihr Pass links oder ein Knoten ihrer
+    /// Gruppe gewaehlt ist - und kommt in ihren Faktor, statt als neue Maskenebene oben auf den
+    /// Stapel. Eine zweite kommt dazu. Ohne Wahl bleibt es die Maskenebene.
+    /// </summary>
+    private static void MasksGoToTheChosenLayer()
+    {
+        Check.Group("Knoten in Gruppen: eine neue Maske kommt an die gewaehlte Ebene");
+
+        string root = Path.Combine(Path.GetTempPath(), "frameflip-gruppen-" + Guid.NewGuid().ToString("N")[..8]);
+        Directory.CreateDirectory(root);
+        string? previous = Environment.GetEnvironmentVariable("FRAMEFLIP_CONFIG");
+        Environment.SetEnvironmentVariable("FRAMEFLIP_CONFIG", Path.Combine(root, "config.json"));
+
+        string picture = Png(Path.Combine(root, "render_0001.png"), 0);
+        string logo = Png(Path.Combine(root, "logo.png"), 1);
+
+        var settings = new AppSettings
+        {
+            Layers = new LayerStack
+            {
+                Layers =
+                {
+                    new ImageLayer { Content = LayerContent.Pass, Source = "" },
+                    new ImageLayer { Content = LayerContent.Image, Source = logo, FollowSequence = false, Mode = BlendMode.Screen, Name = "Logo" },
+                },
+            },
+            AtelierImage = picture,
+        };
+
+        var page = new AtelierPage(FrameDecoderRegistry.CreateDefault(() => null), settings, _ => { });
+        var window = new Window
+        {
+            Content = page, Width = 1100, Height = 750, ShowInTaskbar = false,
+            WindowStyle = WindowStyle.None, ShowActivated = false, Left = -4000, Top = -4000,
+        };
+
+        var flags = System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic;
+        object? Call(string method, params object[] arguments) => typeof(AtelierPage).GetMethod(method, flags)!.Invoke(page, arguments);
+
+        try
+        {
+            window.Show();
+            page.UpdateLayout();
+            page.Open(picture);
+
+            if (!Pump(() => ((TextBlock)page.FindName("SourceText")).Text.Length > 0, 10))
+            {
+                Check.That(false, "das Bild wird geladen");
+                return;
+            }
+
+            Pump(() => false, 0.6);
+            page.ConvertToNodes();
+            Pump(() => false, 0.4);
+
+            var graph = page.Graph!;
+            var editor = (NodeEditor)page.FindName("NodeView");
+            var mix = graph.Nodes.OfType<MixNode>().Single(m => m.Label == "Logo");
+            var source = graph.Nodes.OfType<PictureNode>().Single(n => n.Path == logo);
+            var place = graph.Nodes.OfType<PlaceNode>().Single(n => graph.Into(n.Id, "Bild")?.From == source.Id);
+            int mixes = graph.Nodes.OfType<MixNode>().Count();
+
+            // Die Quelle links gewaehlt, ein erster Pinselstrich: die Maske kommt an die Ebene.
+            editor.Select(source);
+            Call("MakeNodeMask");
+            graph = page.Graph!;
+
+            var painted = graph.Into(mix.Id, "Faktor") is { } factor ? graph.Find(factor.From) as MaskNode : null;
+
+            Check.That(painted is { Mask.Kind: MaskKind.Painted } && graph.Nodes.OfType<MixNode>().Count() == mixes,
+                       "die Quelle gewaehlt, der Pinsel legt seine Maske in den Faktor ihrer Ebene - keine neue Ebene");
+            Check.That(NodeGroups.Of(graph).Single(g => g.Head == mix).Members.Contains(painted!),
+                       "und sie steht in deren Gruppe");
+
+            // Das Platzieren gewaehlt, eine Verlaufsmaske dazu: Sie kommt hinzu, die gemalte bleibt.
+            editor.Select(place);
+            Call("AddNodeMaskLayer", new LayerMask { Kind = MaskKind.Gradient, Angle = 30 }, "Verlauf", true);
+            graph = page.Graph!;
+
+            var union = graph.Into(mix.Id, "Faktor") is { } both ? graph.Find(both.From) as MaskMathNode : null;
+
+            Check.That(union is { Operation: MaskOperation.Maximum } && graph.Into(union.Id, "A")?.From == painted!.Id &&
+                       graph.Find(graph.Into(union.Id, "B")!.From) is MaskNode { Mask.Kind: MaskKind.Gradient } &&
+                       graph.Nodes.OfType<MixNode>().Count() == mixes,
+                       "eine zweite Maske kommt dazu - die Ebene ist sichtbar, wo eine der beiden es sagt");
+
+            // Der Pinsel findet die gemalte Maske auch hinter der Rechnung wieder.
+            editor.Select(mix);
+            int masks = graph.Nodes.OfType<MaskNode>().Count();
+            Call("MakeNodeMask");
+
+            Check.That(page.Graph!.Nodes.OfType<MaskNode>().Count() == masks, "weitermalen malt in die gemalte Maske der Ebene");
+
+            // Nichts gewaehlt: wie bisher eine eigene Maskenebene.
+            editor.Select(null);
+            Call("AddNodeMaskLayer", new LayerMask { Kind = MaskKind.Gradient }, "Maske", true);
+
+            Check.That(page.Graph!.Nodes.OfType<MixNode>().Count() == mixes + 1, "ohne gewaehlte Ebene entsteht eine Maskenebene");
+        }
+        finally
+        {
+            window.Close();
+            Pump(() => false, 0.2);
+            Atelier.AtelierProjectStore.WaitForWrites(TimeSpan.FromSeconds(10));
+            Environment.SetEnvironmentVariable("FRAMEFLIP_CONFIG", previous);
+            try { Directory.Delete(root, true); } catch (IOException) { }
+        }
+    }
+
+    private static string Png(string path, int variant)
+    {
+        const int w = 48, h = 24;
+        var pixels = new byte[w * h * 4];
+
+        for (int i = 0; i < w * h; i++)
+        {
+            pixels[i * 4] = (byte)((i % w * 5 + variant * 90) % 256);
+            pixels[i * 4 + 1] = (byte)(100 + variant * 60);
+            pixels[i * 4 + 2] = (byte)(180 - i / w * 3);
+            pixels[i * 4 + 3] = 255;
+        }
+
+        var encoder = new PngBitmapEncoder();
+        encoder.Frames.Add(BitmapFrame.Create(BitmapSource.Create(w, h, 96, 96, PixelFormats.Bgra32, null, pixels, w * 4)));
+
+        using (var file = File.Create(path)) encoder.Save(file);
+        return path;
+    }
+
+    private static bool Pump(Func<bool> until, double seconds)
+    {
+        var end = DateTime.UtcNow + TimeSpan.FromSeconds(seconds);
+
+        while (DateTime.UtcNow < end)
+        {
+            if (until()) return true;
+            Dispatcher.CurrentDispatcher.Invoke(() => { }, DispatcherPriority.Background);
+        }
+
+        return until();
     }
 
     // ------------------------------------------------------------ Gruppen

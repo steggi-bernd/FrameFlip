@@ -69,8 +69,11 @@ public static class NodeEdits
 
     /// <summary>Der erste Bildeingang und der erste Bildausgang - der Weg, den ein Bild durch den Knoten nimmt.</summary>
     public static (string? Input, string? Output) Through(Node node)
-        => (node.Inputs.FirstOrDefault(s => s.Type == SocketType.Image && !s.Source).Name
-                ?? node.Inputs.FirstOrDefault(s => s.Type == SocketType.Image).Name,
+        => (node is MixNode
+                // Beim Mischen steht "Oben" zuoberst; der Bildweg fuehrt trotzdem durch "Unten".
+                ? "Unten"
+                : node.Inputs.FirstOrDefault(s => s.Type == SocketType.Image && !s.Source).Name
+                  ?? node.Inputs.FirstOrDefault(s => s.Type == SocketType.Image).Name,
             node.Outputs.FirstOrDefault(s => s.Type == SocketType.Image).Name);
 
     /// <summary>

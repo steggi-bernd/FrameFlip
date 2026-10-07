@@ -449,7 +449,9 @@ public static class MaskElementInvariants
                        string.Join(", ", page.LayerMenu!.Items));
             page.LayerMenu.Close();
 
-            // Verbinden: die Kopie an eine zweite Ebene.
+            // Verbinden: die Kopie an eine zweite Ebene. Ohne Wahl wird "Objekt hier als Maske" eine
+            // eigene Maskenebene - mit gewaehlter Maske kaeme es an deren Ebene.
+            editor.Select(null);
             page.MaskObjectAt(sets[0], spot!.Value.X, spot.Value.Y);
             graph = page.Graph!;
             var second = graph.Nodes.OfType<MixNode>().Where(m => m != layer).Last(m => graph.Into(m.Id, "Faktor") is not null);

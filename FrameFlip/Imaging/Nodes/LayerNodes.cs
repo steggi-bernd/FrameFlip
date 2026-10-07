@@ -724,14 +724,22 @@ public sealed class MixNode : Node
     [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingDefault)]
     public bool Covered { get; set; }
 
+    /// <summary>
+    /// Oben, was oben liegt: Die Reihenfolge der Anschluesse folgt dem Bild, nicht der
+    /// Rechnung. Frueher stand "Unten" zuoberst - das las sich verkehrt herum. Gespeichert
+    /// wird nach Namen, ein alter Graph liest sich also unveraendert.
+    /// </summary>
     public override IReadOnlyList<Socket> Inputs { get; } = new[]
     {
-        new Socket("Unten", SocketType.Image),
         new Socket("Oben", SocketType.Image),
+        new Socket("Unten", SocketType.Image),
         new Socket("Faktor", SocketType.Value),
     };
 
     public override IReadOnlyList<Socket> Outputs { get; } = new[] { new Socket("Bild", SocketType.Image) };
+
+    /// <summary>Stumm reicht ein Mischen weiter, was darunter liegt - nicht seine Ebene.</summary>
+    internal override string? Through => "Unten";
 
     internal override void Run(NodeRun run)
     {

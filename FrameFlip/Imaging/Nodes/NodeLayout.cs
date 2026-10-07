@@ -53,25 +53,35 @@ public static class NodeLayout
 
     /// <summary>Wie hoch ein Knoten ist - dieselbe Rechnung, mit der der Editor ihn zeichnet.</summary>
     public static double Height(Node node)
-    {
-        int rows = Math.Max(1, Math.Max(node.Inputs.Count, node.Outputs.Count));
-
-        return Header + Pad + rows * Row + Pad + (node.Preview ? PreviewHeight + Pad : 0);
-    }
+        => Header + Pad + Rows(node) * Row + Pad + (node.Preview ? PreviewSize(node).Height + Pad : 0);
 
     /// <summary>Wie viel Platz eine Vorschau unter den Anschluessen braucht.</summary>
     public const double PreviewHeight = NodePreviews.Height;
 
-    /// <summary>Wo die Vorschau eines Knotens steht - unter den Anschluessen, damit diese bleiben, wo sie sind.</summary>
-    public static double PreviewTop(Node node)
-    {
-        int rows = Math.Max(1, Math.Max(node.Inputs.Count, node.Outputs.Count));
+    /// <summary>Die Vorschau einer Maske: kleiner, sie zeigt nur Hell und Dunkel.</summary>
+    public const double MaskPreviewHeight = 54;
 
-        return node.Y + Header + Pad + rows * Row + Pad;
-    }
+    /// <summary>Wie gross die Vorschau eines Knotens gezeichnet wird.</summary>
+    public static (double Width, double Height) PreviewSize(Node node)
+        => MaskLike(node) ? (MaskPreviewHeight * NodePreviews.Width / NodePreviews.Height, MaskPreviewHeight)
+                          : (NodePreviews.Width, PreviewHeight);
+
+    /// <summary>Wo die Vorschau eines Knotens steht - unter den Anschluessen, damit diese bleiben, wo sie sind.</summary>
+    public static double PreviewTop(Node node) => node.Y + Header + Pad + Rows(node) * Row + Pad;
+
+    private static int Rows(Node node) => Math.Max(1, Math.Max(ShownInputs(node).Count, node.Outputs.Count));
+
+    /// <summary>
+    /// Die Eingaenge, die der Editor zeigt. Eine Maske zeigt nur, was sie wirklich liest
+    /// (<see cref="MaskNode.Reads"/>): Ein Verlauf, ein Anstrich oder eine Kryptomatte braucht
+    /// weder die Ebene noch den Untergrund. Ein Kabel an einem verborgenen Eingang steckt
+    /// weiter und tut, was es vorher tat - nichts.
+    /// </summary>
+    public static IReadOnlyList<Socket> ShownInputs(Node node)
+        => node is MaskNode mask ? mask.Inputs.Where(s => mask.Reads(s.Name)).ToList() : node.Inputs;
 
     /// <summary>Ob ein Knoten in die Bahn der Masken gehoert: Er gibt eine Zahl je Bildpunkt aus.</summary>
-    private static bool MaskLike(Node node) => node.Outputs.Count > 0 && node.Outputs[0].Type == SocketType.Value;
+    public static bool MaskLike(Node node) => node.Outputs.Count > 0 && node.Outputs[0].Type == SocketType.Value;
 
     public static void Arrange(NodeGraph graph)
     {

@@ -296,16 +296,43 @@ public partial class AtelierPage
     }
 
     /// <summary>
-    /// Worauf der Pinsel im Knotenmodus malt: die gewaehlte gemalte Maske - oder die, die
-    /// in den Faktor der gewaehlten Ebene fliesst. Sonst keine.
+    /// Worauf der Pinsel im Knotenmodus malt: die gewaehlte gemalte Maske - oder eine gemalte,
+    /// die in den Faktor der gewaehlten Ebene fliesst, auch ueber eine Maskenrechnung. Sonst keine.
     /// </summary>
     private MaskNode? PaintTarget() => SelectedNode switch
     {
         MaskNode { Mask.Kind: MaskKind.Painted } mask => mask,
-        MixNode mix when _graph?.Into(mix.Id, "Faktor") is { } factor &&
-                         _graph.Find(factor.From) is MaskNode { Mask.Kind: MaskKind.Painted } mask => mask,
+        _ when ChosenLayer() is { } layer => PaintedOf(layer),
         _ => null,
     };
+
+    /// <summary>Die gemalte Maske einer Ebene - im Faktor, oder in einer Maskenrechnung davor.</summary>
+    private MaskNode? PaintedOf(MixNode layer)
+    {
+        var open = new Queue<string>();
+        var seen = new HashSet<string>(StringComparer.Ordinal);
+
+        if (_graph?.Into(layer.Id, "Faktor") is { } factor) open.Enqueue(factor.From);
+
+        while (open.Count > 0 && seen.Count < 64)
+        {
+            string id = open.Dequeue();
+            if (!seen.Add(id)) continue;
+
+            switch (_graph!.Find(id))
+            {
+                case MaskNode { Mask.Kind: MaskKind.Painted } painted:
+                    return painted;
+
+                case MaskMathNode math:
+                    foreach (string input in new[] { "A", "B" })
+                        if (_graph.Into(math.Id, input) is { } link) open.Enqueue(link.From);
+                    break;
+            }
+        }
+
+        return null;
+    }
 
     /// <summary>
     /// Der erste Strich ohne Maske: eine Maskenebene - eine Einstellungsebene mit gemalter
@@ -329,13 +356,31 @@ public partial class AtelierPage
     }
 
     /// <summary>
-    /// Eine Maskenebene im Graphen: eine Einstellungsebene, deren Mischen diese Maske im
-    /// Faktor hat - ueber der gewaehlten Ebene oder oben auf den Ebenen. Gewaehlt ist danach
-    /// die Maske. Fuer den ersten Pinselstrich und fuer "Objekt hier als Maske".
+    /// Eine neue Maske. Ist eine Ebene gewaehlt - ihr Mischen, ein Knoten ihrer Gruppe oder ihr
+    /// Pass -, kommt sie an diese Ebene und begrenzt, wo sie zu sehen ist (<see cref="AttachMask"/>).
+    /// Sonst, und fuer eine Auswahl, an der man Farbe dreht (<paramref name="onLayer"/> aus), eine
+    /// Maskenebene: eine Einstellungsebene, deren Mischen diese Maske im Faktor hat - ueber der
+    /// gewaehlten Ebene oder oben auf den Ebenen. Gewaehlt ist danach die Maske.
     /// </summary>
-    private MaskNode? AddNodeMaskLayer(LayerMask mask, string label)
+    private MaskNode? AddNodeMaskLayer(LayerMask mask, string label, bool onLayer = true)
     {
-        if (_graph is null || ListTarget() is not { } after || NodeEdits.Through(after).Output is not { } below) return null;
+        if (_graph is null) return null;
+
+        if (onLayer && ChosenLayer() is { } layer)
+        {
+            RememberNodes();
+
+            var attached = AttachMask(layer, mask);
+            ArrangeLayer();
+
+            NodeView.Select(attached);
+            NodeView.InvalidateVisual();
+            AfterNodeEdit();
+
+            return attached;
+        }
+
+        if (ListTarget() is not { } after || NodeEdits.Through(after).Output is not { } below) return null;
 
         RememberNodes();
 

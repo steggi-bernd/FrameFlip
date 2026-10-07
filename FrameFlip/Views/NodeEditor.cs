@@ -360,10 +360,12 @@ public sealed class NodeEditor : FrameworkElement
 
         foreach (var node in _graph.Nodes)
         {
-            for (int i = 0; i < node.Inputs.Count; i++)
+            var shownInputs = NodeLayout.ShownInputs(node);
+
+            for (int i = 0; i < shownInputs.Count; i++)
             {
                 double d = (ToScreen(InputAt(node, i)) - screen).Length;
-                if (d < nearest) { nearest = d; best = (node, node.Inputs[i], true); }
+                if (d < nearest) { nearest = d; best = (node, shownInputs[i], true); }
             }
 
             for (int i = 0; i < node.Outputs.Count; i++)
@@ -379,7 +381,7 @@ public sealed class NodeEditor : FrameworkElement
     /// <summary>Wo ein Anschluss auf dem Schirm liegt - fuer die Probe.</summary>
     internal Point ScreenOf(Node node, string socket, bool input)
     {
-        var list = input ? node.Inputs : node.Outputs;
+        var list = input ? NodeLayout.ShownInputs(node) : node.Outputs;
         int index = IndexOf(list, socket);
 
         return ToScreen(input ? InputAt(node, index) : OutputAt(node, index));
@@ -631,7 +633,7 @@ public sealed class NodeEditor : FrameworkElement
             }
             else
             {
-                foreach (var input in node.Inputs)
+                foreach (var input in NodeLayout.ShownInputs(node))
                 {
                     // Der eigene, gerade geloeste Eingang passt immer - dorthin zurueck
                     // heisst: nichts geaendert.
@@ -1437,7 +1439,7 @@ public sealed class NodeEditor : FrameworkElement
     {
         if (_wireNode is null || _wireSocket is null) return;
 
-        var list = _wireFromInput ? _wireNode.Inputs : _wireNode.Outputs;
+        var list = _wireFromInput ? NodeLayout.ShownInputs(_wireNode) : _wireNode.Outputs;
         int index = IndexOf(list, _wireSocket);
         if (index < 0) return;
 
@@ -1483,7 +1485,7 @@ public sealed class NodeEditor : FrameworkElement
         if (from is null || to is null) return null;
 
         int output = IndexOf(from.Outputs, link.Output);
-        int input = IndexOf(to.Inputs, link.Input);
+        int input = IndexOf(NodeLayout.ShownInputs(to), link.Input);
         if (output < 0 || input < 0) return null;
 
         return (ToScreen(OutputAt(from, output)), ToScreen(InputAt(to, input)));
@@ -1546,11 +1548,7 @@ public sealed class NodeEditor : FrameworkElement
         var halo = new Pen(Halo, pen.Thickness + 3);
         halo.Freeze();
 
-        // Ein Kabel, das die Maske nicht liest - der Untergrund eines Verlaufs -, steckt,
-        // tut aber nichts. Blass, damit es den Blick nicht quer durch die Gruppen zieht.
-        bool idle = to is MaskNode reader && !reader.Reads(link.Input);
-
-        dc.PushOpacity(landing || lit ? 1 : idle ? 0.12 : from.Muted || to.Muted ? 0.35 : 0.85);
+        dc.PushOpacity(landing || lit ? 1 : from.Muted || to.Muted ? 0.35 : 0.85);
         dc.DrawGeometry(null, halo, path);
         dc.DrawGeometry(null, pen, path);
         dc.Pop();
@@ -1634,14 +1632,16 @@ public sealed class NodeEditor : FrameworkElement
 
         double socket = 4.5 * Zoom;
 
-        for (int i = 0; i < node.Inputs.Count; i++)
+        var inputs = NodeLayout.ShownInputs(node);
+
+        for (int i = 0; i < inputs.Count; i++)
         {
             var at = ToScreen(InputAt(node, i));
-            dc.DrawEllipse(SocketBrush(node.Inputs[i].Type), SocketRim, at, socket, socket);
+            dc.DrawEllipse(SocketBrush(inputs[i].Type), SocketRim, at, socket, socket);
 
             if (!labels) continue;
 
-            var text = Label(SocketTitle?.Invoke(node.Inputs[i].Name) ?? node.Inputs[i].Name, 10.5 * Zoom, Faint);
+            var text = Label(SocketTitle?.Invoke(inputs[i].Name) ?? inputs[i].Name, 10.5 * Zoom, Faint);
             dc.DrawText(text, new Point(at.X + 9 * Zoom, at.Y - text.Height / 2));
         }
 
@@ -1828,7 +1828,7 @@ public sealed class NodeEditor : FrameworkElement
         var (input, output) = NodeEdits.Through(node);
         if (input is null || output is null) return;
 
-        int i = IndexOf(node.Inputs, input), o = IndexOf(node.Outputs, output);
+        int i = IndexOf(NodeLayout.ShownInputs(node), input), o = IndexOf(node.Outputs, output);
         if (i < 0 || o < 0) return;
 
         dc.DrawLine(PassThrough, ToScreen(InputAt(node, i)), ToScreen(OutputAt(node, o)));
@@ -1837,8 +1837,8 @@ public sealed class NodeEditor : FrameworkElement
     /// <summary>Das kleine Bild unter den Anschluessen - im Seitenverhaeltnis des Bildes, mittig.</summary>
     private void DrawPreview(DrawingContext dc, Node node)
     {
-        var area = new Rect(node.X + (NodeWidth - NodePreviews.Width) / 2, NodeLayout.PreviewTop(node),
-                            NodePreviews.Width, NodePreviews.Height);
+        var (width, height) = NodeLayout.PreviewSize(node);
+        var area = new Rect(node.X + (NodeWidth - width) / 2, NodeLayout.PreviewTop(node), width, height);
 
         var topLeft = ToScreen(area.TopLeft);
         var box = new Rect(topLeft, new Size(area.Width * Zoom, area.Height * Zoom));

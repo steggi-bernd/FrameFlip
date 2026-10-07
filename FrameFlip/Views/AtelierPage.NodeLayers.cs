@@ -215,9 +215,7 @@ public partial class AtelierPage
     {
         if (_graph is null) return null;
 
-        if (SelectedNode is MixNode mix && LayerEdits.ChainOf(LayerEdits.Chains(_graph), mix) is not null) return mix;
-
-        return NodeEdits.LayerTop(_graph);
+        return (Node?)LayerAt(SelectedNode) ?? NodeEdits.LayerTop(_graph);
     }
 
     /// <summary>
